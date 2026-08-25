@@ -2837,7 +2837,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         textScaler: MediaQuery.textScalerOf(context),
         colors: colors,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          padding: const EdgeInsetsDirectional.fromSTEB(27, 8, 8, 8),
           child: editor,
         ),
       );
@@ -2958,6 +2958,14 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
               ],
             ),
           )
+        : quoteMarker != null
+        ? CustomPaint(
+            key: const ValueKey('ianvs-markdown-active-quote-pattern'),
+            painter: IanvsMarkdownCodePatternPainter(
+              color: activeCodePatternColor,
+            ),
+            child: decoratedActiveChild,
+          )
         : decoratedActiveChild;
     final quoteBlock = quoteMarker != null;
     return _activeMultiTapRegion(
@@ -2975,7 +2983,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           child: Container(
             key: const ValueKey('ianvs-markdown-active-block'),
             constraints: const BoxConstraints(minHeight: 36),
-            clipBehavior: fencedCode ? Clip.antiAlias : Clip.none,
+            clipBehavior: fencedCode || quoteBlock ? Clip.antiAlias : Clip.none,
             margin: fencedCode || quoteBlock
                 ? const EdgeInsets.symmetric(horizontal: 10, vertical: 3)
                 : null,
@@ -2985,7 +2993,10 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
                     borderRadius: BorderRadius.circular(activeCodeRadius),
                   )
                 : quoteBlock
-                ? BoxDecoration(color: colors.surfaceRaised)
+                ? BoxDecoration(
+                    color: colors.surface,
+                    borderRadius: BorderRadius.circular(activeCodeRadius),
+                  )
                 : null,
             foregroundDecoration: fencedCode
                 ? IanvsMarkdownDashedBorderDecoration(
@@ -5760,14 +5771,17 @@ class _ActiveQuoteBlock extends StatelessWidget {
             ),
           ),
         ),
-        Positioned(
-          left: 0,
-          top: 3,
-          bottom: 3,
+        PositionedDirectional(
+          start: 8,
+          top: 8,
+          bottom: 8,
           child: Container(
             key: const ValueKey('ianvs-markdown-active-quote-rail'),
-            width: 2,
-            decoration: BoxDecoration(color: colors.accent),
+            width: 3,
+            decoration: BoxDecoration(
+              color: colors.accent,
+              borderRadius: BorderRadius.circular(4),
+            ),
           ),
         ),
         child,
@@ -5798,13 +5812,13 @@ class _ActiveQuoteRailsPainter extends CustomPainter {
       text: textSpan,
       textDirection: textDirection,
       textScaler: textScaler,
-    )..layout(maxWidth: (size.width - 10).clamp(0.0, double.infinity));
+    )..layout(maxWidth: (size.width - 35).clamp(0.0, double.infinity));
     final plainLength = textSpan.toPlainText().length;
     final fallbackHeight =
         (textSpan.style?.fontSize ?? 14.5) * (textSpan.style?.height ?? 1.58);
     final paint = Paint()
       ..color = color
-      ..strokeWidth = 2;
+      ..strokeWidth = 3;
     for (var index = 0; index < lines.length; index += 1) {
       final line = lines[index];
       final start = line.line.start.clamp(0, plainLength);
@@ -5815,13 +5829,16 @@ class _ActiveQuoteRailsPainter extends CustomPainter {
         boxHeightStyle: BoxHeightStyle.tight,
       );
       final top = boxes.isEmpty
-          ? 3 + index * fallbackHeight
-          : 3 + boxes.map((box) => box.top).reduce((a, b) => a < b ? a : b);
+          ? 11 + index * fallbackHeight
+          : 11 + boxes.map((box) => box.top).reduce((a, b) => a < b ? a : b);
       final bottom = boxes.isEmpty
           ? top + fallbackHeight
-          : 3 + boxes.map((box) => box.bottom).reduce((a, b) => a > b ? a : b);
-      for (var depth = 0; depth < line.depth; depth += 1) {
-        final x = 1 + depth * 14.0;
+          : 11 + boxes.map((box) => box.bottom).reduce((a, b) => a > b ? a : b);
+      for (var depth = 1; depth < line.depth; depth += 1) {
+        final logicalX = 9.5 + depth * 19.0;
+        final x = textDirection == TextDirection.rtl
+            ? size.width - logicalX
+            : logicalX;
         canvas.drawLine(Offset(x, top), Offset(x, bottom), paint);
       }
     }

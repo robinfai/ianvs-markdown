@@ -72,6 +72,137 @@ void paintIanvsMarkdownCodePattern(
   canvas.restore();
 }
 
+/// Obsidian Border-theme blockquote surface.
+///
+/// Border uses the same 4x4 dot tile as fenced code, but gives quotes a solid
+/// accent rail inset by 8px instead of a dashed frame.
+class IanvsMarkdownQuoteSurfacePainter extends CustomPainter {
+  const IanvsMarkdownQuoteSurfacePainter({
+    required this.backgroundColor,
+    required this.patternColor,
+    required this.railColor,
+    this.textDirection = TextDirection.ltr,
+    this.radius = 4,
+    this.inset = 8,
+    this.railWidth = 3,
+  });
+
+  final Color backgroundColor;
+  final Color patternColor;
+  final Color railColor;
+  final TextDirection textDirection;
+  final double radius;
+  final double inset;
+  final double railWidth;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    paintIanvsMarkdownQuoteSurface(
+      canvas,
+      Offset.zero & size,
+      backgroundColor: backgroundColor,
+      patternColor: patternColor,
+      railColor: railColor,
+      textDirection: textDirection,
+      radius: radius,
+      inset: inset,
+      railWidth: railWidth,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant IanvsMarkdownQuoteSurfacePainter oldDelegate) {
+    return backgroundColor != oldDelegate.backgroundColor ||
+        patternColor != oldDelegate.patternColor ||
+        railColor != oldDelegate.railColor ||
+        textDirection != oldDelegate.textDirection ||
+        radius != oldDelegate.radius ||
+        inset != oldDelegate.inset ||
+        railWidth != oldDelegate.railWidth;
+  }
+}
+
+/// Decoration form of [IanvsMarkdownQuoteSurfacePainter] for rendered quotes.
+class IanvsMarkdownQuoteDecoration extends Decoration {
+  const IanvsMarkdownQuoteDecoration({
+    required this.backgroundColor,
+    required this.patternColor,
+    required this.railColor,
+    this.radius = 4,
+    this.inset = 8,
+    this.railWidth = 3,
+  });
+
+  final Color backgroundColor;
+  final Color patternColor;
+  final Color railColor;
+  final double radius;
+  final double inset;
+  final double railWidth;
+
+  @override
+  BoxPainter createBoxPainter([VoidCallback? onChanged]) {
+    return _IanvsMarkdownQuoteBoxPainter(this);
+  }
+}
+
+class _IanvsMarkdownQuoteBoxPainter extends BoxPainter {
+  _IanvsMarkdownQuoteBoxPainter(this.decoration);
+
+  final IanvsMarkdownQuoteDecoration decoration;
+
+  @override
+  void paint(Canvas canvas, Offset offset, ImageConfiguration configuration) {
+    final size = configuration.size;
+    if (size == null || size.isEmpty) return;
+    paintIanvsMarkdownQuoteSurface(
+      canvas,
+      offset & size,
+      backgroundColor: decoration.backgroundColor,
+      patternColor: decoration.patternColor,
+      railColor: decoration.railColor,
+      textDirection: configuration.textDirection ?? TextDirection.ltr,
+      radius: decoration.radius,
+      inset: decoration.inset,
+      railWidth: decoration.railWidth,
+    );
+  }
+}
+
+void paintIanvsMarkdownQuoteSurface(
+  Canvas canvas,
+  Rect rect, {
+  required Color backgroundColor,
+  required Color patternColor,
+  required Color railColor,
+  TextDirection textDirection = TextDirection.ltr,
+  double radius = 4,
+  double inset = 8,
+  double railWidth = 3,
+}) {
+  if (rect.isEmpty || radius < 0 || inset < 0 || railWidth <= 0) return;
+  final rounded = RRect.fromRectAndRadius(rect, Radius.circular(radius));
+  canvas.save();
+  canvas.clipRRect(rounded);
+  canvas.drawRect(rect, Paint()..color = backgroundColor);
+  paintIanvsMarkdownCodePattern(canvas, rect, color: patternColor);
+  canvas.restore();
+
+  final railHeight = (rect.height - inset * 2)
+      .clamp(0, double.infinity)
+      .toDouble();
+  if (railHeight <= 0) return;
+  final railLeft = textDirection == TextDirection.rtl
+      ? rect.right - inset - railWidth
+      : rect.left + inset;
+  final rail = RRect.fromRectAndRadius(
+    Rect.fromLTWH(railLeft, rect.top + inset, railWidth, railHeight),
+    Radius.circular(radius),
+  );
+  canvas.drawRRect(rail, Paint()..color = railColor);
+}
+
 /// Obsidian Border-theme frame used around fenced-code surfaces.
 class IanvsMarkdownDashedBorderDecoration extends Decoration {
   const IanvsMarkdownDashedBorderDecoration({

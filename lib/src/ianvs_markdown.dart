@@ -5,6 +5,7 @@ import 'package:markdown/markdown.dart' as md;
 import 'blocked_image.dart';
 import 'callout.dart';
 import 'code_block.dart';
+import 'code_surface.dart';
 import 'front_matter_card.dart';
 import 'heading_folding.dart';
 import 'highlight.dart';
@@ -1223,6 +1224,10 @@ MarkdownStyleSheet ianvsMarkdownStyleSheet(
   IanvsMarkdownThemeData? theme,
 ]) {
   final colors = IanvsMarkdownThemeData.resolve(context, theme);
+  final dark = Theme.of(context).brightness == Brightness.dark;
+  final quotePatternColor = (dark ? Colors.white : Colors.black).withValues(
+    alpha: .12,
+  );
   final base = MarkdownStyleSheet.fromTheme(Theme.of(context));
   return base.copyWith(
     h1: TextStyle(
@@ -1289,12 +1294,15 @@ MarkdownStyleSheet ianvsMarkdownStyleSheet(
     ),
     tableBody: TextStyle(color: colors.textPrimary),
     tableCellsPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-    blockquoteDecoration: BoxDecoration(
-      color: colors.surfaceRaised,
-      border: Border(left: BorderSide(color: colors.accent, width: 2)),
+    blockquoteDecoration: IanvsMarkdownQuoteDecoration(
+      backgroundColor: colors.surface,
+      patternColor: quotePatternColor,
+      railColor: colors.accent,
+      radius: colors.smallRadius / 2,
     ),
+    blockquotePadding: const EdgeInsets.fromLTRB(27, 8, 8, 8),
     horizontalRuleDecoration: BoxDecoration(
-      border: Border(top: BorderSide(color: colors.borderSoft)),
+      border: Border(top: BorderSide(color: colors.borderSoft, width: 2)),
     ),
     blockSpacing: 14,
     listIndent: 24,

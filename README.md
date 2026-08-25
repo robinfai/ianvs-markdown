@@ -6,6 +6,7 @@
 
 - GitHub Flavored Markdown、可选择文本、表格与任务列表
 - 对齐 Obsidian Border 主题点阵、虚线框、亮暗语法色、可复制语言标签、四列 Tab、折行和活动行轨道的代码块
+- 阅读、实时预览与源码模式共享 Border 点阵、3 px 内缩强调轨和 4 px 圆角的引用块，以及 2 px 水平分隔线
 - YAML front matter 信息卡和可折叠文档大纲
 - 普通链接、文件引用、Obsidian Wiki 链接、块级嵌入与层级标签的区分展示
 - Obsidian `==高亮==` 与可折叠、分类型着色的 Callout 卡片

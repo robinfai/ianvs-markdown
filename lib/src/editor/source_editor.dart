@@ -8,6 +8,7 @@ import '../code_surface.dart';
 import '../inline_code.dart';
 import '../theme.dart';
 import 'editor_controller.dart';
+import 'editor_models.dart';
 import 'editor_shortcuts.dart';
 import 'editor_toolbar.dart';
 
@@ -481,6 +482,27 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
                   IgnorePointer(
                     child: CustomPaint(
                       key: const ValueKey(
+                        'ianvs-markdown-source-quote-backgrounds',
+                      ),
+                      painter: _SourceQuoteBackgroundPainter(
+                        controller: widget.controller,
+                        scrollController: _scrollController,
+                        style: textStyle,
+                        padding: resolvedPadding,
+                        textDirection: direction,
+                        textScaler: textScaler,
+                        colors: colors,
+                        dark: dark,
+                        repaint: Listenable.merge(<Listenable>[
+                          widget.controller,
+                          _scrollController,
+                        ]),
+                      ),
+                    ),
+                  ),
+                  IgnorePointer(
+                    child: CustomPaint(
+                      key: const ValueKey(
                         'ianvs-markdown-source-code-backgrounds',
                       ),
                       painter: _SourceFencedCodeBackgroundPainter(
@@ -531,6 +553,97 @@ int _sourceLineEnd(String text, int offset) {
   final safeOffset = offset.clamp(0, text.length);
   final newline = text.indexOf('\n', safeOffset);
   return newline < 0 ? text.length : newline;
+}
+
+class _SourceQuoteBackgroundPainter extends CustomPainter {
+  _SourceQuoteBackgroundPainter({
+    required this.controller,
+    required this.scrollController,
+    required this.style,
+    required this.padding,
+    required this.textDirection,
+    required this.textScaler,
+    required this.colors,
+    required this.dark,
+    required Listenable repaint,
+  }) : super(repaint: repaint);
+
+  final IanvsMarkdownController controller;
+  final ScrollController scrollController;
+  final TextStyle style;
+  final EdgeInsets padding;
+  final TextDirection textDirection;
+  final TextScaler textScaler;
+  final IanvsMarkdownThemeData colors;
+  final bool dark;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final ranges = parseMarkdownBlocks(controller.text)
+        .where((block) => block.type == IanvsMarkdownBlockType.blockquote)
+        .map((block) => TextRange(start: block.start, end: block.end))
+        .toList(growable: false);
+    if (ranges.isEmpty || size.isEmpty) return;
+
+    final contentWidth = size.width - padding.horizontal;
+    if (contentWidth <= 0) return;
+    final textPainter = TextPainter(
+      text: TextSpan(text: controller.text, style: style),
+      textDirection: textDirection,
+      textScaler: textScaler,
+      textWidthBasis: TextWidthBasis.parent,
+    )..layout(maxWidth: contentWidth);
+    final positions = scrollController.positions;
+    final scrollOffset = positions.isEmpty ? 0.0 : positions.last.pixels;
+    final patternColor = (dark ? Colors.white : Colors.black).withValues(
+      alpha: .12,
+    );
+
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
+    for (final range in ranges) {
+      final boxes = textPainter.getBoxesForSelection(
+        TextSelection(baseOffset: range.start, extentOffset: range.end),
+        boxHeightStyle: BoxHeightStyle.max,
+      );
+      if (boxes.isEmpty) continue;
+      final top = boxes
+          .map((box) => box.top)
+          .reduce((value, next) => value < next ? value : next);
+      final bottom = boxes
+          .map((box) => box.bottom)
+          .reduce((value, next) => value > next ? value : next);
+      final rect = Rect.fromLTRB(
+        (padding.left - 6).clamp(0, size.width),
+        padding.top + top - scrollOffset - 8,
+        (size.width - padding.right + 6).clamp(0, size.width),
+        padding.top + bottom - scrollOffset + 8,
+      );
+      if (rect.bottom < 0 || rect.top > size.height) continue;
+      paintIanvsMarkdownQuoteSurface(
+        canvas,
+        rect,
+        backgroundColor: colors.surface,
+        patternColor: patternColor,
+        railColor: colors.accent,
+        textDirection: textDirection,
+        radius: colors.smallRadius / 2,
+      );
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _SourceQuoteBackgroundPainter oldDelegate) {
+    return oldDelegate.controller != controller ||
+        oldDelegate.scrollController != scrollController ||
+        oldDelegate.style != style ||
+        oldDelegate.padding != padding ||
+        oldDelegate.textDirection != textDirection ||
+        oldDelegate.textScaler != textScaler ||
+        oldDelegate.colors != colors ||
+        oldDelegate.dark != dark;
+  }
 }
 
 class _SourceFencedCodeBackgroundPainter extends CustomPainter {

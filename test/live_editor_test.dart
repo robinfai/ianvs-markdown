@@ -4067,13 +4067,32 @@ empty:
       (quoteRail.decoration! as BoxDecoration).color,
       IanvsMarkdownThemeData.light.accent,
     );
+    expect(
+      tester
+          .getSize(
+            find.byKey(const ValueKey('ianvs-markdown-active-quote-rail')),
+          )
+          .width,
+      3,
+    );
+    final quotePattern = tester.widget<CustomPaint>(
+      find.byKey(const ValueKey('ianvs-markdown-active-quote-pattern')),
+    );
+    final quotePatternPainter =
+        quotePattern.painter! as IanvsMarkdownCodePatternPainter;
+    expect(quotePatternPainter.color, Colors.black.withValues(alpha: .12));
     final active = tester.widget<Container>(
       find.byKey(const ValueKey('ianvs-markdown-active-block')),
     );
     expect(
       (active.decoration! as BoxDecoration).color,
-      IanvsMarkdownThemeData.light.surfaceRaised,
+      IanvsMarkdownThemeData.light.surface,
     );
+    expect(
+      (active.decoration! as BoxDecoration).borderRadius,
+      BorderRadius.circular(4),
+    );
+    expect(active.clipBehavior, Clip.antiAlias);
   });
 
   testWidgets(
@@ -4162,8 +4181,8 @@ empty:
       return offset;
     }
 
-    final leftOffset = await activateAt(44);
-    final rightOffset = await activateAt(170);
+    final leftOffset = await activateAt(64);
+    final rightOffset = await activateAt(190);
 
     expect(leftOffset, greaterThanOrEqualTo(2));
     expect(rightOffset, greaterThan(leftOffset));
@@ -7772,6 +7791,58 @@ Standard[^note] and inline ^[inline body].
       find.byKey(const ValueKey('ianvs-markdown-source-field')),
     );
     expect(field.decoration?.filled, isFalse);
+
+    controller.text = 'Plain source';
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('source editor paints Border quote surfaces behind text', (
+    tester,
+  ) async {
+    final controller = IanvsMarkdownController(
+      text: '> Outer\n> > Nested\nLazy continuation\n\nTail',
+    )..selection = const TextSelection.collapsed(offset: 18);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 800,
+            height: 560,
+            child: IanvsMarkdownEditor(
+              controller: controller,
+              showToolbar: false,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final quoteBackground = find.byKey(
+      const ValueKey('ianvs-markdown-source-quote-backgrounds'),
+    );
+    expect(quoteBackground, findsOneWidget);
+    expect(tester.getSize(quoteBackground), const Size(800, 560));
+    expect(tester.widget<CustomPaint>(quoteBackground).painter, isNotNull);
+    final field = find.byKey(const ValueKey('ianvs-markdown-source-field'));
+    expect(field, findsOneWidget);
+
+    final stack = tester.widget<Stack>(
+      find.ancestor(of: field, matching: find.byType(Stack)).first,
+    );
+    final quoteIndex = stack.children.indexWhere(
+      (child) =>
+          child is IgnorePointer &&
+          child.child is CustomPaint &&
+          (child.child! as CustomPaint).key ==
+              const ValueKey('ianvs-markdown-source-quote-backgrounds'),
+    );
+    final fieldIndex = stack.children.indexWhere((child) => child is Focus);
+    expect(quoteIndex, greaterThanOrEqualTo(0));
+    expect(fieldIndex, greaterThan(quoteIndex));
 
     controller.text = 'Plain source';
     await tester.pump();

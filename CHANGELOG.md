@@ -12,6 +12,9 @@
 - Match the active Border theme's fenced-code dot texture, dashed frame,
   dimensions, light and dark syntax palettes, persistent copyable Live Preview
   flair, desktop and mobile reading controls, and one-second copy feedback.
+- Match Border blockquotes across reading, Live Preview, and source modes with
+  the 4x4 dot texture, 4px radius, inset 3px accent rail, exact outer padding,
+  and Obsidian's 2px horizontal-rule weight.
 
 ## 0.1.0
 

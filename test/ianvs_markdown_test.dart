@@ -74,6 +74,55 @@ void main() {
     expect(pixel(2, 2), <int>[0, 0, 0, 0]);
   });
 
+  test('Border quote surface insets its three-pixel accent rail', () async {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    const painter = IanvsMarkdownQuoteSurfacePainter(
+      backgroundColor: Color(0x00000000),
+      patternColor: Color(0x1f000000),
+      railColor: Color(0xffff0000),
+      radius: 4,
+      inset: 8,
+      railWidth: 3,
+    );
+    painter.paint(canvas, const Size(24, 24));
+    final image = await recorder.endRecording().toImage(24, 24);
+    final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    final bytes = data!.buffer.asUint8List();
+
+    List<int> pixel(int x, int y) {
+      final offset = (y * 24 + x) * 4;
+      return bytes.sublist(offset, offset + 4);
+    }
+
+    expect(pixel(3, 1), <int>[0, 0, 0, 31]);
+    expect(pixel(9, 11), <int>[255, 0, 0, 255]);
+    expect(pixel(9, 12), <int>[255, 0, 0, 255]);
+    expect(pixel(8, 7), isNot(<int>[255, 0, 0, 255]));
+    expect(pixel(11, 8), isNot(<int>[255, 0, 0, 255]));
+
+    final rtlRecorder = ui.PictureRecorder();
+    const IanvsMarkdownQuoteSurfacePainter(
+      backgroundColor: Color(0x00000000),
+      patternColor: Color(0x1f000000),
+      railColor: Color(0xffff0000),
+      textDirection: TextDirection.rtl,
+    ).paint(Canvas(rtlRecorder), const Size(24, 24));
+    final rtlImage = await rtlRecorder.endRecording().toImage(24, 24);
+    final rtlData = await rtlImage.toByteData(
+      format: ui.ImageByteFormat.rawRgba,
+    );
+    final rtlBytes = rtlData!.buffer.asUint8List();
+
+    List<int> rtlPixel(int x, int y) {
+      final offset = (y * 24 + x) * 4;
+      return rtlBytes.sublist(offset, offset + 4);
+    }
+
+    expect(rtlPixel(14, 11), <int>[255, 0, 0, 255]);
+    expect(rtlPixel(9, 11), isNot(<int>[255, 0, 0, 255]));
+  });
+
   test('strong and emphasis theme colors customize and interpolate', () {
     const customStrong = Color(0xff123456);
     const customEmphasis = Color(0xff654321);
@@ -2107,7 +2156,7 @@ Done.
     expect(code.style?.color, customCode);
   });
 
-  testWidgets('uses Obsidian-weight quote rails and horizontal rules', (
+  testWidgets('uses Border quote surfaces and Obsidian horizontal rules', (
     tester,
   ) async {
     late MarkdownStyleSheet styleSheet;
@@ -2122,21 +2171,56 @@ Done.
       ),
     );
 
-    final quote = styleSheet.blockquoteDecoration! as BoxDecoration;
-    final quoteBorder = quote.border! as Border;
-    expect(quoteBorder.left.color, IanvsMarkdownThemeData.light.accent);
-    expect(quoteBorder.left.width, 2);
+    final quote =
+        styleSheet.blockquoteDecoration! as IanvsMarkdownQuoteDecoration;
+    expect(quote.backgroundColor, IanvsMarkdownThemeData.light.surface);
+    expect(quote.patternColor, Colors.black.withValues(alpha: .12));
+    expect(quote.railColor, IanvsMarkdownThemeData.light.accent);
+    expect(quote.railWidth, 3);
+    expect(quote.inset, 8);
+    expect(quote.radius, 4);
+    expect(
+      styleSheet.blockquotePadding,
+      const EdgeInsets.fromLTRB(27, 8, 8, 8),
+    );
 
     final rule = styleSheet.horizontalRuleDecoration! as BoxDecoration;
     final ruleBorder = rule.border! as Border;
     expect(ruleBorder.top.color, IanvsMarkdownThemeData.light.borderSoft);
-    expect(ruleBorder.top.width, 1);
+    expect(ruleBorder.top.width, 2);
 
     final tableBorder = styleSheet.tableBorder!;
     expect(tableBorder.top.color, IanvsMarkdownThemeData.light.borderSoft);
     expect(
       styleSheet.tableCellsPadding,
       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    );
+  });
+
+  testWidgets('Border quote dots switch to white in dark mode', (tester) async {
+    late MarkdownStyleSheet styleSheet;
+    await tester.pumpWidget(
+      app(
+        Builder(
+          builder: (context) {
+            styleSheet = ianvsMarkdownStyleSheet(context);
+            return const IanvsMarkdown(data: '> Dark quote');
+          },
+        ),
+        theme: ThemeData.dark(),
+      ),
+    );
+
+    final quote =
+        styleSheet.blockquoteDecoration! as IanvsMarkdownQuoteDecoration;
+    expect(quote.backgroundColor, IanvsMarkdownThemeData.dark.surface);
+    expect(quote.patternColor, Colors.white.withValues(alpha: .12));
+    expect(quote.railColor, IanvsMarkdownThemeData.dark.accent);
+    expect(
+      tester
+          .widgetList<DecoratedBox>(find.byType(DecoratedBox))
+          .where((widget) => widget.decoration is IanvsMarkdownQuoteDecoration),
+      hasLength(1),
     );
   });
 
