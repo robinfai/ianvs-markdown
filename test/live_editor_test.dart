@@ -4,6 +4,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
+import 'package:ianvs_markdown/src/code_surface.dart';
 
 void main() {
   Widget app(IanvsMarkdownController controller) {
@@ -4768,7 +4769,12 @@ Standard[^note] and inline ^[inline body].
     final container = tester.widget<Container>(active);
     final decoration = container.decoration! as BoxDecoration;
     expect(decoration.color, IanvsMarkdownThemeData.light.surfaceRaised);
-    expect((decoration.border! as Border).isUniform, isTrue);
+    expect(decoration.border, isNull);
+    final frame =
+        container.foregroundDecoration! as IanvsMarkdownDashedBorderDecoration;
+    expect(frame.strokeWidth, 1);
+    expect(frame.dashLength, 3);
+    expect(frame.gapLength, 3);
     expect(
       decoration.borderRadius,
       BorderRadius.circular(IanvsMarkdownThemeData.light.smallRadius / 2),
@@ -4777,7 +4783,7 @@ Standard[^note] and inline ^[inline body].
       container.margin,
       const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
     );
-    expect(container.foregroundDecoration, isNull);
+    expect(container.foregroundDecoration, isNotNull);
     expect(
       container.padding,
       const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

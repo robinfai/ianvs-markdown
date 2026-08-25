@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
+import '../code_surface.dart';
 import '../inline_code.dart';
 import '../theme.dart';
 import 'editor_controller.dart';
@@ -607,7 +608,7 @@ class _SourceFencedCodeBackgroundPainter extends CustomPainter {
       final radius = Radius.circular(colors.smallRadius);
       final rounded = RRect.fromRectAndRadius(rect, radius);
       canvas.drawRRect(rounded, fill);
-      canvas.drawRRect(rounded, outline);
+      paintIanvsMarkdownDashedRRect(canvas, rounded, outline);
       if (caret >= range.start && caret <= range.end) {
         final rail = RRect.fromRectAndRadius(
           Rect.fromLTWH(rect.left, rect.top + 3, 2, rect.height - 6),

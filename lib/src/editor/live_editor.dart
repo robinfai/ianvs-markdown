@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import '../code_block.dart';
+import '../code_surface.dart';
 import '../front_matter.dart';
 import '../front_matter_card.dart';
 import '../heading_folding.dart';
@@ -2941,15 +2942,18 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             decoration: fencedCode
                 ? BoxDecoration(
                     color: activeCodeCanvasColor,
-                    border: Border.all(
-                      color: colors.borderSoft.withValues(
-                        alpha: dark ? .72 : .82,
-                      ),
-                    ),
                     borderRadius: BorderRadius.circular(activeCodeRadius),
                   )
                 : quoteBlock
                 ? BoxDecoration(color: colors.surfaceRaised)
+                : null,
+            foregroundDecoration: fencedCode
+                ? IanvsMarkdownDashedBorderDecoration(
+                    color: colors.borderSoft.withValues(
+                      alpha: dark ? .72 : .82,
+                    ),
+                    radius: activeCodeRadius,
+                  )
                 : null,
             padding: fencedCode
                 ? const EdgeInsets.symmetric(horizontal: 12, vertical: 6)

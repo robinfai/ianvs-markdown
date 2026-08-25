@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
+import 'package:ianvs_markdown/src/code_surface.dart';
 
 void main() {
   Widget app(Widget child, {ThemeData? theme}) {
@@ -660,8 +661,13 @@ return first + second;
       );
       final decoration = surface.decoration! as BoxDecoration;
       expect(decoration.boxShadow, isNull);
-      expect((decoration.border! as Border).isUniform, isTrue);
-      final idleBorderColor = (decoration.border! as Border).top.color;
+      expect(decoration.border, isNull);
+      final idleFrame =
+          surface.foregroundDecoration! as IanvsMarkdownDashedBorderDecoration;
+      final idleBorderColor = idleFrame.color;
+      expect(idleFrame.strokeWidth, 1);
+      expect(idleFrame.dashLength, 3);
+      expect(idleFrame.gapLength, 3);
       expect(
         decoration.borderRadius,
         BorderRadius.circular(IanvsMarkdownThemeData.light.smallRadius / 2),
@@ -708,11 +714,12 @@ return first + second;
       final hoveredSurface = tester.widget<Container>(
         find.byKey(const ValueKey('ianvs-markdown-code-block')),
       );
-      final hoveredBorder =
-          (hoveredSurface.decoration! as BoxDecoration).border! as Border;
-      expect(hoveredBorder.top.color, isNot(idleBorderColor));
+      final hoveredFrame =
+          hoveredSurface.foregroundDecoration!
+              as IanvsMarkdownDashedBorderDecoration;
+      expect(hoveredFrame.color, isNot(idleBorderColor));
       expect(
-        hoveredBorder.top.color,
+        hoveredFrame.color,
         IanvsMarkdownThemeData.light.border.withValues(alpha: .62),
       );
       expect(

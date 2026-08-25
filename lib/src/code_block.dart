@@ -38,6 +38,7 @@ import 'package:re_highlight/re_highlight.dart';
 import 'package:re_highlight/styles/github.dart';
 import 'package:re_highlight/styles/github-dark.dart';
 
+import 'code_surface.dart';
 import 'scroll_fade_region.dart';
 import 'theme.dart';
 
@@ -343,8 +344,11 @@ class _IanvsMarkdownCodeBlockState extends State<IanvsMarkdownCodeBlock> {
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: canvasColor,
-          border: Border.all(color: frameColor),
           borderRadius: BorderRadius.circular(radius),
+        ),
+        foregroundDecoration: IanvsMarkdownDashedBorderDecoration(
+          color: frameColor,
+          radius: radius,
         ),
         child: body,
       ),
