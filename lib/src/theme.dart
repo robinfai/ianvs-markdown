@@ -29,6 +29,13 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
     Color? taskCheckboxBorderColor,
     Color? taskCheckboxHoverOutlineColor,
     Color? taskDoneColor,
+    Color? taskStatusRed,
+    Color? taskStatusOrange,
+    Color? taskStatusYellow,
+    Color? taskStatusCyan,
+    Color? taskStatusBlue,
+    Color? taskStatusPurple,
+    Color? taskStatusPink,
     this.headingAccents = const <Color>[
       Color(0xffc24b57),
       Color(0xffb56b35),
@@ -53,7 +60,14 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
        taskCheckboxColor = taskCheckboxColor ?? accent,
        taskCheckboxBorderColor = taskCheckboxBorderColor ?? textTertiary,
        taskCheckboxHoverOutlineColor = taskCheckboxHoverOutlineColor ?? border,
-       taskDoneColor = taskDoneColor ?? textTertiary;
+       taskDoneColor = taskDoneColor ?? textTertiary,
+       taskStatusRed = taskStatusRed ?? error,
+       taskStatusOrange = taskStatusOrange ?? emphasisForeground ?? textPrimary,
+       taskStatusYellow = taskStatusYellow ?? accent,
+       taskStatusCyan = taskStatusCyan ?? accent,
+       taskStatusBlue = taskStatusBlue ?? accent,
+       taskStatusPurple = taskStatusPurple ?? accent,
+       taskStatusPink = taskStatusPink ?? inlineCodeForeground ?? textPrimary;
 
   static const IanvsMarkdownThemeData light = IanvsMarkdownThemeData(
     surface: Color(0xffffffff),
@@ -78,6 +92,13 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
     taskCheckboxBorderColor: Color(0xff989bae),
     taskCheckboxHoverOutlineColor: Color(0x408089c6),
     taskDoneColor: Color(0xff989bae),
+    taskStatusRed: Color(0xffdd2c38),
+    taskStatusOrange: Color(0xffde7417),
+    taskStatusYellow: Color(0xffc09c0c),
+    taskStatusCyan: Color(0xff16a6ab),
+    taskStatusBlue: Color(0xff1775d9),
+    taskStatusPurple: Color(0xff8f47e1),
+    taskStatusPink: Color(0xffdd1399),
     headingAccents: <Color>[
       Color(0xffc24b57),
       Color(0xffb56b35),
@@ -111,6 +132,13 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
     taskCheckboxBorderColor: Color(0xff74778b),
     taskCheckboxHoverOutlineColor: Color(0x406974bc),
     taskDoneColor: Color(0xff74778b),
+    taskStatusRed: Color(0xffff7881),
+    taskStatusOrange: Color(0xfffbbb83),
+    taskStatusYellow: Color(0xffffe88b),
+    taskStatusCyan: Color(0xff86dfe2),
+    taskStatusBlue: Color(0xff89bdf4),
+    taskStatusPurple: Color(0xffcb9eff),
+    taskStatusPink: Color(0xfff2b6de),
     headingAccents: <Color>[
       Color(0xffe06c75),
       Color(0xffd19a66),
@@ -143,6 +171,13 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
   final Color taskCheckboxBorderColor;
   final Color taskCheckboxHoverOutlineColor;
   final Color taskDoneColor;
+  final Color taskStatusRed;
+  final Color taskStatusOrange;
+  final Color taskStatusYellow;
+  final Color taskStatusCyan;
+  final Color taskStatusBlue;
+  final Color taskStatusPurple;
+  final Color taskStatusPink;
   final List<Color> headingAccents;
   final String monoFontFamily;
   final List<String> monoFontFamilyFallback;
@@ -189,6 +224,13 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
     Color? taskCheckboxBorderColor,
     Color? taskCheckboxHoverOutlineColor,
     Color? taskDoneColor,
+    Color? taskStatusRed,
+    Color? taskStatusOrange,
+    Color? taskStatusYellow,
+    Color? taskStatusCyan,
+    Color? taskStatusBlue,
+    Color? taskStatusPurple,
+    Color? taskStatusPink,
     List<Color>? headingAccents,
     String? monoFontFamily,
     List<String>? monoFontFamilyFallback,
@@ -221,6 +263,13 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
       taskCheckboxHoverOutlineColor:
           taskCheckboxHoverOutlineColor ?? this.taskCheckboxHoverOutlineColor,
       taskDoneColor: taskDoneColor ?? this.taskDoneColor,
+      taskStatusRed: taskStatusRed ?? this.taskStatusRed,
+      taskStatusOrange: taskStatusOrange ?? this.taskStatusOrange,
+      taskStatusYellow: taskStatusYellow ?? this.taskStatusYellow,
+      taskStatusCyan: taskStatusCyan ?? this.taskStatusCyan,
+      taskStatusBlue: taskStatusBlue ?? this.taskStatusBlue,
+      taskStatusPurple: taskStatusPurple ?? this.taskStatusPurple,
+      taskStatusPink: taskStatusPink ?? this.taskStatusPink,
       headingAccents: headingAccents ?? this.headingAccents,
       monoFontFamily: monoFontFamily ?? this.monoFontFamily,
       monoFontFamilyFallback:
@@ -284,6 +333,25 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
         t,
       )!,
       taskDoneColor: Color.lerp(taskDoneColor, other.taskDoneColor, t)!,
+      taskStatusRed: Color.lerp(taskStatusRed, other.taskStatusRed, t)!,
+      taskStatusOrange: Color.lerp(
+        taskStatusOrange,
+        other.taskStatusOrange,
+        t,
+      )!,
+      taskStatusYellow: Color.lerp(
+        taskStatusYellow,
+        other.taskStatusYellow,
+        t,
+      )!,
+      taskStatusCyan: Color.lerp(taskStatusCyan, other.taskStatusCyan, t)!,
+      taskStatusBlue: Color.lerp(taskStatusBlue, other.taskStatusBlue, t)!,
+      taskStatusPurple: Color.lerp(
+        taskStatusPurple,
+        other.taskStatusPurple,
+        t,
+      )!,
+      taskStatusPink: Color.lerp(taskStatusPink, other.taskStatusPink, t)!,
       headingAccents: <Color>[
         for (var level = 1; level <= 6; level += 1)
           Color.lerp(headingAccent(level), other.headingAccent(level), t)!,

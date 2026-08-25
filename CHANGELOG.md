@@ -18,6 +18,10 @@
 - Match Border's ordinary task checkboxes with 16px geometry, 6px corners,
   exact light and dark colors, a two-pixel hover/focus ring, thick check mark,
   keyboard and semantic toggling, and muted completed text in Live Preview.
+- Render Obsidian's full single-character task-state model, including Border's
+  progress, cancelled, forwarding, scheduling, question, importance, star,
+  info, idea, location, bookmark, note, sentiment, quote, savings, and trend
+  icons; preserve every original marker and toggle it with Obsidian semantics.
 
 ## 0.1.0
 

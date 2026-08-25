@@ -89,6 +89,22 @@ final value = 1;
     expect(blocks.single.source, source);
   });
 
+  test('classifies alternate and ordered task states without rewriting', () {
+    const source = '- [!] Important\n\n1. [/] In progress\n\n- [k] Unknown';
+
+    final blocks = parseMarkdownBlocks(source);
+
+    expect(
+      blocks.map((block) => block.type),
+      everyElement(IanvsMarkdownBlockType.taskList),
+    );
+    expect(blocks.map((block) => block.source), <String>[
+      '- [!] Important',
+      '1. [/] In progress',
+      '- [k] Unknown',
+    ]);
+  });
+
   test('retains every intentional blank line between live blocks', () {
     const source = 'First paragraph.\n\n\n\nSecond paragraph.';
     final blocks = parseMarkdownBlocks(source);

@@ -375,7 +375,7 @@ bool _isThematicBreak(String text) => RegExp(
 bool _isBlockquote(String text) => RegExp(r'^ {0,3}>').hasMatch(text);
 
 bool _isTaskList(String text) =>
-    RegExp(r'^\s{0,3}[-+*]\s+\[[ xX]\]\s+').hasMatch(text);
+    RegExp(r'^\s{0,3}(?:[-+*]|\d{1,9}[.)])\s+\[[^\r\n]\]\s+').hasMatch(text);
 
 bool _isUnorderedList(String text) =>
     RegExp(r'^\s{0,3}[-+*]\s+').hasMatch(text);

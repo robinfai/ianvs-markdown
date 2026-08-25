@@ -5043,6 +5043,192 @@ Standard[^note] and inline ^[inline body].
     },
   );
 
+  testWidgets('alternate task states preserve markers and toggle exact items', (
+    tester,
+  ) async {
+    final controller = IanvsMarkdownController(
+      text: '- [!] Critical\n- [/] Moving\n- [-] Cancelled',
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    var checkboxes = tester
+        .widgetList<IanvsMarkdownTaskCheckbox>(
+          find.byType(IanvsMarkdownTaskCheckbox),
+        )
+        .toList();
+    expect(checkboxes.map((checkbox) => checkbox.marker), <String>[
+      '!',
+      '/',
+      '-',
+    ]);
+    final boxes = tester
+        .widgetList<AnimatedContainer>(
+          find.byKey(const ValueKey('ianvs-markdown-task-checkbox-box')),
+        )
+        .toList();
+    expect(
+      (boxes.first.decoration! as BoxDecoration).color,
+      IanvsMarkdownThemeData.light.taskStatusOrange,
+    );
+    expect(
+      ((boxes[1].decoration! as BoxDecoration).border! as Border).top.width,
+      2,
+    );
+    expect(
+      find.byKey(
+        const ValueKey('ianvs-markdown-task-checkbox-alternative-icon'),
+      ),
+      findsNWidgets(3),
+    );
+    final cancelledText = tester
+        .widgetList<SelectableText>(find.byType(SelectableText))
+        .any(
+          (text) =>
+              text.textSpan != null &&
+              _spanContainsDecoration(
+                text.textSpan!,
+                text: 'Cancelled',
+                decoration: TextDecoration.lineThrough,
+              ) &&
+              _spanContainsColor(
+                text.textSpan!,
+                text: 'Cancelled',
+                color: IanvsMarkdownThemeData.light.taskDoneColor,
+              ),
+        );
+    expect(cancelledText, isTrue);
+
+    await tester.tap(find.byType(IanvsMarkdownTaskCheckbox).at(1));
+    await tester.pump();
+    expect(controller.text, '- [!] Critical\n- [ ] Moving\n- [-] Cancelled');
+    checkboxes = tester
+        .widgetList<IanvsMarkdownTaskCheckbox>(
+          find.byType(IanvsMarkdownTaskCheckbox),
+        )
+        .toList();
+    expect(checkboxes.map((checkbox) => checkbox.marker), <String>[
+      '!',
+      ' ',
+      '-',
+    ]);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pump();
+    expect(controller.text, '- [!] Critical\n- [x] Moving\n- [-] Cancelled');
+  });
+
+  testWidgets('ordered alternate tasks stay visual and continue unchecked', (
+    tester,
+  ) async {
+    final controller = IanvsMarkdownController(text: '1. [/] Ongoing');
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<IanvsMarkdownTaskCheckbox>(
+            find.byType(IanvsMarkdownTaskCheckbox),
+          )
+          .marker,
+      '/',
+    );
+
+    await tester.tap(find.text('Ongoing'));
+    await tester.pump();
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    expect(active, findsOneWidget);
+    final activeCheckbox = tester.widget<IanvsMarkdownTaskCheckbox>(
+      find.descendant(
+        of: active,
+        matching: find.byType(IanvsMarkdownTaskCheckbox),
+      ),
+    );
+    expect(activeCheckbox.marker, '/');
+    final field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    field.controller?.selection = TextSelection.collapsed(
+      offset: field.controller!.text.length,
+    );
+    expect(field.focusNode?.hasFocus, isTrue);
+
+    tester.testTextInput.updateEditingValue(
+      TextEditingValue(
+        text: '${field.controller!.text}\n',
+        selection: TextSelection.collapsed(
+          offset: field.controller!.text.length + 1,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.text, '1. [/] Ongoing\n2. [ ] ');
+  });
+
+  testWidgets('nested and quoted alternate tasks toggle exact markers', (
+    tester,
+  ) async {
+    final controller = IanvsMarkdownController(
+      text: '- [!] Parent\n  - [b] Child\n\n> - [-] Quoted cancelled',
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    var checkboxes = tester
+        .widgetList<IanvsMarkdownTaskCheckbox>(
+          find.byType(IanvsMarkdownTaskCheckbox),
+        )
+        .toList();
+    expect(checkboxes.map((checkbox) => checkbox.marker), <String>[
+      '!',
+      'b',
+      '-',
+    ]);
+    expect(
+      tester
+          .widgetList<SelectableText>(find.byType(SelectableText))
+          .any(
+            (text) =>
+                text.textSpan != null &&
+                _spanContainsDecoration(
+                  text.textSpan!,
+                  text: 'Quoted cancelled',
+                  decoration: TextDecoration.lineThrough,
+                ),
+          ),
+      isTrue,
+    );
+
+    await tester.tap(find.byType(IanvsMarkdownTaskCheckbox).at(1));
+    await tester.pumpAndSettle();
+    expect(
+      controller.text,
+      '- [!] Parent\n  - [ ] Child\n\n> - [-] Quoted cancelled',
+    );
+
+    checkboxes = tester
+        .widgetList<IanvsMarkdownTaskCheckbox>(
+          find.byType(IanvsMarkdownTaskCheckbox),
+        )
+        .toList();
+    expect(checkboxes.map((checkbox) => checkbox.marker), <String>[
+      '!',
+      ' ',
+      '-',
+    ]);
+    await tester.tap(find.byType(IanvsMarkdownTaskCheckbox).at(2));
+    await tester.pumpAndSettle();
+    expect(
+      controller.text,
+      '- [!] Parent\n  - [ ] Child\n\n> - [ ] Quoted cancelled',
+    );
+  });
+
   testWidgets('empty active task keeps a paintable caret beside its checkbox', (
     tester,
   ) async {

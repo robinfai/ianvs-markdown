@@ -1319,7 +1319,15 @@ void main() {
     test('continues unordered, task, ordered, and quote markers', () {
       expect(_pressEnter(formatter, '- item').text, '- item\n- ');
       expect(_pressEnter(formatter, '- [x] done').text, '- [x] done\n- [ ] ');
+      expect(
+        _pressEnter(formatter, '- [!] important').text,
+        '- [!] important\n- [ ] ',
+      );
       expect(_pressEnter(formatter, '9. item').text, '9. item\n10. ');
+      expect(
+        _pressEnter(formatter, '9. [/] ongoing').text,
+        '9. [/] ongoing\n10. [ ] ',
+      );
       expect(_pressEnter(formatter, '> quote').text, '> quote\n> ');
     });
 
@@ -1387,6 +1395,10 @@ void main() {
       expect(
         _pressEnter(formatter, '> - [x] done').text,
         '> - [x] done\n> - [ ] ',
+      );
+      expect(
+        _pressEnter(formatter, '> - [?] question').text,
+        '> - [?] question\n> - [ ] ',
       );
       expect(_pressEnter(formatter, '> > quote').text, '> > quote\n> > ');
       expect(

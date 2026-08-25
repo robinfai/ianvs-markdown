@@ -160,17 +160,29 @@ void main() {
     const border = Color(0xff234567);
     const outline = Color(0x40345678);
     const done = Color(0xff456789);
+    const red = Color(0xff56789a);
+    const yellow = Color(0xff6789ab);
+    const cyan = Color(0xff789abc);
+    const purple = Color(0xff89abcd);
     final customized = IanvsMarkdownThemeData.light.copyWith(
       taskCheckboxColor: checked,
       taskCheckboxBorderColor: border,
       taskCheckboxHoverOutlineColor: outline,
       taskDoneColor: done,
+      taskStatusRed: red,
+      taskStatusYellow: yellow,
+      taskStatusCyan: cyan,
+      taskStatusPurple: purple,
     );
 
     expect(customized.taskCheckboxColor, checked);
     expect(customized.taskCheckboxBorderColor, border);
     expect(customized.taskCheckboxHoverOutlineColor, outline);
     expect(customized.taskDoneColor, done);
+    expect(customized.taskStatusRed, red);
+    expect(customized.taskStatusYellow, yellow);
+    expect(customized.taskStatusCyan, cyan);
+    expect(customized.taskStatusPurple, purple);
     final midpoint = IanvsMarkdownThemeData.light.lerp(
       IanvsMarkdownThemeData.dark,
       .5,
@@ -188,6 +200,14 @@ void main() {
       Color.lerp(
         IanvsMarkdownThemeData.light.taskDoneColor,
         IanvsMarkdownThemeData.dark.taskDoneColor,
+        .5,
+      ),
+    );
+    expect(
+      midpoint.taskStatusPurple,
+      Color.lerp(
+        IanvsMarkdownThemeData.light.taskStatusPurple,
+        IanvsMarkdownThemeData.dark.taskStatusPurple,
         .5,
       ),
     );
@@ -230,9 +250,7 @@ final answer = 42;
     expect(taskCheckbox.onChanged, isNull);
     expect(
       tester.getSize(
-        find.byKey(
-          const ValueKey('ianvs-markdown-task-checkbox-outline'),
-        ),
+        find.byKey(const ValueKey('ianvs-markdown-task-checkbox-outline')),
       ),
       const Size.square(24),
     );
@@ -293,6 +311,187 @@ final answer = 42;
       find.byKey(const ValueKey('ianvs-markdown-task-checkbox-check')),
     );
     expect(check.painter, isNotNull);
+  });
+
+  testWidgets(
+    'renders every Border alternate task state and unknown fallback',
+    (tester) async {
+      const markers = <String>[
+        ' ',
+        'x',
+        '/',
+        '-',
+        '>',
+        '<',
+        '?',
+        '!',
+        '*',
+        'i',
+        'I',
+        'l',
+        'b',
+        'n',
+        'p',
+        'c',
+        '"',
+        '“',
+        'S',
+        'u',
+        'd',
+        'k',
+        ']',
+      ];
+      final source = markers
+          .map(
+            (marker) =>
+                '- [$marker] marker ${marker == ' ' ? 'space' : marker}',
+          )
+          .join('\n');
+
+      await tester.pumpWidget(
+        app(
+          SingleChildScrollView(
+            child: IanvsMarkdown(data: source, fitContent: true),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final checkboxes = tester
+          .widgetList<IanvsMarkdownTaskCheckbox>(
+            find.byType(IanvsMarkdownTaskCheckbox),
+          )
+          .toList();
+      expect(checkboxes, hasLength(markers.length));
+      expect(checkboxes.map((checkbox) => checkbox.marker), markers);
+      expect(checkboxes.map((checkbox) => checkbox.value), <bool>[
+        false,
+        ...List<bool>.filled(markers.length - 1, true),
+      ]);
+      expect(
+        find.byKey(
+          const ValueKey('ianvs-markdown-task-checkbox-alternative-icon'),
+        ),
+        findsNWidgets(19),
+      );
+      expect(
+        find.byKey(const ValueKey('ianvs-markdown-task-checkbox-check')),
+        findsNWidgets(3),
+      );
+      expect(find.bySemanticsLabel('Important task'), findsOneWidget);
+      expect(find.bySemanticsLabel('Scheduled task'), findsOneWidget);
+      expect(find.bySemanticsLabel('Checked task k'), findsOneWidget);
+
+      final boxes = tester
+          .widgetList<AnimatedContainer>(
+            find.byKey(const ValueKey('ianvs-markdown-task-checkbox-box')),
+          )
+          .toList();
+      BoxDecoration decorationFor(String marker) {
+        final index = markers.indexOf(marker);
+        return boxes[index].decoration! as BoxDecoration;
+      }
+
+      expect(
+        decorationFor('!').color,
+        IanvsMarkdownThemeData.light.taskStatusOrange,
+      );
+      expect(
+        decorationFor('?').color,
+        IanvsMarkdownThemeData.light.taskStatusPink,
+      );
+      expect(decorationFor('*').color, Colors.transparent);
+      expect(decorationFor('*').border, isNull);
+      expect(decorationFor('*').borderRadius, BorderRadius.zero);
+      expect(decorationFor('/').color, Colors.transparent);
+      expect(
+        (decorationFor('/').border! as Border).top,
+        BorderSide(
+          color: IanvsMarkdownThemeData.light.taskStatusYellow,
+          width: 2,
+        ),
+      );
+      expect(
+        decorationFor('k').color,
+        IanvsMarkdownThemeData.light.taskCheckboxColor,
+      );
+    },
+  );
+
+  testWidgets('alternate task colors follow the Border dark palette', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdownTaskCheckbox(value: true, marker: '?'),
+        theme: ThemeData.dark(),
+      ),
+    );
+
+    final box = tester.widget<AnimatedContainer>(
+      find.byKey(const ValueKey('ianvs-markdown-task-checkbox-box')),
+    );
+    expect((box.decoration! as BoxDecoration).color, const Color(0xfff2b6de));
+    expect(find.bySemanticsLabel('Question task'), findsOneWidget);
+  });
+
+  testWidgets('alternate marker changes rebuild when projected GFM is equal', (
+    tester,
+  ) async {
+    Future<void> pump(String marker) async {
+      await tester.pumpWidget(app(IanvsMarkdown(data: '- [$marker] State')));
+      await tester.pumpAndSettle();
+    }
+
+    await pump('!');
+    expect(
+      tester
+          .widget<IanvsMarkdownTaskCheckbox>(
+            find.byType(IanvsMarkdownTaskCheckbox),
+          )
+          .marker,
+      '!',
+    );
+
+    await pump('?');
+    expect(
+      tester
+          .widget<IanvsMarkdownTaskCheckbox>(
+            find.byType(IanvsMarkdownTaskCheckbox),
+          )
+          .marker,
+      '?',
+    );
+    expect(find.bySemanticsLabel('Question task'), findsOneWidget);
+  });
+
+  testWidgets('alternate tasks render through nested ordered and quote lists', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const SingleChildScrollView(
+          child: IanvsMarkdown(
+            data:
+                '- [!] Root\n  - [b] Nested\n\n1. [/] Ordered\n\n> - [?] Quoted',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widgetList<IanvsMarkdownTaskCheckbox>(
+            find.byType(IanvsMarkdownTaskCheckbox),
+          )
+          .map((checkbox) => checkbox.marker),
+      <String>['!', 'b', '/', '?'],
+    );
+    expect(find.text('Root'), findsOneWidget);
+    expect(find.text('Nested'), findsOneWidget);
+    expect(find.text('Ordered'), findsOneWidget);
+    expect(find.text('Quoted'), findsOneWidget);
   });
 
   testWidgets('renders full, collapsed, and shortcut reference links', (

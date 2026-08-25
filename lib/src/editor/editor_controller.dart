@@ -467,7 +467,7 @@ class IanvsMarkdownController extends TextEditingController {
     final lineEnd = nextLineBreak < 0 ? text.length : nextLineBreak;
     final line = text.substring(lineStart, lineEnd);
     return RegExp(
-      r'^\s*(?:(?:[-+*] )(?:\[[ xX]\] )?|\d{1,9}[.)] |> )',
+      r'^\s*(?:(?:[-+*]|\d{1,9}[.)]) (?:\[[^\r\n]\] )?|> )',
     ).hasMatch(line);
   }
 
@@ -1135,7 +1135,7 @@ class IanvsMarkdownEditingFormatter extends TextInputFormatter {
     final lineEnd = lineBreak < 0 ? oldValue.text.length : lineBreak;
     final afterCaret = oldValue.text.substring(oldCaret, lineEnd);
     final startsListMarker = RegExp(
-      r'^(?:[-+*] (?:\[[ xX]\] )?|\d{1,9}[.)] )',
+      r'^(?:(?:[-+*]|\d{1,9}[.)]) (?:\[[^\r\n]\] )?)',
     ).hasMatch(afterCaret);
     final isCodeContent = _isCodeContentCaret(
       oldValue.text,
@@ -1601,7 +1601,7 @@ _MarkdownContinuationLine? _parseMarkdownContinuationLine(String line) {
       continue;
     }
 
-    final unordered = RegExp(r'^([-+*] )(\[[ xX]\] )?').firstMatch(remaining);
+    final unordered = RegExp(r'^([-+*] )(\[[^\r\n]\] )?').firstMatch(remaining);
     if (unordered != null) {
       final marker = unordered.group(1)!;
       final task = unordered.group(2);
@@ -1618,15 +1618,19 @@ _MarkdownContinuationLine? _parseMarkdownContinuationLine(String line) {
       continue;
     }
 
-    final ordered = RegExp(r'^(\d{1,9})([.)] )').firstMatch(remaining);
+    final ordered = RegExp(
+      r'^(\d{1,9})([.)] )(\[[^\r\n]\] )?',
+    ).firstMatch(remaining);
     if (ordered != null) {
       final source = ordered.group(0)!;
       final number = int.parse(ordered.group(1)!);
+      final task = ordered.group(3);
       components.add(
         _MarkdownPrefixComponent(
           leadingIndent: leadingIndent,
           source: source,
-          continuation: '${number + 1}${ordered.group(2)}',
+          continuation:
+              '${number + 1}${ordered.group(2)}${task == null ? '' : '[ ] '}',
           isQuote: false,
         ),
       );
@@ -2016,7 +2020,7 @@ String _backtickFenceClosingPrefix(String beforeFence) {
     }
 
     final list = RegExp(
-      r'^(?:[-+*][ \t]+(?:\[[ xX]\][ \t]+)?|\d{1,9}[.)][ \t]+)',
+      r'^(?:(?:[-+*]|\d{1,9}[.)])[ \t]+(?:\[[^\r\n]\][ \t]+)?)',
     ).firstMatch(remaining);
     if (list != null) {
       final marker = list.group(0)!;

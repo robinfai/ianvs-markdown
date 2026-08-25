@@ -20,6 +20,7 @@ import '../obsidian_image.dart';
 import '../obsidian_metadata.dart';
 import '../render_budget.dart';
 import '../task_checkbox.dart';
+import '../task_syntax.dart';
 import '../theme.dart';
 import '../wiki_embed.dart';
 import 'editor_controller.dart';
@@ -2666,7 +2667,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         ? _activeFencedCodePayload(block.source)
         : null;
     final taskMarker = block.type == IanvsMarkdownBlockType.taskList
-        ? RegExp(r'^( {0,3})[-+*]\s+\[([ xX])\][ \t]*').firstMatch(block.source)
+        ? RegExp(
+            r'^( {0,3})(?:[-+*]|\d{1,9}[.)])\s+\[([^\r\n])\][ \t]*',
+          ).firstMatch(block.source)
         : null;
     final unorderedMarker = block.type == IanvsMarkdownBlockType.unorderedList
         ? RegExp(r'^( {0,3})[-+*][ \t]+').firstMatch(block.source)
@@ -2731,7 +2734,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     if (indentedCode) {
       activeTextStyle = activeTextStyle.copyWith(color: colors.accentDark);
     }
-    if (taskMarker != null && taskMarker.group(2)!.toLowerCase() == 'x') {
+    if (taskMarker != null &&
+        ianvsMarkdownTaskMarkerUsesDoneText(taskMarker.group(2)!)) {
       activeTextStyle = activeTextStyle.copyWith(
         color: colors.taskDoneColor,
         decoration: TextDecoration.lineThrough,
@@ -2774,8 +2778,13 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             height: 30,
             child: Center(
               child: IanvsMarkdownTaskCheckbox(
-                value: taskMarker.group(2)!.toLowerCase() == 'x',
-                onChanged: (value) => _setTaskChecked(block, value),
+                value: ianvsMarkdownTaskMarkerIsChecked(taskMarker.group(2)!),
+                marker: taskMarker.group(2)!,
+                onChanged: (value) => _setTaskChecked(
+                  block,
+                  block.source.indexOf('[', taskMarker.start) + 1,
+                  value,
+                ),
                 theme: colors,
               ),
             ),
@@ -3038,6 +3047,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         ),
       );
     }
+    final sourceTasks = projectObsidianTaskMarkers(block.source).tasks;
+    var renderedTaskIndex = 0;
     Widget rendered;
     if (block.type == IanvsMarkdownBlockType.frontMatter) {
       final document = parseMarkdownFrontMatter(block.source);
@@ -3062,9 +3073,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         onTap: () => _activateRenderedBlock(block, tapCount: _pointerTapCount),
       );
     } else {
-      final completedTask =
-          block.type == IanvsMarkdownBlockType.taskList &&
-          RegExp(r'^\s*[-+*]\s+\[[xX]\]').hasMatch(block.source);
+      final completedTask = sourceTasks.any(
+        (task) => ianvsMarkdownTaskMarkerUsesDoneText(task.marker),
+      );
       final baseStyleSheet =
           widget.styleSheet ?? ianvsMarkdownStyleSheet(context, colors);
       final renderedStyleSheet = completedTask
@@ -3092,12 +3103,25 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             : (_, _, _) {},
         imageBuilder: widget.imageBuilder,
         onImageResize: (request) => _resizeImage(block, request),
-        checkboxBuilder: block.type == IanvsMarkdownBlockType.taskList
-            ? (checked) => IanvsMarkdownTaskCheckbox(
-                value: checked,
-                onChanged: (value) => _setTaskChecked(block, value),
-                theme: colors,
-              )
+        checkboxBuilder: sourceTasks.isNotEmpty
+            ? (checked) {
+                final taskIndex = renderedTaskIndex;
+                final task = taskIndex < sourceTasks.length
+                    ? sourceTasks[taskIndex]
+                    : IanvsMarkdownTaskSourceMarker(
+                        marker: checked ? 'x' : ' ',
+                        offset: -1,
+                      );
+                renderedTaskIndex += 1;
+                return IanvsMarkdownTaskCheckbox(
+                  value: ianvsMarkdownTaskMarkerIsChecked(task.marker),
+                  marker: task.marker,
+                  onChanged: task.offset < 0
+                      ? null
+                      : (value) => _setTaskChecked(block, task.offset, value),
+                  theme: colors,
+                );
+              }
             : null,
         builders: widget.builders,
         softLineBreak: widget.softLineBreak,
@@ -3168,17 +3192,25 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       document: widget.controller.text,
     );
     var source = footnoteDefinition ?? block.source;
-    if (footnoteDefinition == null &&
-        block.type == IanvsMarkdownBlockType.taskList) {
-      final completed = RegExp(
-        r'^(\s*[-+*]\s+\[[xX]\]\s+)(.*)$',
-      ).firstMatch(block.source);
-      final content = completed?.group(2) ?? '';
-      if (completed != null &&
-          content.isNotEmpty &&
-          !(content.startsWith('~~') && content.endsWith('~~'))) {
-        source = '${completed.group(1)}~~$content~~';
-      }
+    if (footnoteDefinition == null) {
+      source = source
+          .split('\n')
+          .map((line) {
+            final task = RegExp(
+              r'^((?:(?:[ \t]{0,3}>[ \t]?)+)?[ \t]*(?:[-+*]|\d{1,9}[.)])[ \t]+\[([^\r\n])\][ \t]+)(.*)$',
+            ).firstMatch(line);
+            final marker = task?.group(2);
+            final content = task?.group(3) ?? '';
+            if (task == null ||
+                marker == null ||
+                !ianvsMarkdownTaskMarkerUsesDoneText(marker) ||
+                content.isEmpty ||
+                content.startsWith('~~') && content.endsWith('~~')) {
+              return line;
+            }
+            return '${task.group(1)}~~$content~~';
+          })
+          .join('\n');
     }
     if (block.type == IanvsMarkdownBlockType.fencedCode ||
         block.type == IanvsMarkdownBlockType.indentedCode ||
@@ -3210,16 +3242,19 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     _replaceBlockSource(block, replacement);
   }
 
-  void _setTaskChecked(IanvsMarkdownBlock block, bool checked) {
-    final marker = RegExp(
-      r'^ {0,3}[-+*]\s+\[([ xX])\]',
-    ).firstMatch(block.source);
-    if (marker == null) return;
-    final bracketOffset = block.source.indexOf('[', marker.start);
-    if (bracketOffset < 0) return;
-    final markerOffset = block.start + bracketOffset + 1;
+  void _setTaskChecked(
+    IanvsMarkdownBlock block,
+    int markerOffsetInBlock,
+    bool checked,
+  ) {
+    final markerOffset = block.start + markerOffsetInBlock;
     final current = widget.controller.value;
-    if (markerOffset < 0 || markerOffset >= current.text.length) return;
+    if (markerOffsetInBlock < 0 ||
+        markerOffsetInBlock >= block.source.length ||
+        markerOffset < 0 ||
+        markerOffset >= current.text.length) {
+      return;
+    }
     widget.controller.value = current.copyWith(
       text: current.text.replaceRange(
         markerOffset,

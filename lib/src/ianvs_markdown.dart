@@ -20,6 +20,7 @@ import 'obsidian_metadata.dart';
 import 'obsidian_image.dart';
 import 'render_budget.dart';
 import 'task_checkbox.dart';
+import 'task_syntax.dart';
 import 'theme.dart';
 import 'wiki_embed.dart';
 
@@ -291,14 +292,16 @@ class IanvsMarkdown extends StatelessWidget {
         mode: obsidianMetadataMode,
       ),
     );
+    final taskProjection = projectObsidianTaskMarkers(renderedData);
     var imageIndex = 0;
+    var taskIndex = 0;
     return KeyedSubtree(
       key: const ValueKey('ianvs-markdown-body'),
       child: MarkdownBody(
         // flutter_markdown_plus only reparses when data or styles change, so
         // changing this option must remount its state to rebuild line spans.
         key: ValueKey<bool>(softLineBreak),
-        data: renderedData,
+        data: taskProjection.data,
         selectable: selectable,
         styleSheet: effectiveStyleSheet,
         styleSheetTheme: styleSheetTheme,
@@ -339,10 +342,20 @@ class IanvsMarkdown extends StatelessWidget {
             child: image,
           );
         },
-        checkboxBuilder:
-            checkboxBuilder ??
-            (checked) =>
-                IanvsMarkdownTaskCheckbox(value: checked, theme: colors),
+        checkboxBuilder: (checked) {
+          final marker = taskIndex < taskProjection.tasks.length
+              ? taskProjection.tasks[taskIndex].marker
+              : checked
+              ? 'x'
+              : ' ';
+          taskIndex += 1;
+          return checkboxBuilder?.call(checked) ??
+              IanvsMarkdownTaskCheckbox(
+                value: marker != ' ',
+                marker: marker,
+                theme: colors,
+              );
+        },
         bulletBuilder:
             bulletBuilder ??
             (parameters) =>
