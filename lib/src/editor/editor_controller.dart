@@ -9,6 +9,7 @@ import '../obsidian_autolink.dart';
 import '../obsidian_html.dart';
 import 'editor_models.dart';
 import 'markdown_paste.dart';
+import 'reference_links.dart';
 
 @immutable
 final class IanvsMarkdownHistoryValue {
@@ -82,6 +83,7 @@ class IanvsMarkdownController extends TextEditingController {
            selection: const TextSelection.collapsed(offset: 0),
          ),
        ) {
+    _linkReferences = MarkdownLinkReferenceContext.parse(text);
     _history.add(value);
     _lastObservedValue = value;
     addListener(_handleValueChanged);
@@ -95,6 +97,7 @@ class IanvsMarkdownController extends TextEditingController {
   final List<TextEditingValue> _history = <TextEditingValue>[];
 
   late TextEditingValue _lastObservedValue;
+  late MarkdownLinkReferenceContext _linkReferences;
   String _savedText;
   Timer? _coalescingTimer;
   var _historyIndex = 0;
@@ -637,6 +640,9 @@ class IanvsMarkdownController extends TextEditingController {
     final previous = _lastObservedValue;
     _lastObservedValue = current;
     _setDirty(current.text != _savedText);
+    if (current.text != previous.text) {
+      _linkReferences = MarkdownLinkReferenceContext.parse(current.text);
+    }
     if (_applyingHistory) return;
 
     if (current.text == previous.text) {
@@ -716,6 +722,7 @@ class IanvsMarkdownController extends TextEditingController {
       style: style,
       syntaxTheme: syntax,
       withComposing: withComposing,
+      linkReferenceLabels: _linkReferences.labels,
     );
   }
 
@@ -2154,9 +2161,16 @@ TextSpan buildMarkdownSourceTextSpan(
   required bool withComposing,
   bool hideInactiveInlineMarkers = false,
   bool hideInactiveEscapeMarkers = false,
+  Set<String>? linkReferenceLabels,
 }) {
   final text = value.text;
-  final tokens = _markdownSyntaxTokens(text, syntaxTheme);
+  final effectiveLinkReferenceLabels =
+      linkReferenceLabels ?? MarkdownLinkReferenceContext.parse(text).labels;
+  final tokens = _markdownSyntaxTokens(
+    text,
+    syntaxTheme,
+    linkReferenceLabels: effectiveLinkReferenceLabels,
+  );
   if (hideInactiveEscapeMarkers) {
     _addEscapeMarkerSyntaxTokens(tokens, text, syntaxTheme.marker);
   }
@@ -2295,8 +2309,9 @@ TextStyle? _mergeMarkdownSyntaxStyles(Iterable<TextStyle> styles) {
 
 List<_SyntaxToken> _markdownSyntaxTokens(
   String text,
-  IanvsMarkdownSyntaxTheme theme,
-) {
+  IanvsMarkdownSyntaxTheme theme, {
+  required Set<String> linkReferenceLabels,
+}) {
   final tokens = <_SyntaxToken>[];
   final fencedRanges = <TextRange>[];
   final lines = text.split('\n');
@@ -2441,23 +2456,48 @@ List<_SyntaxToken> _markdownSyntaxTokens(
     theme,
     <TextRange>[...codeExcludedRanges, ...codeRanges, ...mathRanges],
   );
+  final wikiLinkLiteralRanges = _addWikiLinkSyntaxTokens(
+    tokens,
+    text,
+    theme,
+    <TextRange>[...codeExcludedRanges, ...mathRanges],
+    openingExcludedRanges: <TextRange>[...codeRanges, ...mathRanges],
+  );
+  final inlineLinkLiteralRanges = _addLinkSyntaxTokens(
+    tokens,
+    text,
+    theme,
+    <TextRange>[...codeExcludedRanges, ...mathRanges, ...wikiLinkLiteralRanges],
+    openingExcludedRanges: <TextRange>[
+      ...codeRanges,
+      ...mathRanges,
+      ...wikiLinkLiteralRanges,
+    ],
+  );
+  final referenceLinkLiteralRanges = _addReferenceLinkSyntaxTokens(
+    tokens,
+    text,
+    theme,
+    linkReferenceLabels,
+    <TextRange>[
+      ...codeExcludedRanges,
+      ...mathRanges,
+      ...wikiLinkLiteralRanges,
+      ...inlineLinkLiteralRanges,
+    ],
+    openingExcludedRanges: <TextRange>[
+      ...codeRanges,
+      ...mathRanges,
+      ...wikiLinkLiteralRanges,
+      ...inlineLinkLiteralRanges,
+    ],
+  );
   final explicitLinkLiteralRanges = <TextRange>[
     ...mathRanges,
     ...inlineHtmlLiteralRanges,
-    ..._addWikiLinkSyntaxTokens(
-      tokens,
-      text,
-      theme,
-      <TextRange>[...codeExcludedRanges, ...mathRanges],
-      openingExcludedRanges: <TextRange>[...codeRanges, ...mathRanges],
-    ),
-    ..._addLinkSyntaxTokens(
-      tokens,
-      text,
-      theme,
-      <TextRange>[...codeExcludedRanges, ...mathRanges],
-      openingExcludedRanges: <TextRange>[...codeRanges, ...mathRanges],
-    ),
+    ...wikiLinkLiteralRanges,
+    ...inlineLinkLiteralRanges,
+    ...referenceLinkLiteralRanges,
   ];
   final autolinkRanges = _addAutolinkSyntaxTokens(
     tokens,
@@ -3169,6 +3209,131 @@ List<TextRange> _addLinkSyntaxTokens(
     index = matchEnd;
   }
   return literalRanges;
+}
+
+List<TextRange> _addReferenceLinkSyntaxTokens(
+  List<_SyntaxToken> target,
+  String text,
+  IanvsMarkdownSyntaxTheme theme,
+  Set<String> definedLabels,
+  List<TextRange> excludedRanges, {
+  List<TextRange> openingExcludedRanges = const <TextRange>[],
+}) {
+  if (definedLabels.isEmpty) return const <TextRange>[];
+  final literalRanges = <TextRange>[];
+  var index = 0;
+  while (index < text.length) {
+    final isImage =
+        text.codeUnitAt(index) == 0x21 &&
+        index + 1 < text.length &&
+        text.codeUnitAt(index + 1) == 0x5b;
+    final bracketStart = isImage
+        ? index + 1
+        : text.codeUnitAt(index) == 0x5b
+        ? index
+        : -1;
+    if (bracketStart < 0) {
+      index += 1;
+      continue;
+    }
+    final matchStart = index;
+    if (_isEscapedAt(text, matchStart) ||
+        _isOffsetInsideAnyRange(matchStart, openingExcludedRanges)) {
+      index = bracketStart + 1;
+      continue;
+    }
+    final labelEnd = _balancedMarkdownDelimiterEnd(
+      text,
+      bracketStart,
+      opening: 0x5b,
+      closing: 0x5d,
+    );
+    if (labelEnd == null) {
+      index = bracketStart + 1;
+      continue;
+    }
+
+    final labelStart = bracketStart + 1;
+    final primaryLabel = text.substring(labelStart, labelEnd);
+    var referenceLabel = primaryLabel;
+    var matchEnd = labelEnd + 1;
+    if (matchEnd < text.length && text.codeUnitAt(matchEnd) == 0x28) {
+      final inlineDestinationEnd = _balancedMarkdownDelimiterEnd(
+        text,
+        matchEnd,
+        opening: 0x28,
+        closing: 0x29,
+      );
+      if (inlineDestinationEnd != null) {
+        index = matchEnd;
+        continue;
+      }
+    }
+    if (matchEnd < text.length && text.codeUnitAt(matchEnd) == 0x5b) {
+      final referenceEnd = _balancedMarkdownDelimiterEnd(
+        text,
+        matchEnd,
+        opening: 0x5b,
+        closing: 0x5d,
+      );
+      if (referenceEnd == null) {
+        index = matchEnd + 1;
+        continue;
+      }
+      final secondaryLabel = text.substring(matchEnd + 1, referenceEnd);
+      if (secondaryLabel.isNotEmpty) referenceLabel = secondaryLabel;
+      matchEnd = referenceEnd + 1;
+    } else {
+      if (matchEnd < text.length && text.codeUnitAt(matchEnd) == 0x3a) {
+        index = matchEnd;
+        continue;
+      }
+      if (_isTaskCheckboxCandidate(text, bracketStart, labelEnd)) {
+        index = matchEnd;
+        continue;
+      }
+    }
+
+    final normalized = normalizeMarkdownLinkReferenceLabel(referenceLabel);
+    if (!definedLabels.contains(normalized) ||
+        _overlapsAnyRange(matchStart, matchEnd, excludedRanges)) {
+      index = matchEnd;
+      continue;
+    }
+    final revealRange = TextRange(start: matchStart, end: matchEnd);
+    literalRanges
+      ..add(TextRange(start: matchStart, end: labelStart))
+      ..add(TextRange(start: labelEnd, end: matchEnd));
+    target.add(
+      _SyntaxToken(
+        matchStart,
+        labelStart,
+        theme.marker,
+        inlineMarkerRange: revealRange,
+      ),
+    );
+    if (labelStart < labelEnd) {
+      target.add(_SyntaxToken(labelStart, labelEnd, theme.link));
+    }
+    target.add(
+      _SyntaxToken(
+        labelEnd,
+        matchEnd,
+        theme.marker,
+        inlineMarkerRange: revealRange,
+      ),
+    );
+    index = matchEnd;
+  }
+  return literalRanges;
+}
+
+bool _isTaskCheckboxCandidate(String text, int start, int end) {
+  final label = text.substring(start + 1, end);
+  if (label != ' ' && label != 'x' && label != 'X') return false;
+  final lineStart = text.lastIndexOf('\n', start - 1) + 1;
+  final prefix = text.substring(lineStart, start);
+  return RegExp(r'^ {0,3}(?:[-+*]|\d{1,9}[.)])[ \t]+$').hasMatch(prefix);
 }
 
 int? _balancedMarkdownDelimiterEnd(

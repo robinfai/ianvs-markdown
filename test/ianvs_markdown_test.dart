@@ -120,6 +120,35 @@ final answer = 42;
     expect(find.byTooltip('自动换行'), findsNothing);
   });
 
+  testWidgets('renders full, collapsed, and shortcut reference links', (
+    tester,
+  ) async {
+    String? tappedHref;
+    await tester.pumpWidget(
+      app(
+        IanvsMarkdown(
+          data:
+              'Full [Reference label][guide-ref].\n\n'
+              'Collapsed [Collapsed][] and [shortcut].\n\n'
+              '[guide-ref]: docs/guide.md "Reference title"\n'
+              '[Collapsed]: docs/collapsed.md\n'
+              '[shortcut]: docs/shortcut.md',
+          onTapLink: (text, href, title) => tappedHref = href,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Reference label'), findsOneWidget);
+    expect(find.text('Collapsed'), findsOneWidget);
+    expect(find.text('shortcut'), findsOneWidget);
+    expect(find.textContaining('[guide-ref]:'), findsNothing);
+
+    await tester.tap(find.text('Reference label'));
+    await tester.pump();
+    expect(tappedHref, 'docs/guide.md');
+  });
+
   testWidgets('reading tables retain extra cells and pad missing cells', (
     tester,
   ) async {

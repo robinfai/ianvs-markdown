@@ -173,6 +173,91 @@ void main() {
     expect(openedHref, 'https://example.com/path');
   });
 
+  testWidgets('live preview resolves document-wide reference links', (
+    tester,
+  ) async {
+    const source =
+        'Full [Reference label][guide-ref] tail.\n\n'
+        'Collapsed [Collapsed][] and [shortcut].\n\n'
+        '[guide-ref]: docs/guide.md "Reference title"\n'
+        '[Collapsed]: docs/collapsed.md\n'
+        '[shortcut]: docs/shortcut.md';
+    final controller = IanvsMarkdownController(text: source);
+    String? openedHref;
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1000,
+            height: 720,
+            child: IanvsMarkdownLiveEditor(
+              controller: controller,
+              onTapLink: (text, href, title) => openedHref = href,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Reference label'), findsOneWidget);
+    expect(find.text('Collapsed'), findsOneWidget);
+    expect(find.text('shortcut'), findsOneWidget);
+    expect(find.textContaining('[guide-ref]:'), findsNothing);
+
+    await tester.tap(find.text('Reference label'));
+    await tester.pump();
+    expect(openedHref, isNull);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
+
+    final renderedBlock = find.byKey(
+      const ValueKey('ianvs-markdown-block-0-paragraph'),
+    );
+    final rect = tester.getRect(renderedBlock);
+    await tester.tapAt(Offset(rect.right - 16, rect.center.dy));
+    await tester.pumpAndSettle();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final fieldFinder = find.descendant(
+      of: active,
+      matching: find.byType(TextField),
+    );
+    final field = tester.widget<TextField>(fieldFinder);
+    expect(field.controller?.text, 'Full [Reference label][guide-ref] tail.');
+    expect(controller.text, source);
+
+    TextSpan markerSpan() {
+      final spans = field.controller!
+          .buildTextSpan(
+            context: tester.element(fieldFinder),
+            style: field.style,
+            withComposing: false,
+          )
+          .children!
+          .cast<TextSpan>();
+      return spans.firstWhere((span) => span.text == '[');
+    }
+
+    field.controller!.selection = TextSelection.collapsed(
+      offset: field.controller!.text.length,
+    );
+    await tester.pump();
+    expect(markerSpan().style?.fontSize, .01);
+    field.controller!.selection = const TextSelection.collapsed(offset: 8);
+    await tester.pump();
+    expect(markerSpan().style?.fontSize, greaterThan(1));
+
+    controller.mode = IanvsMarkdownEditorMode.preview;
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Reference label'));
+    await tester.pump();
+    expect(openedHref, 'docs/guide.md');
+  });
+
   testWidgets('ordinary active rail follows only the caret line', (
     tester,
   ) async {

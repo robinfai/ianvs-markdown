@@ -2608,6 +2608,92 @@ void main() {
     expect(inactive.map((span) => span.text).join(), source);
   });
 
+  test(
+    'reference links resolve document definitions before hiding markers',
+    () {
+      const syntax = IanvsMarkdownSyntaxTheme(
+        heading: TextStyle(fontWeight: FontWeight.w600),
+        marker: TextStyle(color: Color(0xff777777)),
+        link: TextStyle(decoration: TextDecoration.underline),
+        code: TextStyle(fontFamily: 'monospace'),
+        comment: TextStyle(fontStyle: FontStyle.italic),
+      );
+      const source =
+          'Full [Reference label][guide-ref]. '
+          'Collapsed [Collapsed][]. Shortcut [shortcut]. '
+          'Image ![Preview][guide-ref]. Undefined [Missing][unknown].\n\n'
+          '- [x] complete\n\n'
+          '[guide-ref]: docs/guide.md "Reference title"\n'
+          '[Collapsed]: docs/collapsed.md\n'
+          '[SHORTCUT]: docs/shortcut.md';
+
+      List<TextSpan> build(int caret) => buildMarkdownSourceTextSpan(
+        TextEditingValue(
+          text: source,
+          selection: TextSelection.collapsed(offset: caret),
+        ),
+        style: const TextStyle(fontSize: 14),
+        syntaxTheme: syntax,
+        withComposing: false,
+        hideInactiveInlineMarkers: true,
+      ).children!.cast<TextSpan>().toList();
+
+      TextSpan spanAt(List<TextSpan> spans, int offset) {
+        var cursor = 0;
+        for (final span in spans) {
+          final end = cursor + (span.text?.length ?? 0);
+          if (offset >= cursor && offset < end) return span;
+          cursor = end;
+        }
+        throw StateError('No span at $offset');
+      }
+
+      final inactive = build(0);
+      for (final location in <String>[
+        '[Reference label',
+        '[Collapsed]',
+        '[shortcut]',
+        '[Preview]',
+      ]) {
+        expect(
+          spanAt(inactive, source.indexOf(location) + 1).style?.decoration,
+          TextDecoration.underline,
+          reason: location,
+        );
+      }
+      for (final marker in <String>['[Reference label', '][guide-ref]']) {
+        expect(
+          spanAt(inactive, source.indexOf(marker)).style?.fontSize,
+          .01,
+          reason: marker,
+        );
+      }
+      expect(
+        spanAt(inactive, source.indexOf('Missing')).style?.decoration,
+        isNull,
+      );
+      expect(
+        spanAt(inactive, source.indexOf('[x]') + 1).style?.decoration,
+        isNull,
+      );
+      expect(
+        spanAt(inactive, source.indexOf('[guide-ref]:')).style?.fontSize,
+        14,
+      );
+
+      final active = build(source.indexOf('Reference label') + 2);
+      expect(
+        spanAt(active, source.indexOf('[Reference label')).style?.fontSize,
+        14,
+      );
+      expect(
+        spanAt(active, source.indexOf('][guide-ref]')).style?.fontSize,
+        14,
+      );
+      expect(inactive.map((span) => span.text).join(), source);
+    },
+  );
+
   test('Obsidian autolinks share boundaries and hide angle wrappers', () {
     const syntax = IanvsMarkdownSyntaxTheme(
       heading: TextStyle(fontWeight: FontWeight.w600),

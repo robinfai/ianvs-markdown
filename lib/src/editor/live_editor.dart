@@ -23,6 +23,7 @@ import 'editor_controller.dart';
 import 'editor_models.dart';
 import 'editor_shortcuts.dart';
 import 'editor_toolbar.dart';
+import 'reference_links.dart';
 import 'source_editor.dart';
 
 enum _RenderedTapSelection { caret, word, line }
@@ -125,6 +126,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   late ScrollController _scrollController;
   late List<IanvsMarkdownBlock> _blocks;
   late IanvsMarkdownHeadingFoldModel _headingFoldModel;
+  late MarkdownLinkReferenceContext _linkReferences;
   late String _lastText;
   late IanvsMarkdownEditorMode _lastMode;
   int? _activeBlockStart;
@@ -312,6 +314,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   }
 
   void _refreshBlocks(String source) {
+    _linkReferences = MarkdownLinkReferenceContext.parse(source);
+    _blockController.linkReferenceLabels = _linkReferences.labels;
     _blocks = parseMarkdownBlocks(source, splitListItems: true);
     _headingFoldModel = IanvsMarkdownHeadingFoldModel.fromBlocks(
       source,
@@ -2978,6 +2982,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         child: _EditableMarkdownTable(
           block: block,
           colors: colors,
+          linkReferenceLabels: _linkReferences.labels,
           onCellChanged: _replaceTableCell,
           onAddRow: () => _appendTableRow(block),
           onAddRowAbove: () => _prependTableRow(block),
@@ -3103,17 +3108,27 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       block.source,
       document: widget.controller.text,
     );
-    if (footnoteDefinition != null) return footnoteDefinition;
-    if (block.type != IanvsMarkdownBlockType.taskList) return block.source;
-    final completed = RegExp(
-      r'^(\s*[-+*]\s+\[[xX]\]\s+)(.*)$',
-    ).firstMatch(block.source);
-    if (completed == null) return block.source;
-    final content = completed.group(2) ?? '';
-    if (content.isEmpty || content.startsWith('~~') && content.endsWith('~~')) {
-      return block.source;
+    var source = footnoteDefinition ?? block.source;
+    if (footnoteDefinition == null &&
+        block.type == IanvsMarkdownBlockType.taskList) {
+      final completed = RegExp(
+        r'^(\s*[-+*]\s+\[[xX]\]\s+)(.*)$',
+      ).firstMatch(block.source);
+      final content = completed?.group(2) ?? '';
+      if (completed != null &&
+          content.isNotEmpty &&
+          !(content.startsWith('~~') && content.endsWith('~~'))) {
+        source = '${completed.group(1)}~~$content~~';
+      }
     }
-    return '${completed.group(1)}~~$content~~';
+    if (block.type == IanvsMarkdownBlockType.fencedCode ||
+        block.type == IanvsMarkdownBlockType.indentedCode ||
+        block.type == IanvsMarkdownBlockType.displayMath ||
+        block.type == IanvsMarkdownBlockType.frontMatter ||
+        block.type == IanvsMarkdownBlockType.html) {
+      return source;
+    }
+    return _linkReferences.appendDefinitionsTo(source);
   }
 
   void _setTaskChecked(IanvsMarkdownBlock block, bool checked) {
@@ -3882,6 +3897,7 @@ class _EditableMarkdownTable extends StatefulWidget {
   const _EditableMarkdownTable({
     required this.block,
     required this.colors,
+    required this.linkReferenceLabels,
     required this.onCellChanged,
     required this.onAddRow,
     required this.onAddRowAbove,
@@ -3890,6 +3906,7 @@ class _EditableMarkdownTable extends StatefulWidget {
 
   final IanvsMarkdownBlock block;
   final IanvsMarkdownThemeData colors;
+  final Set<String> linkReferenceLabels;
   final void Function(_EditableTableCell cell, String value) onCellChanged;
   final VoidCallback onAddRow;
   final VoidCallback onAddRowAbove;
@@ -4172,6 +4189,8 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                                 final focusNode = _focusNodes[cell.key]!;
                                 final controller = _controllers[cell.key]!
                                   ..syntaxTheme = syntaxTheme
+                                  ..linkReferenceLabels =
+                                      widget.linkReferenceLabels
                                   ..revealSource = focusNode.hasFocus;
                                 final editor = Focus(
                                   onKeyEvent: (_, event) =>
@@ -4312,6 +4331,7 @@ class _TableCellEditingController extends TextEditingController {
   _TableCellEditingController({required String text}) : super(text: text);
 
   late IanvsMarkdownSyntaxTheme syntaxTheme;
+  Set<String> linkReferenceLabels = const <String>{};
   var revealSource = false;
 
   @override
@@ -4333,6 +4353,7 @@ class _TableCellEditingController extends TextEditingController {
       withComposing: withComposing && revealSource,
       hideInactiveInlineMarkers: !revealSource,
       hideInactiveEscapeMarkers: !revealSource,
+      linkReferenceLabels: linkReferenceLabels,
     );
   }
 }
@@ -5202,6 +5223,7 @@ class _ActiveQuoteRailsPainter extends CustomPainter {
 
 class _BlockEditingController extends TextEditingController {
   IanvsMarkdownSyntaxTheme? syntaxTheme;
+  Set<String> linkReferenceLabels = const <String>{};
   bool highlightFencedCode = false;
   int leadingMarkerCharacters = 0;
   bool revealLeadingMarker = false;
@@ -5261,6 +5283,7 @@ class _BlockEditingController extends TextEditingController {
               syntaxTheme: syntax,
               withComposing: withComposing,
               hideInactiveInlineMarkers: true,
+              linkReferenceLabels: linkReferenceLabels,
             ),
         ],
       );
@@ -5272,6 +5295,7 @@ class _BlockEditingController extends TextEditingController {
         style: style,
         syntaxTheme: syntax,
         withComposing: withComposing,
+        linkReferenceLabels: linkReferenceLabels,
       );
     }
     final hiddenCharacters = hiddenLeadingCharacters.clamp(
@@ -5298,6 +5322,7 @@ class _BlockEditingController extends TextEditingController {
               syntaxTheme: syntax,
               withComposing: withComposing,
               hideInactiveInlineMarkers: true,
+              linkReferenceLabels: linkReferenceLabels,
             ),
         ],
       );
@@ -5308,6 +5333,7 @@ class _BlockEditingController extends TextEditingController {
       syntaxTheme: syntax,
       withComposing: withComposing,
       hideInactiveInlineMarkers: true,
+      linkReferenceLabels: linkReferenceLabels,
     );
   }
 }
@@ -5318,6 +5344,7 @@ TextSpan _buildTextSpanWithHiddenRanges(
   required TextStyle? style,
   required IanvsMarkdownSyntaxTheme syntaxTheme,
   required bool withComposing,
+  required Set<String> linkReferenceLabels,
 }) {
   final children = <InlineSpan>[];
   var cursor = 0;
@@ -5333,6 +5360,7 @@ TextSpan _buildTextSpanWithHiddenRanges(
           style: style,
           syntaxTheme: syntaxTheme,
           withComposing: withComposing,
+          linkReferenceLabels: linkReferenceLabels,
         ),
       );
     }
@@ -5352,6 +5380,7 @@ TextSpan _buildTextSpanWithHiddenRanges(
         style: style,
         syntaxTheme: syntaxTheme,
         withComposing: withComposing,
+        linkReferenceLabels: linkReferenceLabels,
       ),
     );
   }
@@ -5365,6 +5394,7 @@ TextSpan _buildMarkdownSegmentSpan(
   required TextStyle? style,
   required IanvsMarkdownSyntaxTheme syntaxTheme,
   required bool withComposing,
+  required Set<String> linkReferenceLabels,
 }) {
   final selection =
       value.selection.isValid &&
@@ -5396,6 +5426,7 @@ TextSpan _buildMarkdownSegmentSpan(
     syntaxTheme: syntaxTheme,
     withComposing: withComposing,
     hideInactiveInlineMarkers: true,
+    linkReferenceLabels: linkReferenceLabels,
   );
 }
 
