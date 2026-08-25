@@ -5650,6 +5650,59 @@ Standard[^note] and inline ^[inline body].
     );
   });
 
+  testWidgets('paired fence info keeps repeated empty code lines active', (
+    tester,
+  ) async {
+    const paired = '```dart\n```';
+    final controller = IanvsMarkdownController(text: paired)
+      ..selection = const TextSelection.collapsed(offset: 7);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1000,
+            height: 720,
+            child: IanvsMarkdownLiveEditor(
+              controller: controller,
+              autofocus: true,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final fieldFinder = find.descendant(
+      of: active,
+      matching: find.byType(TextField),
+    );
+    expect(tester.widget<TextField>(fieldFinder).focusNode?.hasFocus, isTrue);
+
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: '```dart\n\n```',
+        selection: TextSelection.collapsed(offset: 8),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.text, '```dart\n\n```');
+    expect(controller.selection, const TextSelection.collapsed(offset: 8));
+
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: '```dart\n\n\n```',
+        selection: TextSelection.collapsed(offset: 9),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.text, '```dart\n\n\n```');
+    expect(controller.selection, const TextSelection.collapsed(offset: 9));
+    expect(tester.widget<TextField>(fieldFinder).focusNode?.hasFocus, isTrue);
+  });
+
   testWidgets('Enter after a closing fence hands input to a new paragraph', (
     tester,
   ) async {

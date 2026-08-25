@@ -962,6 +962,49 @@ void main() {
       );
     });
 
+    test('paired fence info keeps repeated empty code lines active', () {
+      var value = _typeCharacter(formatter, '``', 2, '`');
+      for (final character in 'dart'.split('')) {
+        value = _typeCharacter(
+          formatter,
+          value.text,
+          value.selection.extentOffset,
+          character,
+        );
+      }
+      expect(
+        value,
+        const TextEditingValue(
+          text: '```dart\n```',
+          selection: TextSelection.collapsed(offset: 7),
+        ),
+      );
+
+      final firstEmptyLine = _pressEnterAt(
+        formatter,
+        value.text,
+        value.selection.extentOffset,
+      );
+      expect(
+        firstEmptyLine,
+        const TextEditingValue(
+          text: '```dart\n\n```',
+          selection: TextSelection.collapsed(offset: 8),
+        ),
+      );
+      expect(
+        _pressEnterAt(
+          formatter,
+          firstEmptyLine.text,
+          firstEmptyLine.selection.extentOffset,
+        ),
+        const TextEditingValue(
+          text: '```dart\n\n\n```',
+          selection: TextSelection.collapsed(offset: 9),
+        ),
+      );
+    });
+
     test('syntax fences indent after opening delimiters', () {
       const braced = '```dart\nif (ready) {\n}\n```';
       final bracedCaret = braced.indexOf('\n}');
