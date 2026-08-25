@@ -35,8 +35,6 @@ import 'package:re_highlight/languages/typescript.dart';
 import 'package:re_highlight/languages/xml.dart';
 import 'package:re_highlight/languages/yaml.dart';
 import 'package:re_highlight/re_highlight.dart';
-import 'package:re_highlight/styles/github.dart';
-import 'package:re_highlight/styles/github-dark.dart';
 
 import 'code_surface.dart';
 import 'scroll_fade_region.dart';
@@ -235,16 +233,17 @@ class _IanvsMarkdownCodeBlockState extends State<IanvsMarkdownCodeBlock> {
     final colors = IanvsMarkdownThemeData.resolve(context, widget.theme);
     final dark = Theme.of(context).brightness == Brightness.dark;
     final radius = colors.smallRadius / 2;
-    final canvasColor = dark ? colors.surfaceMuted : colors.surfaceRaised;
-    final frameColor = _hovered
-        ? colors.border.withValues(alpha: dark ? .72 : .62)
-        : colors.borderSoft.withValues(alpha: dark ? .72 : .82);
+    final canvasColor = colors.surface;
+    final patternColor = (dark ? Colors.white : Colors.black).withValues(
+      alpha: .12,
+    );
+    final frameColor = colors.borderSoft;
     final baseStyle = TextStyle(
-      color: colors.textPrimary,
+      color: colors.codeForeground,
       fontFamily: colors.monoFontFamily,
       fontFamilyFallback: colors.monoFontFamilyFallback,
-      fontSize: 13.25,
-      height: 1.55,
+      fontSize: 14,
+      height: 1.5,
       letterSpacing: 0,
     );
     final normalizedLanguage = normalizeMarkdownCodeLanguage(widget.language);
@@ -267,14 +266,7 @@ class _IanvsMarkdownCodeBlockState extends State<IanvsMarkdownCodeBlock> {
     };
     final editing =
         widget.presentation == IanvsMarkdownCodeBlockPresentation.editing;
-    final showActions =
-        _hovered ||
-        !desktopHoverControls ||
-        (editing && widget.language == null);
-    final showLanguage =
-        editing &&
-        (!_hovered || !desktopHoverControls) &&
-        widget.language != null;
+    final showActions = editing || _hovered || !desktopHoverControls || _copied;
 
     final codeViewport = LayoutBuilder(
       builder: (context, constraints) {
@@ -291,28 +283,29 @@ class _IanvsMarkdownCodeBlockState extends State<IanvsMarkdownCodeBlock> {
     );
     Widget body = Container(
       key: const ValueKey('ianvs-markdown-code-canvas'),
-      color: canvasColor,
       child: Stack(
         children: [
           Padding(
             key: const ValueKey('ianvs-markdown-code-content-padding'),
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: codeViewport,
           ),
           Positioned(
-            top: 4,
-            right: 5,
+            top: editing ? 6 : 0,
+            right: editing ? 6 : 0,
             child: _CodeBlockToolbar(
+              source: widget.source,
               language: widget.language == null
                   ? null
                   : markdownCodeLanguageLabel(widget.language),
+              editing: editing,
               highlightSkipped: highlightSkipped,
               copied: _copied,
               isCollapsible: _isCollapsible,
               expanded: _expanded,
               showActions: showActions,
-              showLanguage: showLanguage,
               colors: colors,
+              onCopyCode: widget.onCopyCode,
               onToggleExpanded: () => setState(() => _expanded = !_expanded),
               onCopy: _copy,
             ),
@@ -338,6 +331,7 @@ class _IanvsMarkdownCodeBlockState extends State<IanvsMarkdownCodeBlock> {
         key: const ValueKey('ianvs-markdown-code-block'),
         width: widget.maxWidth ?? double.infinity,
         constraints: BoxConstraints(
+          minHeight: 38,
           maxWidth: widget.maxWidth ?? double.infinity,
         ),
         margin: const EdgeInsets.symmetric(vertical: 8),
@@ -350,7 +344,11 @@ class _IanvsMarkdownCodeBlockState extends State<IanvsMarkdownCodeBlock> {
           color: frameColor,
           radius: radius,
         ),
-        child: body,
+        child: CustomPaint(
+          key: const ValueKey('ianvs-markdown-code-pattern'),
+          painter: IanvsMarkdownCodePatternPainter(color: patternColor),
+          child: body,
+        ),
       ),
     );
     final onTap = widget.onTap;
@@ -372,7 +370,7 @@ class _IanvsMarkdownCodeBlockState extends State<IanvsMarkdownCodeBlock> {
     if (!mounted) return;
     _copiedTimer?.cancel();
     setState(() => _copied = true);
-    _copiedTimer = Timer(const Duration(seconds: 2), () {
+    _copiedTimer = Timer(const Duration(seconds: 1), () {
       if (mounted) setState(() => _copied = false);
     });
   }
@@ -380,61 +378,48 @@ class _IanvsMarkdownCodeBlockState extends State<IanvsMarkdownCodeBlock> {
 
 class _CodeBlockToolbar extends StatelessWidget {
   const _CodeBlockToolbar({
+    required this.source,
     required this.language,
+    required this.editing,
     required this.highlightSkipped,
     required this.copied,
     required this.isCollapsible,
     required this.expanded,
     required this.showActions,
-    required this.showLanguage,
     required this.colors,
+    required this.onCopyCode,
     required this.onToggleExpanded,
     required this.onCopy,
   });
 
+  final String source;
   final String? language;
+  final bool editing;
   final bool highlightSkipped;
   final bool copied;
   final bool isCollapsible;
   final bool expanded;
   final bool showActions;
-  final bool showLanguage;
   final IanvsMarkdownThemeData colors;
+  final IanvsMarkdownCodeCopyHandler? onCopyCode;
   final VoidCallback onToggleExpanded;
   final VoidCallback onCopy;
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedSwitcher(
+    if (!showActions && !highlightSkipped) {
+      return const SizedBox.shrink(
+        key: ValueKey('ianvs-markdown-code-toolbar'),
+      );
+    }
+    return Row(
       key: const ValueKey('ianvs-markdown-code-toolbar'),
-      duration: const Duration(milliseconds: 120),
-      switchInCurve: Curves.easeOutCubic,
-      switchOutCurve: Curves.easeInCubic,
-      child: Row(
-        key: ValueKey((showActions, showLanguage)),
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (showLanguage && language != null)
-            Semantics(
-              key: const ValueKey('ianvs-markdown-code-language-badge'),
-              label: language,
-              excludeSemantics: true,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(5, 2, 5, 3),
-                child: Text(
-                  language!,
-                  style: TextStyle(
-                    color: colors.textTertiary.withValues(alpha: .88),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: .1,
-                  ),
-                ),
-              ),
-            ),
-          if (highlightSkipped) ...[
-            if (showLanguage) const SizedBox(width: 8),
-            Tooltip(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (highlightSkipped)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Tooltip(
               message: '代码过大，已回退为纯文本以保持预览流畅',
               child: Icon(
                 Icons.speed_rounded,
@@ -442,50 +427,126 @@ class _CodeBlockToolbar extends StatelessWidget {
                 color: colors.textTertiary,
               ),
             ),
-          ],
-          if (showActions) ...[
-            if (showLanguage || highlightSkipped)
-              const SizedBox(
-                key: ValueKey('ianvs-markdown-code-action-strip'),
-                width: 3,
-              )
-            else
-              const SizedBox(key: ValueKey('ianvs-markdown-code-action-strip')),
-            if (isCollapsible)
-              TextButton.icon(
-                onPressed: onToggleExpanded,
-                style: TextButton.styleFrom(
-                  foregroundColor: colors.textSecondary,
+          ),
+        if (showActions && isCollapsible) ...[
+          TextButton.icon(
+            onPressed: onToggleExpanded,
+            style:
+                TextButton.styleFrom(
+                  foregroundColor: colors.codeForeground,
+                  backgroundColor: Colors.transparent,
                   visualDensity: VisualDensity.compact,
-                  minimumSize: const Size(0, 24),
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  minimumSize: Size.zero,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 4,
+                  ),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(3),
+                    borderRadius: BorderRadius.circular(4),
                   ),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  textStyle: const TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w600,
+                  textStyle: const TextStyle(fontSize: 12),
+                ).copyWith(
+                  overlayColor: WidgetStatePropertyAll(
+                    colors.codeForeground.withValues(alpha: .2),
                   ),
                 ),
-                icon: Icon(
-                  expanded
-                      ? Icons.unfold_less_rounded
-                      : Icons.unfold_more_rounded,
-                  size: 13,
-                ),
-                label: Text(expanded ? '收起' : '展开'),
-              ),
-            if (isCollapsible) const SizedBox(width: 2),
-            _CodeToolbarButton(
+            icon: Icon(
+              expanded ? Icons.unfold_less_rounded : Icons.unfold_more_rounded,
+              size: 14,
+            ),
+            label: Text(expanded ? '收起' : '展开'),
+          ),
+          const SizedBox(width: 2),
+        ],
+        if (showActions && editing)
+          IanvsMarkdownCodeFlair(
+            source: source,
+            language: language,
+            theme: colors,
+            onCopyCode: onCopyCode,
+          )
+        else if (showActions)
+          KeyedSubtree(
+            key: const ValueKey('ianvs-markdown-code-action-strip'),
+            child: _CodeToolbarButton(
               tooltip: copied ? '已复制到剪贴板' : '复制',
               icon: copied ? Icons.check_rounded : Icons.content_copy_rounded,
               selected: copied,
               colors: colors,
               onPressed: onCopy,
             ),
-          ],
-        ],
+          ),
+      ],
+    );
+  }
+}
+
+/// Obsidian Live Preview's persistent code-block flair.
+///
+/// A labeled fence shows its language; an unlabeled fence shows the copy icon.
+/// Both forms copy the exact code payload when pressed.
+class IanvsMarkdownCodeFlair extends StatelessWidget {
+  const IanvsMarkdownCodeFlair({
+    super.key,
+    required this.source,
+    this.language,
+    this.theme,
+    this.onCopyCode,
+  });
+
+  final String source;
+  final String? language;
+  final IanvsMarkdownThemeData? theme;
+  final IanvsMarkdownCodeCopyHandler? onCopyCode;
+
+  Future<void> _copy() async {
+    final handler = onCopyCode;
+    if (handler == null) {
+      await Clipboard.setData(ClipboardData(text: source));
+    } else {
+      await handler(source);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = IanvsMarkdownThemeData.resolve(context, theme);
+    final label = language == null ? null : markdownCodeLanguageLabel(language);
+    final hasLabel = label != null && label.isNotEmpty;
+    return Tooltip(
+      message: '复制',
+      child: TextButton(
+        key: const ValueKey('ianvs-markdown-code-flair'),
+        onPressed: _copy,
+        style:
+            TextButton.styleFrom(
+              foregroundColor: colors.codeForeground,
+              backgroundColor: Colors.transparent,
+              minimumSize: Size.zero,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.compact,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+              ),
+              textStyle: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+              ),
+            ).copyWith(
+              overlayColor: WidgetStatePropertyAll(
+                colors.codeForeground.withValues(alpha: .2),
+              ),
+            ),
+        child: hasLabel
+            ? Semantics(
+                key: const ValueKey('ianvs-markdown-code-language-badge'),
+                label: label,
+                excludeSemantics: true,
+                child: Text(label),
+              )
+            : const Icon(Icons.content_copy_rounded, size: 16),
       ),
     );
   }
@@ -511,22 +572,23 @@ class _CodeToolbarButton extends StatelessWidget {
     return IconButton(
       tooltip: tooltip,
       onPressed: onPressed,
-      icon: Icon(icon, size: 14),
-      style: IconButton.styleFrom(
-        foregroundColor: selected ? colors.accentDark : colors.textSecondary,
-        backgroundColor: selected
-            ? colors.accentMist
-            : colors.surface.withValues(alpha: .82),
-        overlayColor: colors.surfaceHover,
-        side: BorderSide(
-          color: selected
-              ? colors.accent.withValues(alpha: .34)
-              : colors.borderSoft.withValues(alpha: .78),
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
-      ),
-      constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-      padding: EdgeInsets.zero,
+      icon: Icon(icon, size: 16),
+      style:
+          IconButton.styleFrom(
+            foregroundColor: selected
+                ? colors.headingAccent(4)
+                : colors.codeForeground,
+            backgroundColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ).copyWith(
+            overlayColor: WidgetStatePropertyAll(
+              colors.codeForeground.withValues(alpha: .2),
+            ),
+          ),
+      constraints: const BoxConstraints(minWidth: 32, minHeight: 28),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       visualDensity: VisualDensity.compact,
     );
   }
@@ -631,7 +693,7 @@ TextSpan markdownHighlightedCodeSpan(
   }
   final renderer = TextSpanRenderer(
     baseStyle,
-    dark ? githubDarkTheme : githubTheme,
+    dark ? _borderDarkCodeTheme : _borderLightCodeTheme,
   );
   result.render(renderer);
   return renderer.span ?? TextSpan(text: source, style: baseStyle);
@@ -654,6 +716,94 @@ String _stripMarkdownTerminalNewline(String source) {
 
 final Highlight _codeHighlighter = _createCodeHighlighter();
 final _HighlightCache _highlightCache = _HighlightCache();
+
+const _borderLightCodeTheme = <String, TextStyle>{
+  'root': TextStyle(color: Color(0xff545664)),
+  'doctag': TextStyle(color: Color(0xff989bae)),
+  'keyword': TextStyle(color: Color(0xffdd1399)),
+  'meta-keyword': TextStyle(color: Color(0xffdd1399)),
+  'template-tag': TextStyle(color: Color(0xffdd2c38)),
+  'template-variable': TextStyle(color: Color(0xff16a6ab)),
+  'type': TextStyle(color: Color(0xffc09c0c)),
+  'variable.language_': TextStyle(color: Color(0xff16a6ab)),
+  'title': TextStyle(color: Color(0xffc09c0c)),
+  'title.class_': TextStyle(color: Color(0xffc09c0c)),
+  'title.class_.inherited__': TextStyle(color: Color(0xffc09c0c)),
+  'title.function_': TextStyle(color: Color(0xffc09c0c)),
+  'attr': TextStyle(color: Color(0xff1da51d)),
+  'attribute': TextStyle(color: Color(0xff1da51d)),
+  'literal': TextStyle(color: Color(0xff8f47e1)),
+  'meta': TextStyle(color: Color(0xff989bae)),
+  'number': TextStyle(color: Color(0xff8f47e1)),
+  'operator': TextStyle(color: Color(0xffdd2c38)),
+  'variable': TextStyle(color: Color(0xff16a6ab)),
+  'selector-attr': TextStyle(color: Color(0xff1da51d)),
+  'selector-class': TextStyle(color: Color(0xff1da51d)),
+  'selector-id': TextStyle(color: Color(0xff1da51d)),
+  'regexp': TextStyle(color: Color(0xffde7417)),
+  'string': TextStyle(color: Color(0xff1da51d)),
+  'meta-string': TextStyle(color: Color(0xff1da51d)),
+  'built_in': TextStyle(color: Color(0xffc09c0c)),
+  'symbol': TextStyle(color: Color(0xffdd2c38)),
+  'comment': TextStyle(color: Color(0xff989bae)),
+  'code': TextStyle(color: Color(0xff989bae)),
+  'formula': TextStyle(color: Color(0xff989bae)),
+  'name': TextStyle(color: Color(0xffdd2c38)),
+  'quote': TextStyle(color: Color(0xff1da51d)),
+  'selector-tag': TextStyle(color: Color(0xff1da51d)),
+  'selector-pseudo': TextStyle(color: Color(0xff1da51d)),
+  'subst': TextStyle(color: Color(0xff545664)),
+  'section': TextStyle(color: Color(0xffc09c0c), fontWeight: FontWeight.bold),
+  'bullet': TextStyle(color: Color(0xffdd2c38)),
+  'emphasis': TextStyle(color: Color(0xff545664), fontStyle: FontStyle.italic),
+  'strong': TextStyle(color: Color(0xff545664), fontWeight: FontWeight.bold),
+  'addition': TextStyle(color: Color(0xff1da51d)),
+  'deletion': TextStyle(color: Color(0xffdd2c38)),
+};
+
+const _borderDarkCodeTheme = <String, TextStyle>{
+  'root': TextStyle(color: Color(0xffb8bac7)),
+  'doctag': TextStyle(color: Color(0xff74778b)),
+  'keyword': TextStyle(color: Color(0xfff2b6de)),
+  'meta-keyword': TextStyle(color: Color(0xfff2b6de)),
+  'template-tag': TextStyle(color: Color(0xffff7881)),
+  'template-variable': TextStyle(color: Color(0xff86dfe2)),
+  'type': TextStyle(color: Color(0xffffe88b)),
+  'variable.language_': TextStyle(color: Color(0xff86dfe2)),
+  'title': TextStyle(color: Color(0xffffe88b)),
+  'title.class_': TextStyle(color: Color(0xffffe88b)),
+  'title.class_.inherited__': TextStyle(color: Color(0xffffe88b)),
+  'title.function_': TextStyle(color: Color(0xffffe88b)),
+  'attr': TextStyle(color: Color(0xff7cd37c)),
+  'attribute': TextStyle(color: Color(0xff7cd37c)),
+  'literal': TextStyle(color: Color(0xffcb9eff)),
+  'meta': TextStyle(color: Color(0xff74778b)),
+  'number': TextStyle(color: Color(0xffcb9eff)),
+  'operator': TextStyle(color: Color(0xffff7881)),
+  'variable': TextStyle(color: Color(0xff86dfe2)),
+  'selector-attr': TextStyle(color: Color(0xff7cd37c)),
+  'selector-class': TextStyle(color: Color(0xff7cd37c)),
+  'selector-id': TextStyle(color: Color(0xff7cd37c)),
+  'regexp': TextStyle(color: Color(0xfffbbb83)),
+  'string': TextStyle(color: Color(0xff7cd37c)),
+  'meta-string': TextStyle(color: Color(0xff7cd37c)),
+  'built_in': TextStyle(color: Color(0xffffe88b)),
+  'symbol': TextStyle(color: Color(0xffff7881)),
+  'comment': TextStyle(color: Color(0xff74778b)),
+  'code': TextStyle(color: Color(0xff74778b)),
+  'formula': TextStyle(color: Color(0xff74778b)),
+  'name': TextStyle(color: Color(0xffff7881)),
+  'quote': TextStyle(color: Color(0xff7cd37c)),
+  'selector-tag': TextStyle(color: Color(0xff7cd37c)),
+  'selector-pseudo': TextStyle(color: Color(0xff7cd37c)),
+  'subst': TextStyle(color: Color(0xffb8bac7)),
+  'section': TextStyle(color: Color(0xffffe88b), fontWeight: FontWeight.bold),
+  'bullet': TextStyle(color: Color(0xffff7881)),
+  'emphasis': TextStyle(color: Color(0xffb8bac7), fontStyle: FontStyle.italic),
+  'strong': TextStyle(color: Color(0xffb8bac7), fontWeight: FontWeight.bold),
+  'addition': TextStyle(color: Color(0xff7cd37c)),
+  'deletion': TextStyle(color: Color(0xffff7881)),
+};
 
 Highlight _createCodeHighlighter() {
   return Highlight()..registerLanguages(<String, Mode>{

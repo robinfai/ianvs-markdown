@@ -2657,10 +2657,13 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       r'^ {0,3}!\[\[[^\]\n]+\]\][ \t]*$',
     ).hasMatch(block.source);
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final activeCodeCanvasColor = dark
-        ? colors.surfaceMuted
-        : colors.surfaceRaised;
+    final activeCodeCanvasColor = colors.surface;
+    final activeCodePatternColor = (dark ? Colors.white : Colors.black)
+        .withValues(alpha: .12);
     final activeCodeRadius = colors.smallRadius / 2;
+    final activeCodePayload = fencedCode
+        ? _activeFencedCodePayload(block.source)
+        : null;
     final taskMarker = block.type == IanvsMarkdownBlockType.taskList
         ? RegExp(r'^( {0,3})[-+*]\s+\[([ xX])\][ \t]*').firstMatch(block.source)
         : null;
@@ -2717,6 +2720,13 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         ? (styleSheet.p ?? const TextStyle(fontSize: 14.5, height: 1.58))
               .copyWith(color: colors.textPrimary)
         : _activeBlockTextStyle(block, styleSheet, colors);
+    if (fencedCode) {
+      activeTextStyle = activeTextStyle.copyWith(
+        color: colors.codeForeground,
+        fontSize: 14,
+        height: 1.5,
+      );
+    }
     if (indentedCode) {
       activeTextStyle = activeTextStyle.copyWith(color: colors.accentDark);
     }
@@ -2926,6 +2936,29 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             colors: colors,
             child: activeChild,
           );
+    final surfacedActiveChild = fencedCode
+        ? CustomPaint(
+            key: const ValueKey('ianvs-markdown-active-code-pattern'),
+            painter: IanvsMarkdownCodePatternPainter(
+              color: activeCodePatternColor,
+            ),
+            child: Stack(
+              children: [
+                decoratedActiveChild,
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: IanvsMarkdownCodeFlair(
+                    source: activeCodePayload!.source,
+                    language: activeCodePayload.language,
+                    theme: colors,
+                    onCopyCode: widget.onCopyCode,
+                  ),
+                ),
+              ],
+            ),
+          )
+        : decoratedActiveChild;
     final quoteBlock = quoteMarker != null;
     return _activeMultiTapRegion(
       Focus(
@@ -2942,6 +2975,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           child: Container(
             key: const ValueKey('ianvs-markdown-active-block'),
             constraints: const BoxConstraints(minHeight: 36),
+            clipBehavior: fencedCode ? Clip.antiAlias : Clip.none,
             margin: fencedCode || quoteBlock
                 ? const EdgeInsets.symmetric(horizontal: 10, vertical: 3)
                 : null,
@@ -2955,18 +2989,16 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
                 : null,
             foregroundDecoration: fencedCode
                 ? IanvsMarkdownDashedBorderDecoration(
-                    color: colors.borderSoft.withValues(
-                      alpha: dark ? .72 : .82,
-                    ),
+                    color: colors.borderSoft,
                     radius: activeCodeRadius,
                   )
                 : null,
             padding: fencedCode
-                ? const EdgeInsets.symmetric(horizontal: 12, vertical: 6)
+                ? const EdgeInsets.symmetric(horizontal: 16)
                 : quoteBlock
                 ? EdgeInsets.zero
                 : const EdgeInsets.symmetric(horizontal: 10),
-            child: decoratedActiveChild,
+            child: surfacedActiveChild,
           ),
         ),
       ),
@@ -3393,7 +3425,11 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         fontFamily: colors.monoFontFamily,
         fontFamilyFallback: colors.monoFontFamilyFallback,
       ),
-      codeBlock: TextStyle(color: colors.textPrimary),
+      codeBlock: TextStyle(
+        color: colors.codeForeground,
+        fontSize: 14,
+        height: 1.5,
+      ),
       strong: TextStyle(
         color: colors.strongForeground,
         fontWeight: FontWeight.w600,
@@ -6042,6 +6078,56 @@ TextRange _shiftTextRange(TextRange range, int delta) {
     start: (range.start + delta).clamp(0, 1 << 30),
     end: (range.end + delta).clamp(0, 1 << 30),
   );
+}
+
+({String source, String? language}) _activeFencedCodePayload(String markdown) {
+  final opening = RegExp(
+    r'^ {0,3}((?:`{3,})|(?:~{3,}))(.*?)(?:\r?\n|$)',
+  ).firstMatch(markdown);
+  if (opening == null) return (source: markdown, language: null);
+  final fence = opening.group(1)!;
+  final info = opening.group(2)?.trim() ?? '';
+  final language = info.isEmpty ? null : info.split(RegExp(r'\s+')).first;
+  final bodyStart = opening.end;
+  var bodyEnd = markdown.length;
+  final lastLineStart = markdown.lastIndexOf('\n') + 1;
+  if (lastLineStart >= bodyStart && lastLineStart < markdown.length) {
+    final lastLine = markdown.substring(lastLineStart);
+    if (_isMatchingClosingFence(lastLine, fence)) bodyEnd = lastLineStart;
+  }
+  if (bodyEnd > bodyStart && markdown.codeUnitAt(bodyEnd - 1) == 0x0a) {
+    bodyEnd -= 1;
+    if (bodyEnd > bodyStart && markdown.codeUnitAt(bodyEnd - 1) == 0x0d) {
+      bodyEnd -= 1;
+    }
+  }
+  return (
+    source: markdown.substring(bodyStart, bodyEnd),
+    language: language == null ? null : markdownCodeLanguageLabel(language),
+  );
+}
+
+bool _isMatchingClosingFence(String line, String openingFence) {
+  var end = line.length;
+  if (end > 0 && line.codeUnitAt(end - 1) == 0x0d) end -= 1;
+  var index = 0;
+  while (index < end && index < 3 && line.codeUnitAt(index) == 0x20) {
+    index += 1;
+  }
+  var fenceLength = 0;
+  final fenceCharacter = openingFence.codeUnitAt(0);
+  while (index + fenceLength < end &&
+      line.codeUnitAt(index + fenceLength) == fenceCharacter) {
+    fenceLength += 1;
+  }
+  if (fenceLength < openingFence.length) return false;
+  index += fenceLength;
+  while (index < end) {
+    final codeUnit = line.codeUnitAt(index);
+    if (codeUnit != 0x20 && codeUnit != 0x09) return false;
+    index += 1;
+  }
+  return true;
 }
 
 TextSpan _buildHighlightedFencedCodeSpan(

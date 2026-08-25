@@ -21,6 +21,7 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
     required this.accentSoft,
     required this.accentMist,
     required this.error,
+    Color? codeForeground,
     Color? inlineCodeForeground,
     Color? strongForeground,
     Color? emphasisForeground,
@@ -41,7 +42,8 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
     this.smallRadius = 8,
     this.mediumRadius = 10,
     this.largeRadius = 14,
-  }) : inlineCodeForeground = inlineCodeForeground ?? textPrimary,
+  }) : codeForeground = codeForeground ?? textSecondary,
+       inlineCodeForeground = inlineCodeForeground ?? textPrimary,
        strongForeground = strongForeground ?? textPrimary,
        emphasisForeground = emphasisForeground ?? textPrimary;
 
@@ -60,6 +62,7 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
     accentSoft: Color(0xffdceced),
     accentMist: Color(0xffeef7f7),
     error: Color(0xffc33f43),
+    codeForeground: Color(0xff545664),
     inlineCodeForeground: Color(0xffdd1399),
     strongForeground: Color(0xffdd2c38),
     emphasisForeground: Color(0xffde7417),
@@ -88,6 +91,7 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
     accentSoft: Color(0xff27484a),
     accentMist: Color(0xff24393b),
     error: Color(0xffff8a8e),
+    codeForeground: Color(0xffb8bac7),
     inlineCodeForeground: Color(0xfff2b6de),
     strongForeground: Color(0xffff7881),
     emphasisForeground: Color(0xfffbbb83),
@@ -115,6 +119,7 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
   final Color accentSoft;
   final Color accentMist;
   final Color error;
+  final Color codeForeground;
   final Color inlineCodeForeground;
   final Color strongForeground;
   final Color emphasisForeground;
@@ -156,6 +161,7 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
     Color? accentSoft,
     Color? accentMist,
     Color? error,
+    Color? codeForeground,
     Color? inlineCodeForeground,
     Color? strongForeground,
     Color? emphasisForeground,
@@ -181,6 +187,7 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
       accentSoft: accentSoft ?? this.accentSoft,
       accentMist: accentMist ?? this.accentMist,
       error: error ?? this.error,
+      codeForeground: codeForeground ?? this.codeForeground,
       inlineCodeForeground: inlineCodeForeground ?? this.inlineCodeForeground,
       strongForeground: strongForeground ?? this.strongForeground,
       emphasisForeground: emphasisForeground ?? this.emphasisForeground,
@@ -215,6 +222,7 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
       accentSoft: Color.lerp(accentSoft, other.accentSoft, t)!,
       accentMist: Color.lerp(accentMist, other.accentMist, t)!,
       error: Color.lerp(error, other.error, t)!,
+      codeForeground: Color.lerp(codeForeground, other.codeForeground, t)!,
       inlineCodeForeground: Color.lerp(
         inlineCodeForeground,
         other.inlineCodeForeground,

@@ -4975,6 +4975,7 @@ Standard[^note] and inline ^[inline body].
   testWidgets('active fenced code preserves the rendered surface hierarchy', (
     tester,
   ) async {
+    String? copied;
     final controller = IanvsMarkdownController(
       text: '```dart\nfinal value = 1;\n```',
     );
@@ -4989,6 +4990,7 @@ Standard[^note] and inline ^[inline body].
             child: IanvsMarkdownLiveEditor(
               controller: controller,
               autofocus: true,
+              onCopyCode: (source) => copied = source,
             ),
           ),
         ),
@@ -4999,8 +5001,9 @@ Standard[^note] and inline ^[inline body].
     expect(tester.takeException(), isNull);
     final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
     final container = tester.widget<Container>(active);
+    expect(container.clipBehavior, Clip.antiAlias);
     final decoration = container.decoration! as BoxDecoration;
-    expect(decoration.color, IanvsMarkdownThemeData.light.surfaceRaised);
+    expect(decoration.color, IanvsMarkdownThemeData.light.surface);
     expect(decoration.border, isNull);
     final frame =
         container.foregroundDecoration! as IanvsMarkdownDashedBorderDecoration;
@@ -5016,10 +5019,22 @@ Standard[^note] and inline ^[inline body].
       const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
     );
     expect(container.foregroundDecoration, isNotNull);
-    expect(
-      container.padding,
-      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    expect(container.padding, const EdgeInsets.symmetric(horizontal: 16));
+    final pattern = tester.widget<CustomPaint>(
+      find.byKey(const ValueKey('ianvs-markdown-active-code-pattern')),
     );
+    final patternPainter = pattern.painter! as IanvsMarkdownCodePatternPainter;
+    expect(patternPainter.tileSize, 4);
+    expect(patternPainter.dotSize, 1);
+    expect(patternPainter.color, Colors.black.withValues(alpha: .12));
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-code-language-badge')),
+      findsOneWidget,
+    );
+    expect(find.text('Dart'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('ianvs-markdown-code-flair')));
+    await tester.pump();
+    expect(copied, 'final value = 1;');
     final codeLineRail = find.byKey(
       const ValueKey('ianvs-markdown-active-code-line-rail'),
     );
@@ -5055,6 +5070,34 @@ Standard[^note] and inline ^[inline body].
       keywordSpans.any((span) => span.style?.color != field.style?.color),
       isTrue,
     );
+  });
+
+  testWidgets('active code flair copies only the exact nested-fence payload', (
+    tester,
+  ) async {
+    const source = '````markdown\n```dart\nfinal value = 1;\n```\n\n````';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    String? copied;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: IanvsMarkdownLiveEditor(
+            controller: controller,
+            autofocus: true,
+            onCopyCode: (value) => copied = value,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Markdown'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('ianvs-markdown-code-flair')));
+    await tester.pump();
+    expect(copied, '```dart\nfinal value = 1;\n```\n');
+    expect(controller.text, source);
   });
 
   testWidgets('empty fenced code renders a canvas until activated', (

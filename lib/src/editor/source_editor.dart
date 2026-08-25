@@ -478,7 +478,6 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  field,
                   IgnorePointer(
                     child: CustomPaint(
                       key: const ValueKey(
@@ -500,6 +499,7 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
                       ),
                     ),
                   ),
+                  field,
                 ],
               ),
             ),
@@ -570,13 +570,10 @@ class _SourceFencedCodeBackgroundPainter extends CustomPainter {
     )..layout(maxWidth: contentWidth);
     final positions = scrollController.positions;
     final scrollOffset = positions.isEmpty ? 0.0 : positions.last.pixels;
-    final fill = Paint()
-      ..color = colors.accent.withValues(alpha: dark ? .045 : .025)
-      ..style = PaintingStyle.fill;
     final outline = Paint()
       ..color = colors.borderSoft
       ..style = PaintingStyle.stroke
-      ..strokeWidth = .8;
+      ..strokeWidth = 1;
     final activeRail = Paint()
       ..color = colors.accent
       ..style = PaintingStyle.fill;
@@ -605,9 +602,16 @@ class _SourceFencedCodeBackgroundPainter extends CustomPainter {
         padding.top + bottom - scrollOffset + 3,
       );
       if (rect.bottom < 0 || rect.top > size.height) continue;
-      final radius = Radius.circular(colors.smallRadius);
+      final radius = Radius.circular(colors.smallRadius / 2);
       final rounded = RRect.fromRectAndRadius(rect, radius);
-      canvas.drawRRect(rounded, fill);
+      canvas.save();
+      canvas.clipRRect(rounded);
+      paintIanvsMarkdownCodePattern(
+        canvas,
+        rect,
+        color: (dark ? Colors.white : Colors.black).withValues(alpha: .12),
+      );
+      canvas.restore();
       paintIanvsMarkdownDashedRRect(canvas, rounded, outline);
       if (caret >= range.start && caret <= range.end) {
         final rail = RRect.fromRectAndRadius(
@@ -705,7 +709,11 @@ IanvsMarkdownSyntaxTheme ianvsMarkdownSyntaxTheme(
       fontFamily: colors.monoFontFamily,
       fontFamilyFallback: colors.monoFontFamilyFallback,
     ),
-    codeBlock: TextStyle(color: colors.textPrimary),
+    codeBlock: TextStyle(
+      color: colors.codeForeground,
+      fontSize: 14,
+      height: 1.5,
+    ),
     strong: TextStyle(
       color: colors.strongForeground,
       fontWeight: FontWeight.w600,

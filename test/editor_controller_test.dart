@@ -2890,7 +2890,7 @@ Hidden **source** block.
     final keyword = spans.singleWhere(
       (span) => span.text?.contains('final') ?? false,
     );
-    expect(keyword.style?.color, const Color(0xffff7b72));
+    expect(keyword.style?.color, const Color(0xfff2b6de));
     expect(spans.last.text, '```');
     expect(spans.last.style?.color, const Color(0xff777777));
     expect(spans.map((span) => span.text).join(), source);

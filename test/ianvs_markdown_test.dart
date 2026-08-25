@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -18,15 +20,28 @@ void main() {
     );
   }
 
-  test('inline-code theme color is customizable and interpolates', () {
+  test('code theme colors are customizable and interpolate', () {
     const customPrimary = Color(0xff123456);
+    const customCode = Color(0xff345678);
     const customInline = Color(0xff654321);
     final fallback = IanvsMarkdownThemeData.light.copyWith(
       textPrimary: customPrimary,
+      codeForeground: customCode,
       inlineCodeForeground: customInline,
     );
 
+    expect(fallback.codeForeground, customCode);
     expect(fallback.inlineCodeForeground, customInline);
+    expect(
+      IanvsMarkdownThemeData.light
+          .lerp(IanvsMarkdownThemeData.dark, .5)
+          .codeForeground,
+      Color.lerp(
+        IanvsMarkdownThemeData.light.codeForeground,
+        IanvsMarkdownThemeData.dark.codeForeground,
+        .5,
+      ),
+    );
     expect(
       IanvsMarkdownThemeData.light
           .lerp(IanvsMarkdownThemeData.dark, .5)
@@ -37,6 +52,26 @@ void main() {
         .5,
       ),
     );
+  });
+
+  test('Border code pattern paints two one-pixel dots per 4px tile', () async {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    const painter = IanvsMarkdownCodePatternPainter(color: Color(0x1f000000));
+    painter.paint(canvas, const Size(4, 4));
+    final image = await recorder.endRecording().toImage(4, 4);
+    final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    final bytes = data!.buffer.asUint8List();
+
+    List<int> pixel(int x, int y) {
+      final offset = (y * 4 + x) * 4;
+      return bytes.sublist(offset, offset + 4);
+    }
+
+    expect(pixel(1, 3), <int>[0, 0, 0, 31]);
+    expect(pixel(3, 1), <int>[0, 0, 0, 31]);
+    expect(pixel(0, 0), <int>[0, 0, 0, 0]);
+    expect(pixel(2, 2), <int>[0, 0, 0, 0]);
   });
 
   test('strong and emphasis theme colors customize and interpolate', () {
@@ -748,142 +783,189 @@ Literal:A``Z
     expect(find.byType(Image), findsNothing);
   });
 
-  testWidgets(
-    'editing code blocks use flat Obsidian chrome and copy on hover',
-    (tester) async {
-      final semanticsHandle = tester.ensureSemantics();
-      await tester.pumpWidget(
-        app(
-          const IanvsMarkdown(
-            data: '''
+  testWidgets('editing code blocks keep persistent copyable Border flair', (
+    tester,
+  ) async {
+    final semanticsHandle = tester.ensureSemantics();
+    String? copied;
+    await tester.pumpWidget(
+      app(
+        IanvsMarkdown(
+          data: '''
 ```dart
 final first = 1;
 final second = 2;
 return first + second;
 ```
 ''',
-            obsidianMetadataMode: IanvsMarkdownObsidianMetadataMode.editing,
-          ),
-          theme: ThemeData(platform: TargetPlatform.macOS),
+          obsidianMetadataMode: IanvsMarkdownObsidianMetadataMode.editing,
+          onCopyCode: (source) => copied = source,
         ),
-      );
+        theme: ThemeData(platform: TargetPlatform.macOS),
+      ),
+    );
 
-      expect(
-        find.byKey(const ValueKey('ianvs-markdown-code-language-badge')),
-        findsOneWidget,
-      );
-      expect(
-        tester
-            .getSemantics(
-              find.byKey(const ValueKey('ianvs-markdown-code-language-badge')),
-            )
-            .label,
-        'Dart',
-      );
-      expect(
-        find.byKey(const ValueKey('ianvs-markdown-code-canvas')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const ValueKey('ianvs-markdown-code-line-numbers')),
-        findsNothing,
-      );
-      expect(find.text('3 LINES'), findsNothing);
-      expect(
-        find.byKey(const ValueKey('ianvs-markdown-code-action-strip')),
-        findsNothing,
-      );
-      expect(find.byTooltip('关闭自动换行'), findsNothing);
-      expect(find.byTooltip('复制'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-code-language-badge')),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .getSemantics(
+            find.byKey(const ValueKey('ianvs-markdown-code-language-badge')),
+          )
+          .label,
+      'Dart',
+    );
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-code-canvas')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-code-line-numbers')),
+      findsNothing,
+    );
+    expect(find.text('3 LINES'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-code-action-strip')),
+      findsNothing,
+    );
+    expect(find.byTooltip('关闭自动换行'), findsNothing);
+    expect(find.byTooltip('复制'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-code-flair')),
+      findsOneWidget,
+    );
 
-      final surface = tester.widget<Container>(
-        find.byKey(const ValueKey('ianvs-markdown-code-block')),
-      );
-      final decoration = surface.decoration! as BoxDecoration;
-      expect(decoration.boxShadow, isNull);
-      expect(decoration.border, isNull);
-      final idleFrame =
-          surface.foregroundDecoration! as IanvsMarkdownDashedBorderDecoration;
-      final idleBorderColor = idleFrame.color;
-      expect(idleFrame.strokeWidth, 1);
-      expect(idleFrame.dashLength, 3);
-      expect(idleFrame.gapLength, 3);
-      expect(
-        decoration.borderRadius,
-        BorderRadius.circular(IanvsMarkdownThemeData.light.smallRadius / 2),
-      );
+    final surface = tester.widget<Container>(
+      find.byKey(const ValueKey('ianvs-markdown-code-block')),
+    );
+    expect(surface.constraints?.minHeight, 38);
+    final decoration = surface.decoration! as BoxDecoration;
+    expect(decoration.boxShadow, isNull);
+    expect(decoration.border, isNull);
+    expect(decoration.color, IanvsMarkdownThemeData.light.surface);
+    final idleFrame =
+        surface.foregroundDecoration! as IanvsMarkdownDashedBorderDecoration;
+    expect(idleFrame.strokeWidth, 1);
+    expect(idleFrame.dashLength, 3);
+    expect(idleFrame.gapLength, 3);
+    expect(
+      decoration.borderRadius,
+      BorderRadius.circular(IanvsMarkdownThemeData.light.smallRadius / 2),
+    );
 
-      final canvas = tester.widget<Container>(
-        find.byKey(const ValueKey('ianvs-markdown-code-canvas')),
-      );
-      expect(canvas.decoration, isNull);
-      expect(canvas.color, IanvsMarkdownThemeData.light.surfaceRaised);
+    final canvas = tester.widget<Container>(
+      find.byKey(const ValueKey('ianvs-markdown-code-canvas')),
+    );
+    expect(canvas.decoration, isNull);
+    expect(canvas.color, isNull);
 
-      final contentPadding = tester.widget<Padding>(
-        find.byKey(const ValueKey('ianvs-markdown-code-content-padding')),
-      );
-      expect(contentPadding.padding, const EdgeInsets.all(12));
+    final pattern = tester.widget<CustomPaint>(
+      find.byKey(const ValueKey('ianvs-markdown-code-pattern')),
+    );
+    final patternPainter = pattern.painter! as IanvsMarkdownCodePatternPainter;
+    expect(patternPainter.tileSize, 4);
+    expect(patternPainter.dotSize, 1);
+    expect(patternPainter.color, Colors.black.withValues(alpha: .12));
 
-      final toolbar = tester.widget<AnimatedSwitcher>(
-        find.byKey(const ValueKey('ianvs-markdown-code-toolbar')),
-      );
-      expect(toolbar.duration, const Duration(milliseconds: 120));
+    final contentPadding = tester.widget<Padding>(
+      find.byKey(const ValueKey('ianvs-markdown-code-content-padding')),
+    );
+    expect(
+      contentPadding.padding,
+      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    );
 
-      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
-      addTearDown(mouse.removePointer);
-      await mouse.addPointer(location: Offset.zero);
-      await mouse.moveTo(
-        tester.getCenter(
-          find.byKey(const ValueKey('ianvs-markdown-code-block')),
-        ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 150));
-      expect(
-        find.byKey(const ValueKey('ianvs-markdown-code-language-badge')),
-        findsNothing,
-      );
-      expect(find.text('Dart'), findsNothing);
-      expect(
-        find.byKey(const ValueKey('ianvs-markdown-code-action-strip')),
-        findsOneWidget,
-      );
-      expect(find.byTooltip('关闭自动换行'), findsNothing);
-      expect(find.byTooltip('自动换行'), findsNothing);
-      expect(find.byTooltip('复制'), findsOneWidget);
-      final hoveredSurface = tester.widget<Container>(
-        find.byKey(const ValueKey('ianvs-markdown-code-block')),
-      );
-      final hoveredFrame =
-          hoveredSurface.foregroundDecoration!
-              as IanvsMarkdownDashedBorderDecoration;
-      expect(hoveredFrame.color, isNot(idleBorderColor));
-      expect(
-        hoveredFrame.color,
-        IanvsMarkdownThemeData.light.border.withValues(alpha: .62),
-      );
-      expect(
-        tester
-            .getSize(find.byKey(const ValueKey('ianvs-markdown-code-toolbar')))
-            .width,
-        lessThan(40),
-      );
+    final toolbar = tester.widget<Row>(
+      find.byKey(const ValueKey('ianvs-markdown-code-toolbar')),
+    );
+    expect(toolbar.mainAxisSize, MainAxisSize.min);
 
-      await mouse.moveTo(const Offset(-10, -10));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 150));
-      expect(
-        find.byKey(const ValueKey('ianvs-markdown-code-action-strip')),
-        findsNothing,
-      );
-      expect(
-        find.byKey(const ValueKey('ianvs-markdown-code-language-badge')),
-        findsOneWidget,
-      );
-      expect(find.text('Dart'), findsOneWidget);
-      semanticsHandle.dispose();
-    },
-  );
+    final flair = tester.widget<TextButton>(
+      find.byKey(const ValueKey('ianvs-markdown-code-flair')),
+    );
+    expect(
+      flair.style?.padding?.resolve(<WidgetState>{}),
+      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    );
+    expect(
+      flair.style?.overlayColor?.resolve(<WidgetState>{WidgetState.hovered}),
+      IanvsMarkdownThemeData.light.codeForeground.withValues(alpha: .2),
+    );
+    await tester.tap(find.byKey(const ValueKey('ianvs-markdown-code-flair')));
+    await tester.pump();
+    expect(
+      copied,
+      'final first = 1;\nfinal second = 2;\nreturn first + second;',
+    );
+
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    addTearDown(mouse.removePointer);
+    await mouse.addPointer(location: Offset.zero);
+    await mouse.moveTo(
+      tester.getCenter(find.byKey(const ValueKey('ianvs-markdown-code-block'))),
+    );
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-code-language-badge')),
+      findsOneWidget,
+    );
+    expect(find.text('Dart'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-code-action-strip')),
+      findsNothing,
+    );
+    expect(find.byTooltip('关闭自动换行'), findsNothing);
+    expect(find.byTooltip('自动换行'), findsNothing);
+    expect(find.byTooltip('复制'), findsOneWidget);
+    final hoveredSurface = tester.widget<Container>(
+      find.byKey(const ValueKey('ianvs-markdown-code-block')),
+    );
+    final hoveredFrame =
+        hoveredSurface.foregroundDecoration!
+            as IanvsMarkdownDashedBorderDecoration;
+    expect(hoveredFrame.color, idleFrame.color);
+    expect(
+      tester
+          .getSize(find.byKey(const ValueKey('ianvs-markdown-code-toolbar')))
+          .width,
+      greaterThan(30),
+    );
+    final codeText = tester.widget<SelectableText>(
+      find.descendant(
+        of: find.byType(IanvsMarkdownCodeBlock),
+        matching: find.byType(SelectableText),
+      ),
+    );
+    expect(codeText.style?.fontSize, 14);
+    expect(codeText.style?.height, 1.5);
+    expect(codeText.style?.color, IanvsMarkdownThemeData.light.codeForeground);
+    expect(
+      tester
+          .getSize(
+            find.descendant(
+              of: find.byType(IanvsMarkdownCodeBlock),
+              matching: find.byType(SelectableText),
+            ),
+          )
+          .height,
+      63,
+    );
+
+    await mouse.moveTo(const Offset(-10, -10));
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-code-action-strip')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-code-language-badge')),
+      findsOneWidget,
+    );
+    expect(find.text('Dart'), findsOneWidget);
+    semanticsHandle.dispose();
+  });
 
   testWidgets(
     'editing code blocks keep unlabeled copy visible and unknown labels literal',
@@ -906,7 +988,12 @@ widget := unknown_token(42)
       );
 
       expect(find.byType(IanvsMarkdownCodeBlock), findsNWidgets(2));
-      expect(find.byTooltip('复制'), findsOneWidget);
+      expect(find.byTooltip('复制'), findsNWidgets(2));
+      expect(
+        find.byKey(const ValueKey('ianvs-markdown-code-flair')),
+        findsNWidgets(2),
+      );
+      expect(find.byIcon(Icons.content_copy_rounded), findsOneWidget);
       expect(
         find.byKey(const ValueKey('ianvs-markdown-code-language-badge')),
         findsOneWidget,
@@ -976,9 +1063,86 @@ widget := unknown_token(42)
     expect(find.byTooltip('复制'), findsOneWidget);
     expect(find.byTooltip('关闭自动换行'), findsNothing);
     expect(find.byTooltip('自动换行'), findsNothing);
+    final copyButton = tester.widget<IconButton>(
+      find.descendant(
+        of: find.byType(IanvsMarkdownCodeBlock),
+        matching: find.byType(IconButton),
+      ),
+    );
+    expect(
+      copyButton.constraints,
+      const BoxConstraints(minWidth: 32, minHeight: 28),
+    );
+    expect(
+      copyButton.padding,
+      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+    );
+    expect(
+      copyButton.style?.backgroundColor?.resolve(<WidgetState>{}),
+      Colors.transparent,
+    );
+    expect(
+      copyButton.style?.overlayColor?.resolve(<WidgetState>{
+        WidgetState.hovered,
+      }),
+      IanvsMarkdownThemeData.light.codeForeground.withValues(alpha: .2),
+    );
   });
 
-  testWidgets('touch code blocks keep language and actions discoverable', (
+  testWidgets('dark code blocks use the white Border dot pattern', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(data: '```text\ndark\n```'),
+        theme: ThemeData.dark(),
+      ),
+    );
+
+    final surface = tester.widget<Container>(
+      find.byKey(const ValueKey('ianvs-markdown-code-block')),
+    );
+    expect(
+      (surface.decoration! as BoxDecoration).color,
+      IanvsMarkdownThemeData.dark.surface,
+    );
+    final pattern = tester.widget<CustomPaint>(
+      find.byKey(const ValueKey('ianvs-markdown-code-pattern')),
+    );
+    expect(
+      (pattern.painter! as IanvsMarkdownCodePatternPainter).color,
+      Colors.white.withValues(alpha: .12),
+    );
+  });
+
+  testWidgets('reading copy feedback matches Obsidian one-second check', (
+    tester,
+  ) async {
+    String? copied;
+    await tester.pumpWidget(
+      app(
+        IanvsMarkdown(
+          data: '```text\ncopy me\n```',
+          onCopyCode: (source) => copied = source,
+        ),
+        theme: ThemeData(platform: TargetPlatform.android),
+      ),
+    );
+
+    await tester.tap(find.byTooltip('复制'));
+    await tester.pump();
+    expect(copied, 'copy me');
+    expect(find.byTooltip('已复制到剪贴板'), findsOneWidget);
+    expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 999));
+    expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(find.byTooltip('复制'), findsOneWidget);
+    expect(find.byIcon(Icons.content_copy_rounded), findsOneWidget);
+  });
+
+  testWidgets('touch editing code blocks keep their copyable language flair', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -997,6 +1161,10 @@ widget := unknown_token(42)
     );
     expect(
       find.byKey(const ValueKey('ianvs-markdown-code-action-strip')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-code-flair')),
       findsOneWidget,
     );
     expect(find.text('Dart'), findsOneWidget);
@@ -1238,7 +1406,7 @@ widget := unknown_token(42)
     expect(find.text('收起'), findsOneWidget);
   });
 
-  test('dark code highlighting uses a dark syntax palette', () {
+  test('dark code highlighting uses the Border syntax palette', () {
     final span = markdownHighlightedCodeSpan(
       'final value = true;',
       language: 'dart',
@@ -1246,8 +1414,23 @@ widget := unknown_token(42)
       dark: true,
     );
 
-    expect(_textSpanContainsColor(span, const Color(0xffff7b72)), isTrue);
+    expect(_textSpanContainsColor(span, const Color(0xfff2b6de)), isTrue);
   });
+
+  test(
+    'light code highlighting uses Border keyword string and value colors',
+    () {
+      final span = markdownHighlightedCodeSpan(
+        'final message = "ready"; final count = 42;',
+        language: 'dart',
+        baseStyle: const TextStyle(color: Colors.black),
+      );
+
+      expect(_textSpanContainsColor(span, const Color(0xffdd1399)), isTrue);
+      expect(_textSpanContainsColor(span, const Color(0xff1da51d)), isTrue);
+      expect(_textSpanContainsColor(span, const Color(0xff8f47e1)), isTrue);
+    },
+  );
 
   testWidgets('renders Obsidian Wiki links, aliases, and tag chips', (
     tester,
@@ -1898,9 +2081,13 @@ Done.
 
   testWidgets('uses ThemeExtension colors', (tester) async {
     const customSurface = Color(0xff123456);
+    const customCode = Color(0xffabcdef);
     final theme = ThemeData(
       extensions: <ThemeExtension<dynamic>>[
-        IanvsMarkdownThemeData.light.copyWith(surfaceRaised: customSurface),
+        IanvsMarkdownThemeData.light.copyWith(
+          surface: customSurface,
+          codeForeground: customCode,
+        ),
       ],
     );
     await tester.pumpWidget(
@@ -1911,6 +2098,13 @@ Done.
       find.byKey(const ValueKey('ianvs-markdown-code-block')),
     );
     expect((surface.decoration! as BoxDecoration).color, customSurface);
+    final code = tester.widget<SelectableText>(
+      find.descendant(
+        of: find.byType(IanvsMarkdownCodeBlock),
+        matching: find.byType(SelectableText),
+      ),
+    );
+    expect(code.style?.color, customCode);
   });
 
   testWidgets('uses Obsidian-weight quote rails and horizontal rules', (
