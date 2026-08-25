@@ -1039,6 +1039,37 @@ void main() {
       );
     });
 
+    test('four-backtick fences keep inner triple runs active on Enter', () {
+      const source =
+          '````markdown\n'
+          'literal ``` inner\n'
+          '````\n\n'
+          'After code.';
+      const expected =
+          '````markdown\n'
+          'literal ``` inner\n'
+          '\n'
+          '````\n\n'
+          'After code.';
+      final bodyEnd = source.indexOf('\n````');
+      final closingStart = bodyEnd + 1;
+
+      expect(
+        _pressEnterAt(formatter, source, bodyEnd),
+        TextEditingValue(
+          text: expected,
+          selection: TextSelection.collapsed(offset: bodyEnd + 1),
+        ),
+      );
+      expect(
+        _pressEnterAt(formatter, source, closingStart),
+        TextEditingValue(
+          text: expected,
+          selection: TextSelection.collapsed(offset: closingStart + 1),
+        ),
+      );
+    });
+
     test('syntax fences indent after opening delimiters', () {
       const braced = '```dart\nif (ready) {\n}\n```';
       final bracedCaret = braced.indexOf('\n}');

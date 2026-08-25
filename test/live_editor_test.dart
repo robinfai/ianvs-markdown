@@ -5773,6 +5773,55 @@ Standard[^note] and inline ^[inline body].
     expect(controller.selection, const TextSelection.collapsed(offset: 12));
   });
 
+  testWidgets('four-backtick code keeps inner triples active on Enter', (
+    tester,
+  ) async {
+    const paired =
+        '````markdown\n'
+        'literal ``` inner\n'
+        '````';
+    const source = '$paired\n\nAfter code.';
+    final bodyEnd = paired.indexOf('\n````');
+    final controller = IanvsMarkdownController(text: source)
+      ..selection = TextSelection.collapsed(offset: bodyEnd);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(IanvsMarkdownCodeBlock));
+    await tester.pumpAndSettle();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final fieldFinder = find.descendant(
+      of: active,
+      matching: find.byType(TextField),
+    );
+    final field = tester.widget<TextField>(fieldFinder);
+    field.controller!.selection = TextSelection.collapsed(offset: bodyEnd);
+    await tester.pump();
+
+    const expectedBlock =
+        '````markdown\n'
+        'literal ``` inner\n'
+        '\n'
+        '````';
+    tester.testTextInput.updateEditingValue(
+      TextEditingValue(
+        text: expectedBlock,
+        selection: TextSelection.collapsed(offset: bodyEnd + 1),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(controller.text, '$expectedBlock\n\nAfter code.');
+    expect(controller.selection, TextSelection.collapsed(offset: bodyEnd + 1));
+    expect(find.byType(IanvsMarkdownCodeBlock), findsNothing);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('Enter after a closing fence hands input to a new paragraph', (
     tester,
   ) async {
