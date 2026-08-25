@@ -19,6 +19,7 @@ import 'obsidian_inline.dart';
 import 'obsidian_metadata.dart';
 import 'obsidian_image.dart';
 import 'render_budget.dart';
+import 'task_checkbox.dart';
 import 'theme.dart';
 import 'wiki_embed.dart';
 
@@ -338,7 +339,10 @@ class IanvsMarkdown extends StatelessWidget {
             child: image,
           );
         },
-        checkboxBuilder: checkboxBuilder,
+        checkboxBuilder:
+            checkboxBuilder ??
+            (checked) =>
+                IanvsMarkdownTaskCheckbox(value: checked, theme: colors),
         bulletBuilder:
             bulletBuilder ??
             (parameters) =>

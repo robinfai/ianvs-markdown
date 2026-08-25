@@ -1111,7 +1111,10 @@ void main() {
       );
       if (testCase.task) {
         expect(
-          find.descendant(of: active, matching: find.byType(Checkbox)),
+          find.descendant(
+            of: active,
+            matching: find.byType(IanvsMarkdownTaskCheckbox),
+          ),
           findsOneWidget,
         );
       } else {
@@ -1128,7 +1131,10 @@ void main() {
         findsNothing,
       );
       expect(
-        find.descendant(of: active, matching: find.byType(Checkbox)),
+        find.descendant(
+          of: active,
+          matching: find.byType(IanvsMarkdownTaskCheckbox),
+        ),
         findsNothing,
       );
       field = tester.widget<TextField>(
@@ -3944,7 +3950,10 @@ empty:
     final field = find.descendant(of: active, matching: find.byType(TextField));
     expect(tester.widget<TextField>(field).controller?.text, '- [ ] Open');
     expect(
-      find.descendant(of: active, matching: find.byType(Checkbox)),
+      find.descendant(
+        of: active,
+        matching: find.byType(IanvsMarkdownTaskCheckbox),
+      ),
       findsOneWidget,
     );
     final activeField = tester.widget<TextField>(field);
@@ -4926,7 +4935,37 @@ Standard[^note] and inline ^[inline body].
 
       await tester.pumpWidget(app(controller));
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(Checkbox));
+      final checkbox = find.byType(IanvsMarkdownTaskCheckbox);
+      expect(checkbox, findsOneWidget);
+      expect(tester.widget<IanvsMarkdownTaskCheckbox>(checkbox).value, isFalse);
+      final uncheckedBox = tester.widget<AnimatedContainer>(
+        find.byKey(const ValueKey('ianvs-markdown-task-checkbox-box')),
+      );
+      final uncheckedDecoration = uncheckedBox.decoration! as BoxDecoration;
+      expect(uncheckedDecoration.color, Colors.transparent);
+      expect(
+        (uncheckedDecoration.border! as Border).top.color,
+        IanvsMarkdownThemeData.light.taskCheckboxBorderColor,
+      );
+      expect(uncheckedDecoration.borderRadius, BorderRadius.circular(6));
+
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(mouse.removePointer);
+      await mouse.addPointer(location: Offset.zero);
+      await mouse.moveTo(tester.getCenter(checkbox));
+      await tester.pump(IanvsMarkdownTaskCheckbox.animationDuration);
+      final outline = tester.widget<AnimatedContainer>(
+        find.byKey(const ValueKey('ianvs-markdown-task-checkbox-outline')),
+      );
+      final outlineBorder =
+          (outline.decoration! as BoxDecoration).border! as Border;
+      expect(
+        outlineBorder.top.color,
+        IanvsMarkdownThemeData.light.taskCheckboxHoverOutlineColor,
+      );
+      expect(outlineBorder.top.width, 2);
+
+      await tester.tap(checkbox);
       await tester.pump();
 
       expect(controller.text, '- [x] Open');
@@ -4935,7 +4974,24 @@ Standard[^note] and inline ^[inline body].
         find.byKey(const ValueKey('ianvs-markdown-active-block')),
         findsNothing,
       );
-      expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isTrue);
+      expect(tester.widget<IanvsMarkdownTaskCheckbox>(checkbox).value, isTrue);
+      final checkedDecoration =
+          tester
+                  .widget<AnimatedContainer>(
+                    find.byKey(
+                      const ValueKey('ianvs-markdown-task-checkbox-box'),
+                    ),
+                  )
+                  .decoration!
+              as BoxDecoration;
+      expect(
+        checkedDecoration.color,
+        isNot(IanvsMarkdownThemeData.light.accent),
+      );
+      expect(
+        find.byKey(const ValueKey('ianvs-markdown-task-checkbox-check')),
+        findsOneWidget,
+      );
       final completedText =
           tester
               .widgetList<RichText>(find.byType(RichText))
@@ -4958,6 +5014,32 @@ Standard[^note] and inline ^[inline body].
                     ),
               );
       expect(completedText, isTrue);
+      final completedTextColor =
+          tester
+              .widgetList<RichText>(find.byType(RichText))
+              .any(
+                (richText) => _spanContainsColor(
+                  richText.text,
+                  text: 'Open',
+                  color: IanvsMarkdownThemeData.light.taskDoneColor,
+                ),
+              ) ||
+          tester
+              .widgetList<SelectableText>(find.byType(SelectableText))
+              .any(
+                (selectableText) =>
+                    selectableText.textSpan != null &&
+                    _spanContainsColor(
+                      selectableText.textSpan!,
+                      text: 'Open',
+                      color: IanvsMarkdownThemeData.light.taskDoneColor,
+                    ),
+              );
+      expect(completedTextColor, isTrue);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pump();
+      expect(controller.text, '- [ ] Open');
     },
   );
 
@@ -4982,7 +5064,10 @@ Standard[^note] and inline ^[inline body].
     expect(tester.takeException(), isNull);
     final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
     expect(
-      find.descendant(of: active, matching: find.byType(Checkbox)),
+      find.descendant(
+        of: active,
+        matching: find.byType(IanvsMarkdownTaskCheckbox),
+      ),
       findsOneWidget,
     );
     final field = tester.widget<TextField>(

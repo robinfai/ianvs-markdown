@@ -155,6 +155,44 @@ void main() {
     );
   });
 
+  test('task checkbox theme colors customize and interpolate', () {
+    const checked = Color(0xff123456);
+    const border = Color(0xff234567);
+    const outline = Color(0x40345678);
+    const done = Color(0xff456789);
+    final customized = IanvsMarkdownThemeData.light.copyWith(
+      taskCheckboxColor: checked,
+      taskCheckboxBorderColor: border,
+      taskCheckboxHoverOutlineColor: outline,
+      taskDoneColor: done,
+    );
+
+    expect(customized.taskCheckboxColor, checked);
+    expect(customized.taskCheckboxBorderColor, border);
+    expect(customized.taskCheckboxHoverOutlineColor, outline);
+    expect(customized.taskDoneColor, done);
+    final midpoint = IanvsMarkdownThemeData.light.lerp(
+      IanvsMarkdownThemeData.dark,
+      .5,
+    );
+    expect(
+      midpoint.taskCheckboxColor,
+      Color.lerp(
+        IanvsMarkdownThemeData.light.taskCheckboxColor,
+        IanvsMarkdownThemeData.dark.taskCheckboxColor,
+        .5,
+      ),
+    );
+    expect(
+      midpoint.taskDoneColor,
+      Color.lerp(
+        IanvsMarkdownThemeData.light.taskDoneColor,
+        IanvsMarkdownThemeData.dark.taskDoneColor,
+        .5,
+      ),
+    );
+  });
+
   testWidgets('renders GFM, file links, and interactive fenced code', (
     tester,
   ) async {
@@ -185,6 +223,39 @@ final answer = 42;
 
     expect(find.text('Example'), findsOneWidget);
     expect(find.text('ready'), findsOneWidget);
+    final taskCheckbox = tester.widget<IanvsMarkdownTaskCheckbox>(
+      find.byType(IanvsMarkdownTaskCheckbox),
+    );
+    expect(taskCheckbox.value, isTrue);
+    expect(taskCheckbox.onChanged, isNull);
+    expect(
+      tester.getSize(
+        find.byKey(
+          const ValueKey('ianvs-markdown-task-checkbox-outline'),
+        ),
+      ),
+      const Size.square(24),
+    );
+    final taskBox = tester.widget<AnimatedContainer>(
+      find.byKey(const ValueKey('ianvs-markdown-task-checkbox-box')),
+    );
+    final taskDecoration = taskBox.decoration! as BoxDecoration;
+    expect(taskBox.constraints?.maxWidth, 16);
+    expect(taskBox.constraints?.maxHeight, 16);
+    expect(
+      taskDecoration.color,
+      IanvsMarkdownThemeData.light.taskCheckboxColor,
+    );
+    expect(
+      (taskDecoration.border! as Border).top.color,
+      IanvsMarkdownThemeData.light.taskCheckboxColor,
+    );
+    expect(taskDecoration.borderRadius, BorderRadius.circular(6));
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-task-checkbox-check')),
+      findsOneWidget,
+    );
+    expect(find.bySemanticsLabel('Completed task'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('ianvs-markdown-file-reference')),
       findsOneWidget,
@@ -202,6 +273,26 @@ final answer = 42;
     expect(find.byTooltip('已复制到剪贴板'), findsOneWidget);
     expect(find.byTooltip('关闭自动换行'), findsNothing);
     expect(find.byTooltip('自动换行'), findsNothing);
+  });
+
+  testWidgets('task checkbox uses the Border dark palette', (tester) async {
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdownTaskCheckbox(value: true),
+        theme: ThemeData.dark(),
+      ),
+    );
+
+    final box = tester.widget<AnimatedContainer>(
+      find.byKey(const ValueKey('ianvs-markdown-task-checkbox-box')),
+    );
+    final decoration = box.decoration! as BoxDecoration;
+    expect(decoration.color, const Color(0xff7cd37c));
+    expect((decoration.border! as Border).top.color, const Color(0xff7cd37c));
+    final check = tester.widget<CustomPaint>(
+      find.byKey(const ValueKey('ianvs-markdown-task-checkbox-check')),
+    );
+    expect(check.painter, isNotNull);
   });
 
   testWidgets('renders full, collapsed, and shortcut reference links', (

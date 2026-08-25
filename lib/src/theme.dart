@@ -25,6 +25,10 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
     Color? inlineCodeForeground,
     Color? strongForeground,
     Color? emphasisForeground,
+    Color? taskCheckboxColor,
+    Color? taskCheckboxBorderColor,
+    Color? taskCheckboxHoverOutlineColor,
+    Color? taskDoneColor,
     this.headingAccents = const <Color>[
       Color(0xffc24b57),
       Color(0xffb56b35),
@@ -45,7 +49,11 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
   }) : codeForeground = codeForeground ?? textSecondary,
        inlineCodeForeground = inlineCodeForeground ?? textPrimary,
        strongForeground = strongForeground ?? textPrimary,
-       emphasisForeground = emphasisForeground ?? textPrimary;
+       emphasisForeground = emphasisForeground ?? textPrimary,
+       taskCheckboxColor = taskCheckboxColor ?? accent,
+       taskCheckboxBorderColor = taskCheckboxBorderColor ?? textTertiary,
+       taskCheckboxHoverOutlineColor = taskCheckboxHoverOutlineColor ?? border,
+       taskDoneColor = taskDoneColor ?? textTertiary;
 
   static const IanvsMarkdownThemeData light = IanvsMarkdownThemeData(
     surface: Color(0xffffffff),
@@ -66,6 +74,10 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
     inlineCodeForeground: Color(0xffdd1399),
     strongForeground: Color(0xffdd2c38),
     emphasisForeground: Color(0xffde7417),
+    taskCheckboxColor: Color(0xff1da51d),
+    taskCheckboxBorderColor: Color(0xff989bae),
+    taskCheckboxHoverOutlineColor: Color(0x408089c6),
+    taskDoneColor: Color(0xff989bae),
     headingAccents: <Color>[
       Color(0xffc24b57),
       Color(0xffb56b35),
@@ -95,6 +107,10 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
     inlineCodeForeground: Color(0xfff2b6de),
     strongForeground: Color(0xffff7881),
     emphasisForeground: Color(0xfffbbb83),
+    taskCheckboxColor: Color(0xff7cd37c),
+    taskCheckboxBorderColor: Color(0xff74778b),
+    taskCheckboxHoverOutlineColor: Color(0x406974bc),
+    taskDoneColor: Color(0xff74778b),
     headingAccents: <Color>[
       Color(0xffe06c75),
       Color(0xffd19a66),
@@ -123,6 +139,10 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
   final Color inlineCodeForeground;
   final Color strongForeground;
   final Color emphasisForeground;
+  final Color taskCheckboxColor;
+  final Color taskCheckboxBorderColor;
+  final Color taskCheckboxHoverOutlineColor;
+  final Color taskDoneColor;
   final List<Color> headingAccents;
   final String monoFontFamily;
   final List<String> monoFontFamilyFallback;
@@ -165,6 +185,10 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
     Color? inlineCodeForeground,
     Color? strongForeground,
     Color? emphasisForeground,
+    Color? taskCheckboxColor,
+    Color? taskCheckboxBorderColor,
+    Color? taskCheckboxHoverOutlineColor,
+    Color? taskDoneColor,
     List<Color>? headingAccents,
     String? monoFontFamily,
     List<String>? monoFontFamilyFallback,
@@ -191,6 +215,12 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
       inlineCodeForeground: inlineCodeForeground ?? this.inlineCodeForeground,
       strongForeground: strongForeground ?? this.strongForeground,
       emphasisForeground: emphasisForeground ?? this.emphasisForeground,
+      taskCheckboxColor: taskCheckboxColor ?? this.taskCheckboxColor,
+      taskCheckboxBorderColor:
+          taskCheckboxBorderColor ?? this.taskCheckboxBorderColor,
+      taskCheckboxHoverOutlineColor:
+          taskCheckboxHoverOutlineColor ?? this.taskCheckboxHoverOutlineColor,
+      taskDoneColor: taskDoneColor ?? this.taskDoneColor,
       headingAccents: headingAccents ?? this.headingAccents,
       monoFontFamily: monoFontFamily ?? this.monoFontFamily,
       monoFontFamilyFallback:
@@ -238,6 +268,22 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
         other.emphasisForeground,
         t,
       )!,
+      taskCheckboxColor: Color.lerp(
+        taskCheckboxColor,
+        other.taskCheckboxColor,
+        t,
+      )!,
+      taskCheckboxBorderColor: Color.lerp(
+        taskCheckboxBorderColor,
+        other.taskCheckboxBorderColor,
+        t,
+      )!,
+      taskCheckboxHoverOutlineColor: Color.lerp(
+        taskCheckboxHoverOutlineColor,
+        other.taskCheckboxHoverOutlineColor,
+        t,
+      )!,
+      taskDoneColor: Color.lerp(taskDoneColor, other.taskDoneColor, t)!,
       headingAccents: <Color>[
         for (var level = 1; level <= 6; level += 1)
           Color.lerp(headingAccent(level), other.headingAccent(level), t)!,

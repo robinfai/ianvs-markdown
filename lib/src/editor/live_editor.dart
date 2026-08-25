@@ -19,6 +19,7 @@ import '../markdown_document.dart';
 import '../obsidian_image.dart';
 import '../obsidian_metadata.dart';
 import '../render_budget.dart';
+import '../task_checkbox.dart';
 import '../theme.dart';
 import '../wiki_embed.dart';
 import 'editor_controller.dart';
@@ -2732,7 +2733,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     }
     if (taskMarker != null && taskMarker.group(2)!.toLowerCase() == 'x') {
       activeTextStyle = activeTextStyle.copyWith(
+        color: colors.taskDoneColor,
         decoration: TextDecoration.lineThrough,
+        decorationColor: colors.taskDoneColor,
       );
     }
     final editor = TextField(
@@ -2769,14 +2772,12 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           SizedBox(
             width: 28,
             height: 30,
-            child: Checkbox(
-              value: taskMarker.group(2)!.toLowerCase() == 'x',
-              onChanged: (value) => _setTaskChecked(block, value ?? false),
-              activeColor: colors.accent,
-              checkColor: colors.surface,
-              side: BorderSide(color: colors.textTertiary, width: 1.5),
-              visualDensity: VisualDensity.compact,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            child: Center(
+              child: IanvsMarkdownTaskCheckbox(
+                value: taskMarker.group(2)!.toLowerCase() == 'x',
+                onChanged: (value) => _setTaskChecked(block, value),
+                theme: colors,
+              ),
             ),
           ),
           const SizedBox(width: 2),
@@ -3061,10 +3062,24 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         onTap: () => _activateRenderedBlock(block, tapCount: _pointerTapCount),
       );
     } else {
+      final completedTask =
+          block.type == IanvsMarkdownBlockType.taskList &&
+          RegExp(r'^\s*[-+*]\s+\[[xX]\]').hasMatch(block.source);
+      final baseStyleSheet =
+          widget.styleSheet ?? ianvsMarkdownStyleSheet(context, colors);
+      final renderedStyleSheet = completedTask
+          ? baseStyleSheet.copyWith(
+              del: (baseStyleSheet.del ?? const TextStyle()).copyWith(
+                color: colors.taskDoneColor,
+                decoration: TextDecoration.lineThrough,
+                decorationColor: colors.taskDoneColor,
+              ),
+            )
+          : widget.styleSheet;
       rendered = IanvsMarkdown(
         data: _renderedBlockSource(block),
         selectable: true,
-        styleSheet: widget.styleSheet,
+        styleSheet: renderedStyleSheet,
         onTapText: () =>
             _activateRenderedBlock(block, tapCount: _pointerTapCount),
         // Obsidian's Live Preview consumes a normal click on rendered links:
@@ -3078,14 +3093,10 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         imageBuilder: widget.imageBuilder,
         onImageResize: (request) => _resizeImage(block, request),
         checkboxBuilder: block.type == IanvsMarkdownBlockType.taskList
-            ? (checked) => Checkbox(
+            ? (checked) => IanvsMarkdownTaskCheckbox(
                 value: checked,
-                onChanged: (value) => _setTaskChecked(block, value ?? false),
-                activeColor: colors.accent,
-                checkColor: colors.surface,
-                side: BorderSide(color: colors.textTertiary, width: 1.5),
-                visualDensity: VisualDensity.compact,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                onChanged: (value) => _setTaskChecked(block, value),
+                theme: colors,
               )
             : null,
         builders: widget.builders,

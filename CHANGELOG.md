@@ -15,6 +15,9 @@
 - Match Border blockquotes across reading, Live Preview, and source modes with
   the 4x4 dot texture, 4px radius, inset 3px accent rail, exact outer padding,
   and Obsidian's 2px horizontal-rule weight.
+- Match Border's ordinary task checkboxes with 16px geometry, 6px corners,
+  exact light and dark colors, a two-pixel hover/focus ring, thick check mark,
+  keyboard and semantic toggling, and muted completed text in Live Preview.
 
 ## 0.1.0
 
