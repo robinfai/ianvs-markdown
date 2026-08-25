@@ -1,0 +1,17 @@
+.dart_tool/
+.git/
+.github/
+.idea/
+.product-design/
+.vscode/
+build/
+coverage/
+design-qa.md
+example/.dart_tool/
+example/build/
+example/macos/Flutter/ephemeral/
+example/macos/Pods/
+**/xcuserdata/
+*.iml
+*.log
+.DS_Store

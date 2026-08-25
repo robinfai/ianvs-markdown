@@ -1,0 +1,27 @@
+# Dart and Flutter tooling
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+coverage/
+
+# IDE and operating-system files
+.idea/
+.vscode/
+*.iml
+*.log
+.DS_Store
+
+# Generated Apple platform files
+**/Flutter/ephemeral/
+**/Pods/
+**/.symlinks/
+**/xcuserdata/
+**/DerivedData/
+
+# Local signing and environment files
+**/*.xcuserstate
+**/flutter_export_environment.sh
