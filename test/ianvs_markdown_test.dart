@@ -1450,6 +1450,39 @@ widget := unknown_token(42)
     },
   );
 
+  testWidgets('blank code canvases follow reading and editing line geometry', (
+    tester,
+  ) async {
+    const data = '```text\n\n```\n\n```text\n\n\n```';
+
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(data: data),
+        theme: ThemeData(platform: TargetPlatform.macOS),
+      ),
+    );
+
+    var canvases = find.byKey(const ValueKey('ianvs-markdown-code-canvas'));
+    expect(canvases, findsNWidgets(2));
+    expect(tester.getSize(canvases.at(0)).height, 34);
+    expect(tester.getSize(canvases.at(1)).height, 65);
+
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(
+          data: data,
+          obsidianMetadataMode: IanvsMarkdownObsidianMetadataMode.editing,
+        ),
+        theme: ThemeData(platform: TargetPlatform.macOS),
+      ),
+    );
+
+    canvases = find.byKey(const ValueKey('ianvs-markdown-code-canvas'));
+    expect(canvases, findsNWidgets(2));
+    expect(tester.getSize(canvases.at(0)).height, 58);
+    expect(tester.getSize(canvases.at(1)).height, 78);
+  });
+
   testWidgets(
     'code language labels normalize known names but preserve unknown casing',
     (tester) async {

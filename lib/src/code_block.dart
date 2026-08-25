@@ -267,6 +267,20 @@ class _IanvsMarkdownCodeBlockState extends State<IanvsMarkdownCodeBlock> {
     final editing =
         widget.presentation == IanvsMarkdownCodeBlockPresentation.editing;
     final showActions = editing || _hovered || !desktopHoverControls || _copied;
+    final blankPayload = widget.source.codeUnits.every(
+      (unit) => unit == 0x0a || unit == 0x0d,
+    );
+    // Obsidian Reading view omits the empty `<code>` line box, while Live
+    // Preview keeps the opening, content, and closing editor rows. Additional
+    // blank payload rows follow each view's measured logical-line step.
+    final contentPadding = blankPayload
+        ? EdgeInsets.symmetric(horizontal: 16, vertical: editing ? 15 : 3)
+        : const EdgeInsets.symmetric(horizontal: 16, vertical: 12);
+    final blankCanvasMinHeight = !blankPayload
+        ? 0.0
+        : editing
+        ? 58.0 + (_lineCount - 1) * 20
+        : 34.0 + (_lineCount - 1) * 31;
 
     final codeViewport = LayoutBuilder(
       builder: (context, constraints) {
@@ -283,11 +297,12 @@ class _IanvsMarkdownCodeBlockState extends State<IanvsMarkdownCodeBlock> {
     );
     Widget body = Container(
       key: const ValueKey('ianvs-markdown-code-canvas'),
+      constraints: BoxConstraints(minHeight: blankCanvasMinHeight),
       child: Stack(
         children: [
           Padding(
             key: const ValueKey('ianvs-markdown-code-content-padding'),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: contentPadding,
             child: codeViewport,
           ),
           Positioned(
@@ -331,7 +346,7 @@ class _IanvsMarkdownCodeBlockState extends State<IanvsMarkdownCodeBlock> {
         key: const ValueKey('ianvs-markdown-code-block'),
         width: widget.maxWidth ?? double.infinity,
         constraints: BoxConstraints(
-          minHeight: 38,
+          minHeight: blankPayload && !editing ? 34 : 38,
           maxWidth: widget.maxWidth ?? double.infinity,
         ),
         margin: const EdgeInsets.symmetric(vertical: 8),

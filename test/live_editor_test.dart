@@ -5618,9 +5618,16 @@ Standard[^note] and inline ^[inline body].
     expect(find.byType(IanvsMarkdownCodeBlock), findsOneWidget);
     expect(find.text(source), findsNothing);
     expect(
-      tester.getSize(find.byType(IanvsMarkdownCodeBlock)).height,
-      greaterThanOrEqualTo(36),
+      tester
+          .getSize(find.byKey(const ValueKey('ianvs-markdown-code-canvas')))
+          .height,
+      58,
     );
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-code-language-badge')),
+      findsOneWidget,
+    );
+    expect(find.text('text'), findsOneWidget);
 
     await tester.tap(find.byType(IanvsMarkdownCodeBlock));
     await tester.pumpAndSettle();
@@ -5638,6 +5645,28 @@ Standard[^note] and inline ^[inline body].
           .value,
       source,
     );
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-code-flair')),
+      findsNothing,
+    );
+
+    final contentStart = source.indexOf('\n') + 1;
+    controller.selection = TextSelection.collapsed(offset: contentStart);
+    await tester.pumpAndSettle();
+    final rail = find.byKey(
+      const ValueKey('ianvs-markdown-active-code-line-rail'),
+    );
+    expect(rail, findsOneWidget);
+    final emptyLineTop = tester.getTopLeft(rail).dy;
+    expect(tester.getSize(rail).height, inInclusiveRange(14, 16));
+
+    controller.selection = TextSelection.collapsed(
+      offset: source.lastIndexOf('```') + 1,
+    );
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(rail).dy, greaterThan(emptyLineTop));
+    expect(tester.getSize(rail).height, inInclusiveRange(14, 16));
+    expect(controller.text, source);
 
     controller.mode = IanvsMarkdownEditorMode.preview;
     await tester.pumpAndSettle();
@@ -5647,7 +5676,61 @@ Standard[^note] and inline ^[inline body].
     );
     expect(find.byType(IanvsMarkdownCodeBlock), findsOneWidget);
     expect(find.text(source), findsNothing);
+    expect(
+      tester
+          .getSize(find.byKey(const ValueKey('ianvs-markdown-code-canvas')))
+          .height,
+      34,
+    );
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-code-language-badge')),
+      findsNothing,
+    );
+    expect(controller.text, source);
     semanticsHandle.dispose();
+  });
+
+  testWidgets('blank active code lines move one logical row at a time', (
+    tester,
+  ) async {
+    const source = '```text\n\n\n```';
+    final firstBlank = source.indexOf('\n') + 1;
+    final controller = IanvsMarkdownController(text: source)
+      ..selection = TextSelection.collapsed(offset: firstBlank);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: IanvsMarkdownLiveEditor(
+            controller: controller,
+            autofocus: true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final rail = find.byKey(
+      const ValueKey('ianvs-markdown-active-code-line-rail'),
+    );
+    expect(rail, findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-code-flair')),
+      findsNothing,
+    );
+    final firstTop = tester.getTopLeft(rail).dy;
+    expect(tester.getSize(rail).height, inInclusiveRange(14, 16));
+
+    controller.selection = TextSelection.collapsed(offset: firstBlank + 1);
+    await tester.pumpAndSettle();
+
+    final secondTop = tester.getTopLeft(rail).dy;
+    expect(secondTop, greaterThan(firstTop));
+    expect(secondTop - firstTop, inInclusiveRange(20, 22));
+    expect(tester.getSize(rail).height, inInclusiveRange(14, 16));
+    expect(rail, findsOneWidget);
+    expect(controller.text, source);
   });
 
   testWidgets(
