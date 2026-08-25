@@ -1226,7 +1226,14 @@ MarkdownStyleSheet ianvsMarkdownStyleSheet(
       decorationColor: colors.accent,
       fontWeight: FontWeight.w600,
     ),
-    strong: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w600),
+    em: TextStyle(
+      color: colors.emphasisForeground,
+      fontStyle: FontStyle.italic,
+    ),
+    strong: TextStyle(
+      color: colors.strongForeground,
+      fontWeight: FontWeight.w600,
+    ),
     code: ianvsMarkdownInlineCodeStyle(colors),
     listBullet: TextStyle(
       color: colors.textPrimary,

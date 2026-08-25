@@ -4447,6 +4447,140 @@ $$''');
     },
   );
 
+  testWidgets('multiline emphasis keeps theme colors and line-local markers', (
+    tester,
+  ) async {
+    const source =
+        'Strong **strong one\nstrong two** tail and '
+        'italic *italic one\nitalic two*.';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    bool renderedHasColor(String text, Color color) =>
+        tester
+            .widgetList<RichText>(find.byType(RichText))
+            .any(
+              (widget) =>
+                  _spanContainsColor(widget.text, text: text, color: color),
+            ) ||
+        tester
+            .widgetList<Text>(find.byType(Text))
+            .any(
+              (widget) =>
+                  widget.textSpan != null &&
+                  _spanContainsColor(
+                    widget.textSpan!,
+                    text: text,
+                    color: color,
+                  ),
+            ) ||
+        tester
+            .widgetList<SelectableText>(find.byType(SelectableText))
+            .any(
+              (widget) =>
+                  widget.textSpan != null &&
+                  _spanContainsColor(
+                    widget.textSpan!,
+                    text: text,
+                    color: color,
+                  ),
+            );
+    expect(
+      renderedHasColor(
+        'strong one\nstrong two',
+        IanvsMarkdownThemeData.light.strongForeground,
+      ),
+      isTrue,
+    );
+    expect(
+      renderedHasColor(
+        'italic one\nitalic two',
+        IanvsMarkdownThemeData.light.emphasisForeground,
+      ),
+      isTrue,
+    );
+
+    await tester.tap(find.textContaining('Strong').first);
+    await tester.pump();
+    final fieldFinder = find.descendant(
+      of: find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      matching: find.byType(TextField),
+    );
+    final field = tester.widget<TextField>(fieldFinder);
+
+    List<TextSpan> leaves() => _textSpanLeaves(
+      field.controller!.buildTextSpan(
+        context: tester.element(fieldFinder),
+        style: field.style,
+        withComposing: false,
+      ),
+    ).toList();
+
+    field.controller!.selection = TextSelection.collapsed(
+      offset: source.indexOf('strong one'),
+    );
+    await tester.pump();
+    var spans = leaves();
+    final strongContent = spans.singleWhere(
+      (span) => span.text == 'strong one\nstrong two',
+    );
+    expect(strongContent.style?.fontWeight, FontWeight.w600);
+    expect(
+      strongContent.style?.color,
+      IanvsMarkdownThemeData.light.strongForeground,
+    );
+    var strongMarkers = spans.where((span) => span.text == '**').toList();
+    expect(strongMarkers, hasLength(2));
+    expect(strongMarkers.first.style?.fontSize, isNot(.01));
+    expect(strongMarkers.last.style?.fontSize, .01);
+    expect(
+      strongMarkers.first.style?.color,
+      IanvsMarkdownThemeData.light.strongForeground,
+    );
+
+    field.controller!.selection = TextSelection.collapsed(
+      offset: source.indexOf('strong two'),
+    );
+    await tester.pump();
+    spans = leaves();
+    strongMarkers = spans.where((span) => span.text == '**').toList();
+    expect(strongMarkers.first.style?.fontSize, .01);
+    expect(strongMarkers.last.style?.fontSize, isNot(.01));
+
+    field.controller!.selection = TextSelection.collapsed(
+      offset: source.indexOf('italic one'),
+    );
+    await tester.pump();
+    spans = leaves();
+    final italicContent = spans.singleWhere(
+      (span) => span.text == 'italic one\nitalic two',
+    );
+    expect(italicContent.style?.fontStyle, FontStyle.italic);
+    expect(
+      italicContent.style?.color,
+      IanvsMarkdownThemeData.light.emphasisForeground,
+    );
+    var italicMarkers = spans.where((span) => span.text == '*').toList();
+    expect(italicMarkers, hasLength(2));
+    expect(italicMarkers.first.style?.fontSize, isNot(.01));
+    expect(italicMarkers.last.style?.fontSize, .01);
+    expect(
+      italicMarkers.first.style?.color,
+      IanvsMarkdownThemeData.light.emphasisForeground,
+    );
+
+    field.controller!.selection = TextSelection.collapsed(
+      offset: source.indexOf('italic two'),
+    );
+    await tester.pump();
+    italicMarkers = leaves().where((span) => span.text == '*').toList();
+    expect(italicMarkers.first.style?.fontSize, .01);
+    expect(italicMarkers.last.style?.fontSize, isNot(.01));
+    expect(controller.text, source);
+  });
+
   testWidgets('inline math reveals delimiters only when the caret enters it', (
     tester,
   ) async {
@@ -6120,7 +6254,11 @@ Standard[^note] and inline ^[inline body].
     expect(hiddenMarkers.every((item) => item.style?.fontSize == .01), isTrue);
     expect(
       boldSpan.singleWhere((item) => item.text == 'Bold').style?.fontWeight,
-      FontWeight.w700,
+      FontWeight.w600,
+    );
+    expect(
+      boldSpan.singleWhere((item) => item.text == 'Bold').style?.color,
+      IanvsMarkdownThemeData.light.strongForeground,
     );
 
     await tester.tap(boldFinder);
@@ -7127,6 +7265,27 @@ bool _spanContainsDecoration(
       text: text,
       decoration: decoration,
       inheritedDecoration: effectiveDecoration,
+    ),
+  );
+}
+
+bool _spanContainsColor(
+  InlineSpan span, {
+  required String text,
+  required Color color,
+  Color? inheritedColor,
+}) {
+  if (span is! TextSpan) return false;
+  final effectiveColor = span.style?.color ?? inheritedColor;
+  if ((span.text?.contains(text) ?? false) && effectiveColor == color) {
+    return true;
+  }
+  return (span.children ?? const <InlineSpan>[]).any(
+    (child) => _spanContainsColor(
+      child,
+      text: text,
+      color: color,
+      inheritedColor: effectiveColor,
     ),
   );
 }

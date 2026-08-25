@@ -39,6 +39,38 @@ void main() {
     );
   });
 
+  test('strong and emphasis theme colors customize and interpolate', () {
+    const customStrong = Color(0xff123456);
+    const customEmphasis = Color(0xff654321);
+    final customized = IanvsMarkdownThemeData.light.copyWith(
+      strongForeground: customStrong,
+      emphasisForeground: customEmphasis,
+    );
+
+    expect(customized.strongForeground, customStrong);
+    expect(customized.emphasisForeground, customEmphasis);
+    final midpoint = IanvsMarkdownThemeData.light.lerp(
+      IanvsMarkdownThemeData.dark,
+      .5,
+    );
+    expect(
+      midpoint.strongForeground,
+      Color.lerp(
+        IanvsMarkdownThemeData.light.strongForeground,
+        IanvsMarkdownThemeData.dark.strongForeground,
+        .5,
+      ),
+    );
+    expect(
+      midpoint.emphasisForeground,
+      Color.lerp(
+        IanvsMarkdownThemeData.light.emphasisForeground,
+        IanvsMarkdownThemeData.dark.emphasisForeground,
+        .5,
+      ),
+    );
+  });
+
   testWidgets('renders GFM, file links, and interactive fenced code', (
     tester,
   ) async {
@@ -569,8 +601,48 @@ Literal:A``Z
     );
     expect(_renderedTextIsBold(tester, 'double'), isTrue);
     expect(_renderedTextIsItalic(tester, 'standalone'), isTrue);
+    expect(
+      _renderedTextHasColor(
+        tester,
+        'double',
+        IanvsMarkdownThemeData.light.strongForeground,
+      ),
+      isTrue,
+    );
+    expect(
+      _renderedTextHasColor(
+        tester,
+        'standalone',
+        IanvsMarkdownThemeData.light.emphasisForeground,
+      ),
+      isTrue,
+    );
     expect(_renderedTextIsItalic(tester, 'single'), isFalse);
     expect(_renderedTextIsItalic(tester, 'short'), isFalse);
+  });
+
+  testWidgets('reading keeps delimited formatting across soft line breaks', (
+    tester,
+  ) async {
+    const source =
+        'Italic *italic one\nitalic two* tail.\n\n'
+        'Strong **strong one\nstrong two** tail.\n\n'
+        'Strike ~~strike one\nstrike two~~ tail.\n\n'
+        'Highlight ==mark one\nmark two== tail.';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    expect(_renderedTextIsItalic(tester, 'italic one\nitalic two'), isTrue);
+    expect(_renderedTextIsBold(tester, 'strong one\nstrong two'), isTrue);
+    expect(
+      _renderedTextHasDecoration(
+        tester,
+        'strike one\nstrike two',
+        TextDecoration.lineThrough,
+      ),
+      isTrue,
+    );
+    expect(_renderedTextHasBackground(tester, 'mark one'), isTrue);
+    expect(_renderedTextHasBackground(tester, 'mark two'), isTrue);
   });
 
   testWidgets(

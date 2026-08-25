@@ -8,7 +8,7 @@ import 'theme.dart';
 /// Parses Obsidian-style highlights such as `==important==`.
 class IanvsMarkdownHighlightSyntax extends md.InlineSyntax {
   IanvsMarkdownHighlightSyntax()
-    : super(r'==([^=\n]+?)==', startCharacter: 0x3d);
+    : super(r'==((?:(?!\n[ \t]*\n)[^=])+?)==', startCharacter: 0x3d);
 
   @override
   bool onMatch(md.InlineParser parser, Match match) {
@@ -67,8 +67,14 @@ List<InlineSpan> _highlightSpans(
 
 TextStyle? _highlightElementStyle(String tag, IanvsMarkdownThemeData colors) {
   return switch (tag) {
-    'strong' => const TextStyle(fontWeight: FontWeight.w700),
-    'em' => const TextStyle(fontStyle: FontStyle.italic),
+    'strong' => TextStyle(
+      color: colors.strongForeground,
+      fontWeight: FontWeight.w600,
+    ),
+    'em' => TextStyle(
+      color: colors.emphasisForeground,
+      fontStyle: FontStyle.italic,
+    ),
     'del' => const TextStyle(decoration: TextDecoration.lineThrough),
     'code' || 'ianvs-inline-code' => ianvsMarkdownInlineCodeStyle(colors),
     'a' => TextStyle(

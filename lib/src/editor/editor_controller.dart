@@ -2470,7 +2470,7 @@ List<_SyntaxToken> _markdownSyntaxTokens(
   _addDelimitedSyntaxTokens(
     tokens,
     text,
-    RegExp(r'(==)(\S(?:[^\n]*?\S)?)=='),
+    RegExp(r'(==)(\S(?:(?:(?!\n[ \t]*\n)[\s\S])*?\S)?)=='),
     theme.highlight,
     theme.marker,
     inlineSyntaxExcludedRanges,
@@ -2478,39 +2478,47 @@ List<_SyntaxToken> _markdownSyntaxTokens(
   _addDelimitedSyntaxTokens(
     tokens,
     text,
-    RegExp(r'(?<!\*)(\*\*\*)(?!\*)(\S(?:[^\n]*?\S)?)(?<!\*)\*\*\*(?!\*)'),
+    RegExp(
+      r'(?<!\*)(\*\*\*)(?!\*)(\S(?:(?:(?!\n[ \t]*\n)[\s\S])*?\S)?)(?<!\*)\*\*\*(?!\*)',
+    ),
     theme.strong.merge(theme.emphasis),
-    theme.marker,
-    inlineSyntaxExcludedRanges,
-  );
-  _addDelimitedSyntaxTokens(
-    tokens,
-    text,
-    RegExp(r'(?<!_)(___)(?!_)(\S(?:[^\n]*?\S)?)(?<!_)___(?!_)'),
     theme.strong.merge(theme.emphasis),
-    theme.marker,
     inlineSyntaxExcludedRanges,
   );
   _addDelimitedSyntaxTokens(
     tokens,
     text,
-    RegExp(r'(?<!\*)(\*\*)(?!\*)(\S(?:[^\n]*?\S)?)(?<!\*)\*\*(?!\*)'),
+    RegExp(
+      r'(?<!_)(___)(?!_)(\S(?:(?:(?!\n[ \t]*\n)[\s\S])*?\S)?)(?<!_)___(?!_)',
+    ),
+    theme.strong.merge(theme.emphasis),
+    theme.strong.merge(theme.emphasis),
+    inlineSyntaxExcludedRanges,
+  );
+  _addDelimitedSyntaxTokens(
+    tokens,
+    text,
+    RegExp(
+      r'(?<!\*)(\*\*)(?!\*)(\S(?:(?:(?!\n[ \t]*\n)[\s\S])*?\S)?)(?<!\*)\*\*(?!\*)',
+    ),
     theme.strong,
-    theme.marker,
-    inlineSyntaxExcludedRanges,
-  );
-  _addDelimitedSyntaxTokens(
-    tokens,
-    text,
-    RegExp(r'(?<!_)(__)(?!_)(\S(?:[^\n]*?\S)?)(?<!_)__(?!_)'),
     theme.strong,
-    theme.marker,
     inlineSyntaxExcludedRanges,
   );
   _addDelimitedSyntaxTokens(
     tokens,
     text,
-    RegExp(r'(~~)(\S(?:[^\n]*?\S)?)~~'),
+    RegExp(
+      r'(?<!_)(__)(?!_)(\S(?:(?:(?!\n[ \t]*\n)[\s\S])*?\S)?)(?<!_)__(?!_)',
+    ),
+    theme.strong,
+    theme.strong,
+    inlineSyntaxExcludedRanges,
+  );
+  _addDelimitedSyntaxTokens(
+    tokens,
+    text,
+    RegExp(r'(~~)(\S(?:(?:(?!\n[ \t]*\n)[\s\S])*?\S)?)~~'),
     theme.strikethrough,
     theme.marker,
     inlineSyntaxExcludedRanges,
@@ -2518,17 +2526,19 @@ List<_SyntaxToken> _markdownSyntaxTokens(
   _addDelimitedSyntaxTokens(
     tokens,
     text,
-    RegExp(r'(?<!\*)(\*)(?!\*)(\S(?:[^\n]*?\S)?)(?<!\*)\*(?!\*)'),
+    RegExp(
+      r'(?<!\*)(\*)(?!\*)(\S(?:(?:(?!\n[ \t]*\n)[\s\S])*?\S)?)(?<!\*)\*(?!\*)',
+    ),
     theme.emphasis,
-    theme.marker,
+    theme.emphasis,
     inlineSyntaxExcludedRanges,
   );
   _addDelimitedSyntaxTokens(
     tokens,
     text,
-    RegExp(r'(?<!_)(_)(?!_)(\S(?:[^\n]*?\S)?)(?<!_)_(?!_)'),
+    RegExp(r'(?<!_)(_)(?!_)(\S(?:(?:(?!\n[ \t]*\n)[\s\S])*?\S)?)(?<!_)_(?!_)'),
     theme.emphasis,
-    theme.marker,
+    theme.emphasis,
     inlineSyntaxExcludedRanges,
     disallowIntraWord: true,
   );
@@ -2867,6 +2877,9 @@ List<TextRange> _addDelimitedSyntaxTokens(
     final contentStart = match.start + marker.length;
     final contentEnd = match.end - marker.length;
     if (contentStart >= contentEnd) continue;
+    if (_containsMarkdownParagraphBreak(text, contentStart, contentEnd)) {
+      continue;
+    }
     if (disallowIntraWord &&
         ((_isMarkdownWordLikeAt(text, match.start - 1) &&
                 _isMarkdownWordLikeAt(text, contentStart)) ||
@@ -2881,6 +2894,17 @@ List<TextRange> _addDelimitedSyntaxTokens(
       continue;
     }
     final revealRange = TextRange(start: match.start, end: match.end);
+    final openingLineEnd = text.indexOf('\n', contentStart);
+    final multiline = openingLineEnd >= 0 && openingLineEnd < contentEnd;
+    final closingLineStart = multiline
+        ? text.lastIndexOf('\n', contentEnd - 1) + 1
+        : match.start;
+    final openingRevealRange = multiline
+        ? TextRange(start: match.start, end: openingLineEnd)
+        : revealRange;
+    final closingRevealRange = multiline
+        ? TextRange(start: closingLineStart, end: match.end)
+        : revealRange;
     ranges.add(revealRange);
     target
       ..add(
@@ -2888,7 +2912,7 @@ List<TextRange> _addDelimitedSyntaxTokens(
           match.start,
           contentStart,
           markerStyle,
-          inlineMarkerRange: revealRange,
+          inlineMarkerRange: openingRevealRange,
         ),
       )
       ..add(_SyntaxToken(contentStart, contentEnd, contentStyle))
@@ -2897,7 +2921,7 @@ List<TextRange> _addDelimitedSyntaxTokens(
           contentEnd,
           match.end,
           markerStyle,
-          inlineMarkerRange: revealRange,
+          inlineMarkerRange: closingRevealRange,
         ),
       );
   }

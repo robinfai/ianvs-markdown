@@ -706,6 +706,14 @@ IanvsMarkdownSyntaxTheme ianvsMarkdownSyntaxTheme(
       fontFamilyFallback: colors.monoFontFamilyFallback,
     ),
     codeBlock: TextStyle(color: colors.textPrimary),
+    strong: TextStyle(
+      color: colors.strongForeground,
+      fontWeight: FontWeight.w600,
+    ),
+    emphasis: TextStyle(
+      color: colors.emphasisForeground,
+      fontStyle: FontStyle.italic,
+    ),
     comment: TextStyle(color: colors.textTertiary, fontStyle: FontStyle.italic),
     darkCodeHighlighting: dark,
   );

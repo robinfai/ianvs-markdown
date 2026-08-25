@@ -1085,6 +1085,40 @@ void main() {
       );
     });
 
+    test('emphasis marker Backspace removes one source character', () {
+      for (final (source, caret, expected) in <(String, int, String)>[
+        (
+          'Strong **bold text** tail.',
+          'Strong **bold text**'.length,
+          'Strong **bold text* tail.',
+        ),
+        (
+          'Strong **bold text** tail.',
+          'Strong **'.length,
+          'Strong *bold text** tail.',
+        ),
+        (
+          'Highlight ==marked text== tail.',
+          'Highlight ==marked text=='.length,
+          'Highlight ==marked text= tail.',
+        ),
+      ]) {
+        final oldValue = TextEditingValue(
+          text: source,
+          selection: TextSelection.collapsed(offset: caret),
+        );
+        final nativeBackspace = TextEditingValue(
+          text: source.replaceRange(caret - 1, caret, ''),
+          selection: TextSelection.collapsed(offset: caret - 1),
+        );
+        expect(nativeBackspace.text, expected);
+        expect(
+          formatter.formatEditUpdate(oldValue, nativeBackspace),
+          nativeBackspace,
+        );
+      }
+    });
+
     test('four-backtick fences keep inner triple runs active on Enter', () {
       const source =
           '````markdown\n'
@@ -1872,6 +1906,14 @@ void main() {
           backgroundColor: Color(0xffeeeeee),
         ),
         comment: TextStyle(fontStyle: FontStyle.italic),
+        strong: TextStyle(
+          color: Color(0xffff0000),
+          fontWeight: FontWeight.w700,
+        ),
+        emphasis: TextStyle(
+          color: Color(0xffff8800),
+          fontStyle: FontStyle.italic,
+        ),
         highlight: TextStyle(backgroundColor: Color(0xffffe184)),
       );
       const base = TextStyle(fontSize: 14);
@@ -1954,6 +1996,20 @@ void main() {
         innerActiveMarkers.skip(4).every((span) => span.style?.fontSize == .01),
         isTrue,
       );
+      expect(
+        innerActive
+            .where((span) => span.text == '**')
+            .take(2)
+            .every((span) => span.style?.color == const Color(0xffff0000)),
+        isTrue,
+      );
+      expect(
+        innerActive
+            .where((span) => span.text == '*')
+            .take(2)
+            .every((span) => span.style?.color == const Color(0xffff8800)),
+        isTrue,
+      );
 
       final codeActive = build(source.indexOf('code') + 2);
       expect(
@@ -1976,6 +2032,152 @@ void main() {
       expect(inactive.map((span) => span.text).join(), source);
     },
   );
+
+  test('multiline delimited syntax keeps styles and reveals local markers', () {
+    const syntax = IanvsMarkdownSyntaxTheme(
+      heading: TextStyle(fontWeight: FontWeight.w600),
+      marker: TextStyle(color: Color(0xff777777)),
+      link: TextStyle(decoration: TextDecoration.underline),
+      code: TextStyle(fontFamily: 'monospace'),
+      comment: TextStyle(fontStyle: FontStyle.italic),
+      strong: TextStyle(color: Color(0xffff0000), fontWeight: FontWeight.w700),
+      emphasis: TextStyle(
+        color: Color(0xffff8800),
+        fontStyle: FontStyle.italic,
+      ),
+      strikethrough: TextStyle(decoration: TextDecoration.lineThrough),
+      highlight: TextStyle(backgroundColor: Color(0xffffe184)),
+    );
+    const source =
+        'Italic *italic one\nitalic two* tail.\n\n'
+        'Strong **strong one\nstrong two** tail.\n\n'
+        'Strike ~~strike one\nstrike two~~ tail.\n\n'
+        'Highlight ==mark one\nmark two== tail.';
+
+    List<TextSpan> build(int caret) => buildMarkdownSourceTextSpan(
+      TextEditingValue(
+        text: source,
+        selection: TextSelection.collapsed(offset: caret),
+      ),
+      style: const TextStyle(fontSize: 14),
+      syntaxTheme: syntax,
+      withComposing: false,
+      hideInactiveInlineMarkers: true,
+    ).children!.cast<TextSpan>().toList();
+
+    TextSpan spanAt(List<TextSpan> spans, int offset) {
+      var cursor = 0;
+      for (final span in spans) {
+        final end = cursor + (span.text?.length ?? 0);
+        if (offset >= cursor && offset < end) return span;
+        cursor = end;
+      }
+      throw StateError('No span at $offset');
+    }
+
+    final formats = <({int opening, int closing, int first, int second})>[
+      (
+        opening: source.indexOf('*italic one'),
+        closing: source.indexOf('* tail.'),
+        first: source.indexOf('italic one'),
+        second: source.indexOf('italic two'),
+      ),
+      (
+        opening: source.indexOf('**strong one'),
+        closing: source.indexOf('** tail.', source.indexOf('Strong')),
+        first: source.indexOf('strong one'),
+        second: source.indexOf('strong two'),
+      ),
+      (
+        opening: source.indexOf('~~strike one'),
+        closing: source.indexOf('~~ tail.'),
+        first: source.indexOf('strike one'),
+        second: source.indexOf('strike two'),
+      ),
+      (
+        opening: source.indexOf('==mark one'),
+        closing: source.indexOf('== tail.'),
+        first: source.indexOf('mark one'),
+        second: source.indexOf('mark two'),
+      ),
+    ];
+
+    final inactive = build(0);
+    for (final format in formats) {
+      expect(spanAt(inactive, format.opening).style?.fontSize, .01);
+      expect(spanAt(inactive, format.closing).style?.fontSize, .01);
+
+      final firstLineActive = build(format.first);
+      expect(spanAt(firstLineActive, format.opening).style?.fontSize, 14);
+      expect(spanAt(firstLineActive, format.closing).style?.fontSize, .01);
+
+      final secondLineActive = build(format.second);
+      expect(spanAt(secondLineActive, format.opening).style?.fontSize, .01);
+      expect(spanAt(secondLineActive, format.closing).style?.fontSize, 14);
+    }
+
+    expect(
+      spanAt(inactive, source.indexOf('italic two')).style?.fontStyle,
+      FontStyle.italic,
+    );
+    expect(
+      spanAt(inactive, source.indexOf('italic two')).style?.color,
+      const Color(0xffff8800),
+    );
+    expect(
+      spanAt(inactive, source.indexOf('strong two')).style?.fontWeight,
+      FontWeight.w700,
+    );
+    expect(
+      spanAt(inactive, source.indexOf('strong two')).style?.color,
+      const Color(0xffff0000),
+    );
+    expect(
+      spanAt(inactive, source.indexOf('strike two')).style?.decoration,
+      TextDecoration.lineThrough,
+    );
+    expect(
+      spanAt(inactive, source.indexOf('mark two')).style?.backgroundColor,
+      const Color(0xffffe184),
+    );
+    expect(inactive.map((span) => span.text).join(), source);
+  });
+
+  test('delimited syntax never crosses a Markdown paragraph break', () {
+    const syntax = IanvsMarkdownSyntaxTheme(
+      heading: TextStyle(fontWeight: FontWeight.w600),
+      marker: TextStyle(color: Color(0xff777777)),
+      link: TextStyle(decoration: TextDecoration.underline),
+      code: TextStyle(fontFamily: 'monospace'),
+      comment: TextStyle(fontStyle: FontStyle.italic),
+    );
+    const source = 'Before **first\n\nsecond** after.';
+    final spans = buildMarkdownSourceTextSpan(
+      const TextEditingValue(
+        text: source,
+        selection: TextSelection.collapsed(offset: 0),
+      ),
+      style: const TextStyle(fontSize: 14),
+      syntaxTheme: syntax,
+      withComposing: false,
+      hideInactiveInlineMarkers: true,
+    ).children!.cast<TextSpan>().toList();
+
+    TextSpan spanAt(int offset) {
+      var cursor = 0;
+      for (final span in spans) {
+        final end = cursor + (span.text?.length ?? 0);
+        if (offset >= cursor && offset < end) return span;
+        cursor = end;
+      }
+      throw StateError('No span at $offset');
+    }
+
+    expect(spanAt(source.indexOf('first')).style?.fontWeight, isNull);
+    expect(spanAt(source.indexOf('second')).style?.fontWeight, isNull);
+    expect(spanAt(source.indexOf('**')).style?.fontSize, 14);
+    expect(spans.map((span) => span.text).join(), source);
+  });
 
   test('escaped inline delimiters remain literal source', () {
     const syntax = IanvsMarkdownSyntaxTheme(
