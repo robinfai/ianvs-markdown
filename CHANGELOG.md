@@ -3,6 +3,9 @@
 - Match Obsidian image dimensions for standard Markdown images, external
   images, and host-resolved Wiki image embeds while preserving safe default
   image blocking and exact Live Preview source editing.
+- Add Obsidian-style desktop image resize handles in Live Preview with
+  aspect-ratio preservation, editor-width clamping, width-only source
+  writeback, double-click reset, and independent undo steps.
 
 ## 0.1.0
 

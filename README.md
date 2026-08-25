@@ -101,6 +101,8 @@ IanvsMarkdown(
 
 `IanvsMarkdownWikiEmbedReference` 会分别提供完整 `target`、笔记路径 `note`、标题或块目标 `subpath` 以及可选 `alias`。图片嵌入还支持 `![[image.png|250]]` 和 `![[image.png|替代文本|100x145]]`，回调可通过 `isImageEmbed`、`width` 与 `height` 读取解析结果；宿主返回的图片组件会受到对应尺寸约束。普通笔记的数字别名不会被当作图片尺寸。未注入 `wikiEmbedBuilder` 时显示安全的引用占位，不会读取文件或访问网络。
 
+在桌面端 Live Preview 中，宿主成功解析的标准图片和 Wiki 图片会在悬停时显示右下角缩放柄。拖拽保持当前宽高比，宽度限制在 `20` 到编辑区可用宽度之间；松开后只把整数宽度写回 `|宽度`，双击缩放柄则移除有效尺寸。拖拽和重置各自形成独立撤销项。阅读模式、源码模式和移动端不显示该控件，安全占位也不会因此触发任何图片 I/O。
+
 ## 编辑与实时预览
 
 `IanvsMarkdownController` 是编辑状态的唯一数据源，管理文本、选区、模式、dirty 状态和撤销历史。`IanvsMarkdownLiveEditor` 会把当前块显示为原始 Markdown，其余块继续使用渲染组件：

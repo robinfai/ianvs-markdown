@@ -42,6 +42,7 @@ class IanvsMarkdown extends StatelessWidget {
     this.inlineSyntaxes,
     this.extensionSet,
     this.imageBuilder,
+    this.onImageResize,
     this.checkboxBuilder,
     this.bulletBuilder,
     this.builders = const <String, MarkdownElementBuilder>{},
@@ -73,6 +74,11 @@ class IanvsMarkdown extends StatelessWidget {
   final List<md.InlineSyntax>? inlineSyntaxes;
   final md.ExtensionSet? extensionSet;
   final MarkdownImageBuilder? imageBuilder;
+
+  /// Receives completed desktop resize and reset gestures for host-resolved
+  /// images. [IanvsMarkdownLiveEditor] uses this internally for exact source
+  /// updates; renderer hosts can use it with the public rewrite helpers.
+  final IanvsMarkdownImageResizeHandler? onImageResize;
   final MarkdownCheckboxBuilder? checkboxBuilder;
   final MarkdownBulletBuilder? bulletBuilder;
   final Map<String, MarkdownElementBuilder> builders;
@@ -206,6 +212,15 @@ class IanvsMarkdown extends StatelessWidget {
         onTapLink: onTapLink,
         onTapText: onTapText,
         contentBuilder: wikiEmbedBuilder,
+        onResizeImage: onImageResize == null
+            ? null
+            : (source, width) => onImageResize!(
+                IanvsMarkdownImageResizeRequest(
+                  syntax: IanvsMarkdownImageSourceSyntax.wiki,
+                  source: source,
+                  width: width,
+                ),
+              ),
         theme: colors,
       ),
       if (obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing)
@@ -274,6 +289,7 @@ class IanvsMarkdown extends StatelessWidget {
         mode: obsidianMetadataMode,
       ),
     );
+    var imageIndex = 0;
     return KeyedSubtree(
       key: const ValueKey('ianvs-markdown-body'),
       child: MarkdownBody(
@@ -291,6 +307,8 @@ class IanvsMarkdown extends StatelessWidget {
         inlineSyntaxes: effectiveInlineSyntaxes,
         extensionSet: extensionSet ?? md.ExtensionSet.gitHubFlavored,
         imageBuilder: (uri, title, alt) {
+          final currentImageIndex = imageIndex;
+          imageIndex += 1;
           final dimensions = parseIanvsMarkdownImageDimensions(alt);
           final builder = imageBuilder;
           if (builder == null) {
@@ -302,8 +320,22 @@ class IanvsMarkdown extends StatelessWidget {
             );
           }
           final image = builder(uri, title, dimensions.alt);
-          if (!dimensions.hasDimensions) return image;
-          return IanvsMarkdownSizedImage(dimensions: dimensions, child: image);
+          final resize = onImageResize;
+          if (!dimensions.hasDimensions && resize == null) return image;
+          return IanvsMarkdownSizedImage(
+            dimensions: dimensions,
+            resizeColor: colors.accent,
+            onResize: resize == null
+                ? null
+                : (width) => resize(
+                    IanvsMarkdownImageResizeRequest(
+                      syntax: IanvsMarkdownImageSourceSyntax.standard,
+                      imageIndex: currentImageIndex,
+                      width: width,
+                    ),
+                  ),
+            child: image,
+          );
         },
         checkboxBuilder: checkboxBuilder,
         bulletBuilder:
@@ -340,6 +372,7 @@ class IanvsMarkdown extends StatelessWidget {
       inlineSyntaxes: inlineSyntaxes,
       extensionSet: extensionSet,
       imageBuilder: imageBuilder,
+      onImageResize: onImageResize,
       checkboxBuilder: checkboxBuilder,
       bulletBuilder: bulletBuilder,
       builders: builders,
@@ -392,6 +425,7 @@ class IanvsMarkdown extends StatelessWidget {
       inlineSyntaxes: inlineSyntaxes,
       extensionSet: extensionSet,
       imageBuilder: imageBuilder,
+      onImageResize: onImageResize,
       builders: builders,
       paddingBuilders: paddingBuilders,
       fitContent: true,

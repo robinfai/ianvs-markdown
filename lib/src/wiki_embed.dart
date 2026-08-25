@@ -117,12 +117,14 @@ class IanvsMarkdownWikiEmbedElementBuilder extends MarkdownElementBuilder {
     required this.onTapLink,
     required this.onTapText,
     this.contentBuilder,
+    this.onResizeImage,
     this.theme,
   });
 
   final MarkdownTapLinkCallback? onTapLink;
   final VoidCallback? onTapText;
   final IanvsMarkdownWikiEmbedContentBuilder? contentBuilder;
+  final void Function(String source, int? width)? onResizeImage;
   final IanvsMarkdownThemeData? theme;
 
   @override
@@ -150,6 +152,7 @@ class IanvsMarkdownWikiEmbedElementBuilder extends MarkdownElementBuilder {
         height: int.tryParse(rawHeight),
       ),
       contentBuilder: contentBuilder,
+      onResizeImage: onResizeImage,
       onTapLink: onTapLink,
       onTapText: onTapText,
       theme: theme,
@@ -163,6 +166,7 @@ class IanvsMarkdownWikiEmbed extends StatelessWidget {
     super.key,
     required this.reference,
     this.contentBuilder,
+    this.onResizeImage,
     this.onTapLink,
     this.onTapText,
     this.theme,
@@ -170,6 +174,7 @@ class IanvsMarkdownWikiEmbed extends StatelessWidget {
 
   final IanvsMarkdownWikiEmbedReference reference;
   final IanvsMarkdownWikiEmbedContentBuilder? contentBuilder;
+  final void Function(String source, int? width)? onResizeImage;
   final MarkdownTapLinkCallback? onTapLink;
   final VoidCallback? onTapText;
   final IanvsMarkdownThemeData? theme;
@@ -184,8 +189,16 @@ class IanvsMarkdownWikiEmbed extends StatelessWidget {
         width: reference.width,
         height: reference.height,
       );
-      final image = dimensions.hasDimensions
-          ? IanvsMarkdownSizedImage(dimensions: dimensions, child: resolved)
+      final resize = onResizeImage;
+      final image = dimensions.hasDimensions || resize != null
+          ? IanvsMarkdownSizedImage(
+              dimensions: dimensions,
+              resizeColor: colors.accent,
+              onResize: resize == null
+                  ? null
+                  : (width) => resize(reference.source, width),
+              child: resolved,
+            )
           : resolved;
       return GestureDetector(
         key: const ValueKey('ianvs-markdown-wiki-embed-tap-target'),
@@ -195,7 +208,10 @@ class IanvsMarkdownWikiEmbed extends StatelessWidget {
           key: const ValueKey('ianvs-markdown-wiki-embed'),
           margin: const EdgeInsets.symmetric(vertical: 5),
           alignment: Alignment.centerLeft,
-          child: IgnorePointer(ignoring: onTapText != null, child: image),
+          child: IgnorePointer(
+            ignoring: onTapText != null && resize == null,
+            child: image,
+          ),
         ),
       );
     }

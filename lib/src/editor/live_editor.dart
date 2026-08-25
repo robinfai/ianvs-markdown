@@ -15,6 +15,7 @@ import '../inline_code.dart';
 import '../inline_link.dart';
 import '../math.dart';
 import '../markdown_document.dart';
+import '../obsidian_image.dart';
 import '../obsidian_metadata.dart';
 import '../render_budget.dart';
 import '../theme.dart';
@@ -3029,6 +3030,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             ? widget.onTapLink
             : (_, _, _) {},
         imageBuilder: widget.imageBuilder,
+        onImageResize: (request) => _resizeImage(block, request),
         checkboxBuilder: block.type == IanvsMarkdownBlockType.taskList
             ? (checked) => Checkbox(
                 value: checked,
@@ -3131,6 +3133,26 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     return _linkReferences.appendDefinitionsTo(source);
   }
 
+  void _resizeImage(
+    IanvsMarkdownBlock block,
+    IanvsMarkdownImageResizeRequest request,
+  ) {
+    final replacement = switch (request.syntax) {
+      IanvsMarkdownImageSourceSyntax.standard => rewriteIanvsMarkdownImageWidth(
+        block.source,
+        imageIndex: request.imageIndex,
+        width: request.width,
+        linkReferenceLabels: _linkReferences.labels,
+      ),
+      IanvsMarkdownImageSourceSyntax.wiki => rewriteIanvsMarkdownWikiImageWidth(
+        block.source,
+        width: request.width,
+      ),
+    };
+    if (replacement == block.source) return;
+    _replaceBlockSource(block, replacement);
+  }
+
   void _setTaskChecked(IanvsMarkdownBlock block, bool checked) {
     final marker = RegExp(
       r'^ {0,3}[-+*]\s+\[([ xX])\]',
@@ -3196,7 +3218,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     ).length;
     if (columnCount == 0) return;
     final row = _blankTableRow(lines.first, columnCount);
-    _replaceTableSource(block, '${block.source}\n$row');
+    _replaceBlockSource(block, '${block.source}\n$row');
   }
 
   void _prependTableRow(IanvsMarkdownBlock block) {
@@ -3207,7 +3229,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     ).length;
     if (columnCount == 0) return;
     final row = _blankTableRow(lines.first, columnCount);
-    _replaceTableSource(
+    _replaceBlockSource(
       block,
       <String>[row, lines[1], lines.first, ...lines.skip(2)].join('\n'),
     );
@@ -3220,10 +3242,10 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     for (var index = 0; index < lines.length; index += 1) {
       updated.add(_appendTableLineCell(lines[index], separator: index == 1));
     }
-    _replaceTableSource(block, updated.join('\n'));
+    _replaceBlockSource(block, updated.join('\n'));
   }
 
-  void _replaceTableSource(IanvsMarkdownBlock block, String replacement) {
+  void _replaceBlockSource(IanvsMarkdownBlock block, String replacement) {
     final current = widget.controller.value;
     if (block.start < 0 ||
         block.end < block.start ||
@@ -3251,11 +3273,13 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             isDirectional: current.selection.isDirectional,
           )
         : current.selection;
+    widget.controller.commitHistoryGroup();
     widget.controller.value = current.copyWith(
       text: current.text.replaceRange(block.start, block.end, replacement),
       selection: selection,
       composing: TextRange.empty,
     );
+    widget.controller.commitHistoryGroup();
   }
 
   TextStyle _activeBlockTextStyle(
