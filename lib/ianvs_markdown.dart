@@ -32,6 +32,7 @@ export 'src/ianvs_markdown.dart';
 export 'src/math.dart';
 export 'src/markdown_document.dart';
 export 'src/obsidian_inline.dart';
+export 'src/obsidian_image.dart';
 export 'src/obsidian_metadata.dart';
 export 'src/render_budget.dart';
 export 'src/theme.dart';

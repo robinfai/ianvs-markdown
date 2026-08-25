@@ -16,6 +16,7 @@ import 'obsidian_autolink.dart';
 import 'obsidian_html.dart';
 import 'obsidian_inline.dart';
 import 'obsidian_metadata.dart';
+import 'obsidian_image.dart';
 import 'render_budget.dart';
 import 'theme.dart';
 import 'wiki_embed.dart';
@@ -289,14 +290,21 @@ class IanvsMarkdown extends StatelessWidget {
         blockSyntaxes: effectiveBlockSyntaxes,
         inlineSyntaxes: effectiveInlineSyntaxes,
         extensionSet: extensionSet ?? md.ExtensionSet.gitHubFlavored,
-        imageBuilder:
-            imageBuilder ??
-            (uri, title, alt) => IanvsMarkdownBlockedImage(
+        imageBuilder: (uri, title, alt) {
+          final dimensions = parseIanvsMarkdownImageDimensions(alt);
+          final builder = imageBuilder;
+          if (builder == null) {
+            return IanvsMarkdownBlockedImage(
               uri: uri,
               title: title,
-              alt: alt,
+              alt: dimensions.alt,
               theme: colors,
-            ),
+            );
+          }
+          final image = builder(uri, title, dimensions.alt);
+          if (!dimensions.hasDimensions) return image;
+          return IanvsMarkdownSizedImage(dimensions: dimensions, child: image);
+        },
         checkboxBuilder: checkboxBuilder,
         bulletBuilder:
             bulletBuilder ??

@@ -1,3 +1,9 @@
+## Unreleased
+
+- Match Obsidian image dimensions for standard Markdown images, external
+  images, and host-resolved Wiki image embeds while preserving safe default
+  image blocking and exact Live Preview source editing.
+
 ## 0.1.0
 
 - Add `IanvsMarkdownController` with selection, dirty state, formatting

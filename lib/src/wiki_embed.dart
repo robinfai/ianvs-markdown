@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
+import 'obsidian_image.dart';
 import 'theme.dart';
 
 /// The parsed destination of an Obsidian `![[...]]` embed.
@@ -13,6 +14,8 @@ class IanvsMarkdownWikiEmbedReference {
     required this.note,
     this.subpath,
     this.alias,
+    this.width,
+    this.height,
   });
 
   /// Exact embed source, including `![[` and `]]`.
@@ -29,6 +32,25 @@ class IanvsMarkdownWikiEmbedReference {
 
   /// Optional label after `|`.
   final String? alias;
+
+  /// Requested image width in logical pixels.
+  ///
+  /// This remains null for non-image embeds, including numeric note aliases.
+  final int? width;
+
+  /// Requested image height in logical pixels, or null for proportional
+  /// width-only sizing.
+  final int? height;
+
+  bool get isImageEmbed {
+    final separator = note.lastIndexOf('.');
+    if (separator < 0 || separator == note.length - 1) return false;
+    return _imageExtensions.contains(
+      note.substring(separator + 1).toLowerCase(),
+    );
+  }
+
+  bool get hasImageDimensions => isImageEmbed && width != null;
 
   bool get isBlockReference => subpath?.startsWith('^') ?? false;
 
@@ -75,12 +97,18 @@ class IanvsMarkdownWikiEmbedSyntax extends md.BlockSyntax {
     final hash = target.indexOf('#');
     final note = (hash < 0 ? target : target.substring(0, hash)).trim();
     final rawSubpath = hash < 0 ? '' : target.substring(hash + 1).trim();
+    final imageEmbed = _isImageTarget(note);
+    final dimensions = imageEmbed
+        ? parseIanvsMarkdownImageDimensions(rawAlias.isEmpty ? null : rawAlias)
+        : IanvsMarkdownImageDimensions(alt: rawAlias.isEmpty ? null : rawAlias);
     return md.Element('ianvs-wiki-embed', const <md.Node>[])
       ..attributes['data-source'] = source
       ..attributes['data-target'] = target
       ..attributes['data-note'] = note
       ..attributes['data-subpath'] = rawSubpath
-      ..attributes['data-alias'] = rawAlias;
+      ..attributes['data-alias'] = dimensions.alt ?? ''
+      ..attributes['data-width'] = dimensions.width?.toString() ?? ''
+      ..attributes['data-height'] = dimensions.height?.toString() ?? '';
   }
 }
 
@@ -109,6 +137,8 @@ class IanvsMarkdownWikiEmbedElementBuilder extends MarkdownElementBuilder {
   ) {
     final rawSubpath = element.attributes['data-subpath'] ?? '';
     final rawAlias = element.attributes['data-alias'] ?? '';
+    final rawWidth = element.attributes['data-width'] ?? '';
+    final rawHeight = element.attributes['data-height'] ?? '';
     return IanvsMarkdownWikiEmbed(
       reference: IanvsMarkdownWikiEmbedReference(
         source: element.attributes['data-source'] ?? '',
@@ -116,6 +146,8 @@ class IanvsMarkdownWikiEmbedElementBuilder extends MarkdownElementBuilder {
         note: element.attributes['data-note'] ?? '',
         subpath: rawSubpath.isEmpty ? null : rawSubpath,
         alias: rawAlias.isEmpty ? null : rawAlias,
+        width: int.tryParse(rawWidth),
+        height: int.tryParse(rawHeight),
       ),
       contentBuilder: contentBuilder,
       onTapLink: onTapLink,
@@ -146,6 +178,27 @@ class IanvsMarkdownWikiEmbed extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = IanvsMarkdownThemeData.resolve(context, theme);
     final resolved = contentBuilder?.call(context, reference);
+    if (resolved != null && reference.isImageEmbed) {
+      final dimensions = IanvsMarkdownImageDimensions(
+        alt: reference.alias,
+        width: reference.width,
+        height: reference.height,
+      );
+      final image = dimensions.hasDimensions
+          ? IanvsMarkdownSizedImage(dimensions: dimensions, child: resolved)
+          : resolved;
+      return GestureDetector(
+        key: const ValueKey('ianvs-markdown-wiki-embed-tap-target'),
+        behavior: HitTestBehavior.translucent,
+        onTap: onTapText,
+        child: Container(
+          key: const ValueKey('ianvs-markdown-wiki-embed'),
+          margin: const EdgeInsets.symmetric(vertical: 5),
+          alignment: Alignment.centerLeft,
+          child: IgnorePointer(ignoring: onTapText != null, child: image),
+        ),
+      );
+    }
     return GestureDetector(
       key: const ValueKey('ianvs-markdown-wiki-embed-tap-target'),
       behavior: HitTestBehavior.translucent,
@@ -229,4 +282,23 @@ class IanvsMarkdownWikiEmbed extends StatelessWidget {
       ],
     );
   }
+}
+
+const Set<String> _imageExtensions = <String>{
+  'bmp',
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'svg',
+  'webp',
+  'avif',
+};
+
+bool _isImageTarget(String target) {
+  final separator = target.lastIndexOf('.');
+  if (separator < 0 || separator == target.length - 1) return false;
+  return _imageExtensions.contains(
+    target.substring(separator + 1).toLowerCase(),
+  );
 }

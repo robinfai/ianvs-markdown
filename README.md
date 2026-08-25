@@ -10,7 +10,7 @@
 - 普通链接、文件引用、Obsidian Wiki 链接、块级嵌入与层级标签的区分展示
 - Obsidian `==高亮==` 与可折叠、分类型着色的 Callout 卡片
 - Obsidian `%%注释%%`、块 ID、标准脚注与 `^[内联脚注]`
-- Mermaid、自定义图片和额外元素 builder 注入点
+- Mermaid、自定义图片和额外元素 builder 注入点，以及 Obsidian 图片尺寸语法
 - Markdown 语法预算和 UTF-8 有界纯文本降级
 - 通过 `ThemeExtension` 支持亮色、暗色和宿主自定义主题
 - 默认不读取本地文件、不发起网络请求
@@ -56,7 +56,7 @@ Expanded(
 )
 ```
 
-默认图片 builder 只显示安全占位，不会自动访问网络或文件系统。宿主注入 `imageBuilder` 后，应自行完成路径授权、大小限制、解码预算和远端加载确认。
+默认图片 builder 只显示安全占位，不会自动访问网络或文件系统。宿主注入 `imageBuilder` 后，应自行完成路径授权、大小限制、解码预算和远端加载确认。标准图片支持 Obsidian 的 `![替代文本|250](image.png)`、`![替代文本|100x145](image.png)` 和外部图片简写 `![250](https://example.com/image.png)`；有效尺寸会从传给宿主的 `alt` 中移除，并以逻辑像素约束宿主返回的图片组件。无效尺寸保持为普通替代文本。
 
 无显式别名的 Wiki 锚点在 Live Preview 中保留 `[[Note#Heading]]` 的 `Note#Heading` 标签，阅读态显示为 `Note > Heading`；本地 `[[#Heading]]` 在两种模式下都只显示 `Heading`。宿主可同步提供 `wikiLinkExists`，让缺失目标使用 Obsidian 风格的紫色无下划线样式：
 
@@ -99,7 +99,7 @@ IanvsMarkdown(
 )
 ```
 
-`IanvsMarkdownWikiEmbedReference` 会分别提供完整 `target`、笔记路径 `note`、标题或块目标 `subpath` 以及可选 `alias`。未注入 `wikiEmbedBuilder` 时显示安全的引用占位，不会读取文件或访问网络。
+`IanvsMarkdownWikiEmbedReference` 会分别提供完整 `target`、笔记路径 `note`、标题或块目标 `subpath` 以及可选 `alias`。图片嵌入还支持 `![[image.png|250]]` 和 `![[image.png|替代文本|100x145]]`，回调可通过 `isImageEmbed`、`width` 与 `height` 读取解析结果；宿主返回的图片组件会受到对应尺寸约束。普通笔记的数字别名不会被当作图片尺寸。未注入 `wikiEmbedBuilder` 时显示安全的引用占位，不会读取文件或访问网络。
 
 ## 编辑与实时预览
 
