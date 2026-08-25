@@ -79,6 +79,16 @@ final value = 1;
     expect(markdownGapLineCount(source, blocks.first, blocks[1]), 2);
   });
 
+  test('accepts the shortest alignment markers Obsidian emits', () {
+    const source = '| A | B | C |\n| :-: | --: | :-- |\n| 1 | 2 | 3 |';
+
+    final blocks = parseMarkdownBlocks(source);
+
+    expect(blocks, hasLength(1));
+    expect(blocks.single.type, IanvsMarkdownBlockType.table);
+    expect(blocks.single.source, source);
+  });
+
   test('retains every intentional blank line between live blocks', () {
     const source = 'First paragraph.\n\n\n\nSecond paragraph.';
     final blocks = parseMarkdownBlocks(source);

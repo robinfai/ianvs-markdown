@@ -1,5 +1,6 @@
 import 'dart:ui' show BoxHeightStyle;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -2988,6 +2989,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           onAddRow: () => _appendTableRow(block),
           onAddRowAbove: () => _prependTableRow(block),
           onAddColumn: () => _appendTableColumn(block),
+          onMoveRow: (from, to) => _moveTableRow(block, from, to),
+          onMoveColumn: (from, to) => _moveTableColumn(block, from, to),
         ),
       );
     }
@@ -3211,38 +3214,66 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   }
 
   void _appendTableRow(IanvsMarkdownBlock block) {
-    final lines = block.source.split('\n');
-    if (lines.length < 2) return;
-    final columnCount = _tableLineCellRanges(
-      _EditableTableLine(lines[1], 0),
-    ).length;
-    if (columnCount == 0) return;
-    final row = _blankTableRow(lines.first, columnCount);
-    _replaceBlockSource(block, '${block.source}\n$row');
+    final model = _parseEditableTable(block);
+    if (model.rows.isEmpty || model.alignments.isEmpty) return;
+    final rows = _editableTableTextRows(model)
+      ..add(List<String>.filled(model.alignments.length, ''));
+    _replaceBlockSource(block, _serializeEditableTable(rows, model.alignments));
   }
 
   void _prependTableRow(IanvsMarkdownBlock block) {
-    final lines = block.source.split('\n');
-    if (lines.length < 2) return;
-    final columnCount = _tableLineCellRanges(
-      _EditableTableLine(lines[1], 0),
-    ).length;
-    if (columnCount == 0) return;
-    final row = _blankTableRow(lines.first, columnCount);
-    _replaceBlockSource(
-      block,
-      <String>[row, lines[1], lines.first, ...lines.skip(2)].join('\n'),
-    );
+    final model = _parseEditableTable(block);
+    if (model.rows.isEmpty || model.alignments.isEmpty) return;
+    final rows = _editableTableTextRows(model)
+      ..insert(0, List<String>.filled(model.alignments.length, ''));
+    _replaceBlockSource(block, _serializeEditableTable(rows, model.alignments));
   }
 
   void _appendTableColumn(IanvsMarkdownBlock block) {
-    final lines = block.source.split('\n');
-    if (lines.length < 2) return;
-    final updated = <String>[];
-    for (var index = 0; index < lines.length; index += 1) {
-      updated.add(_appendTableLineCell(lines[index], separator: index == 1));
+    final model = _parseEditableTable(block);
+    if (model.rows.isEmpty || model.alignments.isEmpty) return;
+    final rows = _editableTableTextRows(model);
+    for (final row in rows) {
+      row.add('');
     }
-    _replaceBlockSource(block, updated.join('\n'));
+    final alignments = [...model.alignments, _EditableTableAlignment.none];
+    _replaceBlockSource(block, _serializeEditableTable(rows, alignments));
+  }
+
+  void _moveTableRow(IanvsMarkdownBlock block, int from, int to) {
+    final model = _parseEditableTable(block);
+    if (from < 0 ||
+        to < 0 ||
+        from >= model.rows.length ||
+        to >= model.rows.length ||
+        from == to) {
+      return;
+    }
+    final rows = _editableTableTextRows(model);
+    final moved = rows.removeAt(from);
+    rows.insert(to, moved);
+    _replaceBlockSource(block, _serializeEditableTable(rows, model.alignments));
+  }
+
+  void _moveTableColumn(IanvsMarkdownBlock block, int from, int to) {
+    final model = _parseEditableTable(block);
+    if (model.rows.isEmpty ||
+        from < 0 ||
+        to < 0 ||
+        from >= model.alignments.length ||
+        to >= model.alignments.length ||
+        from == to) {
+      return;
+    }
+    final rows = _editableTableTextRows(model);
+    for (final row in rows) {
+      final moved = row.removeAt(from);
+      row.insert(to, moved);
+    }
+    final alignments = [...model.alignments];
+    final movedAlignment = alignments.removeAt(from);
+    alignments.insert(to, movedAlignment);
+    _replaceBlockSource(block, _serializeEditableTable(rows, alignments));
   }
 
   void _replaceBlockSource(IanvsMarkdownBlock block, String replacement) {
@@ -3926,6 +3957,8 @@ class _EditableMarkdownTable extends StatefulWidget {
     required this.onAddRow,
     required this.onAddRowAbove,
     required this.onAddColumn,
+    required this.onMoveRow,
+    required this.onMoveColumn,
   });
 
   final IanvsMarkdownBlock block;
@@ -3935,19 +3968,38 @@ class _EditableMarkdownTable extends StatefulWidget {
   final VoidCallback onAddRow;
   final VoidCallback onAddRowAbove;
   final VoidCallback onAddColumn;
+  final void Function(int from, int to) onMoveRow;
+  final void Function(int from, int to) onMoveColumn;
 
   @override
   State<_EditableMarkdownTable> createState() => _EditableMarkdownTableState();
 }
 
 class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
+  static const double _handleExtent = 16;
+
+  final GlobalKey _tableGeometryKey = GlobalKey(
+    debugLabel: 'ianvs-markdown-table-geometry',
+  );
   final Map<String, _TableCellEditingController> _controllers = {};
   final Map<String, FocusNode> _focusNodes = {};
+  final Map<String, GlobalKey> _cellGeometryKeys = {};
+  final Map<int, LayerLink> _rowHandleLinks = {};
+  final Map<int, LayerLink> _columnHandleLinks = {};
+  final Map<int, double> _rowHandleLengths = {};
+  final Map<int, double> _columnHandleLengths = {};
   late _EditableTableModel _model;
   String? _pendingFocusKey;
   _TableFocusPlacement _pendingFocusPlacement = _TableFocusPlacement.start;
   String? _focusedCellAtPointerDown;
-  var _hovering = false;
+  _TableDragAxis? _dragAxis;
+  int? _dragSourceIndex;
+  int? _dragTargetIndex;
+  int? _dragPointer;
+  Offset? _dragStartPosition;
+  Offset _dragOffset = Offset.zero;
+  int? _selectedRow;
+  int? _selectedColumn;
 
   @override
   void initState() {
@@ -3997,7 +4049,15 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
       final node = _focusNodes.remove(key);
       node?.removeListener(_handleCellFocusChanged);
       node?.dispose();
+      _cellGeometryKeys.remove(key);
     }
+    _rowHandleLinks.removeWhere((row, _) => row >= _model.rows.length);
+    _rowHandleLengths.removeWhere((row, _) => row >= _model.rows.length);
+    final columnCount = _model.rows.isEmpty ? 0 : _model.rows.first.length;
+    _columnHandleLinks.removeWhere((column, _) => column >= columnCount);
+    _columnHandleLengths.removeWhere((column, _) => column >= columnCount);
+    if ((_selectedRow ?? -1) >= _model.rows.length) _selectedRow = null;
+    if ((_selectedColumn ?? -1) >= columnCount) _selectedColumn = null;
     final pendingFocusKey = _pendingFocusKey;
     if (pendingFocusKey != null && _focusNodes.containsKey(pendingFocusKey)) {
       _pendingFocusKey = null;
@@ -4028,6 +4088,174 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
     _pendingFocusKey = '0-${_model.rows.first.length}';
     _pendingFocusPlacement = _TableFocusPlacement.start;
     widget.onAddColumn();
+  }
+
+  GlobalKey _cellGeometryKey(String key) => _cellGeometryKeys.putIfAbsent(
+    key,
+    () => GlobalKey(debugLabel: 'ianvs-markdown-table-cell-$key'),
+  );
+
+  LayerLink _rowHandleLink(int row) =>
+      _rowHandleLinks.putIfAbsent(row, LayerLink.new);
+
+  LayerLink _columnHandleLink(int column) =>
+      _columnHandleLinks.putIfAbsent(column, LayerLink.new);
+
+  void _syncTableHandleLengths() {
+    if (!mounted) return;
+    var changed = false;
+    final tableRender = _tableGeometryKey.currentContext?.findRenderObject();
+    if (tableRender is RenderTable && !tableRender.debugNeedsLayout) {
+      for (var row = 0; row < tableRender.rows; row++) {
+        final height = tableRender.getRowBox(row).height;
+        if (_rowHandleLengths[row] != height) {
+          _rowHandleLengths[row] = height;
+          changed = true;
+        }
+      }
+    }
+    final columnCount = _model.rows.isEmpty ? 0 : _model.rows.first.length;
+    for (var column = 0; column < columnCount; column++) {
+      final renderObject = _cellGeometryKeys['0-$column']?.currentContext
+          ?.findRenderObject();
+      if (renderObject is! RenderBox || !renderObject.hasSize) continue;
+      final width = renderObject.size.width;
+      if (_columnHandleLengths[column] != width) {
+        _columnHandleLengths[column] = width;
+        changed = true;
+      }
+    }
+    if (changed) setState(() {});
+  }
+
+  bool get _mobileTableControls => switch (defaultTargetPlatform) {
+    TargetPlatform.android || TargetPlatform.iOS => true,
+    _ => false,
+  };
+
+  (int, int)? get _focusedCellCoordinates {
+    for (final entry in _focusNodes.entries) {
+      if (!entry.value.hasFocus) continue;
+      final separator = entry.key.indexOf('-');
+      if (separator <= 0) return null;
+      final row = int.tryParse(entry.key.substring(0, separator));
+      final column = int.tryParse(entry.key.substring(separator + 1));
+      if (row != null && column != null) return (row, column);
+    }
+    return null;
+  }
+
+  void _startTableDrag(_TableDragAxis axis, int index, PointerDownEvent event) {
+    if (_dragPointer != null || !event.down || event.buttons & 1 == 0) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _dragAxis = axis;
+      _dragSourceIndex = index;
+      _dragTargetIndex = index;
+      _dragPointer = event.pointer;
+      _dragStartPosition = event.position;
+      _dragOffset = Offset.zero;
+      if (axis == _TableDragAxis.row) {
+        _selectedRow = index;
+        _selectedColumn = null;
+      } else {
+        _selectedColumn = index;
+        _selectedRow = null;
+      }
+    });
+  }
+
+  void _updateTableDrag(PointerMoveEvent event) {
+    final axis = _dragAxis;
+    if (axis == null || event.pointer != _dragPointer) return;
+    final target = _tableDragTargetAt(axis, event.position);
+    setState(() {
+      _dragOffset = event.position - (_dragStartPosition ?? event.position);
+      if (target != null) _dragTargetIndex = target;
+    });
+  }
+
+  int? _tableDragTargetAt(_TableDragAxis axis, Offset globalPosition) {
+    final count = axis == _TableDragAxis.row
+        ? _model.rows.length
+        : (_model.rows.isEmpty ? 0 : _model.rows.first.length);
+    if (count == 0) return null;
+    final coordinate = axis == _TableDragAxis.row
+        ? globalPosition.dy
+        : globalPosition.dx;
+    double? smallestMinimum;
+    double? largestMaximum;
+    var smallestIndex = 0;
+    var largestIndex = count - 1;
+    for (var index = 0; index < count; index++) {
+      final key = axis == _TableDragAxis.row ? '$index-0' : '0-$index';
+      final renderObject = _cellGeometryKeys[key]?.currentContext
+          ?.findRenderObject();
+      if (renderObject is! RenderBox || !renderObject.hasSize) continue;
+      final origin = renderObject.localToGlobal(Offset.zero);
+      final rect = origin & renderObject.size;
+      final minimum = axis == _TableDragAxis.row ? rect.top : rect.left;
+      final maximum = axis == _TableDragAxis.row ? rect.bottom : rect.right;
+      if (smallestMinimum == null || minimum < smallestMinimum) {
+        smallestMinimum = minimum;
+        smallestIndex = index;
+      }
+      if (largestMaximum == null || maximum > largestMaximum) {
+        largestMaximum = maximum;
+        largestIndex = index;
+      }
+      if (coordinate >= minimum && coordinate <= maximum) return index;
+    }
+    if (smallestMinimum == null || largestMaximum == null) return null;
+    return coordinate < smallestMinimum ? smallestIndex : largestIndex;
+  }
+
+  void _finishTableDrag(PointerUpEvent event) {
+    if (event.pointer != _dragPointer) return;
+    final axis = _dragAxis;
+    final source = _dragSourceIndex;
+    final target = _dragTargetIndex;
+    setState(() {
+      _dragAxis = null;
+      _dragSourceIndex = null;
+      _dragTargetIndex = null;
+      _dragPointer = null;
+      _dragStartPosition = null;
+      _dragOffset = Offset.zero;
+      if (axis == _TableDragAxis.row) {
+        _selectedRow = target;
+      } else if (axis == _TableDragAxis.column) {
+        _selectedColumn = target;
+      }
+    });
+    if (axis == null || source == null || target == null || source == target) {
+      return;
+    }
+    if (axis == _TableDragAxis.row) {
+      widget.onMoveRow(source, target);
+    } else {
+      widget.onMoveColumn(source, target);
+    }
+  }
+
+  void _cancelTableDrag(PointerCancelEvent event) {
+    if (event.pointer != _dragPointer) return;
+    setState(() {
+      _dragAxis = null;
+      _dragSourceIndex = null;
+      _dragTargetIndex = null;
+      _dragPointer = null;
+      _dragStartPosition = null;
+      _dragOffset = Offset.zero;
+    });
+  }
+
+  void _clearTableSelection() {
+    if (_selectedRow == null && _selectedColumn == null) return;
+    setState(() {
+      _selectedRow = null;
+      _selectedColumn = null;
+    });
   }
 
   KeyEventResult _handleCellKey(_EditableTableCell cell, KeyEvent event) {
@@ -4160,6 +4388,53 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
     };
   }
 
+  BoxDecoration? _tableCellDecoration(
+    _EditableTableCell cell,
+    TextDirection direction,
+  ) {
+    final selected = cell.row == _selectedRow || cell.column == _selectedColumn;
+    BorderSide? top;
+    BorderSide? right;
+    BorderSide? bottom;
+    BorderSide? left;
+    final source = _dragSourceIndex;
+    final target = _dragTargetIndex;
+    if (source != null && target != null && source != target) {
+      final indicator = BorderSide(color: widget.colors.accent, width: 2);
+      if (_dragAxis == _TableDragAxis.row && cell.row == target) {
+        if (target < source) {
+          top = indicator;
+        } else {
+          bottom = indicator;
+        }
+      } else if (_dragAxis == _TableDragAxis.column && cell.column == target) {
+        final atLogicalStart = target < source;
+        if ((direction == TextDirection.ltr && atLogicalStart) ||
+            (direction == TextDirection.rtl && !atLogicalStart)) {
+          left = indicator;
+        } else {
+          right = indicator;
+        }
+      }
+    }
+    if (!selected &&
+        top == null &&
+        right == null &&
+        bottom == null &&
+        left == null) {
+      return null;
+    }
+    return BoxDecoration(
+      color: selected ? widget.colors.accentMist.withValues(alpha: .72) : null,
+      border: Border(
+        top: top ?? BorderSide.none,
+        right: right ?? BorderSide.none,
+        bottom: bottom ?? BorderSide.none,
+        left: left ?? BorderSide.none,
+      ),
+    );
+  }
+
   @override
   void dispose() {
     for (final controller in _controllers.values) {
@@ -4180,171 +4455,270 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
       Theme.of(context).brightness,
     );
     final showControls =
-        _hovering || _focusNodes.values.any((focusNode) => focusNode.hasFocus);
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovering = true),
-      onExit: (_) => setState(() => _hovering = false),
-      child: SizedBox(
-        key: const ValueKey('ianvs-markdown-editable-table'),
-        width: double.infinity,
-        child: Semantics(
-          container: true,
-          explicitChildNodes: true,
-          label: 'Editable Markdown table',
-          child: Stack(
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(right: 28, bottom: 24),
-                child: Table(
-                  defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-                  defaultColumnWidth: const IntrinsicColumnWidth(),
-                  columnWidths: _obsidianTableColumnWidths(_model),
-                  border: TableBorder.all(color: widget.colors.borderSoft),
-                  children: [
-                    for (final row in _model.rows)
-                      TableRow(
-                        decoration: row.first.isHeader
-                            ? BoxDecoration(color: widget.colors.surfaceMuted)
-                            : null,
-                        children: [
-                          for (final cell in row)
-                            Builder(
-                              builder: (context) {
-                                final focusNode = _focusNodes[cell.key]!;
-                                final controller = _controllers[cell.key]!
-                                  ..syntaxTheme = syntaxTheme
-                                  ..linkReferenceLabels =
-                                      widget.linkReferenceLabels
-                                  ..revealSource = focusNode.hasFocus;
-                                final editor = Focus(
-                                  onKeyEvent: (_, event) =>
-                                      _handleCellKey(cell, event),
-                                  child: Listener(
-                                    behavior: HitTestBehavior.translucent,
-                                    onPointerDown: (_) {
-                                      _focusedCellAtPointerDown =
-                                          focusNode.hasFocus ? cell.key : null;
-                                    },
-                                    child: TextField(
-                                      key: ValueKey(
-                                        'ianvs-markdown-table-${cell.key}',
-                                      ),
-                                      controller: controller,
-                                      focusNode: focusNode,
-                                      maxLines: null,
-                                      keyboardType: TextInputType.text,
-                                      textInputAction: TextInputAction.next,
-                                      smartDashesType: SmartDashesType.disabled,
-                                      smartQuotesType: SmartQuotesType.disabled,
-                                      autocorrect: false,
-                                      enableSuggestions: false,
-                                      inputFormatters: [
-                                        FilteringTextInputFormatter.deny(
-                                          RegExp(r'[\r\n|]'),
-                                        ),
-                                      ],
-                                      textAlign: cell.alignment,
-                                      style: TextStyle(
-                                        color: widget.colors.textPrimary,
-                                        fontSize: 13.5,
-                                        height: 1.35,
-                                        fontWeight: cell.isHeader
-                                            ? FontWeight.w600
-                                            : FontWeight.w400,
-                                      ),
-                                      cursorColor: widget.colors.accent,
-                                      cursorWidth: 1.5,
-                                      decoration: const InputDecoration(
-                                        border: InputBorder.none,
-                                        enabledBorder: InputBorder.none,
-                                        focusedBorder: InputBorder.none,
-                                        isCollapsed: true,
-                                        contentPadding: EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 3,
-                                        ),
-                                      ),
-                                      onTap: () {
-                                        if (_focusedCellAtPointerDown !=
-                                            cell.key) {
-                                          controller.selection = TextSelection(
-                                            baseOffset: 0,
-                                            extentOffset:
-                                                controller.text.length,
-                                          );
-                                        }
-                                        _focusedCellAtPointerDown = null;
-                                      },
-                                      onChanged: (value) =>
-                                          widget.onCellChanged(cell, value),
+        _mobileTableControls &&
+        _focusNodes.values.any((focusNode) => focusNode.hasFocus);
+    final focusedCell = _focusedCellCoordinates;
+    final direction = Directionality.of(context);
+    final rowCount = _model.rows.length;
+    final columnCount = _model.rows.first.length;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncTableHandleLengths();
+    });
+    return SizedBox(
+      key: const ValueKey('ianvs-markdown-editable-table'),
+      width: double.infinity,
+      child: Semantics(
+        container: true,
+        explicitChildNodes: true,
+        label: 'Editable Markdown table',
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(_handleExtent),
+              child: Table(
+                key: _tableGeometryKey,
+                defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                defaultColumnWidth: const IntrinsicColumnWidth(),
+                columnWidths: _obsidianTableColumnWidths(_model),
+                border: TableBorder.all(color: widget.colors.borderSoft),
+                children: [
+                  for (final row in _model.rows)
+                    TableRow(
+                      decoration: row.first.isHeader
+                          ? BoxDecoration(color: widget.colors.surfaceMuted)
+                          : null,
+                      children: [
+                        for (final cell in row)
+                          Builder(
+                            builder: (context) {
+                              final focusNode = _focusNodes[cell.key]!;
+                              final controller = _controllers[cell.key]!
+                                ..syntaxTheme = syntaxTheme
+                                ..linkReferenceLabels =
+                                    widget.linkReferenceLabels
+                                ..revealSource = focusNode.hasFocus;
+                              final editor = Focus(
+                                onKeyEvent: (_, event) =>
+                                    _handleCellKey(cell, event),
+                                child: Listener(
+                                  behavior: HitTestBehavior.translucent,
+                                  onPointerDown: (_) {
+                                    _clearTableSelection();
+                                    _focusedCellAtPointerDown =
+                                        focusNode.hasFocus ? cell.key : null;
+                                  },
+                                  child: TextField(
+                                    key: ValueKey(
+                                      'ianvs-markdown-table-${cell.key}',
                                     ),
+                                    controller: controller,
+                                    focusNode: focusNode,
+                                    maxLines: null,
+                                    keyboardType: TextInputType.text,
+                                    textInputAction: TextInputAction.next,
+                                    smartDashesType: SmartDashesType.disabled,
+                                    smartQuotesType: SmartQuotesType.disabled,
+                                    autocorrect: false,
+                                    enableSuggestions: false,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.deny(
+                                        RegExp(r'[\r\n|]'),
+                                      ),
+                                    ],
+                                    textAlign: cell.alignment,
+                                    style: TextStyle(
+                                      color: widget.colors.textPrimary,
+                                      fontSize: 13.5,
+                                      height: 1.35,
+                                      fontWeight: cell.isHeader
+                                          ? FontWeight.w600
+                                          : FontWeight.w400,
+                                    ),
+                                    cursorColor: widget.colors.accent,
+                                    cursorWidth: 1.5,
+                                    decoration: const InputDecoration(
+                                      border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                      isCollapsed: true,
+                                      contentPadding: EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 3,
+                                      ),
+                                    ),
+                                    onTap: () {
+                                      if (_focusedCellAtPointerDown !=
+                                          cell.key) {
+                                        controller.selection = TextSelection(
+                                          baseOffset: 0,
+                                          extentOffset: controller.text.length,
+                                        );
+                                      }
+                                      _focusedCellAtPointerDown = null;
+                                    },
+                                    onChanged: (value) =>
+                                        widget.onCellChanged(cell, value),
                                   ),
+                                ),
+                              );
+                              Widget surface = Semantics(
+                                key: ValueKey(
+                                  'ianvs-markdown-table-cell-semantics-${cell.key}',
+                                ),
+                                container: true,
+                                explicitChildNodes: focusNode.hasFocus,
+                                role: cell.isHeader
+                                    ? SemanticsRole.columnHeader
+                                    : SemanticsRole.cell,
+                                label: focusNode.hasFocus
+                                    ? null
+                                    : _tableCellDisplayText(cell.text),
+                                value: focusNode.hasFocus
+                                    ? controller.text
+                                    : null,
+                                onTap: focusNode.hasFocus
+                                    ? null
+                                    : () => _focusCell(
+                                        cell.key,
+                                        placement:
+                                            _TableFocusPlacement.selectAll,
+                                      ),
+                                child: focusNode.hasFocus
+                                    ? editor
+                                    : ExcludeSemantics(child: editor),
+                              );
+                              surface = Container(
+                                key: ValueKey(
+                                  'ianvs-markdown-table-cell-surface-${cell.key}',
+                                ),
+                                decoration: _tableCellDecoration(
+                                  cell,
+                                  direction,
+                                ),
+                                child: surface,
+                              );
+                              surface = KeyedSubtree(
+                                key: _cellGeometryKey(cell.key),
+                                child: surface,
+                              );
+                              if (cell.column == 0) {
+                                surface = CompositedTransformTarget(
+                                  link: _rowHandleLink(cell.row),
+                                  child: surface,
                                 );
-                                return Semantics(
-                                  key: ValueKey(
-                                    'ianvs-markdown-table-cell-semantics-${cell.key}',
-                                  ),
-                                  container: true,
-                                  explicitChildNodes: focusNode.hasFocus,
-                                  role: cell.isHeader
-                                      ? SemanticsRole.columnHeader
-                                      : SemanticsRole.cell,
-                                  label: focusNode.hasFocus
-                                      ? null
-                                      : _tableCellDisplayText(cell.text),
-                                  value: focusNode.hasFocus
-                                      ? controller.text
-                                      : null,
-                                  onTap: focusNode.hasFocus
-                                      ? null
-                                      : () => _focusCell(
-                                          cell.key,
-                                          placement:
-                                              _TableFocusPlacement.selectAll,
-                                        ),
-                                  child: focusNode.hasFocus
-                                      ? editor
-                                      : ExcludeSemantics(child: editor),
+                              }
+                              if (cell.row == 0) {
+                                surface = CompositedTransformTarget(
+                                  link: _columnHandleLink(cell.column),
+                                  child: surface,
                                 );
-                              },
-                            ),
-                        ],
-                      ),
-                  ],
-                ),
+                              }
+                              return surface;
+                            },
+                          ),
+                      ],
+                    ),
+                ],
               ),
-              Positioned(
-                right: 0,
-                top: 0,
-                bottom: 24,
-                child: Center(
-                  child: _TableStructureButton(
-                    key: const ValueKey('ianvs-markdown-table-add-column'),
+            ),
+            for (var row = 0; row < rowCount; row++)
+              CompositedTransformFollower(
+                link: _rowHandleLink(row),
+                showWhenUnlinked: false,
+                targetAnchor: Alignment.centerLeft,
+                followerAnchor: Alignment.centerRight,
+                child: Transform.translate(
+                  offset:
+                      _dragAxis == _TableDragAxis.row && _dragSourceIndex == row
+                      ? Offset(0, _dragOffset.dy)
+                      : Offset.zero,
+                  child: _TableDragHandle(
+                    key: ValueKey('ianvs-markdown-table-row-drag-$row'),
+                    axis: _TableDragAxis.row,
+                    index: row,
+                    length: _rowHandleLengths[row] ?? 24,
                     colors: widget.colors,
-                    visible: showControls,
-                    tooltip: '在右侧新增列',
-                    icon: Icons.add_rounded,
-                    onPressed: _addColumn,
+                    active:
+                        _dragAxis == _TableDragAxis.row &&
+                            _dragSourceIndex == row ||
+                        _mobileTableControls &&
+                            (focusedCell?.$1 == row || _selectedRow == row),
+                    dragging:
+                        _dragAxis == _TableDragAxis.row &&
+                        _dragSourceIndex == row,
+                    onPointerDown: (event) =>
+                        _startTableDrag(_TableDragAxis.row, row, event),
+                    onPointerMove: _updateTableDrag,
+                    onPointerUp: _finishTableDrag,
+                    onPointerCancel: _cancelTableDrag,
                   ),
                 ),
               ),
-              Positioned(
-                left: 0,
-                right: 28,
-                bottom: 0,
-                child: Center(
-                  child: _TableStructureButton(
-                    key: const ValueKey('ianvs-markdown-table-add-row'),
+            for (var column = 0; column < columnCount; column++)
+              CompositedTransformFollower(
+                link: _columnHandleLink(column),
+                showWhenUnlinked: false,
+                targetAnchor: Alignment.topCenter,
+                followerAnchor: Alignment.bottomCenter,
+                child: Transform.translate(
+                  offset:
+                      _dragAxis == _TableDragAxis.column &&
+                          _dragSourceIndex == column
+                      ? Offset(_dragOffset.dx, 0)
+                      : Offset.zero,
+                  child: _TableDragHandle(
+                    key: ValueKey('ianvs-markdown-table-column-drag-$column'),
+                    axis: _TableDragAxis.column,
+                    index: column,
+                    length: _columnHandleLengths[column] ?? 24,
                     colors: widget.colors,
-                    visible: showControls,
-                    tooltip: '在下方新增行',
-                    icon: Icons.add_rounded,
-                    onPressed: _addRow,
+                    active:
+                        _dragAxis == _TableDragAxis.column &&
+                            _dragSourceIndex == column ||
+                        _mobileTableControls &&
+                            (focusedCell?.$2 == column ||
+                                _selectedColumn == column),
+                    dragging:
+                        _dragAxis == _TableDragAxis.column &&
+                        _dragSourceIndex == column,
+                    onPointerDown: (event) =>
+                        _startTableDrag(_TableDragAxis.column, column, event),
+                    onPointerMove: _updateTableDrag,
+                    onPointerUp: _finishTableDrag,
+                    onPointerCancel: _cancelTableDrag,
                   ),
                 ),
               ),
-            ],
-          ),
+            Positioned(
+              right: 0,
+              top: _handleExtent,
+              bottom: _handleExtent,
+              width: _handleExtent,
+              child: _TableStructureButton(
+                key: const ValueKey('ianvs-markdown-table-add-column'),
+                colors: widget.colors,
+                visible: showControls,
+                tooltip: '在右侧新增列',
+                icon: Icons.add_rounded,
+                onPressed: _addColumn,
+              ),
+            ),
+            Positioned(
+              left: _handleExtent,
+              right: _handleExtent,
+              bottom: 0,
+              height: _handleExtent,
+              child: _TableStructureButton(
+                key: const ValueKey('ianvs-markdown-table-add-row'),
+                colors: widget.colors,
+                visible: showControls,
+                tooltip: '在下方新增行',
+                icon: Icons.add_rounded,
+                onPressed: _addRow,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -4432,7 +4806,117 @@ IanvsMarkdownSyntaxTheme _tableCellSyntaxTheme(
 
 enum _TableFocusPlacement { selectAll, start, end, preserve }
 
-class _TableStructureButton extends StatelessWidget {
+enum _TableDragAxis { row, column }
+
+class _TableDragHandle extends StatefulWidget {
+  const _TableDragHandle({
+    super.key,
+    required this.axis,
+    required this.index,
+    required this.length,
+    required this.colors,
+    required this.active,
+    required this.dragging,
+    required this.onPointerDown,
+    required this.onPointerMove,
+    required this.onPointerUp,
+    required this.onPointerCancel,
+  });
+
+  final _TableDragAxis axis;
+  final int index;
+  final double length;
+  final IanvsMarkdownThemeData colors;
+  final bool active;
+  final bool dragging;
+  final ValueChanged<PointerDownEvent> onPointerDown;
+  final ValueChanged<PointerMoveEvent> onPointerMove;
+  final ValueChanged<PointerUpEvent> onPointerUp;
+  final ValueChanged<PointerCancelEvent> onPointerCancel;
+
+  @override
+  State<_TableDragHandle> createState() => _TableDragHandleState();
+}
+
+class _TableDragHandleState extends State<_TableDragHandle> {
+  var _hovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final mobile = switch (defaultTargetPlatform) {
+      TargetPlatform.android || TargetPlatform.iOS => true,
+      _ => false,
+    };
+    final visible = widget.active || _hovering;
+    final label = widget.axis == _TableDragAxis.row
+        ? '拖动表格第 ${widget.index + 1} 行'
+        : '拖动表格第 ${widget.index + 1} 列';
+    final icon = Icon(Icons.drag_indicator_rounded, size: 14);
+    final orientedIcon = widget.axis == _TableDragAxis.row
+        ? icon
+        : RotatedBox(quarterTurns: 1, child: icon);
+    return IgnorePointer(
+      ignoring: mobile && !widget.active,
+      child: MouseRegion(
+        cursor: widget.dragging
+            ? SystemMouseCursors.grabbing
+            : SystemMouseCursors.grab,
+        onEnter: (_) => setState(() => _hovering = true),
+        onExit: (_) => setState(() => _hovering = false),
+        child: Semantics(
+          container: true,
+          button: true,
+          label: label,
+          child: Listener(
+            behavior: HitTestBehavior.opaque,
+            onPointerDown: widget.onPointerDown,
+            onPointerMove: widget.onPointerMove,
+            onPointerUp: widget.onPointerUp,
+            onPointerCancel: widget.onPointerCancel,
+            child: AnimatedOpacity(
+              key: ValueKey(
+                'ianvs-markdown-table-${widget.axis.name}-drag-${widget.index}-opacity',
+              ),
+              opacity: visible ? 1 : 0,
+              duration: const Duration(milliseconds: 100),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 80),
+                width: widget.axis == _TableDragAxis.row ? 16 : widget.length,
+                height: widget.axis == _TableDragAxis.row ? widget.length : 16,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: widget.dragging
+                      ? widget.colors.accent
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(4),
+                  boxShadow: widget.dragging
+                      ? <BoxShadow>[
+                          BoxShadow(
+                            color: widget.colors.accent.withValues(alpha: .35),
+                            blurRadius: 0,
+                            spreadRadius: 2,
+                          ),
+                        ]
+                      : null,
+                ),
+                child: IconTheme(
+                  data: IconThemeData(
+                    color: widget.dragging
+                        ? widget.colors.surface
+                        : widget.colors.textTertiary,
+                  ),
+                  child: orientedIcon,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TableStructureButton extends StatefulWidget {
   const _TableStructureButton({
     super.key,
     required this.colors,
@@ -4449,30 +4933,42 @@ class _TableStructureButton extends StatelessWidget {
   final VoidCallback onPressed;
 
   @override
+  State<_TableStructureButton> createState() => _TableStructureButtonState();
+}
+
+class _TableStructureButtonState extends State<_TableStructureButton> {
+  var _hovering = false;
+
+  @override
   Widget build(BuildContext context) {
-    return AnimatedOpacity(
-      opacity: visible ? 1 : 0,
-      duration: const Duration(milliseconds: 120),
-      alwaysIncludeSemantics: true,
-      child: Tooltip(
-        message: tooltip,
-        child: Semantics(
-          container: true,
-          button: true,
-          label: tooltip,
-          onTap: onPressed,
-          child: ExcludeSemantics(
-            child: IconButton(
-              onPressed: onPressed,
-              icon: Icon(icon, size: 15),
-              color: colors.textTertiary,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints.tightFor(width: 24, height: 24),
-              style: IconButton.styleFrom(
-                backgroundColor: colors.surfaceRaised,
-                side: BorderSide(color: colors.borderSoft),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(5),
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      child: AnimatedOpacity(
+        opacity: widget.visible || _hovering ? 1 : 0,
+        duration: const Duration(milliseconds: 100),
+        alwaysIncludeSemantics: true,
+        child: Tooltip(
+          message: widget.tooltip,
+          child: Semantics(
+            container: true,
+            button: true,
+            label: widget.tooltip,
+            onTap: widget.onPressed,
+            child: ExcludeSemantics(
+              child: SizedBox.expand(
+                child: IconButton(
+                  onPressed: widget.onPressed,
+                  icon: Icon(widget.icon, size: 12),
+                  color: widget.colors.textTertiary,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  visualDensity: VisualDensity.compact,
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    side: BorderSide(color: widget.colors.borderSoft),
+                    shape: const RoundedRectangleBorder(),
+                  ),
                 ),
               ),
             ),
@@ -4484,10 +4980,13 @@ class _TableStructureButton extends StatelessWidget {
 }
 
 final class _EditableTableModel {
-  const _EditableTableModel(this.rows);
+  const _EditableTableModel(this.rows, this.alignments);
 
   final List<List<_EditableTableCell>> rows;
+  final List<_EditableTableAlignment> alignments;
 }
+
+enum _EditableTableAlignment { none, left, center, right }
 
 Map<int, TableColumnWidth> _obsidianTableColumnWidths(
   _EditableTableModel model,
@@ -4585,17 +5084,18 @@ _EditableTableModel _parseEditableTable(IanvsMarkdownBlock block) {
     if (newline < 0) break;
     lineStart = newline + 1;
   }
-  if (lines.length < 2) return const _EditableTableModel([]);
+  if (lines.length < 2) return const _EditableTableModel([], []);
 
   final separatorCells = _tableLineCellRanges(lines[1]);
-  if (separatorCells.isEmpty) return const _EditableTableModel([]);
+  if (separatorCells.isEmpty) return const _EditableTableModel([], []);
   final parsedAlignments = separatorCells.map((range) {
     final marker = lines[1].text.substring(range.$1, range.$2).trim();
     if (marker.startsWith(':') && marker.endsWith(':')) {
-      return TextAlign.center;
+      return _EditableTableAlignment.center;
     }
-    if (marker.endsWith(':')) return TextAlign.right;
-    return TextAlign.left;
+    if (marker.endsWith(':')) return _EditableTableAlignment.right;
+    if (marker.startsWith(':')) return _EditableTableAlignment.left;
+    return _EditableTableAlignment.none;
   }).toList();
 
   final visibleLines = <_EditableTableLine>[lines.first, ...lines.skip(2)];
@@ -4606,11 +5106,11 @@ _EditableTableModel _parseEditableTable(IanvsMarkdownBlock block) {
     parsedAlignments.length,
     (largest, ranges) => ranges.length > largest ? ranges.length : largest,
   );
-  final alignments = <TextAlign>[
+  final alignments = <_EditableTableAlignment>[
     ...parsedAlignments,
-    ...List<TextAlign>.filled(
+    ...List<_EditableTableAlignment>.filled(
       columnCount - parsedAlignments.length,
-      TextAlign.left,
+      _EditableTableAlignment.none,
     ),
   ];
   final rows = <List<_EditableTableCell>>[];
@@ -4632,7 +5132,11 @@ _EditableTableModel _parseEditableTable(IanvsMarkdownBlock block) {
           text: column < ranges.length
               ? line.text.substring(ranges[column].$1, ranges[column].$2)
               : '',
-          alignment: alignments[column],
+          alignment: switch (alignments[column]) {
+            _EditableTableAlignment.center => TextAlign.center,
+            _EditableTableAlignment.right => TextAlign.right,
+            _ => TextAlign.left,
+          },
           isHeader: rowIndex == 0,
           lineStart: block.start + line.offset,
           lineEnd: block.start + line.offset + line.text.length,
@@ -4641,7 +5145,73 @@ _EditableTableModel _parseEditableTable(IanvsMarkdownBlock block) {
         ),
     ]);
   }
-  return _EditableTableModel(rows);
+  return _EditableTableModel(rows, alignments);
+}
+
+List<List<String>> _editableTableTextRows(_EditableTableModel model) => [
+  for (final row in model.rows) [for (final cell in row) cell.text],
+];
+
+String _serializeEditableTable(
+  List<List<String>> rows,
+  List<_EditableTableAlignment> alignments,
+) {
+  if (rows.isEmpty || alignments.isEmpty) return '';
+  String repeat(String value, int count) => List.filled(count, value).join();
+  final columnCount = alignments.length;
+  final widths = List<int>.filled(columnCount, 5);
+  for (final row in rows) {
+    for (
+      var column = 0;
+      column < columnCount && column < row.length;
+      column++
+    ) {
+      final requiredWidth = row[column].length + 2;
+      if (requiredWidth > widths[column]) widths[column] = requiredWidth;
+    }
+  }
+
+  String serializeRow(List<String> row) {
+    final output = StringBuffer();
+    for (var column = 0; column < columnCount; column++) {
+      final text = column < row.length ? row[column] : '';
+      final remaining = widths[column] - text.length;
+      final (leading, trailing) = switch (alignments[column]) {
+        _EditableTableAlignment.right => (remaining - 1, 1),
+        _EditableTableAlignment.center => (
+          remaining ~/ 2,
+          (remaining / 2).ceil(),
+        ),
+        _ => (1, remaining - 1),
+      };
+      output
+        ..write('|')
+        ..write(repeat(' ', leading))
+        ..write(text)
+        ..write(repeat(' ', trailing));
+    }
+    return '${output.toString()}|';
+  }
+
+  String serializeAlignmentRow() {
+    final output = StringBuffer();
+    for (var column = 0; column < columnCount; column++) {
+      final width = widths[column];
+      output.write(switch (alignments[column]) {
+        _EditableTableAlignment.left => '| :${repeat('-', width - 3)} ',
+        _EditableTableAlignment.center => '| :${repeat('-', width - 4)}: ',
+        _EditableTableAlignment.right => '| ${repeat('-', width - 3)}: ',
+        _EditableTableAlignment.none => '| ${repeat('-', width - 2)} ',
+      });
+    }
+    return '${output.toString()}|';
+  }
+
+  return <String>[
+    serializeRow(rows.first),
+    serializeAlignmentRow(),
+    for (final row in rows.skip(1)) serializeRow(row),
+  ].join('\n');
 }
 
 String _materializeTableLineCell(
@@ -4722,20 +5292,6 @@ List<(int, int)> _tableLineCellRanges(_EditableTableLine line) {
 }
 
 bool _isTableWhitespace(int codeUnit) => codeUnit == 0x20 || codeUnit == 0x09;
-
-String _blankTableRow(String headerLine, int columnCount) {
-  final trimmedLeft = headerLine.trimLeft();
-  final indent = headerLine.substring(
-    0,
-    headerLine.length - trimmedLeft.length,
-  );
-  final trimmed = headerLine.trim();
-  final leadingPipe = trimmed.startsWith('|');
-  final trailingPipe = trimmed.endsWith('|');
-  final cells = List<String>.filled(columnCount, '');
-  final body = cells.join(' | ');
-  return '$indent${leadingPipe ? '| ' : ''}$body${trailingPipe ? ' |' : ''}';
-}
 
 String _appendTableLineCell(String line, {required bool separator}) {
   final trimmedLength = line.trimRight().length;

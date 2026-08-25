@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -6618,6 +6619,11 @@ Standard[^note] and inline ^[inline body].
     tester,
   ) async {
     const original = '| A | B |\n| :--- | ---: |\n| one | two |';
+    const withBlankRow =
+        '| A   |   B |\n'
+        '| :-- | --: |\n'
+        '| one | two |\n'
+        '|     |     |';
     final controller = IanvsMarkdownController(text: original);
     addTearDown(controller.dispose);
 
@@ -6632,7 +6638,7 @@ Standard[^note] and inline ^[inline body].
     await tester.tap(addRow);
     await tester.pumpAndSettle();
 
-    expect(controller.text, '$original\n|  |  |');
+    expect(controller.text, withBlankRow);
     final newRowCell = tester.widget<TextField>(
       find.byKey(const ValueKey('ianvs-markdown-table-2-0')),
     );
@@ -6651,7 +6657,9 @@ Standard[^note] and inline ^[inline body].
 
     expect(
       controller.text,
-      '| A | B |  |\n| :--- | ---: | --- |\n| one | two |  |',
+      '| A   |   B |     |\n'
+      '| :-- | --: | --- |\n'
+      '| one | two |     |',
     );
     final newHeaderCell = tester.widget<TextField>(
       find.byKey(const ValueKey('ianvs-markdown-table-0-2')),
@@ -6659,10 +6667,307 @@ Standard[^note] and inline ^[inline body].
     expect(newHeaderCell.focusNode?.hasFocus, isTrue);
   });
 
+  testWidgets(
+    'table row drag handles reorder and normalize the exact source',
+    (tester) async {
+      const original =
+          '| Name | Qty |\n'
+          '| :--- | ---: |\n'
+          '| Apples | 10 |\n'
+          '| Pears | 2 |';
+      final controller = IanvsMarkdownController(text: original);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      final sourceHandle = find.byKey(
+        const ValueKey('ianvs-markdown-table-row-drag-2'),
+      );
+      final targetHandle = find.byKey(
+        const ValueKey('ianvs-markdown-table-row-drag-1'),
+      );
+      final opacity = find.byKey(
+        const ValueKey('ianvs-markdown-table-row-drag-2-opacity'),
+      );
+      expect(tester.getSize(sourceHandle).width, 16);
+      expect(
+        tester.getSize(sourceHandle).height,
+        tester
+            .getSize(
+              find.byKey(
+                const ValueKey('ianvs-markdown-table-cell-surface-2-0'),
+              ),
+            )
+            .height,
+      );
+      expect(tester.widget<AnimatedOpacity>(opacity).opacity, 0);
+
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(mouse.removePointer);
+      await mouse.addPointer(location: Offset.zero);
+      await mouse.moveTo(tester.getCenter(sourceHandle));
+      await tester.pump(const Duration(milliseconds: 120));
+      expect(tester.widget<AnimatedOpacity>(opacity).opacity, 1);
+      await mouse.down(tester.getCenter(sourceHandle));
+      await tester.pump();
+      await mouse.moveTo(tester.getCenter(targetHandle));
+      await tester.pump();
+      final draggingSourceSurface = tester.widget<Container>(
+        find.byKey(const ValueKey('ianvs-markdown-table-cell-surface-2-0')),
+      );
+      final rowDropSurface = tester.widget<Container>(
+        find.byKey(const ValueKey('ianvs-markdown-table-cell-surface-1-0')),
+      );
+      expect(
+        (draggingSourceSurface.decoration! as BoxDecoration).color,
+        isNotNull,
+      );
+      expect(
+        ((rowDropSurface.decoration! as BoxDecoration).border! as Border)
+            .top
+            .width,
+        2,
+      );
+      await mouse.up();
+      await tester.pumpAndSettle();
+
+      expect(
+        controller.text,
+        '| Name   | Qty |\n'
+        '| :----- | --: |\n'
+        '| Pears  |   2 |\n'
+        '| Apples |  10 |',
+      );
+      final selectedSurface = tester.widget<Container>(
+        find.byKey(const ValueKey('ianvs-markdown-table-cell-surface-1-0')),
+      );
+      expect((selectedSurface.decoration! as BoxDecoration).color, isNotNull);
+
+      controller.undo();
+      await tester.pumpAndSettle();
+      expect(controller.text, original);
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
+    'table column drag handles move alignment and every cell together',
+    (tester) async {
+      const original =
+          '| Name | Qty |\n'
+          '| :--- | ---: |\n'
+          '| Apples | 10 |\n'
+          '| Pears | 2 |';
+      final controller = IanvsMarkdownController(text: original);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      final sourceHandle = find.byKey(
+        const ValueKey('ianvs-markdown-table-column-drag-1'),
+      );
+      final targetHandle = find.byKey(
+        const ValueKey('ianvs-markdown-table-column-drag-0'),
+      );
+      expect(tester.getSize(sourceHandle).height, 16);
+      expect(
+        tester.getSize(sourceHandle).width,
+        tester
+            .getSize(
+              find.byKey(
+                const ValueKey('ianvs-markdown-table-cell-surface-0-1'),
+              ),
+            )
+            .width,
+      );
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(mouse.removePointer);
+      await mouse.addPointer(location: Offset.zero);
+      await mouse.moveTo(tester.getCenter(sourceHandle));
+      await tester.pump(const Duration(milliseconds: 120));
+      await mouse.down(tester.getCenter(sourceHandle));
+      await tester.pump();
+      await mouse.moveTo(tester.getCenter(targetHandle));
+      await tester.pump();
+      final columnDropSurface = tester.widget<Container>(
+        find.byKey(const ValueKey('ianvs-markdown-table-cell-surface-0-0')),
+      );
+      expect(
+        ((columnDropSurface.decoration! as BoxDecoration).border! as Border)
+            .left
+            .width,
+        2,
+      );
+      await mouse.up();
+      await tester.pumpAndSettle();
+
+      expect(
+        controller.text,
+        '| Qty | Name   |\n'
+        '| --: | :----- |\n'
+        '|  10 | Apples |\n'
+        '|   2 | Pears  |',
+      );
+      final selectedSurface = tester.widget<Container>(
+        find.byKey(const ValueKey('ianvs-markdown-table-cell-surface-0-0')),
+      );
+      expect((selectedSurface.decoration! as BoxDecoration).color, isNotNull);
+
+      controller.undo();
+      await tester.pumpAndSettle();
+      expect(controller.text, original);
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
+    'mobile tables expose only the active row and column drag handles',
+    (tester) async {
+      final controller = IanvsMarkdownController(
+        text: '| A | B |\n| --- | --- |\n| one | two |',
+      );
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      AnimatedOpacity handleOpacity(String axis, int index) =>
+          tester.widget<AnimatedOpacity>(
+            find.byKey(
+              ValueKey('ianvs-markdown-table-$axis-drag-$index-opacity'),
+            ),
+          );
+
+      expect(handleOpacity('row', 1).opacity, 0);
+      expect(handleOpacity('column', 0).opacity, 0);
+      await tester.tap(find.byKey(const ValueKey('ianvs-markdown-table-1-0')));
+      await tester.pumpAndSettle();
+
+      expect(handleOpacity('row', 1).opacity, 1);
+      expect(handleOpacity('column', 0).opacity, 1);
+      expect(handleOpacity('row', 0).opacity, 0);
+      expect(handleOpacity('column', 1).opacity, 0);
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.android,
+    }),
+  );
+
+  testWidgets(
+    'desktop table add strips reveal only when their edge is hovered',
+    (tester) async {
+      final controller = IanvsMarkdownController(
+        text: '| A | B |\n| --- | --- |\n| one | two |',
+      );
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      final addRow = find.byKey(const ValueKey('ianvs-markdown-table-add-row'));
+      final addColumn = find.byKey(
+        const ValueKey('ianvs-markdown-table-add-column'),
+      );
+      AnimatedOpacity opacity(Finder control) => tester.widget<AnimatedOpacity>(
+        find.descendant(of: control, matching: find.byType(AnimatedOpacity)),
+      );
+      expect(tester.getSize(addRow).height, 16);
+      expect(tester.getSize(addColumn).width, 16);
+      expect(opacity(addRow).opacity, 0);
+      expect(opacity(addColumn).opacity, 0);
+
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(mouse.removePointer);
+      await mouse.addPointer(location: Offset.zero);
+      await mouse.moveTo(
+        tester.getCenter(
+          find.byKey(const ValueKey('ianvs-markdown-table-1-0')),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 120));
+      expect(opacity(addRow).opacity, 0);
+      expect(opacity(addColumn).opacity, 0);
+
+      await mouse.moveTo(tester.getCenter(addRow));
+      await tester.pump(const Duration(milliseconds: 120));
+      expect(opacity(addRow).opacity, 1);
+      expect(opacity(addColumn).opacity, 0);
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
+    'RTL table column drag geometry follows logical column order',
+    (tester) async {
+      const original =
+          '| A | B | C |\n'
+          '| --- | --- | --- |\n'
+          '| 1 | 2 | 3 |';
+      final controller = IanvsMarkdownController(text: original);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Scaffold(
+              body: SizedBox(
+                width: 1000,
+                height: 720,
+                child: IanvsMarkdownLiveEditor(controller: controller),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final sourceHandle = find.byKey(
+        const ValueKey('ianvs-markdown-table-column-drag-2'),
+      );
+      final targetHandle = find.byKey(
+        const ValueKey('ianvs-markdown-table-column-drag-0'),
+      );
+      expect(
+        tester.getCenter(sourceHandle).dx,
+        lessThan(tester.getCenter(targetHandle).dx),
+      );
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(mouse.removePointer);
+      await mouse.addPointer(location: Offset.zero);
+      await mouse.moveTo(tester.getCenter(sourceHandle));
+      await tester.pump(const Duration(milliseconds: 120));
+      await mouse.down(tester.getCenter(sourceHandle));
+      await tester.pump();
+      await mouse.moveTo(tester.getCenter(targetHandle));
+      await tester.pump();
+      await mouse.up();
+      await tester.pumpAndSettle();
+
+      expect(
+        controller.text,
+        '| C   | A   | B   |\n'
+        '| --- | --- | --- |\n'
+        '| 3   | 1   | 2   |',
+      );
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
   testWidgets('table keyboard navigation follows Obsidian cell flow', (
     tester,
   ) async {
     const original = '| A | B |\n| :--- | ---: |\n| one | two |';
+    const withBlankRow =
+        '| A   |   B |\n'
+        '| :-- | --: |\n'
+        '| one | two |\n'
+        '|     |     |';
     final controller = IanvsMarkdownController(text: original);
     addTearDown(controller.dispose);
 
@@ -6684,7 +6989,7 @@ Standard[^note] and inline ^[inline body].
 
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
     await tester.pumpAndSettle();
-    expect(controller.text, '$original\n|  |  |');
+    expect(controller.text, withBlankRow);
     expect(field('2-0').focusNode?.hasFocus, isTrue);
 
     controller.undo();
@@ -6698,7 +7003,10 @@ Standard[^note] and inline ^[inline body].
     await tester.pumpAndSettle();
     expect(
       controller.text,
-      '|  |  |\n| :--- | ---: |\n| A | B |\n| one | two |',
+      '|     |     |\n'
+      '| :-- | --: |\n'
+      '| A   |   B |\n'
+      '| one | two |',
     );
     expect(field('0-1').focusNode?.hasFocus, isTrue);
 
@@ -6716,7 +7024,7 @@ Standard[^note] and inline ^[inline body].
     await tester.tap(find.byKey(const ValueKey('ianvs-markdown-table-1-1')));
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
-    expect(controller.text, '$original\n|  |  |');
+    expect(controller.text, withBlankRow);
     expect(field('2-1').focusNode?.hasFocus, isTrue);
 
     controller.undo();

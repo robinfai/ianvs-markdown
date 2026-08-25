@@ -493,7 +493,7 @@ String _projectIrregularObsidianTables(String source) {
 
 bool _isProjectedTableDelimiter(String source) {
   return RegExp(
-    r'^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$',
+    r'^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)+\|?\s*$',
   ).hasMatch(source);
 }
 

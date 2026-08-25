@@ -394,9 +394,7 @@ bool _isTableStart(List<_SourceLine> lines, int index) {
     return false;
   }
   final delimiter = lines[index + 1].text.trim();
-  return RegExp(
-    r'^\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?$',
-  ).hasMatch(delimiter);
+  return RegExp(r'^\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)+\|?$').hasMatch(delimiter);
 }
 
 bool _isHtmlStart(String text) =>

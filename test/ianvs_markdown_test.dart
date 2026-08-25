@@ -174,6 +174,24 @@ final answer = 42;
     semanticsHandle.dispose();
   });
 
+  testWidgets('reading mode accepts Obsidian minimum-width alignments', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(
+          data: '| A | B | C |\n| :-: | --: | :-- |\n| 1 | 2 | 3 |',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Table), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
+    expect(find.text('2'), findsOneWidget);
+    expect(find.text('3'), findsOneWidget);
+  });
+
   testWidgets('table projection ignores fenced source and missing delimiters', (
     tester,
   ) async {

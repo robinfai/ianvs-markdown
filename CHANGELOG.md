@@ -6,6 +6,9 @@
 - Add Obsidian-style desktop image resize handles in Live Preview with
   aspect-ratio preservation, editor-width clamping, width-only source
   writeback, double-click reset, and independent undo steps.
+- Match Obsidian table row and column drag handles, selection and drop
+  feedback, RTL geometry, mobile active-handle visibility, structural source
+  normalization, and the minimum-width alignment markers it emits.
 
 ## 0.1.0
 
