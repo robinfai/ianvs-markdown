@@ -5430,7 +5430,6 @@ Standard[^note] and inline ^[inline body].
   testWidgets('active fenced code preserves the rendered surface hierarchy', (
     tester,
   ) async {
-    String? copied;
     final controller = IanvsMarkdownController(
       text: '```dart\nfinal value = 1;\n```',
     );
@@ -5445,7 +5444,6 @@ Standard[^note] and inline ^[inline body].
             child: IanvsMarkdownLiveEditor(
               controller: controller,
               autofocus: true,
-              onCopyCode: (source) => copied = source,
             ),
           ),
         ),
@@ -5484,23 +5482,28 @@ Standard[^note] and inline ^[inline body].
     expect(patternPainter.color, Colors.black.withValues(alpha: .12));
     expect(
       find.byKey(const ValueKey('ianvs-markdown-code-language-badge')),
-      findsOneWidget,
+      findsNothing,
     );
-    expect(find.text('Dart'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('ianvs-markdown-code-flair')));
-    await tester.pump();
-    expect(copied, 'final value = 1;');
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-code-flair')),
+      findsNothing,
+    );
+    expect(find.text('Dart'), findsNothing);
     final codeLineRail = find.byKey(
       const ValueKey('ianvs-markdown-active-code-line-rail'),
     );
     expect(codeLineRail, findsOneWidget);
-    final positionedRail = tester.widget<Positioned>(codeLineRail);
-    expect(positionedRail.left, -31);
+    final positionedRail = tester.widget<PositionedDirectional>(codeLineRail);
+    expect(positionedRail.start, -5);
     expect(positionedRail.top, isNotNull);
     expect(positionedRail.bottom, isNull);
     final rail = positionedRail.child as Container;
     expect(rail.constraints?.minWidth, 3);
     expect(tester.getSize(codeLineRail).height, inInclusiveRange(14, 16));
+    expect(
+      tester.getRect(codeLineRail).left,
+      lessThan(tester.getRect(active).left),
+    );
     expect(
       find.byKey(const ValueKey('ianvs-markdown-active-code-line-marker')),
       findsNothing,
@@ -5527,13 +5530,12 @@ Standard[^note] and inline ^[inline body].
     );
   });
 
-  testWidgets('active code flair copies only the exact nested-fence payload', (
+  testWidgets('active nested fences hide flair and preserve exact source', (
     tester,
   ) async {
     const source = '````markdown\n```dart\nfinal value = 1;\n```\n\n````';
     final controller = IanvsMarkdownController(text: source);
     addTearDown(controller.dispose);
-    String? copied;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -5541,17 +5543,60 @@ Standard[^note] and inline ^[inline body].
           body: IanvsMarkdownLiveEditor(
             controller: controller,
             autofocus: true,
-            onCopyCode: (value) => copied = value,
           ),
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Markdown'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('ianvs-markdown-code-flair')));
-    await tester.pump();
-    expect(copied, '```dart\nfinal value = 1;\n```\n');
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-code-flair')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-code-language-badge')),
+      findsNothing,
+    );
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, source);
+    expect(controller.text, source);
+  });
+
+  testWidgets('code flair returns after focus leaves the fenced block', (
+    tester,
+  ) async {
+    const source = '```dart\nfinal value = 1;\n```\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: IanvsMarkdownLiveEditor(
+            controller: controller,
+            autofocus: true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-code-flair')),
+      findsNothing,
+    );
+
+    await tester.tap(find.text('After'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-code-language-badge')),
+      findsOneWidget,
+    );
+    expect(find.text('Dart'), findsOneWidget);
     expect(controller.text, source);
   });
 
@@ -5742,10 +5787,13 @@ Standard[^note] and inline ^[inline body].
     expect(tester.getSize(rail).height, lessThan(wrappedHeight));
   });
 
-  testWidgets('active code rail follows the caret visual row', (tester) async {
+  testWidgets('active code rail covers the wrapped logical source line', (
+    tester,
+  ) async {
     final longToken = List.filled(12, 'abcdef0123456789').join();
     final source = '```text\n$longToken\n```';
     final contentStart = source.indexOf('\n') + 1;
+    final contentEnd = contentStart + longToken.length;
     final controller = IanvsMarkdownController(text: source)
       ..selection = TextSelection.collapsed(offset: contentStart + 2);
     addTearDown(controller.dispose);
@@ -5770,9 +5818,28 @@ Standard[^note] and inline ^[inline body].
       const ValueKey('ianvs-markdown-active-code-line-rail'),
     );
     expect(rail, findsOneWidget);
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final fieldFinder = find.descendant(
+      of: active,
+      matching: find.byType(TextField),
+    );
+    final editable = editableWithin(tester, fieldFinder);
+    final logicalStartCaret = editable.getLocalRectForCaret(
+      TextPosition(offset: contentStart),
+    );
+    final logicalEndCaret = editable.getLocalRectForCaret(
+      TextPosition(offset: contentEnd),
+    );
+    final logicalLineHeight =
+        logicalEndCaret.top - logicalStartCaret.top + logicalStartCaret.height;
     final firstRowY = tester.getTopLeft(rail).dy;
     final railHeight = tester.getSize(rail).height;
-    expect(railHeight, inInclusiveRange(14, 16));
+    expect(railHeight, greaterThan(40));
+    expect(railHeight, closeTo(logicalLineHeight - 6, 1));
+    expect(
+      firstRowY,
+      closeTo(editable.localToGlobal(logicalStartCaret.topLeft).dy + 3, 1),
+    );
     expect(
       find.byKey(const ValueKey('ianvs-markdown-active-code-line-marker')),
       findsNothing,
@@ -5783,8 +5850,62 @@ Standard[^note] and inline ^[inline body].
     );
     await tester.pumpAndSettle();
 
-    expect(tester.getTopLeft(rail).dy, greaterThan(firstRowY));
+    expect(tester.getTopLeft(rail).dy, closeTo(firstRowY, .01));
     expect(tester.getSize(rail).height, railHeight);
+
+    final closingFenceStart = source.lastIndexOf('```');
+    controller.selection = TextSelection.collapsed(
+      offset: closingFenceStart + 1,
+    );
+    await tester.pumpAndSettle();
+    final closingTop = tester.getTopLeft(rail).dy;
+    expect(closingTop, greaterThan(firstRowY));
+    expect(tester.getSize(rail).height, inInclusiveRange(14, 16));
+
+    controller.selection = const TextSelection.collapsed(offset: 1);
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(rail).dy, lessThan(firstRowY));
+    expect(tester.getSize(rail).height, inInclusiveRange(14, 16));
+    expect(controller.text, source);
+  });
+
+  testWidgets('active code rail stays outside the logical start in RTL', (
+    tester,
+  ) async {
+    const source = '```text\nalpha\n```';
+    final controller = IanvsMarkdownController(text: source)
+      ..selection = const TextSelection.collapsed(offset: 10);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            body: SizedBox(
+              width: 600,
+              height: 480,
+              child: IanvsMarkdownLiveEditor(
+                controller: controller,
+                autofocus: true,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final rail = find.byKey(
+      const ValueKey('ianvs-markdown-active-code-line-rail'),
+    );
+    expect(
+      tester.getRect(rail).right,
+      greaterThan(tester.getRect(active).right),
+    );
+    expect(tester.widget<PositionedDirectional>(rail).start, -5);
+    expect(controller.text, source);
   });
 
   testWidgets('active syntax fences apply electric indentation through IME', (

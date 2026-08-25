@@ -2725,9 +2725,6 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     final activeCodePatternColor = (dark ? Colors.white : Colors.black)
         .withValues(alpha: .12);
     final activeCodeRadius = colors.smallRadius / 2;
-    final activeCodePayload = fencedCode
-        ? _activeFencedCodePayload(block.source)
-        : null;
     final taskMarker = block.type == IanvsMarkdownBlockType.taskList
         ? RegExp(
             r'^( {0,3})(?:[-+*]|\d{1,9}[.)])\s+\[([^\r\n])\][ \t]*',
@@ -3007,14 +3004,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     } else {
       activeChild = editor;
     }
-    final decoratedActiveChild = fencedCode
-        ? _ActiveCodeLineRail(
-            controller: _blockController,
-            textStyle: activeTextStyle,
-            colors: colors,
-            child: activeChild,
-          )
-        : indentedCode
+    final decoratedActiveChild = indentedCode
         ? _ActiveIndentedCodeLineRail(
             controller: _blockController,
             textStyle: activeTextStyle,
@@ -3040,21 +3030,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             painter: IanvsMarkdownCodePatternPainter(
               color: activeCodePatternColor,
             ),
-            child: Stack(
-              children: [
-                decoratedActiveChild,
-                Positioned(
-                  top: 0,
-                  right: 0,
-                  child: IanvsMarkdownCodeFlair(
-                    source: activeCodePayload!.source,
-                    language: activeCodePayload.language,
-                    theme: colors,
-                    onCopyCode: widget.onCopyCode,
-                  ),
-                ),
-              ],
-            ),
+            child: decoratedActiveChild,
           )
         : quoteMarker != null
         ? CustomPaint(
@@ -3066,6 +3042,45 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           )
         : decoratedActiveChild;
     final quoteBlock = quoteMarker != null;
+    final activeBlockContainer = Container(
+      key: const ValueKey('ianvs-markdown-active-block'),
+      constraints: const BoxConstraints(minHeight: 36),
+      clipBehavior: fencedCode || quoteBlock ? Clip.antiAlias : Clip.none,
+      margin: fencedCode || quoteBlock
+          ? const EdgeInsets.symmetric(horizontal: 10, vertical: 3)
+          : null,
+      decoration: fencedCode
+          ? BoxDecoration(
+              color: activeCodeCanvasColor,
+              borderRadius: BorderRadius.circular(activeCodeRadius),
+            )
+          : quoteBlock
+          ? BoxDecoration(
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(activeCodeRadius),
+            )
+          : null,
+      foregroundDecoration: fencedCode
+          ? IanvsMarkdownDashedBorderDecoration(
+              color: colors.borderSoft,
+              radius: activeCodeRadius,
+            )
+          : null,
+      padding: fencedCode
+          ? const EdgeInsets.symmetric(horizontal: 16)
+          : quoteBlock
+          ? EdgeInsets.zero
+          : const EdgeInsets.symmetric(horizontal: 10),
+      child: surfacedActiveChild,
+    );
+    final framedActiveBlock = fencedCode
+        ? _ActiveCodeLineRail(
+            controller: _blockController,
+            textStyle: activeTextStyle,
+            colors: colors,
+            child: activeBlockContainer,
+          )
+        : activeBlockContainer;
     return _activeMultiTapRegion(
       Focus(
         canRequestFocus: false,
@@ -3078,37 +3093,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
               : null,
           container: fencedCode,
           value: fencedCode ? _blockController.text : null,
-          child: Container(
-            key: const ValueKey('ianvs-markdown-active-block'),
-            constraints: const BoxConstraints(minHeight: 36),
-            clipBehavior: fencedCode || quoteBlock ? Clip.antiAlias : Clip.none,
-            margin: fencedCode || quoteBlock
-                ? const EdgeInsets.symmetric(horizontal: 10, vertical: 3)
-                : null,
-            decoration: fencedCode
-                ? BoxDecoration(
-                    color: activeCodeCanvasColor,
-                    borderRadius: BorderRadius.circular(activeCodeRadius),
-                  )
-                : quoteBlock
-                ? BoxDecoration(
-                    color: colors.surface,
-                    borderRadius: BorderRadius.circular(activeCodeRadius),
-                  )
-                : null,
-            foregroundDecoration: fencedCode
-                ? IanvsMarkdownDashedBorderDecoration(
-                    color: colors.borderSoft,
-                    radius: activeCodeRadius,
-                  )
-                : null,
-            padding: fencedCode
-                ? const EdgeInsets.symmetric(horizontal: 16)
-                : quoteBlock
-                ? EdgeInsets.zero
-                : const EdgeInsets.symmetric(horizontal: 10),
-            child: surfacedActiveChild,
-          ),
+          child: framedActiveBlock,
         ),
       ),
     );
@@ -3882,6 +3867,16 @@ class _ActiveCodeLineRail extends StatelessWidget {
         final caretOffset = selection.isValid
             ? selection.extentOffset.clamp(0, controller.text.length)
             : 0;
+        final lineStart = caretOffset == 0
+            ? 0
+            : controller.text.lastIndexOf('\n', caretOffset - 1) + 1;
+        final nextBreak = controller.text.indexOf('\n', caretOffset);
+        final lineEnd = nextBreak < 0 ? controller.text.length : nextBreak;
+        // The active surface contributes 10px margins and 16px padding on
+        // both sides. RenderEditable then reserves its 1px caret gap and the
+        // 1.5px cursor width. Match all of those insets so a logical source
+        // line and its wrapped visual rows share identical geometry.
+        final editableWidth = constraints.maxWidth - 20 - 32 - 2.5;
         final painter =
             TextPainter(
               text: controller.buildTextSpan(
@@ -3894,24 +3889,37 @@ class _ActiveCodeLineRail extends StatelessWidget {
               textWidthBasis: TextWidthBasis.parent,
             )..layout(
               maxWidth: constraints.hasBoundedWidth
-                  ? constraints.maxWidth
+                  ? editableWidth.clamp(0, double.infinity)
                   : MediaQuery.sizeOf(context).width,
             );
         final lineHeight = painter.preferredLineHeight;
-        final caret = painter.getOffsetForCaret(
-          TextPosition(offset: caretOffset),
+        final logicalStart = painter.getOffsetForCaret(
+          TextPosition(offset: lineStart),
           Rect.zero,
         );
-        final railHeight = lineHeight.clamp(14.0, 16.0).toDouble();
-        final railTop = 3 + caret.dy + ((lineHeight - railHeight) / 2);
+        final logicalEnd = painter.getOffsetForCaret(
+          TextPosition(offset: lineEnd),
+          Rect.zero,
+        );
+        final logicalLineHeight = (logicalEnd.dy - logicalStart.dy + lineHeight)
+            .clamp(lineHeight, double.infinity)
+            .toDouble();
+        const railInset = 3.0;
+        final railHeight = (logicalLineHeight - railInset * 2)
+            .clamp(1, double.infinity)
+            .toDouble();
+        // Surface top margin (3) + TextField top padding (3) + CSS rail inset.
+        final railTop = 6 + logicalStart.dy + railInset;
 
         return Stack(
           clipBehavior: Clip.none,
           children: [
             child,
-            Positioned(
+            PositionedDirectional(
               key: const ValueKey('ianvs-markdown-active-code-line-rail'),
-              left: -31,
+              // Equivalent to the old inner-content offset of -31px, now
+              // outside the clipped code surface so the gutter stays visible.
+              start: -5,
               top: railTop,
               child: Container(
                 width: 3,
@@ -6251,56 +6259,6 @@ TextRange _shiftTextRange(TextRange range, int delta) {
     start: (range.start + delta).clamp(0, 1 << 30),
     end: (range.end + delta).clamp(0, 1 << 30),
   );
-}
-
-({String source, String? language}) _activeFencedCodePayload(String markdown) {
-  final opening = RegExp(
-    r'^ {0,3}((?:`{3,})|(?:~{3,}))(.*?)(?:\r?\n|$)',
-  ).firstMatch(markdown);
-  if (opening == null) return (source: markdown, language: null);
-  final fence = opening.group(1)!;
-  final info = opening.group(2)?.trim() ?? '';
-  final language = info.isEmpty ? null : info.split(RegExp(r'\s+')).first;
-  final bodyStart = opening.end;
-  var bodyEnd = markdown.length;
-  final lastLineStart = markdown.lastIndexOf('\n') + 1;
-  if (lastLineStart >= bodyStart && lastLineStart < markdown.length) {
-    final lastLine = markdown.substring(lastLineStart);
-    if (_isMatchingClosingFence(lastLine, fence)) bodyEnd = lastLineStart;
-  }
-  if (bodyEnd > bodyStart && markdown.codeUnitAt(bodyEnd - 1) == 0x0a) {
-    bodyEnd -= 1;
-    if (bodyEnd > bodyStart && markdown.codeUnitAt(bodyEnd - 1) == 0x0d) {
-      bodyEnd -= 1;
-    }
-  }
-  return (
-    source: markdown.substring(bodyStart, bodyEnd),
-    language: language == null ? null : markdownCodeLanguageLabel(language),
-  );
-}
-
-bool _isMatchingClosingFence(String line, String openingFence) {
-  var end = line.length;
-  if (end > 0 && line.codeUnitAt(end - 1) == 0x0d) end -= 1;
-  var index = 0;
-  while (index < end && index < 3 && line.codeUnitAt(index) == 0x20) {
-    index += 1;
-  }
-  var fenceLength = 0;
-  final fenceCharacter = openingFence.codeUnitAt(0);
-  while (index + fenceLength < end &&
-      line.codeUnitAt(index + fenceLength) == fenceCharacter) {
-    fenceLength += 1;
-  }
-  if (fenceLength < openingFence.length) return false;
-  index += fenceLength;
-  while (index < end) {
-    final codeUnit = line.codeUnitAt(index);
-    if (codeUnit != 0x20 && codeUnit != 0x09) return false;
-    index += 1;
-  }
-  return true;
 }
 
 TextSpan _buildHighlightedFencedCodeSpan(
