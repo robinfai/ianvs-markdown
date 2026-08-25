@@ -1148,6 +1148,34 @@ void main() {
       },
     );
 
+    test('backslash hard breaks keep native newline and Backspace edits', () {
+      const source = 'Backslash alpha\\';
+      final entered = _pressEnter(formatter, source);
+      expect(
+        entered,
+        TextEditingValue(
+          text: '$source\n',
+          selection: TextSelection.collapsed(offset: source.length + 1),
+        ),
+      );
+
+      final merged = TextEditingValue(
+        text: source,
+        selection: TextSelection.collapsed(offset: source.length),
+      );
+      expect(formatter.formatEditUpdate(entered, merged), merged);
+
+      const withoutBackslash = 'Backslash alpha';
+      final deletedBackslash = TextEditingValue(
+        text: withoutBackslash,
+        selection: TextSelection.collapsed(offset: withoutBackslash.length),
+      );
+      expect(
+        formatter.formatEditUpdate(merged, deletedBackslash),
+        deletedBackslash,
+      );
+    });
+
     test('empty nested items outdent once before root items exit', () {
       expect(_pressEnter(formatter, '- first\n  - ').text, '- first\n- ');
       expect(

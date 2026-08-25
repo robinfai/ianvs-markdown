@@ -3318,6 +3318,56 @@ void main() {
     expect(find.textContaining('Soft alpha\nsoft beta'), findsOneWidget);
   });
 
+  testWidgets('backslash hard breaks keep native Enter and Backspace flow', (
+    tester,
+  ) async {
+    const source = 'Backslash alpha\\';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.textContaining('Backslash alpha'));
+    await tester.pump();
+    controller.selection = TextSelection.collapsed(offset: source.length);
+
+    tester.testTextInput.updateEditingValue(
+      TextEditingValue(
+        text: '$source\n',
+        selection: TextSelection.collapsed(offset: source.length + 1),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.text, '$source\n');
+    expect(
+      controller.selection,
+      TextSelection.collapsed(offset: source.length + 1),
+    );
+
+    tester.testTextInput.updateEditingValue(
+      TextEditingValue(
+        text: source,
+        selection: TextSelection.collapsed(offset: source.length),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.text, source);
+    expect(
+      controller.selection,
+      TextSelection.collapsed(offset: source.length),
+    );
+
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: 'Backslash alpha',
+        selection: TextSelection.collapsed(offset: 15),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.text, 'Backslash alpha');
+    expect(controller.selection, const TextSelection.collapsed(offset: 15));
+  });
+
   testWidgets('soft breaks can still follow standard Markdown collapsing', (
     tester,
   ) async {
