@@ -4007,13 +4007,133 @@ empty:
       await tester.tap(find.text('Parent'));
       await tester.pump();
 
+      final rail = find.byKey(
+        const ValueKey('ianvs-markdown-active-line-rail'),
+      );
+      final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+      expect(rail, findsOneWidget);
+      expect(tester.getSize(rail).width, 2);
+      expect(
+        tester.getSize(rail).height,
+        lessThan(tester.getSize(active).height),
+      );
+      final railDecoration = tester
+          .widget<Container>(
+            find.descendant(of: rail, matching: find.byType(Container)).first,
+          )
+          .decoration;
+      expect(
+        (railDecoration as BoxDecoration).color,
+        IanvsMarkdownThemeData.light.accent,
+      );
+      final parentRailX = tester.getTopLeft(rail).dx;
+
       centers = checkboxCenters();
       expect(centers[1].dx - centers[0].dx, closeTo(28, .01));
       segments = surface.debugGuideSegments();
       expect(segments, isNotEmpty);
+
+      await tester.tap(find.text('Nested'));
+      await tester.pump();
+
+      expect(tester.getTopLeft(rail).dx, closeTo(parentRailX, .01));
+      expect(tester.getTopLeft(rail).dx, lessThan(checkboxCenters().first.dx));
       expect(controller.text, '- [!] Parent\n  - [b] Nested\n- [ ] Sibling');
     },
   );
+
+  testWidgets('active list rail follows the caret across visual wraps', (
+    tester,
+  ) async {
+    const source =
+        '- [ ] Parent\n'
+        '  - [ ] Alpha bravo charlie delta echo foxtrot golf hotel india';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 240,
+            height: 480,
+            child: IanvsMarkdownLiveEditor(controller: controller),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('Alpha bravo'));
+    await tester.pumpAndSettle();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final fieldFinder = find.descendant(
+      of: active,
+      matching: find.byType(TextField),
+    );
+    final field = tester.widget<TextField>(fieldFinder);
+    final blockSource = field.controller!.text;
+    field.controller!.selection = TextSelection.collapsed(
+      offset: blockSource.length,
+    );
+    await tester.pumpAndSettle();
+
+    final rail = find.byKey(const ValueKey('ianvs-markdown-active-line-rail'));
+    final editable = editableWithin(tester, fieldFinder);
+    final caretRect = editable.getLocalRectForCaret(
+      TextPosition(offset: blockSource.length),
+    );
+    final caretTop = editable.localToGlobal(caretRect.topLeft).dy;
+    expect(tester.getTopLeft(rail).dy, closeTo(caretTop, 1));
+    expect(
+      tester.getTopLeft(rail).dy,
+      greaterThan(tester.getTopLeft(active).dy + 20),
+    );
+    expect(controller.text, source);
+  });
+
+  testWidgets('active list rail stays at the logical page start in RTL', (
+    tester,
+  ) async {
+    const source = '- [ ] Parent\n  - [ ] Nested';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            body: SizedBox(
+              width: 600,
+              height: 480,
+              child: IanvsMarkdownLiveEditor(controller: controller),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final initialCenters = tester
+        .widgetList<IanvsMarkdownTaskCheckbox>(
+          find.byType(IanvsMarkdownTaskCheckbox),
+        )
+        .map((checkbox) => tester.getCenter(find.byWidget(checkbox)))
+        .toList();
+    expect(initialCenters[0].dx - initialCenters[1].dx, closeTo(28, .01));
+
+    await tester.tap(find.text('Parent'));
+    await tester.pump();
+    final rail = find.byKey(const ValueKey('ianvs-markdown-active-line-rail'));
+    final parentRailRight = tester.getTopRight(rail).dx;
+
+    await tester.tap(find.text('Nested'));
+    await tester.pump();
+    expect(tester.getTopRight(rail).dx, closeTo(parentRailRight, .01));
+    expect(tester.getTopRight(rail).dx, greaterThan(initialCenters.first.dx));
+    expect(controller.text, source);
+  });
 
   testWidgets('active lists stay visual and quotes collapse outer prefixes', (
     tester,

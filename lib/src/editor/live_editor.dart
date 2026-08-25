@@ -2752,6 +2752,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     final setextUnderline = _setextHeadingUnderline(block.source);
     final hiddenMarker = taskMarker ?? unorderedMarker ?? orderedMarker;
     final hiddenMarkerEnd = hiddenMarker?.end ?? 0;
+    final listIndentStep =
+        (styleSheet.listIndent ?? 24) +
+        (styleSheet.listBulletPadding?.horizontal ?? 4);
     final activeSelection = _blockController.selection;
     _blockController.leadingMarkerCharacters = hiddenMarkerEnd;
     _blockController.collapsedLeadingCharacters = 0;
@@ -2828,6 +2831,19 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         contentPadding: EdgeInsets.symmetric(vertical: 3),
       ),
     );
+    Widget activeListEditor(double markerExtent) {
+      return Expanded(
+        child: _ActiveTextLineRail(
+          controller: _blockController,
+          textStyle: activeTextStyle,
+          colors: colors,
+          logicalStartOffset:
+              10 + markerExtent + listNestingLevel * listIndentStep,
+          child: editor,
+        ),
+      );
+    }
+
     final Widget activeChild;
     if (taskMarker != null && !revealHiddenMarker) {
       activeChild = Row(
@@ -2853,7 +2869,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             ),
           ),
           const SizedBox(width: 2),
-          Expanded(child: editor),
+          activeListEditor(30),
         ],
       );
     } else if (unorderedMarker != null && !revealHiddenMarker) {
@@ -2876,7 +2892,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             ),
           ),
           const SizedBox(width: 2),
-          Expanded(child: editor),
+          activeListEditor(30),
         ],
       );
     } else if (orderedMarker != null && !revealHiddenMarker) {
@@ -2899,7 +2915,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             ),
           ),
           const SizedBox(width: 6),
-          Expanded(child: editor),
+          activeListEditor(38),
         ],
       );
     } else if (quoteMarker != null) {
@@ -3005,12 +3021,17 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             colors: colors,
             child: activeChild,
           )
-        : quoteMarker != null || headingLevel != null
+        : quoteMarker != null ||
+              headingLevel != null ||
+              (hiddenMarker != null && !revealHiddenMarker)
         ? activeChild
         : _ActiveTextLineRail(
             controller: _blockController,
             textStyle: activeTextStyle,
             colors: colors,
+            logicalStartOffset: hiddenMarker == null
+                ? 10
+                : 10 + listNestingLevel * listIndentStep,
             child: activeChild,
           );
     final surfacedActiveChild = fencedCode
@@ -3670,18 +3691,24 @@ class _ActiveTextLineRail extends StatelessWidget {
     required this.controller,
     required this.textStyle,
     required this.colors,
+    this.logicalStartOffset = 10,
     required this.child,
   });
 
   final TextEditingController controller;
   final TextStyle textStyle;
   final IanvsMarkdownThemeData colors;
+  final double logicalStartOffset;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        // RenderEditable reserves a one-pixel caret gap in addition to the
+        // 1.5px cursor width. Match that layout width so a wrapped caret and
+        // its active-line rail always resolve to the same visual line.
+        final editableWidth = constraints.maxWidth - 2.5;
         final selection = controller.selection;
         final caretOffset = selection.isValid
             ? selection.extentOffset.clamp(0, controller.text.length)
@@ -3698,7 +3725,7 @@ class _ActiveTextLineRail extends StatelessWidget {
               textWidthBasis: TextWidthBasis.parent,
             )..layout(
               maxWidth: constraints.hasBoundedWidth
-                  ? constraints.maxWidth
+                  ? editableWidth.clamp(0, double.infinity)
                   : MediaQuery.sizeOf(context).width,
             );
         final lineHeight = painter.preferredLineHeight;
@@ -3711,9 +3738,9 @@ class _ActiveTextLineRail extends StatelessWidget {
           clipBehavior: Clip.none,
           children: [
             child,
-            Positioned(
+            PositionedDirectional(
               key: const ValueKey('ianvs-markdown-active-line-rail'),
-              left: -10,
+              start: -logicalStartOffset,
               top: 3 + caret.dy,
               child: Container(
                 width: 2,
