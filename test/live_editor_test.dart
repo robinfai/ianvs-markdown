@@ -5703,6 +5703,76 @@ Standard[^note] and inline ^[inline body].
     expect(tester.widget<TextField>(fieldFinder).focusNode?.hasFocus, isTrue);
   });
 
+  testWidgets('Enter at a closing fence start inserts an empty code line', (
+    tester,
+  ) async {
+    const source = '```dart\nline\n```\n\nAfter code.';
+    final controller = IanvsMarkdownController(text: source)
+      ..selection = const TextSelection.collapsed(offset: 13);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(IanvsMarkdownCodeBlock));
+    await tester.pumpAndSettle();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final fieldFinder = find.descendant(
+      of: active,
+      matching: find.byType(TextField),
+    );
+    final field = tester.widget<TextField>(fieldFinder);
+    field.controller!.selection = const TextSelection.collapsed(offset: 13);
+    await tester.pump();
+    expect(field.focusNode?.hasFocus, isTrue);
+
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: '```dart\nline\n\n```',
+        selection: TextSelection.collapsed(offset: 14),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(controller.text, '```dart\nline\n\n```\n\nAfter code.');
+    expect(controller.selection, const TextSelection.collapsed(offset: 14));
+  });
+
+  testWidgets('Backspace at a closing fence start merges the fence line', (
+    tester,
+  ) async {
+    const source = '```dart\nline\n```\n\nAfter code.';
+    final controller = IanvsMarkdownController(text: source)
+      ..selection = const TextSelection.collapsed(offset: 13);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(IanvsMarkdownCodeBlock));
+    await tester.pumpAndSettle();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final fieldFinder = find.descendant(
+      of: active,
+      matching: find.byType(TextField),
+    );
+    final field = tester.widget<TextField>(fieldFinder);
+    field.controller!.selection = const TextSelection.collapsed(offset: 13);
+    await tester.pump();
+    expect(field.focusNode?.hasFocus, isTrue);
+
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: '```dart\nline```',
+        selection: TextSelection.collapsed(offset: 12),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(controller.text, '```dart\nline```\n\nAfter code.');
+    expect(controller.selection, const TextSelection.collapsed(offset: 12));
+  });
+
   testWidgets('Enter after a closing fence hands input to a new paragraph', (
     tester,
   ) async {

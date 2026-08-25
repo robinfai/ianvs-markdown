@@ -1005,6 +1005,40 @@ void main() {
       );
     });
 
+    test('closing fence boundaries keep native Enter and Backspace edits', () {
+      const source = '```dart\nline\n```\n\nAfter code.';
+      const closingStart = 13;
+      const closingEnd = 16;
+
+      expect(
+        _pressEnterAt(formatter, source, closingStart),
+        const TextEditingValue(
+          text: '```dart\nline\n\n```\n\nAfter code.',
+          selection: TextSelection.collapsed(offset: closingStart + 1),
+        ),
+      );
+      expect(
+        _pressEnterAt(formatter, source, closingEnd),
+        const TextEditingValue(
+          text: '```dart\nline\n```\n\n\nAfter code.',
+          selection: TextSelection.collapsed(offset: closingEnd + 1),
+        ),
+      );
+
+      const atClosingStart = TextEditingValue(
+        text: source,
+        selection: TextSelection.collapsed(offset: closingStart),
+      );
+      const nativeBackspace = TextEditingValue(
+        text: '```dart\nline```\n\nAfter code.',
+        selection: TextSelection.collapsed(offset: closingStart - 1),
+      );
+      expect(
+        formatter.formatEditUpdate(atClosingStart, nativeBackspace),
+        nativeBackspace,
+      );
+    });
+
     test('syntax fences indent after opening delimiters', () {
       const braced = '```dart\nif (ready) {\n}\n```';
       final bracedCaret = braced.indexOf('\n}');
