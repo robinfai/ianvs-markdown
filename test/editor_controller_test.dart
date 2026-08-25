@@ -481,6 +481,8 @@ void main() {
         ('(', ')'),
         ('{', '}'),
         ('`', '`'),
+        ('*', '*'),
+        ('_', '_'),
         ('"', '"'),
         ("'", "'"),
       ]) {
@@ -554,6 +556,77 @@ void main() {
       expect(_typeCharacter(formatter, '词', 1, '"').text, '词"');
     });
 
+    test('auto-completes emphasis only at Markdown boundaries', () {
+      for (final marker in <String>['*', '_']) {
+        final atLineEnd = _typeCharacter(formatter, '', 0, marker);
+        expect(atLineEnd.text, '$marker$marker');
+        expect(atLineEnd.selection, const TextSelection.collapsed(offset: 1));
+
+        final afterSpace = _typeCharacter(formatter, 'word ', 5, marker);
+        expect(afterSpace.text, 'word $marker$marker');
+        expect(afterSpace.selection, const TextSelection.collapsed(offset: 6));
+
+        expect(
+          _typeCharacter(formatter, 'word', 4, marker).text,
+          'word$marker',
+        );
+        expect(
+          _typeCharacter(formatter, 'word', 0, marker).text,
+          '${marker}word',
+        );
+        expect(
+          _typeCharacter(formatter, 'word', 2, marker).text,
+          'wo${marker}rd',
+        );
+      }
+    });
+
+    test('repeated emphasis markers grow without an extra closing mate', () {
+      TextEditingValue typeSequence(String characters) {
+        var value = const TextEditingValue(
+          selection: TextSelection.collapsed(offset: 0),
+        );
+        for (final character in characters.split('')) {
+          value = _typeCharacter(
+            formatter,
+            value.text,
+            value.selection.extentOffset,
+            character,
+          );
+        }
+        return value;
+      }
+
+      expect(
+        typeSequence('*x*'),
+        const TextEditingValue(
+          text: '*x*',
+          selection: TextSelection.collapsed(offset: 3),
+        ),
+      );
+      expect(
+        typeSequence('**x**'),
+        const TextEditingValue(
+          text: '**x**',
+          selection: TextSelection.collapsed(offset: 5),
+        ),
+      );
+      expect(
+        typeSequence('__x__'),
+        const TextEditingValue(
+          text: '__x__',
+          selection: TextSelection.collapsed(offset: 5),
+        ),
+      );
+      expect(
+        typeSequence('***x***'),
+        const TextEditingValue(
+          text: '***x***',
+          selection: TextSelection.collapsed(offset: 7),
+        ),
+      );
+    });
+
     test('word-adjacent backticks stay single but still grow into a fence', () {
       expect(_typeCharacter(formatter, 'word', 4, '`').text, 'word`');
       expect(_typeCharacter(formatter, 'word', 0, '`').text, '`word');
@@ -606,6 +679,42 @@ void main() {
       );
     });
 
+    test('repeated Markdown-only characters grow selected delimiters', () {
+      TextEditingValue surround(TextEditingValue oldValue, String character) {
+        final start = oldValue.selection.start;
+        final end = oldValue.selection.end;
+        final nativeReplacement = TextEditingValue(
+          text: oldValue.text.replaceRange(start, end, character),
+          selection: TextSelection.collapsed(offset: start + 1),
+        );
+        return formatter.formatEditUpdate(oldValue, nativeReplacement);
+      }
+
+      for (final marker in <String>['*', '_', '=', '~', r'$', '%']) {
+        var value = const TextEditingValue(
+          text: 'word',
+          selection: TextSelection(baseOffset: 0, extentOffset: 4),
+        );
+        value = surround(value, marker);
+        expect(value.text, '${marker}word$marker');
+        expect(
+          value.selection,
+          const TextSelection(baseOffset: 1, extentOffset: 5),
+        );
+
+        value = surround(value, marker);
+        expect(value.text, '$marker${marker}word$marker$marker');
+        expect(
+          value.selection,
+          const TextSelection(baseOffset: 2, extentOffset: 6),
+        );
+      }
+
+      for (final marker in <String>['=', '~', r'$', '%']) {
+        expect(_typeCharacter(formatter, '', 0, marker).text, marker);
+      }
+    });
+
     test('Backspace removes untouched Markdown pairs one nesting level', () {
       const oldValue = TextEditingValue(
         text: '()',
@@ -649,6 +758,18 @@ void main() {
         ),
         const TextEditingValue(selection: TextSelection.collapsed(offset: 0)),
       );
+
+      for (final marker in <String>['*', '_']) {
+        final opened = _typeCharacter(formatter, '', 0, marker);
+        final nativeMarkerBackspace = TextEditingValue(
+          text: marker,
+          selection: const TextSelection.collapsed(offset: 0),
+        );
+        expect(
+          formatter.formatEditUpdate(opened, nativeMarkerBackspace),
+          const TextEditingValue(selection: TextSelection.collapsed(offset: 0)),
+        );
+      }
     });
 
     test('Backspace retreats code indentation to the previous tab stop', () {

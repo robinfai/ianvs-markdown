@@ -780,11 +780,12 @@ bool _isMarkdownPunctuation(String character) {
   };
 }
 
-/// Completes Markdown delimiter pairs and backtick fences, continues list and
-/// quote prefixes when the user presses Enter, preserves marker-width
-/// continuation indentation for Shift+Enter, snaps leading code and list
-/// marker indentation Backspace to four-column tab stops, and keeps native
-/// word deletion aligned with Obsidian punctuation boundaries.
+/// Completes Markdown delimiter pairs and backtick fences, surrounds selected
+/// text with Obsidian's Markdown-only delimiters, continues list and quote
+/// prefixes when the user presses Enter, preserves marker-width continuation
+/// indentation for Shift+Enter, snaps leading code and list marker indentation
+/// Backspace to four-column tab stops, and keeps native word deletion aligned
+/// with Obsidian punctuation boundaries.
 ///
 /// An empty nested list item outdents once; an empty root item exits the list.
 /// Composing IME input is never rewritten.
@@ -1262,7 +1263,9 @@ class IanvsMarkdownEditingFormatter extends TextInputFormatter {
         return null;
       }
       final opener = newValue.text.substring(start, start + 1);
-      final closer = _markdownPairClosers[opener];
+      final closer =
+          _markdownPairClosers[opener] ??
+          (_markdownSurroundOnlyCharacters.contains(opener) ? opener : null);
       if (closer == null ||
           newValue.text != oldValue.text.replaceRange(start, end, opener)) {
         return null;
@@ -1336,9 +1339,9 @@ class IanvsMarkdownEditingFormatter extends TextInputFormatter {
 
     final closer = _markdownPairClosers[inserted];
     if (closer == null) return null;
-    if (inserted == '`' &&
+    if ((inserted == '`' || inserted == '*' || inserted == '_') &&
         oldCaret > 0 &&
-        oldValue.text.codeUnitAt(oldCaret - 1) == 0x60) {
+        oldValue.text.substring(oldCaret - 1, oldCaret) == inserted) {
       return null;
     }
     // Obsidian completes opening brackets before blank space or its small
@@ -1347,10 +1350,15 @@ class IanvsMarkdownEditingFormatter extends TextInputFormatter {
         !_shouldAutoCloseBracket(oldValue.text, oldCaret)) {
       return null;
     }
-    // Obsidian leaves quote-like delimiters single beside word characters.
-    // A run of backticks can still reach three and become a fenced block via
-    // the completion check above; only the first inline mate is contextual.
-    if ((inserted == '`' || inserted == '"' || inserted == "'") &&
+    // Obsidian leaves symmetric inline delimiters single beside word
+    // characters. A run of backticks can still reach three and become a
+    // fenced block via the completion check above; only the first inline mate
+    // is contextual.
+    if ((inserted == '`' ||
+            inserted == '*' ||
+            inserted == '_' ||
+            inserted == '"' ||
+            inserted == "'") &&
         !_shouldAutoCloseQuoteLikeDelimiter(oldValue.text, oldCaret)) {
       return null;
     }
@@ -1471,9 +1479,13 @@ const _markdownPairClosers = <String, String>{
   '(': ')',
   '{': '}',
   '`': '`',
+  '*': '*',
+  '_': '_',
   '"': '"',
   "'": "'",
 };
+
+const _markdownSurroundOnlyCharacters = <String>{'=', '~', r'$', '%'};
 
 const _markdownBracketCloseBefore = <String>{
   ')',

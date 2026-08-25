@@ -5630,6 +5630,62 @@ Standard[^note] and inline ^[inline body].
     );
   });
 
+  testWidgets('live preview auto-pairs typed emphasis through IME', (
+    tester,
+  ) async {
+    final controller = IanvsMarkdownController();
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: IanvsMarkdownLiveEditor(
+            controller: controller,
+            autofocus: true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final fieldFinder = find.descendant(
+      of: active,
+      matching: find.byType(TextField),
+    );
+    expect(tester.widget<TextField>(fieldFinder).focusNode?.hasFocus, isTrue);
+
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: '*',
+        selection: TextSelection.collapsed(offset: 1),
+      ),
+    );
+    await tester.pump();
+    expect(controller.text, '**');
+    expect(controller.selection, const TextSelection.collapsed(offset: 1));
+
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: '*x*',
+        selection: TextSelection.collapsed(offset: 2),
+      ),
+    );
+    await tester.pump();
+    expect(controller.text, '*x*');
+
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: '*x**',
+        selection: TextSelection.collapsed(offset: 3),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.text, '*x*');
+    expect(controller.selection, const TextSelection.collapsed(offset: 3));
+    expect(tester.widget<TextField>(fieldFinder).controller?.text, '*x*');
+  });
+
   testWidgets(
     'live preview keeps a word-adjacent backtick single through IME',
     (tester) async {
@@ -7020,6 +7076,53 @@ Standard[^note] and inline ^[inline body].
     controller.redo();
     await tester.pump();
     expect(controller.text, '```\n```');
+  });
+
+  testWidgets('source editor auto-pairs typed underscore emphasis', (
+    tester,
+  ) async {
+    final controller = IanvsMarkdownController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: IanvsMarkdownEditor(
+            controller: controller,
+            autofocus: true,
+            showToolbar: false,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: '_',
+        selection: TextSelection.collapsed(offset: 1),
+      ),
+    );
+    await tester.pump();
+    expect(controller.text, '__');
+    expect(controller.selection, const TextSelection.collapsed(offset: 1));
+
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: '_x_',
+        selection: TextSelection.collapsed(offset: 2),
+      ),
+    );
+    await tester.pump();
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: '_x__',
+        selection: TextSelection.collapsed(offset: 3),
+      ),
+    );
+    await tester.pump();
+
+    expect(controller.text, '_x_');
+    expect(controller.selection, const TextSelection.collapsed(offset: 3));
   });
 
   testWidgets('source editor preserves word-adjacent backtick context', (
