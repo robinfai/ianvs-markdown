@@ -5,6 +5,7 @@ final class IanvsMarkdownTaskSourceMarker {
   const IanvsMarkdownTaskSourceMarker({
     required this.marker,
     required this.offset,
+    required this.nestLevel,
   });
 
   /// The exact single character between `[` and `]`.
@@ -12,6 +13,9 @@ final class IanvsMarkdownTaskSourceMarker {
 
   /// UTF-16 offset of [marker] in the projected source input.
   final int offset;
+
+  /// Zero-based structural list depth used by the rendered marker gutter.
+  final int nestLevel;
 }
 
 /// Markdown prepared for the GFM parser plus its original Obsidian markers.
@@ -114,6 +118,10 @@ void _scanTaskBlock(
       final listItem = _listLine.firstMatch(line);
       if (listItem != null) {
         final marker = listItem.group(2);
+        final depth = _prefixDepth(listItem.group(1)!);
+        while (stack.isNotEmpty && depth <= stack.last.depth) {
+          stack.removeLast();
+        }
         final markerOffset = marker == null
             ? null
             : blockOffset +
@@ -126,14 +134,9 @@ void _scanTaskBlock(
             : IanvsMarkdownTaskSourceMarker(
                 marker: marker!,
                 offset: markerOffset,
+                nestLevel: stack.length,
               );
-        final node = _TaskListNode(
-          depth: _prefixDepth(listItem.group(1)!),
-          task: task,
-        );
-        while (stack.isNotEmpty && node.depth <= stack.last.depth) {
-          stack.removeLast();
-        }
+        final node = _TaskListNode(depth: depth, task: task);
         if (stack.isEmpty) {
           roots.add(node);
         } else {

@@ -11,6 +11,7 @@ import 'heading_folding.dart';
 import 'highlight.dart';
 import 'inline_code.dart';
 import 'inline_link.dart';
+import 'list_guide.dart';
 import 'math.dart';
 import 'markdown_document.dart';
 import 'obsidian_autolink.dart';
@@ -53,6 +54,8 @@ class IanvsMarkdown extends StatelessWidget {
     this.fitContent = false,
     this.listItemCrossAxisAlignment =
         MarkdownListItemCrossAxisAlignment.baseline,
+    this.showListIndentationGuides = true,
+    this.listNestingOffset = 0,
     this.softLineBreak = true,
     this.enableFileLinkChips = false,
     this.obsidianMetadataMode = IanvsMarkdownObsidianMetadataMode.reading,
@@ -64,7 +67,7 @@ class IanvsMarkdown extends StatelessWidget {
     this.wikiEmbedBuilder,
     this.wikiLinkExists,
     this.theme,
-  });
+  }) : assert(listNestingOffset >= 0);
 
   final String data;
   final bool selectable;
@@ -88,6 +91,13 @@ class IanvsMarkdown extends StatelessWidget {
   final Map<String, MarkdownPaddingBuilder> paddingBuilders;
   final bool fitContent;
   final MarkdownListItemCrossAxisAlignment listItemCrossAxisAlignment;
+
+  /// Whether nested lists paint Border/Obsidian-style indentation guides.
+  final bool showListIndentationGuides;
+
+  /// Additional structural depth supplied by a host that renders list items
+  /// as separate Markdown blocks, such as Live Preview.
+  final int listNestingOffset;
   final bool softLineBreak;
   final bool enableFileLinkChips;
   final IanvsMarkdownObsidianMetadataMode obsidianMetadataMode;
@@ -293,79 +303,98 @@ class IanvsMarkdown extends StatelessWidget {
       ),
     );
     final taskProjection = projectObsidianTaskMarkers(renderedData);
+    final listIndentStep =
+        (effectiveStyleSheet.listIndent ?? 24) +
+        (effectiveStyleSheet.listBulletPadding?.horizontal ?? 4);
     var imageIndex = 0;
     var taskIndex = 0;
+    final body = MarkdownBody(
+      key: ValueKey<bool>(softLineBreak),
+      // flutter_markdown_plus only reparses when data or styles change, so
+      // changing this option must remount its state to rebuild line spans.
+      data: taskProjection.data,
+      selectable: selectable,
+      styleSheet: effectiveStyleSheet,
+      styleSheetTheme: styleSheetTheme,
+      onSelectionChanged: onSelectionChanged,
+      onTapLink: onTapLink,
+      onTapText: onTapText,
+      blockSyntaxes: effectiveBlockSyntaxes,
+      inlineSyntaxes: effectiveInlineSyntaxes,
+      extensionSet: extensionSet ?? md.ExtensionSet.gitHubFlavored,
+      imageBuilder: (uri, title, alt) {
+        final currentImageIndex = imageIndex;
+        imageIndex += 1;
+        final dimensions = parseIanvsMarkdownImageDimensions(alt);
+        final builder = imageBuilder;
+        if (builder == null) {
+          return IanvsMarkdownBlockedImage(
+            uri: uri,
+            title: title,
+            alt: dimensions.alt,
+            theme: colors,
+          );
+        }
+        final image = builder(uri, title, dimensions.alt);
+        final resize = onImageResize;
+        if (!dimensions.hasDimensions && resize == null) return image;
+        return IanvsMarkdownSizedImage(
+          dimensions: dimensions,
+          resizeColor: colors.accent,
+          onResize: resize == null
+              ? null
+              : (width) => resize(
+                  IanvsMarkdownImageResizeRequest(
+                    syntax: IanvsMarkdownImageSourceSyntax.standard,
+                    imageIndex: currentImageIndex,
+                    width: width,
+                  ),
+                ),
+          child: image,
+        );
+      },
+      checkboxBuilder: (checked) {
+        final task = taskIndex < taskProjection.tasks.length
+            ? taskProjection.tasks[taskIndex]
+            : IanvsMarkdownTaskSourceMarker(
+                marker: checked ? 'x' : ' ',
+                offset: -1,
+                nestLevel: 0,
+              );
+        taskIndex += 1;
+        return IanvsMarkdownListGuideAnchor(
+          nestLevel: listNestingOffset + task.nestLevel,
+          child:
+              checkboxBuilder?.call(checked) ??
+              IanvsMarkdownTaskCheckbox(
+                value: task.marker != ' ',
+                marker: task.marker,
+                theme: colors,
+              ),
+        );
+      },
+      bulletBuilder: (parameters) => IanvsMarkdownListGuideAnchor(
+        nestLevel: listNestingOffset + parameters.nestLevel,
+        child:
+            bulletBuilder?.call(parameters) ??
+            _IanvsMarkdownListMarker(parameters: parameters, theme: colors),
+      ),
+      builders: effectiveBuilders,
+      paddingBuilders: paddingBuilders,
+      fitContent: fitContent,
+      listItemCrossAxisAlignment: listItemCrossAxisAlignment,
+      softLineBreak: softLineBreak,
+    );
     return KeyedSubtree(
       key: const ValueKey('ianvs-markdown-body'),
-      child: MarkdownBody(
-        // flutter_markdown_plus only reparses when data or styles change, so
-        // changing this option must remount its state to rebuild line spans.
-        key: ValueKey<bool>(softLineBreak),
-        data: taskProjection.data,
-        selectable: selectable,
-        styleSheet: effectiveStyleSheet,
-        styleSheetTheme: styleSheetTheme,
-        onSelectionChanged: onSelectionChanged,
-        onTapLink: onTapLink,
-        onTapText: onTapText,
-        blockSyntaxes: effectiveBlockSyntaxes,
-        inlineSyntaxes: effectiveInlineSyntaxes,
-        extensionSet: extensionSet ?? md.ExtensionSet.gitHubFlavored,
-        imageBuilder: (uri, title, alt) {
-          final currentImageIndex = imageIndex;
-          imageIndex += 1;
-          final dimensions = parseIanvsMarkdownImageDimensions(alt);
-          final builder = imageBuilder;
-          if (builder == null) {
-            return IanvsMarkdownBlockedImage(
-              uri: uri,
-              title: title,
-              alt: dimensions.alt,
-              theme: colors,
-            );
-          }
-          final image = builder(uri, title, dimensions.alt);
-          final resize = onImageResize;
-          if (!dimensions.hasDimensions && resize == null) return image;
-          return IanvsMarkdownSizedImage(
-            dimensions: dimensions,
-            resizeColor: colors.accent,
-            onResize: resize == null
-                ? null
-                : (width) => resize(
-                    IanvsMarkdownImageResizeRequest(
-                      syntax: IanvsMarkdownImageSourceSyntax.standard,
-                      imageIndex: currentImageIndex,
-                      width: width,
-                    ),
-                  ),
-            child: image,
-          );
-        },
-        checkboxBuilder: (checked) {
-          final marker = taskIndex < taskProjection.tasks.length
-              ? taskProjection.tasks[taskIndex].marker
-              : checked
-              ? 'x'
-              : ' ';
-          taskIndex += 1;
-          return checkboxBuilder?.call(checked) ??
-              IanvsMarkdownTaskCheckbox(
-                value: marker != ' ',
-                marker: marker,
-                theme: colors,
-              );
-        },
-        bulletBuilder:
-            bulletBuilder ??
-            (parameters) =>
-                _IanvsMarkdownListMarker(parameters: parameters, theme: colors),
-        builders: effectiveBuilders,
-        paddingBuilders: paddingBuilders,
-        fitContent: fitContent,
-        listItemCrossAxisAlignment: listItemCrossAxisAlignment,
-        softLineBreak: softLineBreak,
-      ),
+      child: showListIndentationGuides
+          ? IanvsMarkdownListGuideSurface(
+              color: colors.listGuideColor,
+              indent: listIndentStep,
+              textDirection: Directionality.of(context),
+              child: body,
+            )
+          : body,
     );
   }
 
@@ -397,6 +426,8 @@ class IanvsMarkdown extends StatelessWidget {
       paddingBuilders: paddingBuilders,
       fitContent: true,
       listItemCrossAxisAlignment: listItemCrossAxisAlignment,
+      showListIndentationGuides: false,
+      listNestingOffset: listNestingOffset,
       softLineBreak: softLineBreak,
       enableFileLinkChips: enableFileLinkChips,
       obsidianMetadataMode: obsidianMetadataMode,
@@ -447,6 +478,8 @@ class IanvsMarkdown extends StatelessWidget {
       builders: builders,
       paddingBuilders: paddingBuilders,
       fitContent: true,
+      showListIndentationGuides: false,
+      listNestingOffset: listNestingOffset,
       softLineBreak: softLineBreak,
       enableFileLinkChips: enableFileLinkChips,
       obsidianMetadataMode: obsidianMetadataMode,

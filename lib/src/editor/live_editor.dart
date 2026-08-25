@@ -14,6 +14,7 @@ import '../heading_folding.dart';
 import '../ianvs_markdown.dart';
 import '../inline_code.dart';
 import '../inline_link.dart';
+import '../list_guide.dart';
 import '../math.dart';
 import '../markdown_document.dart';
 import '../obsidian_image.dart';
@@ -2513,76 +2514,136 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     final hiddenBlockIndices = widget.enableHeadingFolding
         ? _headingFoldModel.hiddenBlockIndices(_headingFoldController)
         : const <int>{};
-    return ListView.builder(
-      key: const ValueKey('ianvs-markdown-live-blocks'),
-      controller: _scrollController,
-      padding: widget.padding,
-      itemCount: _blocks.length,
-      itemBuilder: (context, index) {
-        final block = _blocks[index];
-        if (hiddenBlockIndices.contains(index)) {
+    final styleSheet =
+        widget.styleSheet ?? ianvsMarkdownStyleSheet(context, colors);
+    final listIndentStep =
+        (styleSheet.listIndent ?? 24) +
+        (styleSheet.listBulletPadding?.horizontal ?? 4);
+    final listNestingLevels = _liveListNestingLevels();
+    return IanvsMarkdownListGuideSurface(
+      key: const ValueKey('ianvs-markdown-live-list-guides'),
+      color: colors.listGuideColor,
+      indent: listIndentStep,
+      textDirection: Directionality.of(context),
+      child: ListView.builder(
+        key: const ValueKey('ianvs-markdown-live-blocks'),
+        controller: _scrollController,
+        padding: widget.padding,
+        itemCount: _blocks.length,
+        itemBuilder: (context, index) {
+          final block = _blocks[index];
+          final listNestingLevel = listNestingLevels[index];
+          if (hiddenBlockIndices.contains(index)) {
+            return KeyedSubtree(
+              key: _blockKeys[block.start],
+              child: const SizedBox.shrink(),
+            );
+          }
+          final headingSection = _headingFoldModel.sectionAtBlockIndex(index);
+          final coveredByActiveSelection =
+              _activeBlockStart != null &&
+              block.start > _editingStart &&
+              block.start < _editingEnd;
+          if (coveredByActiveSelection) {
+            return KeyedSubtree(
+              key: _blockKeys[block.start],
+              child: const SizedBox.shrink(),
+            );
+          }
+          final next = index + 1 < _blocks.length ? _blocks[index + 1] : null;
+          final gapLines = markdownGapLineCount(
+            widget.controller.text,
+            block,
+            next,
+          );
+          final activeGapLine =
+              _activeBlockStart == block.start && _activeGapLine;
           return KeyedSubtree(
             key: _blockKeys[block.start],
-            child: const SizedBox.shrink(),
-          );
-        }
-        final headingSection = _headingFoldModel.sectionAtBlockIndex(index);
-        final coveredByActiveSelection =
-            _activeBlockStart != null &&
-            block.start > _editingStart &&
-            block.start < _editingEnd;
-        if (coveredByActiveSelection) {
-          return KeyedSubtree(
-            key: _blockKeys[block.start],
-            child: const SizedBox.shrink(),
-          );
-        }
-        final next = index + 1 < _blocks.length ? _blocks[index + 1] : null;
-        final gapLines = markdownGapLineCount(
-          widget.controller.text,
-          block,
-          next,
-        );
-        final activeGapLine =
-            _activeBlockStart == block.start && _activeGapLine;
-        return KeyedSubtree(
-          key: _blockKeys[block.start],
-          child: Align(
-            alignment: Alignment.topLeft,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: widget.contentMaxWidth),
-              child: Column(
-                key: ValueKey(
-                  'ianvs-markdown-block-${block.start}-${block.type.name}',
-                ),
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (_activeBlockStart == block.start && !activeGapLine)
-                    _buildActiveBlock(
-                      block,
-                      colors,
-                      headingSection: headingSection,
-                    )
-                  else
-                    _buildRenderedBlock(
-                      block,
-                      colors,
-                      headingSection: headingSection,
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: widget.contentMaxWidth),
+                child: Padding(
+                  padding: EdgeInsetsDirectional.only(
+                    start: listNestingLevel * listIndentStep,
+                  ),
+                  child: Column(
+                    key: ValueKey(
+                      'ianvs-markdown-block-${block.start}-${block.type.name}',
                     ),
-                  if (activeGapLine)
-                    _buildActiveGapLine(colors)
-                  else if (_activeBlockStart == block.start &&
-                      _editingEnd > block.end)
-                    const SizedBox.shrink()
-                  else
-                    _buildBlockGap(block, gapLines: gapLines),
-                ],
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_activeBlockStart == block.start && !activeGapLine)
+                        _buildActiveBlock(
+                          block,
+                          colors,
+                          listNestingLevel: listNestingLevel,
+                          headingSection: headingSection,
+                        )
+                      else
+                        _buildRenderedBlock(
+                          block,
+                          colors,
+                          listNestingLevel: listNestingLevel,
+                          headingSection: headingSection,
+                        ),
+                      if (activeGapLine)
+                        _buildActiveGapLine(colors)
+                      else if (_activeBlockStart == block.start &&
+                          _editingEnd > block.end)
+                        const SizedBox.shrink()
+                      else
+                        _buildBlockGap(block, gapLines: gapLines),
+                    ],
+                  ),
+                ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
+  }
+
+  List<int> _liveListNestingLevels() {
+    final levels = List<int>.filled(_blocks.length, 0);
+    final indentationStack = <int>[];
+    IanvsMarkdownBlock? previousListBlock;
+    for (var index = 0; index < _blocks.length; index += 1) {
+      final block = _blocks[index];
+      final listBlock = switch (block.type) {
+        IanvsMarkdownBlockType.taskList ||
+        IanvsMarkdownBlockType.unorderedList ||
+        IanvsMarkdownBlockType.orderedList => true,
+        _ => false,
+      };
+      if (!listBlock) {
+        indentationStack.clear();
+        previousListBlock = null;
+        continue;
+      }
+      if (previousListBlock != null &&
+          markdownGapLineCount(
+                widget.controller.text,
+                previousListBlock,
+                block,
+              ) >
+              1) {
+        indentationStack.clear();
+      }
+      final indentation = _liveListIndentationColumns(block.source);
+      while (indentationStack.isNotEmpty &&
+          indentation < indentationStack.last) {
+        indentationStack.removeLast();
+      }
+      if (indentationStack.isEmpty || indentation > indentationStack.last) {
+        indentationStack.add(indentation);
+      }
+      levels[index] = indentationStack.length - 1;
+      previousListBlock = block;
+    }
+    return levels;
   }
 
   Widget _buildActiveGapLine(IanvsMarkdownThemeData colors) {
@@ -2648,6 +2709,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   Widget _buildActiveBlock(
     IanvsMarkdownBlock block,
     IanvsMarkdownThemeData colors, {
+    required int listNestingLevel,
     IanvsMarkdownHeadingSection? headingSection,
   }) {
     final styleSheet =
@@ -2766,26 +2828,27 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         contentPadding: EdgeInsets.symmetric(vertical: 3),
       ),
     );
-    final indentWidth = (hiddenMarker?.group(1)?.length ?? 0) * 8.0;
     final Widget activeChild;
     if (taskMarker != null && !revealHiddenMarker) {
       activeChild = Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: indentWidth),
-          SizedBox(
-            width: 28,
-            height: 30,
-            child: Center(
-              child: IanvsMarkdownTaskCheckbox(
-                value: ianvsMarkdownTaskMarkerIsChecked(taskMarker.group(2)!),
-                marker: taskMarker.group(2)!,
-                onChanged: (value) => _setTaskChecked(
-                  block,
-                  block.source.indexOf('[', taskMarker.start) + 1,
-                  value,
+          IanvsMarkdownListGuideAnchor(
+            nestLevel: listNestingLevel,
+            child: SizedBox(
+              width: 28,
+              height: 30,
+              child: Center(
+                child: IanvsMarkdownTaskCheckbox(
+                  value: ianvsMarkdownTaskMarkerIsChecked(taskMarker.group(2)!),
+                  marker: taskMarker.group(2)!,
+                  onChanged: (value) => _setTaskChecked(
+                    block,
+                    block.source.indexOf('[', taskMarker.start) + 1,
+                    value,
+                  ),
+                  theme: colors,
                 ),
-                theme: colors,
               ),
             ),
           ),
@@ -2797,16 +2860,18 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       activeChild = Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: indentWidth),
-          SizedBox(
-            key: const ValueKey('ianvs-markdown-active-list-marker'),
-            width: 28,
-            child: Text(
-              _activeUnorderedListMarker(hiddenMarker?.group(1)?.length ?? 0),
-              textAlign: TextAlign.center,
-              style: activeTextStyle.copyWith(
-                color: colors.textSecondary,
-                decoration: TextDecoration.none,
+          IanvsMarkdownListGuideAnchor(
+            nestLevel: listNestingLevel,
+            child: SizedBox(
+              key: const ValueKey('ianvs-markdown-active-list-marker'),
+              width: 28,
+              child: Text(
+                _activeUnorderedListMarker(listNestingLevel),
+                textAlign: TextAlign.center,
+                style: activeTextStyle.copyWith(
+                  color: colors.textSecondary,
+                  decoration: TextDecoration.none,
+                ),
               ),
             ),
           ),
@@ -2818,16 +2883,18 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       activeChild = Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: indentWidth),
-          SizedBox(
-            key: const ValueKey('ianvs-markdown-active-list-marker'),
-            width: 32,
-            child: Text(
-              '${orderedMarker.group(2)}${orderedMarker.group(3)}',
-              textAlign: TextAlign.right,
-              style: activeTextStyle.copyWith(
-                color: colors.textSecondary,
-                decoration: TextDecoration.none,
+          IanvsMarkdownListGuideAnchor(
+            nestLevel: listNestingLevel,
+            child: SizedBox(
+              key: const ValueKey('ianvs-markdown-active-list-marker'),
+              width: 32,
+              child: Text(
+                '${orderedMarker.group(2)}${orderedMarker.group(3)}',
+                textAlign: TextAlign.right,
+                style: activeTextStyle.copyWith(
+                  color: colors.textSecondary,
+                  decoration: TextDecoration.none,
+                ),
               ),
             ),
           ),
@@ -3029,6 +3096,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   Widget _buildRenderedBlock(
     IanvsMarkdownBlock block,
     IanvsMarkdownThemeData colors, {
+    required int listNestingLevel,
     IanvsMarkdownHeadingSection? headingSection,
   }) {
     if (block.type == IanvsMarkdownBlockType.table) {
@@ -3111,6 +3179,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
                     : IanvsMarkdownTaskSourceMarker(
                         marker: checked ? 'x' : ' ',
                         offset: -1,
+                        nestLevel: 0,
                       );
                 renderedTaskIndex += 1;
                 return IanvsMarkdownTaskCheckbox(
@@ -3124,6 +3193,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
               }
             : null,
         builders: widget.builders,
+        showListIndentationGuides: false,
+        listNestingOffset: listNestingLevel,
         softLineBreak: widget.softLineBreak,
         renderBudget: widget.renderBudget,
         diagramBuilder: widget.diagramBuilder,
@@ -4034,8 +4105,20 @@ class _LiveHeadingFoldFrameState extends State<_LiveHeadingFoldFrame> {
   }
 }
 
-String _activeUnorderedListMarker(int indentation) =>
-    switch ((indentation ~/ 2) % 3) {
+int _liveListIndentationColumns(String source) {
+  final marker = RegExp(
+    r'^([ \t]*)(?:[-+*]|\d{1,9}[.)])[ \t]+',
+  ).firstMatch(source);
+  if (marker == null) return 0;
+  var columns = 0;
+  for (final codeUnit in marker.group(1)!.codeUnits) {
+    columns = codeUnit == 0x09 ? columns + (4 - columns % 4) : columns + 1;
+  }
+  return columns;
+}
+
+String _activeUnorderedListMarker(int nestingLevel) =>
+    switch (nestingLevel % 3) {
       0 => '•',
       1 => '-',
       _ => '◦',

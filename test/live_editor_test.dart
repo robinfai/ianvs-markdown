@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:ianvs_markdown/src/code_surface.dart';
+import 'package:ianvs_markdown/src/list_guide.dart';
 
 void main() {
   Widget app(IanvsMarkdownController controller) {
@@ -3969,6 +3970,50 @@ empty:
     expect(find.text('Done'), findsOneWidget);
     expect(find.text('Nested'), findsOneWidget);
   });
+
+  testWidgets(
+    'nested Live Preview lists keep 28px steps and connected guides',
+    (tester) async {
+      final controller = IanvsMarkdownController(
+        text: '- [!] Parent\n  - [b] Nested\n- [ ] Sibling',
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      List<Offset> checkboxCenters() => tester
+          .widgetList<IanvsMarkdownTaskCheckbox>(
+            find.byType(IanvsMarkdownTaskCheckbox),
+          )
+          .map((checkbox) => tester.getCenter(find.byWidget(checkbox)))
+          .toList();
+
+      var centers = checkboxCenters();
+      expect(centers, hasLength(3));
+      expect(centers[1].dx - centers[0].dx, closeTo(28, .01));
+      expect(centers[2].dx, closeTo(centers[0].dx, .01));
+
+      final surface = tester.renderObject<IanvsMarkdownListGuideRenderBox>(
+        find.byKey(const ValueKey('ianvs-markdown-live-list-guides')),
+      );
+      var segments = surface.debugGuideSegments();
+      expect(segments, isNotEmpty);
+      expect(
+        segments.every((segment) => segment.end.dy < centers[2].dy),
+        isTrue,
+      );
+
+      await tester.tap(find.text('Parent'));
+      await tester.pump();
+
+      centers = checkboxCenters();
+      expect(centers[1].dx - centers[0].dx, closeTo(28, .01));
+      segments = surface.debugGuideSegments();
+      expect(segments, isNotEmpty);
+      expect(controller.text, '- [!] Parent\n  - [b] Nested\n- [ ] Sibling');
+    },
+  );
 
   testWidgets('active lists stay visual and quotes collapse outer prefixes', (
     tester,

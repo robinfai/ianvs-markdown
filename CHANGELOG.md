@@ -1,5 +1,7 @@
 ## Unreleased
 
+- Match Border's one-pixel nested-list indentation guides and 28 px marker
+  steps in Reading and Live Preview, including active and split list items.
 - Match Obsidian image dimensions for standard Markdown images, external
   images, and host-resolved Wiki image embeds while preserving safe default
   image blocking and exact Live Preview source editing.

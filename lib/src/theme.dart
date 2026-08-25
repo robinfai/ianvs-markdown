@@ -36,6 +36,8 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
     Color? taskStatusBlue,
     Color? taskStatusPurple,
     Color? taskStatusPink,
+    Color? listGuideColor,
+    Color? listGuideActiveColor,
     this.headingAccents = const <Color>[
       Color(0xffc24b57),
       Color(0xffb56b35),
@@ -67,7 +69,9 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
        taskStatusCyan = taskStatusCyan ?? accent,
        taskStatusBlue = taskStatusBlue ?? accent,
        taskStatusPurple = taskStatusPurple ?? accent,
-       taskStatusPink = taskStatusPink ?? inlineCodeForeground ?? textPrimary;
+       taskStatusPink = taskStatusPink ?? inlineCodeForeground ?? textPrimary,
+       listGuideColor = listGuideColor ?? borderSoft,
+       listGuideActiveColor = listGuideActiveColor ?? border;
 
   static const IanvsMarkdownThemeData light = IanvsMarkdownThemeData(
     surface: Color(0xffffffff),
@@ -99,6 +103,8 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
     taskStatusBlue: Color(0xff1775d9),
     taskStatusPurple: Color(0xff8f47e1),
     taskStatusPink: Color(0xffdd1399),
+    listGuideColor: Color(0x1f000000),
+    listGuideActiveColor: Color(0x4d000000),
     headingAccents: <Color>[
       Color(0xffc24b57),
       Color(0xffb56b35),
@@ -139,6 +145,8 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
     taskStatusBlue: Color(0xff89bdf4),
     taskStatusPurple: Color(0xffcb9eff),
     taskStatusPink: Color(0xfff2b6de),
+    listGuideColor: Color(0x1fffffff),
+    listGuideActiveColor: Color(0x4dffffff),
     headingAccents: <Color>[
       Color(0xffe06c75),
       Color(0xffd19a66),
@@ -178,6 +186,8 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
   final Color taskStatusBlue;
   final Color taskStatusPurple;
   final Color taskStatusPink;
+  final Color listGuideColor;
+  final Color listGuideActiveColor;
   final List<Color> headingAccents;
   final String monoFontFamily;
   final List<String> monoFontFamilyFallback;
@@ -231,6 +241,8 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
     Color? taskStatusBlue,
     Color? taskStatusPurple,
     Color? taskStatusPink,
+    Color? listGuideColor,
+    Color? listGuideActiveColor,
     List<Color>? headingAccents,
     String? monoFontFamily,
     List<String>? monoFontFamilyFallback,
@@ -270,6 +282,8 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
       taskStatusBlue: taskStatusBlue ?? this.taskStatusBlue,
       taskStatusPurple: taskStatusPurple ?? this.taskStatusPurple,
       taskStatusPink: taskStatusPink ?? this.taskStatusPink,
+      listGuideColor: listGuideColor ?? this.listGuideColor,
+      listGuideActiveColor: listGuideActiveColor ?? this.listGuideActiveColor,
       headingAccents: headingAccents ?? this.headingAccents,
       monoFontFamily: monoFontFamily ?? this.monoFontFamily,
       monoFontFamilyFallback:
@@ -352,6 +366,12 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
         t,
       )!,
       taskStatusPink: Color.lerp(taskStatusPink, other.taskStatusPink, t)!,
+      listGuideColor: Color.lerp(listGuideColor, other.listGuideColor, t)!,
+      listGuideActiveColor: Color.lerp(
+        listGuideActiveColor,
+        other.listGuideActiveColor,
+        t,
+      )!,
       headingAccents: <Color>[
         for (var level = 1; level <= 6; level += 1)
           Color.lerp(headingAccent(level), other.headingAccent(level), t)!,

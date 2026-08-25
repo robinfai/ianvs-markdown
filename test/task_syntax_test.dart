@@ -106,6 +106,13 @@ Paragraph - [p] literal
       '!',
       'x',
     ]);
+    expect(projection.tasks.map((task) => task.nestLevel), <int>[
+      2,
+      1,
+      2,
+      0,
+      0,
+    ]);
     for (final task in projection.tasks) {
       expect(source.substring(task.offset, task.offset + 1), task.marker);
     }

@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:ianvs_markdown/src/code_surface.dart';
+import 'package:ianvs_markdown/src/list_guide.dart';
 
 void main() {
   Widget app(Widget child, {ThemeData? theme}) {
@@ -52,6 +53,109 @@ void main() {
         .5,
       ),
     );
+  });
+
+  test('Border list guide colors are exact and interpolate', () {
+    const customGuide = Color(0xff123456);
+    const customActive = Color(0xff654321);
+    final customized = IanvsMarkdownThemeData.light.copyWith(
+      listGuideColor: customGuide,
+      listGuideActiveColor: customActive,
+    );
+
+    expect(
+      IanvsMarkdownThemeData.light.listGuideColor,
+      const Color(0x1f000000),
+    );
+    expect(IanvsMarkdownThemeData.dark.listGuideColor, const Color(0x1fffffff));
+    expect(customized.listGuideColor, customGuide);
+    expect(customized.listGuideActiveColor, customActive);
+    final midpoint = IanvsMarkdownThemeData.light.lerp(
+      IanvsMarkdownThemeData.dark,
+      .5,
+    );
+    expect(
+      midpoint.listGuideColor,
+      Color.lerp(
+        IanvsMarkdownThemeData.light.listGuideColor,
+        IanvsMarkdownThemeData.dark.listGuideColor,
+        .5,
+      ),
+    );
+  });
+
+  testWidgets('nested lists paint one-pixel guides on 28px marker steps', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(
+          data: '- Parent\n  - Nested\n    - Deep\n- Sibling',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final surface = tester.renderObject<IanvsMarkdownListGuideRenderBox>(
+      find.byType(IanvsMarkdownListGuideSurface),
+    );
+    final segments = surface.debugGuideSegments();
+
+    expect(surface.width, 1);
+    expect(surface.color, IanvsMarkdownThemeData.light.listGuideColor);
+    expect(segments, isNotEmpty);
+    expect(segments.map((segment) => segment.level).toSet(), <int>{0, 1});
+    final rootX = segments.firstWhere((segment) => segment.level == 0).start.dx;
+    final nestedX = segments
+        .firstWhere((segment) => segment.level == 1)
+        .start
+        .dx;
+    expect((nestedX - rootX).abs(), closeTo(28, .01));
+    for (var index = 1; index < segments.length; index += 1) {
+      final previous = segments[index - 1];
+      final current = segments[index];
+      if (previous.level == current.level &&
+          (previous.start.dx - current.start.dx).abs() < .01) {
+        expect(current.start.dy, greaterThan(previous.end.dy));
+      }
+    }
+  });
+
+  testWidgets('flat lists do not paint an indentation guide', (tester) async {
+    await tester.pumpWidget(
+      app(const IanvsMarkdown(data: '1. First\n2. Second')),
+    );
+    await tester.pumpAndSettle();
+
+    final surface = tester.renderObject<IanvsMarkdownListGuideRenderBox>(
+      find.byType(IanvsMarkdownListGuideSurface),
+    );
+    expect(surface.debugGuideSegments(), isEmpty);
+  });
+
+  testWidgets('RTL list guides follow logical nesting direction', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const Directionality(
+          textDirection: TextDirection.rtl,
+          child: IanvsMarkdown(data: '- Parent\n  - Nested\n    - Deep'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final surface = tester.renderObject<IanvsMarkdownListGuideRenderBox>(
+      find.byType(IanvsMarkdownListGuideSurface),
+    );
+    final segments = surface.debugGuideSegments();
+    final rootX = segments.firstWhere((segment) => segment.level == 0).start.dx;
+    final nestedX = segments
+        .firstWhere((segment) => segment.level == 1)
+        .start
+        .dx;
+    expect(rootX - nestedX, closeTo(28, .01));
   });
 
   test('Border code pattern paints two one-pixel dots per 4px tile', () async {
