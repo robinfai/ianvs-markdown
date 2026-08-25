@@ -3317,6 +3317,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             : const Color(0xffffe184),
       ),
       code: ianvsMarkdownInlineCodeStyle(colors),
+      inlineCodeMarker: ianvsMarkdownInlineCodeStyle(colors),
       math: TextStyle(
         color: colors.accentDark,
         fontFamily: colors.monoFontFamily,
@@ -4341,6 +4342,7 @@ IanvsMarkdownSyntaxTheme _tableCellSyntaxTheme(
       decorationColor: colors.accentDark,
     ),
     code: ianvsMarkdownInlineCodeStyle(colors),
+    inlineCodeMarker: ianvsMarkdownInlineCodeStyle(colors),
     math: TextStyle(
       color: colors.accentDark,
       fontFamily: colors.monoFontFamily,

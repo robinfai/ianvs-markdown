@@ -18,6 +18,27 @@ void main() {
     );
   }
 
+  test('inline-code theme color is customizable and interpolates', () {
+    const customPrimary = Color(0xff123456);
+    const customInline = Color(0xff654321);
+    final fallback = IanvsMarkdownThemeData.light.copyWith(
+      textPrimary: customPrimary,
+      inlineCodeForeground: customInline,
+    );
+
+    expect(fallback.inlineCodeForeground, customInline);
+    expect(
+      IanvsMarkdownThemeData.light
+          .lerp(IanvsMarkdownThemeData.dark, .5)
+          .inlineCodeForeground,
+      Color.lerp(
+        IanvsMarkdownThemeData.light.inlineCodeForeground,
+        IanvsMarkdownThemeData.dark.inlineCodeForeground,
+        .5,
+      ),
+    );
+  });
+
   testWidgets('renders GFM, file links, and interactive fenced code', (
     tester,
   ) async {
@@ -2008,7 +2029,7 @@ bool _renderedTextUsesInlineCodeStyle(
         style.fontFamily == colors.monoFontFamily &&
         style.fontSize == 12 &&
         style.height == 1.35 &&
-        style.color == colors.textPrimary &&
+        style.color == colors.inlineCodeForeground &&
         style.backgroundColor == colors.surfaceHover) {
       return true;
     }

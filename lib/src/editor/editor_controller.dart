@@ -34,6 +34,7 @@ final class IanvsMarkdownSyntaxTheme {
     required this.link,
     required this.code,
     required this.comment,
+    this.inlineCodeMarker,
     this.codeBlock = const TextStyle(),
     this.strong = const TextStyle(fontWeight: FontWeight.w700),
     this.emphasis = const TextStyle(fontStyle: FontStyle.italic),
@@ -52,6 +53,7 @@ final class IanvsMarkdownSyntaxTheme {
   final TextStyle link;
   final TextStyle code;
   final TextStyle comment;
+  final TextStyle? inlineCodeMarker;
   final TextStyle codeBlock;
   final TextStyle strong;
   final TextStyle emphasis;
@@ -2412,7 +2414,7 @@ List<_SyntaxToken> _markdownSyntaxTokens(
     tokens,
     text,
     theme.code,
-    theme.marker,
+    theme.inlineCodeMarker ?? theme.marker,
     codeExcludedRanges,
   );
   final mathRanges = _addInlineMathSyntaxTokens(

@@ -1039,6 +1039,52 @@ void main() {
       );
     });
 
+    test('inline-code marker Backspace edits stay native', () {
+      const single = 'Plain `alpha beta` tail.';
+      final singleClosing = single.lastIndexOf('`') + 1;
+      final atSingleClosing = TextEditingValue(
+        text: single,
+        selection: TextSelection.collapsed(offset: singleClosing),
+      );
+      final deletedSingleClosing = TextEditingValue(
+        text: single.replaceRange(singleClosing - 1, singleClosing, ''),
+        selection: TextSelection.collapsed(offset: singleClosing - 1),
+      );
+      expect(
+        formatter.formatEditUpdate(atSingleClosing, deletedSingleClosing),
+        deletedSingleClosing,
+      );
+
+      final singleOpening = single.indexOf('`') + 1;
+      final atSingleOpening = TextEditingValue(
+        text: single,
+        selection: TextSelection.collapsed(offset: singleOpening),
+      );
+      final deletedSingleOpening = TextEditingValue(
+        text: single.replaceRange(singleOpening - 1, singleOpening, ''),
+        selection: TextSelection.collapsed(offset: singleOpening - 1),
+      );
+      expect(
+        formatter.formatEditUpdate(atSingleOpening, deletedSingleOpening),
+        deletedSingleOpening,
+      );
+
+      const double = 'Double ``alpha ` beta`` tail.';
+      final doubleClosing = double.lastIndexOf('``') + 2;
+      final atDoubleClosing = TextEditingValue(
+        text: double,
+        selection: TextSelection.collapsed(offset: doubleClosing),
+      );
+      final deletedOneDoubleClosing = TextEditingValue(
+        text: double.replaceRange(doubleClosing - 1, doubleClosing, ''),
+        selection: TextSelection.collapsed(offset: doubleClosing - 1),
+      );
+      expect(
+        formatter.formatEditUpdate(atDoubleClosing, deletedOneDoubleClosing),
+        deletedOneDoubleClosing,
+      );
+    });
+
     test('four-backtick fences keep inner triple runs active on Enter', () {
       const source =
           '````markdown\n'

@@ -21,6 +21,7 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
     required this.accentSoft,
     required this.accentMist,
     required this.error,
+    Color? inlineCodeForeground,
     this.headingAccents = const <Color>[
       Color(0xffc24b57),
       Color(0xffb56b35),
@@ -38,7 +39,7 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
     this.smallRadius = 8,
     this.mediumRadius = 10,
     this.largeRadius = 14,
-  });
+  }) : inlineCodeForeground = inlineCodeForeground ?? textPrimary;
 
   static const IanvsMarkdownThemeData light = IanvsMarkdownThemeData(
     surface: Color(0xffffffff),
@@ -55,6 +56,7 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
     accentSoft: Color(0xffdceced),
     accentMist: Color(0xffeef7f7),
     error: Color(0xffc33f43),
+    inlineCodeForeground: Color(0xffdd1399),
     headingAccents: <Color>[
       Color(0xffc24b57),
       Color(0xffb56b35),
@@ -80,6 +82,7 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
     accentSoft: Color(0xff27484a),
     accentMist: Color(0xff24393b),
     error: Color(0xffff8a8e),
+    inlineCodeForeground: Color(0xfff2b6de),
     headingAccents: <Color>[
       Color(0xffe06c75),
       Color(0xffd19a66),
@@ -104,6 +107,7 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
   final Color accentSoft;
   final Color accentMist;
   final Color error;
+  final Color inlineCodeForeground;
   final List<Color> headingAccents;
   final String monoFontFamily;
   final List<String> monoFontFamilyFallback;
@@ -142,6 +146,7 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
     Color? accentSoft,
     Color? accentMist,
     Color? error,
+    Color? inlineCodeForeground,
     List<Color>? headingAccents,
     String? monoFontFamily,
     List<String>? monoFontFamilyFallback,
@@ -164,6 +169,7 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
       accentSoft: accentSoft ?? this.accentSoft,
       accentMist: accentMist ?? this.accentMist,
       error: error ?? this.error,
+      inlineCodeForeground: inlineCodeForeground ?? this.inlineCodeForeground,
       headingAccents: headingAccents ?? this.headingAccents,
       monoFontFamily: monoFontFamily ?? this.monoFontFamily,
       monoFontFamilyFallback:
@@ -195,6 +201,11 @@ class IanvsMarkdownThemeData extends ThemeExtension<IanvsMarkdownThemeData> {
       accentSoft: Color.lerp(accentSoft, other.accentSoft, t)!,
       accentMist: Color.lerp(accentMist, other.accentMist, t)!,
       error: Color.lerp(error, other.error, t)!,
+      inlineCodeForeground: Color.lerp(
+        inlineCodeForeground,
+        other.inlineCodeForeground,
+        t,
+      )!,
       headingAccents: <Color>[
         for (var level = 1; level <= 6; level += 1)
           Color.lerp(headingAccent(level), other.headingAccent(level), t)!,

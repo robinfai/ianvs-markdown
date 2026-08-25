@@ -16,7 +16,7 @@ TextStyle ianvsMarkdownInlineCodeStyle(
   double? height = 1.35,
 }) {
   return TextStyle(
-    color: colors.textPrimary,
+    color: colors.inlineCodeForeground,
     backgroundColor: colors.surfaceHover,
     fontFamily: colors.monoFontFamily,
     fontFamilyFallback: colors.monoFontFamilyFallback,

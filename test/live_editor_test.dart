@@ -4412,6 +4412,10 @@ $$''');
       expect(code.style?.fontSize, 12);
       expect(code.style?.height, 1.35);
       expect(
+        code.style?.color,
+        IanvsMarkdownThemeData.light.inlineCodeForeground,
+      );
+      expect(
         code.style?.backgroundColor,
         IanvsMarkdownThemeData.light.surfaceHover,
       );
@@ -4431,6 +4435,14 @@ $$''');
       );
       markers = leaves.where((leaf) => leaf.text == '`').toList();
       expect(markers.every((leaf) => leaf.style?.fontSize != .01), isTrue);
+      expect(
+        markers.every(
+          (leaf) =>
+              leaf.style?.color ==
+              IanvsMarkdownThemeData.light.inlineCodeForeground,
+        ),
+        isTrue,
+      );
       expect(controller.text, source);
     },
   );

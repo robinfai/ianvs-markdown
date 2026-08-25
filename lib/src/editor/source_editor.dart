@@ -695,6 +695,11 @@ IanvsMarkdownSyntaxTheme ianvsMarkdownSyntaxTheme(
           : const Color(0xffffe184),
     ),
     code: ianvsMarkdownInlineCodeStyle(colors, fontSize: null, height: null),
+    inlineCodeMarker: ianvsMarkdownInlineCodeStyle(
+      colors,
+      fontSize: null,
+      height: null,
+    ),
     math: TextStyle(
       color: colors.accentDark,
       fontFamily: colors.monoFontFamily,
