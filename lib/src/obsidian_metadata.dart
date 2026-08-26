@@ -14,6 +14,132 @@ enum IanvsMarkdownObsidianMetadataMode {
   editing,
 }
 
+final RegExp _obsidianCommentFencePattern = RegExp(
+  r'^ {0,3}(`{3,}|~{3,})(.*)$',
+);
+
+/// Finds paired Obsidian `%%...%%` comments outside code spans and fences.
+///
+/// Delimiters are paired from left to right. An odd run of preceding
+/// backslashes escapes a delimiter, and an opening delimiter without a later
+/// unescaped close remains ordinary source text.
+List<TextRange> ianvsMarkdownCommentRanges(String source) {
+  final ranges = <TextRange>[];
+  var index = 0;
+  var lineStart = true;
+  var fenceCharacter = 0;
+  var fenceLength = 0;
+
+  while (index < source.length) {
+    if (lineStart) {
+      final lineEnd = source.indexOf('\n', index);
+      final end = lineEnd < 0 ? source.length : lineEnd;
+      final line = source.substring(index, end);
+      final fence = _obsidianCommentFencePattern.firstMatch(line);
+      if (fenceLength > 0) {
+        if (fence != null) {
+          final marker = fence.group(1)!;
+          if (marker.codeUnitAt(0) == fenceCharacter &&
+              marker.length >= fenceLength &&
+              fence.group(2)!.trim().isEmpty) {
+            fenceCharacter = 0;
+            fenceLength = 0;
+          }
+        }
+        index = lineEnd < 0 ? source.length : lineEnd + 1;
+        lineStart = true;
+        continue;
+      }
+      if (fence != null) {
+        final marker = fence.group(1)!;
+        fenceCharacter = marker.codeUnitAt(0);
+        fenceLength = marker.length;
+        index = lineEnd < 0 ? source.length : lineEnd + 1;
+        lineStart = true;
+        continue;
+      }
+    }
+
+    final character = source.codeUnitAt(index);
+    if (character == 0x60 && !isIanvsMarkdownEscapedAt(source, index)) {
+      final runLength = _characterRunLength(source, index, 0x60);
+      final close = _matchingCodeSpanClose(
+        source,
+        index + runLength,
+        runLength,
+      );
+      if (close >= 0) {
+        index = close + runLength;
+        lineStart = false;
+        continue;
+      }
+      index += runLength;
+      lineStart = false;
+      continue;
+    }
+
+    if (character == 0x25 &&
+        index + 1 < source.length &&
+        source.codeUnitAt(index + 1) == 0x25 &&
+        isIanvsMarkdownEscapedAt(source, index)) {
+      // Escaping an opening delimiter makes its matching delimiter literal as
+      // well (`\%%x%%`). Do not reinterpret that close as the start of a
+      // comment on the following text.
+      final lineEnd = source.indexOf('\n', index + 2);
+      final close = _nextUnescapedCommentDelimiter(source, index + 2);
+      if (close >= 0 && (lineEnd < 0 || close < lineEnd)) {
+        index = close + _characterRunLength(source, close, 0x25);
+      } else {
+        index += 2;
+      }
+      lineStart = false;
+      continue;
+    }
+
+    if (character == 0x25 &&
+        index + 1 < source.length &&
+        source.codeUnitAt(index + 1) == 0x25) {
+      final close = _nextUnescapedCommentDelimiter(source, index + 2);
+      if (close >= 0) {
+        ranges.add(TextRange(start: index, end: close + 2));
+        // Any percent signs left in the same closing run are literal residue,
+        // as in `%%%x%%%` and `%%%%%%`; they do not open a new comment.
+        index = close + _characterRunLength(source, close, 0x25);
+        lineStart = false;
+        continue;
+      }
+      // With no later delimiter this marker is literal, and there cannot be
+      // another unescaped comment pair after it.
+      break;
+    }
+
+    lineStart = character == 0x0a;
+    index += 1;
+  }
+  return List<TextRange>.unmodifiable(ranges);
+}
+
+int _matchingCodeSpanClose(String source, int start, int openingLength) {
+  var index = start;
+  while (index < source.length) {
+    final next = source.indexOf('`', index);
+    if (next < 0) return -1;
+    final length = _characterRunLength(source, next, 0x60);
+    if (length == openingLength) return next;
+    index = next + length;
+  }
+  return -1;
+}
+
+int _nextUnescapedCommentDelimiter(String source, int start) {
+  var index = source.indexOf('%%', start);
+  while (index >= 0) {
+    if (!isIanvsMarkdownEscapedAt(source, index)) return index;
+    index = source.indexOf('%%', index + 2);
+  }
+  return -1;
+}
+
 /// Converts Obsidian-only metadata syntax into Markdown understood by the
 /// renderer.
 ///
@@ -39,7 +165,7 @@ String prepareObsidianMarkdownForRendering(
 final class IanvsMarkdownEditingMetadataInlineSyntax extends md.InlineSyntax {
   IanvsMarkdownEditingMetadataInlineSyntax.comment()
     : kind = 'comment',
-      super(r'%%(?:[\s\S]*?%%|[\s\S]*)', startCharacter: 0x25);
+      super(r'%%', startCharacter: 0x25);
 
   IanvsMarkdownEditingMetadataInlineSyntax.blockId()
     : kind = 'block-id',
@@ -57,6 +183,27 @@ final class IanvsMarkdownEditingMetadataInlineSyntax extends md.InlineSyntax {
 
   @override
   bool tryMatch(md.InlineParser parser, [int? startMatchPos]) {
+    if (kind == 'comment') {
+      final start = startMatchPos ?? parser.pos;
+      if (start != parser.pos) return false;
+      TextRange? comment;
+      for (final range in ianvsMarkdownCommentRanges(parser.source)) {
+        if (range.start == start) {
+          comment = range;
+          break;
+        }
+        if (range.start > start) break;
+      }
+      if (comment == null) return false;
+      parser.writeText();
+      final literal = parser.source.substring(comment.start, comment.end);
+      final element = md.Element.text('ianvs-editing-metadata', literal)
+        ..attributes['kind'] = kind;
+      parser
+        ..addNode(element)
+        ..consume(comment.end - comment.start);
+      return true;
+    }
     if (kind != 'inline-footnote') {
       return super.tryMatch(parser, startMatchPos);
     }
@@ -87,6 +234,42 @@ final class IanvsMarkdownEditingMetadataInlineSyntax extends md.InlineSyntax {
       ..attributes['kind'] = kind;
     parser.addNode(element);
     return true;
+  }
+}
+
+/// Keeps a paired standalone comment visible as one source block in editing
+/// mode, including blank lines inside it.
+final class IanvsMarkdownEditingCommentBlockSyntax extends md.BlockSyntax {
+  const IanvsMarkdownEditingCommentBlockSyntax();
+
+  static final RegExp _delimiter = RegExp(r'^ {0,3}%%[ \t]*$');
+
+  @override
+  RegExp get pattern => _delimiter;
+
+  @override
+  bool canParse(md.BlockParser parser) {
+    if (!super.canParse(parser)) return false;
+    for (var offset = 1; ; offset += 1) {
+      final line = parser.peek(offset);
+      if (line == null) return false;
+      if (_delimiter.hasMatch(line.content)) return true;
+    }
+  }
+
+  @override
+  md.Node parse(md.BlockParser parser) {
+    final lines = <String>[parser.current.content];
+    parser.advance();
+    while (!parser.isDone) {
+      final line = parser.current.content;
+      lines.add(line);
+      parser.advance();
+      if (_delimiter.hasMatch(line)) break;
+    }
+    return md.Element('ianvs-editing-metadata-block', <md.Node>[
+      md.Text(lines.join('\n')),
+    ])..attributes['kind'] = 'comment';
   }
 }
 
@@ -301,81 +484,15 @@ final class _ObsidianFootnoteOrdinalCollector {
 
 String _stripObsidianComments(String source) {
   final output = StringBuffer();
-  var index = 0;
-  var inComment = false;
-  var fenceCharacter = 0;
-  var fenceLength = 0;
-  var inlineCodeLength = 0;
-  var lineStart = true;
-
-  while (index < source.length) {
-    if (lineStart && !inComment && inlineCodeLength == 0) {
-      final lineEnd = source.indexOf('\n', index);
-      final end = lineEnd < 0 ? source.length : lineEnd;
-      final line = source.substring(index, end);
-      final fence = RegExp(r'^ {0,3}(`{3,}|~{3,})').firstMatch(line);
-      if (fence != null) {
-        final marker = fence.group(1)!;
-        if (fenceLength == 0) {
-          fenceCharacter = marker.codeUnitAt(0);
-          fenceLength = marker.length;
-        } else if (marker.codeUnitAt(0) == fenceCharacter &&
-            marker.length >= fenceLength) {
-          fenceLength = 0;
-          fenceCharacter = 0;
-        }
-        output.write(line);
-        if (lineEnd >= 0) output.write('\n');
-        index = lineEnd < 0 ? source.length : lineEnd + 1;
-        lineStart = true;
-        continue;
-      }
+  var cursor = 0;
+  for (final range in ianvsMarkdownCommentRanges(source)) {
+    output.write(source.substring(cursor, range.start));
+    for (var index = range.start; index < range.end; index += 1) {
+      if (source.codeUnitAt(index) == 0x0a) output.write('\n');
     }
-
-    final character = source.codeUnitAt(index);
-    if (fenceLength > 0) {
-      output.writeCharCode(character);
-      lineStart = character == 0x0a;
-      index += 1;
-      continue;
-    }
-
-    if (!inComment && character == 0x60) {
-      final runLength = _characterRunLength(source, index, 0x60);
-      if (inlineCodeLength == 0) {
-        inlineCodeLength = runLength;
-      } else if (runLength == inlineCodeLength) {
-        inlineCodeLength = 0;
-      }
-      output.write(source.substring(index, index + runLength));
-      index += runLength;
-      lineStart = false;
-      continue;
-    }
-
-    final isCommentMarker =
-        inlineCodeLength == 0 &&
-        character == 0x25 &&
-        index + 1 < source.length &&
-        source.codeUnitAt(index + 1) == 0x25;
-    if (isCommentMarker) {
-      inComment = !inComment;
-      index += 2;
-      lineStart = false;
-      continue;
-    }
-
-    if (!inComment) {
-      output.writeCharCode(character);
-    } else if (character == 0x0a) {
-      // Preserve line structure so removing a block comment cannot join the
-      // surrounding Markdown blocks together.
-      output.write('\n');
-    }
-    lineStart = character == 0x0a;
-    if (lineStart) inlineCodeLength = 0;
-    index += 1;
+    cursor = range.end;
   }
+  output.write(source.substring(cursor));
   return output.toString();
 }
 

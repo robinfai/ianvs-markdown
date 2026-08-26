@@ -3038,6 +3038,45 @@ Hidden **source** block.
     }
   });
 
+  test('live source comments require pairs and yield to code and escapes', () {
+    const syntax = IanvsMarkdownSyntaxTheme(
+      heading: TextStyle(),
+      marker: TextStyle(),
+      link: TextStyle(),
+      code: TextStyle(fontFamily: 'monospace'),
+      comment: TextStyle(color: Color(0xff555555)),
+    );
+    const source =
+        'paired %%secret%%; '
+        r'escaped \%%literal%%; '
+        'code `%%code%%`; unclosed %% tail';
+
+    final spans = buildMarkdownSourceTextSpan(
+      const TextEditingValue(
+        text: source,
+        selection: TextSelection.collapsed(offset: 0),
+      ),
+      style: const TextStyle(fontSize: 14),
+      syntaxTheme: syntax,
+      withComposing: false,
+    ).children!.cast<TextSpan>().toList();
+
+    expect(
+      spans.singleWhere((span) => span.text == '%%secret%%').style?.color,
+      const Color(0xff555555),
+    );
+    expect(
+      spans
+          .where((span) => span.style?.color == const Color(0xff555555))
+          .map((span) => span.text),
+      <String>['%%secret%%'],
+    );
+    expect(
+      spans.singleWhere((span) => span.text == '%%code%%').style?.fontFamily,
+      'monospace',
+    );
+  });
+
   test('full source keeps language highlighting inside fenced code', () {
     const syntax = IanvsMarkdownSyntaxTheme(
       heading: TextStyle(fontWeight: FontWeight.w600),

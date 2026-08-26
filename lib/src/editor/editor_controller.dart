@@ -8,6 +8,7 @@ import '../code_block.dart';
 import '../footnote_syntax.dart';
 import '../obsidian_autolink.dart';
 import '../obsidian_html.dart';
+import '../obsidian_metadata.dart';
 import '../wiki_link_reference.dart';
 import 'editor_models.dart';
 import 'markdown_paste.dart';
@@ -2472,12 +2473,9 @@ List<_SyntaxToken> _markdownSyntaxTokens(
     _addFencedCodeSyntaxTokens(tokens, text, range, theme);
   }
 
-  final obsidianCommentRanges = <TextRange>[];
-  final obsidianCommentPattern = RegExp(r'%%.*?(?:%%|$)', dotAll: true);
-  for (final match in obsidianCommentPattern.allMatches(text)) {
-    if (_overlapsAnyRange(match.start, match.end, fencedRanges)) continue;
-    obsidianCommentRanges.add(TextRange(start: match.start, end: match.end));
-    tokens.add(_SyntaxToken(match.start, match.end, theme.comment));
+  final obsidianCommentRanges = ianvsMarkdownCommentRanges(text);
+  for (final range in obsidianCommentRanges) {
+    tokens.add(_SyntaxToken(range.start, range.end, theme.comment));
   }
   final displayMathRanges = _addDisplayMathSyntaxTokens(
     tokens,

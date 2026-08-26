@@ -251,6 +251,8 @@ class IanvsMarkdown extends StatelessWidget {
       ...?blockSyntaxes,
       const IanvsMarkdownIndentedCodeBlockSyntax(),
       if (obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing)
+        const IanvsMarkdownEditingCommentBlockSyntax(),
+      if (obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing)
         const IanvsMarkdownEditingFootnoteDefinitionSyntax(),
       const IanvsMarkdownDisplayMathSyntax(),
       const IanvsMarkdownWikiEmbedSyntax(),

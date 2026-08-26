@@ -182,6 +182,31 @@ final value = 1;
     },
   );
 
+  test('paired standalone comments keep internal blank lines in one block', () {
+    const comment = '%%\nhidden first\n\nhidden second\n%%';
+    const source = 'Before.\n\n$comment\n\nAfter.';
+
+    final blocks = parseMarkdownBlocks(source);
+
+    expect(blocks, hasLength(3));
+    expect(blocks[1].type, IanvsMarkdownBlockType.paragraph);
+    expect(blocks[1].source, comment);
+    expect(markdownGapLineCount(source, blocks.first, blocks[1]), 2);
+    expect(markdownGapLineCount(source, blocks[1], blocks.last), 2);
+  });
+
+  test('unclosed standalone comments remain ordinary source blocks', () {
+    const source = 'Before.\n\n%%\nunclosed\n\nAfter.';
+
+    final blocks = parseMarkdownBlocks(source);
+
+    expect(blocks.map((block) => block.source), <String>[
+      'Before.',
+      '%%\nunclosed',
+      'After.',
+    ]);
+  });
+
   test('Setext dashes win after text while thematic variants stay rules', () {
     const source =
         'Setext level two\n'

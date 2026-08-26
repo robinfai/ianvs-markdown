@@ -97,26 +97,31 @@ List<IanvsMarkdownBlock> parseMarkdownBlocks(
         ? _nestedListItemType(lines, first, blocks)
         : null;
     final type = nestedListType ?? _classifyBlock(lines, first);
-    final last = switch (type) {
-      IanvsMarkdownBlockType.frontMatter => _frontMatterEnd(lines, first),
-      IanvsMarkdownBlockType.fencedCode => _fencedCodeEnd(lines, first),
-      IanvsMarkdownBlockType.indentedCode => _indentedCodeEnd(lines, first),
-      IanvsMarkdownBlockType.displayMath => _displayMathEnd(lines, first),
-      IanvsMarkdownBlockType.blockquote => _blockquoteEnd(lines, first),
-      IanvsMarkdownBlockType.unorderedList ||
-      IanvsMarkdownBlockType.orderedList ||
-      IanvsMarkdownBlockType.taskList =>
-        splitListItems ? _listItemEnd(lines, first) : _listEnd(lines, first),
-      IanvsMarkdownBlockType.table => _tableEnd(lines, first),
-      IanvsMarkdownBlockType.heading
-          when first + 1 < lines.length &&
-              _isSetextUnderline(lines[first + 1].text) =>
-        first + 1,
-      IanvsMarkdownBlockType.heading ||
-      IanvsMarkdownBlockType.thematicBreak => first,
-      IanvsMarkdownBlockType.html => _htmlEnd(lines, first),
-      IanvsMarkdownBlockType.paragraph => _paragraphEnd(lines, first),
-    };
+    final standaloneCommentEnd = _standaloneCommentEnd(lines, first);
+    final last =
+        standaloneCommentEnd ??
+        switch (type) {
+          IanvsMarkdownBlockType.frontMatter => _frontMatterEnd(lines, first),
+          IanvsMarkdownBlockType.fencedCode => _fencedCodeEnd(lines, first),
+          IanvsMarkdownBlockType.indentedCode => _indentedCodeEnd(lines, first),
+          IanvsMarkdownBlockType.displayMath => _displayMathEnd(lines, first),
+          IanvsMarkdownBlockType.blockquote => _blockquoteEnd(lines, first),
+          IanvsMarkdownBlockType.unorderedList ||
+          IanvsMarkdownBlockType.orderedList ||
+          IanvsMarkdownBlockType.taskList =>
+            splitListItems
+                ? _listItemEnd(lines, first)
+                : _listEnd(lines, first),
+          IanvsMarkdownBlockType.table => _tableEnd(lines, first),
+          IanvsMarkdownBlockType.heading
+              when first + 1 < lines.length &&
+                  _isSetextUnderline(lines[first + 1].text) =>
+            first + 1,
+          IanvsMarkdownBlockType.heading ||
+          IanvsMarkdownBlockType.thematicBreak => first,
+          IanvsMarkdownBlockType.html => _htmlEnd(lines, first),
+          IanvsMarkdownBlockType.paragraph => _paragraphEnd(lines, first),
+        };
     blocks.add(_block(source, lines, first, last, type));
     index = last + 1;
   }
@@ -134,6 +139,16 @@ List<IanvsMarkdownBlock> parseMarkdownBlocks(
     ];
   }
   return List<IanvsMarkdownBlock>.unmodifiable(blocks);
+}
+
+int? _standaloneCommentEnd(List<_SourceLine> lines, int first) {
+  if (!RegExp(r'^ {0,3}%%[ \t]*$').hasMatch(lines[first].text)) return null;
+  for (var index = first + 1; index < lines.length; index += 1) {
+    if (RegExp(r'^ {0,3}%%[ \t]*$').hasMatch(lines[index].text)) {
+      return index;
+    }
+  }
+  return null;
 }
 
 IanvsMarkdownBlock? markdownBlockAtOffset(

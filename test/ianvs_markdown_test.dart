@@ -2469,6 +2469,89 @@ Text %%hidden%% ^[visible note] ^block-id
     expect(rendered, contains('^[not a footnote] ^fenced-id'));
   });
 
+  test('Obsidian comments require pairs and honor escape parity', () {
+    const source = r'''paired %%gone%%
+one slash \%%x%% after
+two slash \\%%x%% after
+empty %%%%
+triple %%%x%%%
+six %%%%%%
+`%%inline code%%`
+```text
+%%fenced code%%
+```
+unclosed %% stays''';
+
+    final rendered = prepareObsidianMarkdownForRendering(source);
+
+    expect(
+      rendered,
+      'paired \n'
+      r'one slash \%%x%% after'
+      '\n'
+      r'two slash \\ after'
+      '\n'
+      'empty \n'
+      'triple %\n'
+      'six %%\n'
+      '`%%inline code%%`\n'
+      '```text\n'
+      '%%fenced code%%\n'
+      '```\n'
+      'unclosed %% stays',
+    );
+  });
+
+  testWidgets('editing comments keep escaped and unclosed source literal', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(
+          data: r'paired %%secret%%; escaped \%%literal%%; unclosed %% tail',
+          obsidianMetadataMode: IanvsMarkdownObsidianMetadataMode.editing,
+        ),
+      ),
+    );
+
+    expect(find.text('%%secret%%'), findsOneWidget);
+    expect(find.textContaining('%%literal%%'), findsOneWidget);
+    expect(find.textContaining(r'unclosed %% tail'), findsOneWidget);
+  });
+
+  testWidgets('reading keeps escaped and unclosed comments literal', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(
+          data:
+              r'Escaped \%%visible%%. Paired %%hidden%%. Unclosed %% tail',
+        ),
+      ),
+    );
+
+    expect(find.textContaining('%%visible%%'), findsOneWidget);
+    expect(find.textContaining('hidden'), findsNothing);
+    expect(find.textContaining(r'Unclosed %% tail'), findsOneWidget);
+  });
+
+  testWidgets('editing mode keeps standalone comments as one source block', (
+    tester,
+  ) async {
+    const comment = '%%\nhidden first\n\nhidden second\n%%';
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(
+          data: comment,
+          obsidianMetadataMode: IanvsMarkdownObsidianMetadataMode.editing,
+        ),
+      ),
+    );
+
+    expect(find.text(comment), findsOneWidget);
+  });
+
   test('Obsidian preprocessing expands empty and nested inline footnotes', () {
     final rendered = prepareObsidianMarkdownForRendering(
       'Empty ^[] and nested ^[outer ^[inner]].',
