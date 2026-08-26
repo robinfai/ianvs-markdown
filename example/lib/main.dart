@@ -379,7 +379,7 @@ Inactive ==highlight markers disappear== until the caret enters their range.
 An unmarked lazy continuation remains inside the same callout.
 > The explicit quoted tail remains inside it too.
 > > [!tip] Nested callout
-> > Nested callouts keep their own rail, icon, and body.
+> > Nested callouts keep their own card color, icon, and body.
 
 > [!warning]- **Folded** source-preserving detail
 > Expanding this card does not enter editing; clicking its body does.

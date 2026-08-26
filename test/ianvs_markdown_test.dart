@@ -2209,6 +2209,82 @@ Before ==highlighted **bold**== after.
     expect(find.textContaining('Hidden body line.'), findsOneWidget);
   });
 
+  testWidgets('Border callout cards keep Obsidian color and spacing rhythm', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(
+          data:
+              '> [!note] Default note\n'
+              '> First paragraph.\n'
+              '>\n'
+              '> Second paragraph.\n\n'
+              '> [!tip]+ Expandable tip\n'
+              '> Expanded body line 1.\n'
+              '> Expanded body line 2.\n\n'
+              '> [!error]- Collapsed error\n'
+              '> Hidden body line.',
+        ),
+        theme: ThemeData.dark(),
+      ),
+    );
+
+    final note = find.byKey(const ValueKey('ianvs-markdown-callout-note'));
+    final tip = find.byKey(const ValueKey('ianvs-markdown-callout-tip'));
+    final error = find.byKey(const ValueKey('ianvs-markdown-callout-error'));
+    expect(tester.getSize(note).height, inInclusiveRange(123, 127));
+    expect(tester.getSize(tip).height, inInclusiveRange(111, 114));
+    expect(tester.getSize(error).height, 42);
+
+    final noteDecoration =
+        tester.widget<AnimatedContainer>(note).decoration! as BoxDecoration;
+    final tipDecoration =
+        tester.widget<AnimatedContainer>(tip).decoration! as BoxDecoration;
+    final errorDecoration =
+        tester.widget<AnimatedContainer>(error).decoration! as BoxDecoration;
+    expect(noteDecoration.border, isNull);
+    expect(tipDecoration.border, isNull);
+    expect(errorDecoration.border, isNull);
+    expect(
+      noteDecoration.color,
+      IanvsMarkdownThemeData.dark.taskStatusBlue.withValues(alpha: .14),
+    );
+    expect(
+      tipDecoration.color,
+      IanvsMarkdownThemeData.dark.taskStatusCyan.withValues(alpha: .14),
+    );
+    expect(
+      errorDecoration.color,
+      IanvsMarkdownThemeData.dark.taskStatusRed.withValues(alpha: .14),
+    );
+
+    final noteBody = find.byKey(
+      const ValueKey('ianvs-markdown-callout-body-note'),
+    );
+    expect(
+      tester
+              .getRect(
+                find.descendant(
+                  of: noteBody,
+                  matching: find.byType(IanvsMarkdown),
+                ),
+              )
+              .left -
+          tester.getRect(note).left,
+      20,
+    );
+    expect(
+      tester
+              .getRect(
+                find.descendant(of: note, matching: find.byType(Icon)).first,
+              )
+              .left -
+          tester.getRect(note).left,
+      20,
+    );
+  });
+
   testWidgets('callouts retain lazy bodies and Markdown-formatted titles', (
     tester,
   ) async {
@@ -2244,13 +2320,12 @@ Outside callout.
       ),
       findsOneWidget,
     );
-    expect(
-      find.descendant(
-        of: warning,
-        matching: find.byKey(const ValueKey('ianvs-markdown-callout-note')),
-      ),
-      findsOneWidget,
+    final nestedNote = find.descendant(
+      of: warning,
+      matching: find.byKey(const ValueKey('ianvs-markdown-callout-note')),
     );
+    expect(nestedNote, findsOneWidget);
+    expect(tester.getRect(nestedNote).left - tester.getRect(warning).left, 20);
     expect(find.text('Outside callout.'), findsOneWidget);
   });
 

@@ -408,7 +408,7 @@ class IanvsMarkdown extends StatelessWidget {
       data: source,
       selectable: selectable,
       styleSheet: effectiveStyleSheet.copyWith(
-        blockSpacing: 6,
+        blockSpacing: 12,
         pPadding: EdgeInsets.zero,
       ),
       styleSheetTheme: styleSheetTheme,
@@ -451,8 +451,8 @@ class IanvsMarkdown extends StatelessWidget {
   ) {
     final titleStyle = (effectiveStyleSheet.p ?? const TextStyle()).copyWith(
       color: accent,
-      fontSize: 13.5,
-      height: 1.3,
+      fontSize: 14.5,
+      height: 1.4,
       fontWeight: FontWeight.w700,
     );
     return IanvsMarkdown(

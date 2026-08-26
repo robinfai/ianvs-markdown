@@ -160,100 +160,74 @@ class _IanvsMarkdownCalloutState extends State<IanvsMarkdownCallout> {
         color: accent.withValues(
           alpha: Theme.of(context).brightness == Brightness.dark ? .14 : .09,
         ),
-        borderRadius: BorderRadius.circular(5),
-        border: Border.all(color: accent.withValues(alpha: .16)),
+        borderRadius: BorderRadius.circular(colors.smallRadius / 2),
       ),
-      child: Stack(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 3),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    key: ValueKey<String>(
-                      'ianvs-markdown-callout-toggle-${widget.type}',
-                    ),
-                    onTap: _foldable
-                        ? () => setState(() => _expanded = !_expanded)
-                        : null,
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(5),
-                    ),
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(10, 9, 12, showBody ? 4 : 9),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _calloutIcon(widget.type),
-                            size: 15,
-                            color: accent,
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child:
-                                widget.titleBuilder?.call(
-                                  context,
-                                  widget.title,
-                                  accent,
-                                ) ??
-                                Text(
-                                  widget.title,
-                                  style: TextStyle(
-                                    color: accent,
-                                    fontSize: 13.5,
-                                    height: 1.3,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                          ),
-                          if (_foldable)
-                            AnimatedRotation(
-                              turns: _expanded ? .25 : 0,
-                              duration: const Duration(milliseconds: 150),
-                              child: Icon(
-                                Icons.chevron_right_rounded,
-                                size: 17,
-                                color: accent,
-                              ),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              key: ValueKey<String>(
+                'ianvs-markdown-callout-toggle-${widget.type}',
+              ),
+              onTap: _foldable
+                  ? () => setState(() => _expanded = !_expanded)
+                  : null,
+              borderRadius: BorderRadius.vertical(
+                top: Radius.circular(colors.smallRadius / 2),
+              ),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(20, 11, 20, showBody ? 4 : 11),
+                child: Row(
+                  children: [
+                    Icon(_calloutIcon(widget.type), size: 15, color: accent),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child:
+                          widget.titleBuilder?.call(
+                            context,
+                            widget.title,
+                            accent,
+                          ) ??
+                          Text(
+                            widget.title,
+                            style: TextStyle(
+                              color: accent,
+                              fontSize: 14.5,
+                              height: 1.4,
+                              fontWeight: FontWeight.w700,
                             ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                AnimatedSize(
-                  duration: const Duration(milliseconds: 150),
-                  curve: Curves.easeOut,
-                  alignment: Alignment.topCenter,
-                  child: showBody
-                      ? Padding(
-                          key: ValueKey<String>(
-                            'ianvs-markdown-callout-body-${widget.type}',
                           ),
-                          padding: const EdgeInsets.fromLTRB(10, 2, 14, 11),
-                          child: widget.bodyBuilder(context, widget.body),
-                        )
-                      : const SizedBox.shrink(),
-                ),
-              ],
-            ),
-          ),
-          Positioned(
-            left: 0,
-            top: 0,
-            bottom: 0,
-            child: Container(
-              width: 3,
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: .88),
-                borderRadius: const BorderRadius.horizontal(
-                  left: Radius.circular(4),
+                    ),
+                    if (_foldable)
+                      AnimatedRotation(
+                        turns: _expanded ? .25 : 0,
+                        duration: const Duration(milliseconds: 150),
+                        child: Icon(
+                          Icons.chevron_right_rounded,
+                          size: 17,
+                          color: accent,
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOut,
+            alignment: Alignment.topCenter,
+            child: showBody
+                ? Padding(
+                    key: ValueKey<String>(
+                      'ianvs-markdown-callout-body-${widget.type}',
+                    ),
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                    child: widget.bodyBuilder(context, widget.body),
+                  )
+                : const SizedBox.shrink(),
           ),
         ],
       ),
@@ -296,16 +270,16 @@ String _defaultTitle(String type) {
 
 Color _calloutColor(String type, IanvsMarkdownThemeData colors) {
   return switch (type) {
-    'abstract' || 'summary' || 'tldr' => const Color(0xff36a6b8),
-    'tip' || 'hint' || 'important' => const Color(0xff2aa198),
-    'success' || 'check' || 'done' => const Color(0xff3d9b62),
-    'question' || 'help' || 'faq' => const Color(0xffc6922f),
-    'warning' || 'caution' || 'attention' => const Color(0xffd08b2e),
-    'failure' || 'fail' || 'missing' => const Color(0xffd45454),
-    'danger' || 'error' || 'bug' => const Color(0xffcf4d5b),
-    'example' => const Color(0xff8b6bc3),
+    'abstract' || 'summary' || 'tldr' => colors.taskStatusCyan,
+    'tip' || 'hint' || 'important' => colors.taskStatusCyan,
+    'success' || 'check' || 'done' => colors.taskCheckboxColor,
+    'question' || 'help' || 'faq' => colors.taskStatusYellow,
+    'warning' || 'caution' || 'attention' => colors.taskStatusOrange,
+    'failure' || 'fail' || 'missing' => colors.taskStatusRed,
+    'danger' || 'error' || 'bug' => colors.taskStatusRed,
+    'example' => colors.taskStatusPurple,
     'quote' || 'cite' => colors.textSecondary,
-    _ => const Color(0xff4b91d1),
+    _ => colors.taskStatusBlue,
   };
 }
 

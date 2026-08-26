@@ -4408,6 +4408,36 @@ empty:
       find.byKey(const ValueKey('ianvs-markdown-callout-warning')),
       findsOneWidget,
     );
+    final warning = find.byKey(
+      const ValueKey('ianvs-markdown-callout-warning'),
+    );
+    final warningToggle = find.byKey(
+      const ValueKey('ianvs-markdown-callout-toggle-warning'),
+    );
+    expect(tester.getSize(warning).height, 42);
+    expect(tester.getSize(warningToggle).height, 42);
+    final collapsedDecoration =
+        tester.widget<AnimatedContainer>(warning).decoration! as BoxDecoration;
+    expect(collapsedDecoration.border, isNull);
+    expect(
+      collapsedDecoration.borderRadius,
+      BorderRadius.circular(IanvsMarkdownThemeData.light.smallRadius / 2),
+    );
+    expect(
+      collapsedDecoration.color,
+      IanvsMarkdownThemeData.light.taskStatusOrange.withValues(alpha: .09),
+    );
+    expect(
+      find.descendant(
+        of: warning,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Container &&
+              widget.constraints == const BoxConstraints.tightFor(width: 3),
+        ),
+      ),
+      findsNothing,
+    );
     expect(find.textContaining('Hidden'), findsNothing);
 
     await tester.tap(
@@ -4415,6 +4445,16 @@ empty:
     );
     await tester.pumpAndSettle();
     expect(find.textContaining('Hidden'), findsOneWidget);
+    final warningBody = find.byKey(
+      const ValueKey('ianvs-markdown-callout-body-warning'),
+    );
+    expect(tester.getSize(warning).height, 90);
+    expect(tester.getSize(warningToggle).height, 35);
+    expect(tester.getSize(warningBody).height, 55);
+    expect(
+      tester.widget<Padding>(warningBody).padding,
+      const EdgeInsets.fromLTRB(20, 12, 20, 20),
+    );
     expect(
       find.byKey(const ValueKey('ianvs-markdown-active-block')),
       findsNothing,
