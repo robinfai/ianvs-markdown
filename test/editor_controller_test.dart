@@ -2449,6 +2449,58 @@ void main() {
     expect(spans.single.style?.fontFamily, isNull);
   });
 
+  test('inactive escape markers follow consecutive backslash parity', () {
+    const syntax = IanvsMarkdownSyntaxTheme(
+      heading: TextStyle(fontWeight: FontWeight.w600),
+      marker: TextStyle(color: Color(0xff777777)),
+      link: TextStyle(decoration: TextDecoration.underline),
+      code: TextStyle(fontFamily: 'monospace'),
+      comment: TextStyle(fontStyle: FontStyle.italic),
+    );
+    const source =
+        r'one \*literal* two \\*emphasis* three \\\*literal* end \\\\';
+    final spans = buildMarkdownSourceTextSpan(
+      const TextEditingValue(
+        text: source,
+        selection: TextSelection.collapsed(offset: -1),
+      ),
+      style: const TextStyle(fontSize: 14),
+      syntaxTheme: syntax,
+      withComposing: false,
+      hideInactiveInlineMarkers: true,
+      hideInactiveEscapeMarkers: true,
+    ).children!.cast<TextSpan>().toList();
+
+    TextSpan spanAt(int offset) {
+      var cursor = 0;
+      for (final span in spans) {
+        final end = cursor + (span.text?.length ?? 0);
+        if (offset >= cursor && offset < end) return span;
+        cursor = end;
+      }
+      throw StateError('No span at $offset');
+    }
+
+    final single = source.indexOf(r'\*literal');
+    expect(spanAt(single).style?.fontSize, .01);
+
+    final double = source.indexOf(r'\\*emphasis');
+    expect(spanAt(double).style?.fontSize, .01);
+    expect(spanAt(double + 1).style?.fontSize, 14);
+
+    final triple = source.indexOf(r'\\\*literal');
+    expect(spanAt(triple).style?.fontSize, .01);
+    expect(spanAt(triple + 1).style?.fontSize, 14);
+    expect(spanAt(triple + 2).style?.fontSize, .01);
+    expect(spanAt(triple + 3).style?.fontSize, 14);
+
+    final trailing = source.lastIndexOf(r'\\\\');
+    expect(spanAt(trailing).style?.fontSize, .01);
+    expect(spanAt(trailing + 1).style?.fontSize, 14);
+    expect(spanAt(trailing + 2).style?.fontSize, .01);
+    expect(spanAt(trailing + 3).style?.fontSize, 14);
+  });
+
   test(
     'inline code follows backtick runs and keeps nested Markdown literal',
     () {

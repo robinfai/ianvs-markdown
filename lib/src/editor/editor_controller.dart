@@ -2331,22 +2331,39 @@ void _addEscapeMarkerSyntaxTokens(
   String text,
   TextStyle markerStyle,
 ) {
-  for (var offset = 0; offset + 1 < text.length; offset += 1) {
-    if (text.codeUnitAt(offset) != 0x5c) continue;
+  var offset = 0;
+  while (offset < text.length) {
+    if (text.codeUnitAt(offset) != 0x5c) {
+      offset += 1;
+      continue;
+    }
     final runStart = offset;
-    while (offset + 1 < text.length && text.codeUnitAt(offset + 1) == 0x5c) {
+    while (offset < text.length && text.codeUnitAt(offset) == 0x5c) {
       offset += 1;
     }
-    final runLength = offset - runStart + 1;
-    if (runLength.isEven || offset + 1 >= text.length) continue;
-    final escaped = text.codeUnitAt(offset + 1);
-    if (!_isAsciiPunctuation(escaped)) continue;
+    for (var pairStart = runStart; pairStart + 1 < offset; pairStart += 2) {
+      target.add(
+        _SyntaxToken(
+          pairStart,
+          pairStart + 1,
+          markerStyle,
+          inlineMarkerRange: TextRange(start: pairStart, end: pairStart + 2),
+        ),
+      );
+    }
+    final runLength = offset - runStart;
+    if (runLength.isEven ||
+        offset >= text.length ||
+        !_isAsciiPunctuation(text.codeUnitAt(offset))) {
+      continue;
+    }
+    final marker = offset - 1;
     target.add(
       _SyntaxToken(
-        offset,
-        offset + 1,
+        marker,
+        marker + 1,
         markerStyle,
-        inlineMarkerRange: TextRange(start: offset, end: offset + 2),
+        inlineMarkerRange: TextRange(start: marker, end: offset + 1),
       ),
     );
   }

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:markdown/markdown.dart' as md;
 
 import '../code_block.dart';
 import '../code_surface.dart';
@@ -5518,7 +5519,7 @@ int _tableCellDisplayScore(String source) {
 }
 
 String _tableCellDisplayText(String source) {
-  var visible = source.replaceAllMapped(
+  var visible = _protectTableCellEscapes(source).replaceAllMapped(
     RegExp(r'\[\[([^\]|]+)(?:\|([^\]]+))?\]\]'),
     (match) => match.group(2) ?? match.group(1) ?? '',
   );
@@ -5526,13 +5527,65 @@ String _tableCellDisplayText(String source) {
     RegExp(r'\[([^\]]+)\]\([^)]*\)'),
     (match) => match.group(1) ?? '',
   );
-  visible = visible.replaceAll(RegExp(r'[*_~=`]'), '');
   visible = visible.replaceAllMapped(
-    RegExp(r'\\(.)'),
+    RegExp(r'==((?:(?!\n[ \t]*\n)[^=])+?)=='),
     (match) => match.group(1) ?? '',
   );
-  return visible;
+  final document = md.Document(extensionSet: md.ExtensionSet.gitHubFlavored);
+  final plain = document
+      .parseInline(visible)
+      .map((node) => node.textContent)
+      .join();
+  return _restoreTableCellEscapes(plain);
 }
+
+const _tableEscapePlaceholderBase = 0xf0000;
+
+String _protectTableCellEscapes(String source) {
+  final output = StringBuffer();
+  var index = 0;
+  while (index < source.length) {
+    final character = source.codeUnitAt(index);
+    if (character != 0x5c) {
+      output.writeCharCode(character);
+      index += 1;
+      continue;
+    }
+
+    final runStart = index;
+    while (index < source.length && source.codeUnitAt(index) == 0x5c) {
+      index += 1;
+    }
+    final runLength = index - runStart;
+    for (var pair = 0; pair < runLength ~/ 2; pair += 1) {
+      output.writeCharCode(_tableEscapePlaceholderBase + 0x5c);
+    }
+    if (runLength.isEven) continue;
+    if (index < source.length &&
+        _isTableAsciiPunctuation(source.codeUnitAt(index))) {
+      output.writeCharCode(
+        _tableEscapePlaceholderBase + source.codeUnitAt(index),
+      );
+      index += 1;
+    } else {
+      output.writeCharCode(_tableEscapePlaceholderBase + 0x5c);
+    }
+  }
+  return output.toString();
+}
+
+String _restoreTableCellEscapes(String source) => String.fromCharCodes(
+  source.runes.map((rune) {
+    final restored = rune - _tableEscapePlaceholderBase;
+    return restored >= 0x21 && restored <= 0x7e ? restored : rune;
+  }),
+);
+
+bool _isTableAsciiPunctuation(int codeUnit) =>
+    (codeUnit >= 0x21 && codeUnit <= 0x2f) ||
+    (codeUnit >= 0x3a && codeUnit <= 0x40) ||
+    (codeUnit >= 0x5b && codeUnit <= 0x60) ||
+    (codeUnit >= 0x7b && codeUnit <= 0x7e);
 
 final class _EditableTableCell {
   const _EditableTableCell({

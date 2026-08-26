@@ -7671,10 +7671,11 @@ Inline ^[first], missing[^missing], standard[^a], repeated[^a], empty ^[], and s
     tester,
   ) async {
     final controller = IanvsMarkdownController(
-      text:
-          '| Left | Right |\n'
-          '| --- | ---: |\n'
-          '| **Bold** | Escaped \\| pipe |',
+      text: r'''| Left | Right |
+| --- | ---: |
+| **Bold** | Escaped \| pipe |
+| Double \\*em* | Triple \\\*literal* |
+| Non \\a | Plain |''',
     );
     addTearDown(controller.dispose);
     final semanticsHandle = tester.ensureSemantics();
@@ -7693,6 +7694,36 @@ Inline ^[first], missing[^missing], standard[^a], repeated[^a], empty ^[], and s
     expect(header.label, 'Left');
     expect(body.role, SemanticsRole.cell);
     expect(body.label, 'Escaped | pipe');
+    expect(
+      tester
+          .getSemantics(
+            find.byKey(
+              const ValueKey('ianvs-markdown-table-cell-semantics-2-0'),
+            ),
+          )
+          .label,
+      r'Double \em',
+    );
+    expect(
+      tester
+          .getSemantics(
+            find.byKey(
+              const ValueKey('ianvs-markdown-table-cell-semantics-2-1'),
+            ),
+          )
+          .label,
+      r'Triple \*literal*',
+    );
+    expect(
+      tester
+          .getSemantics(
+            find.byKey(
+              const ValueKey('ianvs-markdown-table-cell-semantics-3-0'),
+            ),
+          )
+          .label,
+      r'Non \a',
+    );
 
     final escapedFinder = find.byKey(
       const ValueKey('ianvs-markdown-table-1-1'),
