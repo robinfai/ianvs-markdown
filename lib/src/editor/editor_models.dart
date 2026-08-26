@@ -362,8 +362,13 @@ bool _isFrontMatterOpening(String text) => text.trim() == '---';
 bool _isDisplayMathFence(String text) =>
     RegExp(r'^ {0,3}\$\$[ \t]*$').hasMatch(text);
 
-bool _isAtxHeading(String text) =>
-    RegExp(r'^ {0,3}#{1,6}(?:\s+|$)').hasMatch(text);
+bool _isAtxHeading(String text) {
+  final opening = RegExp(r'^ {0,3}#{1,6}(?:[ \t]+|$)').firstMatch(text);
+  if (opening == null) return false;
+  var content = text.substring(opening.end).trimRight();
+  content = content.replaceFirst(RegExp(r'(?:^|[ \t]+)#+$'), '').trimRight();
+  return content.isNotEmpty;
+}
 
 bool _isSetextUnderline(String text) =>
     RegExp(r'^ {0,3}(?:=+|-+)\s*$').hasMatch(text);

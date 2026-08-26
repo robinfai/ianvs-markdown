@@ -3870,10 +3870,10 @@ void main() {
     );
   });
 
-  testWidgets('empty ATX prefix immediately paints its heading rail', (
+  testWidgets('marker-only ATX prefixes stay literal and use paragraph UI', (
     tester,
   ) async {
-    final controller = IanvsMarkdownController(text: '# ');
+    final controller = IanvsMarkdownController(text: '# \n\n###### \n\nBody');
     addTearDown(controller.dispose);
 
     await tester.pumpWidget(
@@ -3894,14 +3894,29 @@ void main() {
 
     expect(
       find.byKey(const ValueKey('ianvs-markdown-active-heading-rail')),
-      findsOneWidget,
+      findsNothing,
     );
     final field = tester.widget<TextField>(find.byType(TextField));
     expect(field.controller!.text, '# ');
-    expect(controller.text, '# ');
+    expect(field.style?.fontSize, lessThan(20));
+
+    await tester.tap(find.text('Body'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('#'), findsOneWidget);
+    expect(find.text('######'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-live-heading-rail-1')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-live-heading-rail-6')),
+      findsNothing,
+    );
+    expect(controller.text, '# \n\n###### \n\nBody');
   });
 
-  testWidgets('bare ATX markers wait for a space before entering heading UI', (
+  testWidgets('ATX markers enter heading UI only after title text', (
     tester,
   ) async {
     final controller = IanvsMarkdownController(text: '#\n\nBody');
@@ -3944,6 +3959,20 @@ void main() {
     field = tester.widget<TextField>(fieldFinder);
     expect(field.controller!.text, '# ');
     expect(controller.text, '# \n\nBody');
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-heading-rail')),
+      findsNothing,
+    );
+    expect(field.style?.fontSize, lessThan(20));
+
+    await tester.enterText(fieldFinder, '# Title');
+    await tester.pumpAndSettle();
+
+    active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    fieldFinder = find.descendant(of: active, matching: find.byType(TextField));
+    field = tester.widget<TextField>(fieldFinder);
+    expect(field.controller!.text, '# Title');
+    expect(controller.text, '# Title\n\nBody');
     expect(
       find.byKey(const ValueKey('ianvs-markdown-active-heading-rail')),
       findsOneWidget,

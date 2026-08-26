@@ -812,6 +812,9 @@ class IanvsMarkdownEditingFormatter extends TextInputFormatter {
     final smartUrlPaste = formatSmartUrlPasteEdit(oldValue, newValue);
     if (smartUrlPaste != null) return smartUrlPaste;
 
+    final atxHeadingBackspace = _formatAtxHeadingBackspace(oldValue, newValue);
+    if (atxHeadingBackspace != null) return atxHeadingBackspace;
+
     final indentBackspace = _formatStructuralIndentBackspace(
       oldValue,
       newValue,
@@ -1166,6 +1169,52 @@ class IanvsMarkdownEditingFormatter extends TextInputFormatter {
       result,
       touchedLineStarts: {lineStart},
       movedLineStarts: {lineStart},
+    );
+  }
+
+  TextEditingValue? _formatAtxHeadingBackspace(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (!oldValue.selection.isValid ||
+        !oldValue.selection.isCollapsed ||
+        !newValue.selection.isValid ||
+        !newValue.selection.isCollapsed ||
+        oldValue.text.length != newValue.text.length + 1) {
+      return null;
+    }
+
+    final oldCaret = oldValue.selection.extentOffset;
+    final newCaret = newValue.selection.extentOffset;
+    if (oldCaret <= 0 ||
+        newCaret != oldCaret - 1 ||
+        newValue.text !=
+            oldValue.text.replaceRange(oldCaret - 1, oldCaret, '')) {
+      return null;
+    }
+
+    final lineStart = oldValue.text.lastIndexOf('\n', oldCaret - 1) + 1;
+    final lineBreak = oldValue.text.indexOf('\n', lineStart);
+    final lineEnd = lineBreak < 0 ? oldValue.text.length : lineBreak;
+    final line = oldValue.text.substring(lineStart, lineEnd);
+    final heading = RegExp(r'^( {0,3})(#{1,6})([ \t]+)(?=\S)').firstMatch(line);
+    if (heading == null || lineStart + heading.end != oldCaret) return null;
+
+    final indent = heading.group(1)!;
+    final markers = heading.group(2)!;
+    final spacing = heading.group(3)!;
+    final replacement = markers.length == 1
+        ? indent
+        : '$indent${markers.substring(1)}$spacing';
+    return TextEditingValue(
+      text: oldValue.text.replaceRange(
+        lineStart,
+        lineStart + heading.end,
+        replacement,
+      ),
+      selection: TextSelection.collapsed(
+        offset: lineStart + replacement.length,
+      ),
     );
   }
 

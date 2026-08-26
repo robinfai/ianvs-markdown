@@ -3033,7 +3033,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             ),
           ]
         : const <_HiddenMarkerSpan>[];
-    var activeTextStyle = _isBareAtxHeadingSource(block.source)
+    var activeTextStyle = _isEmptyAtxHeadingSource(block.source)
         ? (styleSheet.p ?? const TextStyle(fontSize: 14.5, height: 1.58))
               .copyWith(color: colors.textPrimary)
         : _activeBlockTextStyle(block, styleSheet, colors);
@@ -3555,6 +3555,12 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       document: widget.controller.text,
     );
     var source = footnoteDefinition ?? block.source;
+    if (footnoteDefinition == null && _isEmptyAtxHeadingSource(source)) {
+      // Obsidian keeps marker-only ATX prefixes literal in Live Preview. The
+      // Markdown renderer otherwise interprets them as empty headings and
+      // drops the hashes, so escape only the first marker for display.
+      source = source.replaceFirst('#', r'\#');
+    }
     if (footnoteDefinition == null) {
       source = source
           .split('\n')
@@ -3872,22 +3878,27 @@ int? _headingLevelForSource(String source) {
       ? source
       : source.substring(0, firstLineEnd);
   final atx = RegExp(r'^ {0,3}(#{1,6})(?:[ \t]+|$)').firstMatch(firstLine);
-  if (atx != null) return atx.group(1)!.length;
+  if (atx != null) {
+    final headings = parseMarkdownHeadings(firstLine);
+    return headings.isEmpty ? null : headings.first.level;
+  }
   final headings = parseMarkdownHeadings(source);
   return headings.isEmpty ? null : headings.first.level;
 }
 
-int? _activeHeadingLevelForSource(String source) {
-  if (_isBareAtxHeadingSource(source)) return null;
-  return _headingLevelForSource(source);
-}
+int? _activeHeadingLevelForSource(String source) =>
+    _headingLevelForSource(source);
 
-bool _isBareAtxHeadingSource(String source) {
+bool _isEmptyAtxHeadingSource(String source) {
   final firstLineEnd = source.indexOf('\n');
   final firstLine = firstLineEnd < 0
       ? source
       : source.substring(0, firstLineEnd);
-  return RegExp(r'^ {0,3}#{1,6}$').hasMatch(firstLine);
+  final opening = RegExp(r'^ {0,3}#{1,6}(?:[ \t]+|$)').firstMatch(firstLine);
+  if (opening == null) return false;
+  var content = firstLine.substring(opening.end).trimRight();
+  content = content.replaceFirst(RegExp(r'(?:^|[ \t]+)#+$'), '').trimRight();
+  return content.isEmpty;
 }
 
 String? _setextHeadingUnderline(String source) {

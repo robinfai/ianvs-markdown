@@ -772,6 +772,41 @@ void main() {
       }
     });
 
+    test('Backspace steps down ATX levels before leaving heading syntax', () {
+      const h2 = TextEditingValue(
+        text: '## H2 ATX',
+        selection: TextSelection.collapsed(offset: 3),
+      );
+      final h1 = formatter.formatEditUpdate(
+        h2,
+        const TextEditingValue(
+          text: '##H2 ATX',
+          selection: TextSelection.collapsed(offset: 2),
+        ),
+      );
+      expect(
+        h1,
+        const TextEditingValue(
+          text: '# H2 ATX',
+          selection: TextSelection.collapsed(offset: 2),
+        ),
+      );
+
+      expect(
+        formatter.formatEditUpdate(
+          h1,
+          const TextEditingValue(
+            text: '#H2 ATX',
+            selection: TextSelection.collapsed(offset: 1),
+          ),
+        ),
+        const TextEditingValue(
+          text: 'H2 ATX',
+          selection: TextSelection.collapsed(offset: 0),
+        ),
+      );
+    });
+
     test('Backspace retreats code indentation to the previous tab stop', () {
       const fourSpaces = TextEditingValue(
         text: '```dart\n    alpha\n```',

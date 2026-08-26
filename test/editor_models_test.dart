@@ -79,6 +79,25 @@ final value = 1;
     expect(markdownGapLineCount(source, blocks.first, blocks[1]), 2);
   });
 
+  test('keeps marker-only ATX prefixes as literal paragraphs', () {
+    const source = '# \n\n###### \n\n#\n\n# #\n\n# Title';
+
+    final blocks = parseMarkdownBlocks(source);
+
+    expect(blocks.map((block) => block.source), <String>[
+      '# ',
+      '###### ',
+      '#',
+      '# #',
+      '# Title',
+    ]);
+    expect(
+      blocks.take(4).map((block) => block.type),
+      everyElement(IanvsMarkdownBlockType.paragraph),
+    );
+    expect(blocks.last.type, IanvsMarkdownBlockType.heading);
+  });
+
   test('accepts the shortest alignment markers Obsidian emits', () {
     const source = '| A | B | C |\n| :-: | --: | :-- |\n| 1 | 2 | 3 |';
 
