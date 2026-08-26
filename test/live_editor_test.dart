@@ -7148,8 +7148,8 @@ Standard[^note] and inline ^[inline body].
     await tester.tap(boldFinder);
     await tester.pump();
     expect(
-      tester.widget<TextField>(boldFinder).controller?.selection,
-      const TextSelection(baseOffset: 0, extentOffset: 8),
+      tester.widget<TextField>(boldFinder).controller?.selection.isCollapsed,
+      isTrue,
     );
     boldSpan = span().children!.cast<TextSpan>().toList();
     expect(
@@ -7157,6 +7157,49 @@ Standard[^note] and inline ^[inline body].
           .where((item) => item.text == '**')
           .every((item) => item.style?.fontSize == 13.5),
       isTrue,
+    );
+  });
+
+  testWidgets('first table cell click keeps its visual caret position', (
+    tester,
+  ) async {
+    final controller = IanvsMarkdownController(
+      text:
+          '| Left | Center |\n'
+          '| --- | --- |\n'
+          '| abcdefghij | alpha beta |',
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final first = find.byKey(const ValueKey('ianvs-markdown-table-1-0'));
+    final firstField = tester.widget<TextField>(first);
+    final editable = editableWithin(tester, first);
+    final caret = editable.getLocalRectForCaret(
+      const TextPosition(offset: 5),
+    );
+    await tester.tapAt(
+      editable.localToGlobal(Offset(caret.left, caret.center.dy)),
+    );
+    await tester.pump();
+
+    expect(firstField.focusNode?.hasFocus, isTrue);
+    expect(
+      firstField.controller?.selection,
+      const TextSelection.collapsed(offset: 5),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    final second = tester.widget<TextField>(
+      find.byKey(const ValueKey('ianvs-markdown-table-1-1')),
+    );
+    expect(second.focusNode?.hasFocus, isTrue);
+    expect(
+      second.controller?.selection,
+      const TextSelection(baseOffset: 0, extentOffset: 10),
     );
   });
 

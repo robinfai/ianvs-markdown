@@ -4202,7 +4202,6 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
   late _EditableTableModel _model;
   String? _pendingFocusKey;
   _TableFocusPlacement _pendingFocusPlacement = _TableFocusPlacement.start;
-  String? _focusedCellAtPointerDown;
   _TableDragAxis? _dragAxis;
   int? _dragSourceIndex;
   int? _dragTargetIndex;
@@ -4716,8 +4715,6 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                                   behavior: HitTestBehavior.translucent,
                                   onPointerDown: (_) {
                                     _clearTableSelection();
-                                    _focusedCellAtPointerDown =
-                                        focusNode.hasFocus ? cell.key : null;
                                   },
                                   child: TextField(
                                     key: ValueKey(
@@ -4758,16 +4755,6 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                                         vertical: 4.5,
                                       ),
                                     ),
-                                    onTap: () {
-                                      if (_focusedCellAtPointerDown !=
-                                          cell.key) {
-                                        controller.selection = TextSelection(
-                                          baseOffset: 0,
-                                          extentOffset: controller.text.length,
-                                        );
-                                      }
-                                      _focusedCellAtPointerDown = null;
-                                    },
                                     onChanged: (value) =>
                                         widget.onCellChanged(cell, value),
                                   ),
