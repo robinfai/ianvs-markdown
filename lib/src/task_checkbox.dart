@@ -49,11 +49,6 @@ class _IanvsMarkdownTaskCheckboxState extends State<IanvsMarkdownTaskCheckbox> {
 
   void _toggle() => widget.onChanged?.call(!widget.value);
 
-  void _activateFromPointer() {
-    _focusNode.requestFocus();
-    _toggle();
-  }
-
   @override
   void initState() {
     super.initState();
@@ -189,7 +184,10 @@ class _IanvsMarkdownTaskCheckboxState extends State<IanvsMarkdownTaskCheckbox> {
         },
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: _enabled ? _activateFromPointer : null,
+          // CodeMirror decorations toggle tasks without stealing the caret
+          // from the editor. The control remains keyboard-focusable through
+          // normal focus traversal, but a pointer click preserves text focus.
+          onTap: _enabled ? _toggle : null,
           child: box,
         ),
       ),

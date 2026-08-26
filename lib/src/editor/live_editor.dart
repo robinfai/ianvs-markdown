@@ -2978,14 +2978,14 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     final activeCodeRadius = colors.smallRadius / 2;
     final taskMarker = block.type == IanvsMarkdownBlockType.taskList
         ? RegExp(
-            r'^( {0,3})(?:[-+*]|\d{1,9}[.)])\s+\[([^\r\n])\][ \t]*',
+            r'^([ \t]*)(?:[-+*]|\d{1,9}[.)])\s+\[([^\r\n])\][ \t]*',
           ).firstMatch(block.source)
         : null;
     final unorderedMarker = block.type == IanvsMarkdownBlockType.unorderedList
-        ? RegExp(r'^( {0,3})[-+*][ \t]+').firstMatch(block.source)
+        ? RegExp(r'^([ \t]*)[-+*][ \t]+').firstMatch(block.source)
         : null;
     final orderedMarker = block.type == IanvsMarkdownBlockType.orderedList
-        ? RegExp(r'^( {0,3})(\d{1,9})([.)])[ \t]+').firstMatch(block.source)
+        ? RegExp(r'^([ \t]*)(\d{1,9})([.)])[ \t]+').firstMatch(block.source)
         : null;
     final quoteMarker = block.type == IanvsMarkdownBlockType.blockquote
         ? RegExp(r'^( {0,3})>[ \t]?').firstMatch(block.source)
@@ -3129,12 +3129,12 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             child: SizedBox(
               key: const ValueKey('ianvs-markdown-active-list-marker'),
               width: 28,
-              child: Text(
-                _activeUnorderedListMarker(listNestingLevel),
-                textAlign: TextAlign.center,
-                style: activeTextStyle.copyWith(
+              child: Center(
+                child: IanvsMarkdownUnorderedListMarker(
+                  nestLevel: listNestingLevel,
                   color: colors.textSecondary,
-                  decoration: TextDecoration.none,
+                  fontSize: activeTextStyle.fontSize ?? 14.5,
+                  height: activeTextStyle.height ?? 1.58,
                 ),
               ),
             ),
@@ -3580,6 +3580,17 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             return '${task.group(1)}~~$content~~';
           })
           .join('\n');
+    }
+    if (block.type == IanvsMarkdownBlockType.unorderedList ||
+        block.type == IanvsMarkdownBlockType.orderedList ||
+        block.type == IanvsMarkdownBlockType.taskList) {
+      // Live Preview projects each nested source item as its own visual row.
+      // Outer padding and listNestingOffset carry the structural depth; the
+      // standalone Markdown renderer must therefore receive a root marker.
+      source = source.replaceFirst(
+        RegExp(r'^[ \t]+(?=(?:[-+*]|\d{1,9}[.)])[ \t]+)'),
+        '',
+      );
     }
     if (block.type == IanvsMarkdownBlockType.fencedCode ||
         block.type == IanvsMarkdownBlockType.indentedCode ||
@@ -4448,13 +4459,6 @@ int _liveListIndentationColumns(String source) {
   }
   return columns;
 }
-
-String _activeUnorderedListMarker(int nestingLevel) =>
-    switch (nestingLevel % 3) {
-      0 => '•',
-      1 => '-',
-      _ => '◦',
-    };
 
 class _EditableMarkdownTable extends StatefulWidget {
   const _EditableMarkdownTable({

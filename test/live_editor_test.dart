@@ -4403,16 +4403,16 @@ empty:
     expect(prefix.style?.color, Colors.transparent);
     expect(
       tester
-          .widget<Text>(
+          .widget<IanvsMarkdownUnorderedListMarker>(
             find.descendant(
               of: find.byKey(
                 const ValueKey('ianvs-markdown-active-list-marker'),
               ),
-              matching: find.byType(Text),
+              matching: find.byType(IanvsMarkdownUnorderedListMarker),
             ),
           )
-          .data,
-      '•',
+          .shape,
+      IanvsMarkdownUnorderedListMarkerShape.circle,
     );
 
     await tester.tap(find.text('First'));
@@ -5254,21 +5254,30 @@ Standard[^note] and inline ^[inline body].
 
     expect(controller.text, '- Alpha\n    - Beta');
     expect(controller.selection, const TextSelection.collapsed(offset: 18));
+    expect(field.controller?.text, '    - Beta');
     expect(field.controller?.selection.isCollapsed, isTrue);
-    expect(field.controller?.selection.extentOffset, 18);
+    expect(field.controller?.selection.extentOffset, 10);
     expect(
       tester
-          .widget<Text>(
+          .widget<IanvsMarkdownUnorderedListMarker>(
             find.descendant(
               of: find.byKey(
                 const ValueKey('ianvs-markdown-active-list-marker'),
               ),
-              matching: find.byType(Text),
+              matching: find.byType(IanvsMarkdownUnorderedListMarker),
             ),
           )
-          .data,
-      '•',
+          .shape,
+      IanvsMarkdownUnorderedListMarkerShape.square,
     );
+
+    await tester.tap(find.text('Alpha'));
+    await tester.pumpAndSettle();
+    final nestedMarker = tester.widget<IanvsMarkdownUnorderedListMarker>(
+      find.byKey(const ValueKey('ianvs-markdown-unordered-marker-1')),
+    );
+    expect(nestedMarker.shape, IanvsMarkdownUnorderedListMarkerShape.square);
+    expect(find.text('Beta'), findsOneWidget);
   });
 
   testWidgets('Tab indents inside quote containers and Shift Tab reverses it', (
@@ -5479,9 +5488,44 @@ Standard[^note] and inline ^[inline body].
 
       await tester.sendKeyEvent(LogicalKeyboardKey.space);
       await tester.pump();
-      expect(controller.text, '- [ ] Open');
+      expect(controller.text, '- [x] Open');
     },
   );
+
+  testWidgets('active task checkbox preserves the editor caret focus', (
+    tester,
+  ) async {
+    final controller = IanvsMarkdownController(text: '- [ ] Open');
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Open'));
+    await tester.pump();
+    var active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    var fieldFinder = find.descendant(
+      of: active,
+      matching: find.byType(TextField),
+    );
+    expect(tester.widget<TextField>(fieldFinder).focusNode?.hasFocus, isTrue);
+
+    await tester.tap(
+      find.descendant(
+        of: active,
+        matching: find.byType(IanvsMarkdownTaskCheckbox),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(controller.text, '- [x] Open');
+    active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    fieldFinder = find.descendant(of: active, matching: find.byType(TextField));
+    expect(tester.widget<TextField>(fieldFinder).focusNode?.hasFocus, isTrue);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pump();
+    expect(controller.text, '- [x] Open');
+  });
 
   testWidgets('alternate task states preserve markers and toggle exact items', (
     tester,
@@ -5557,7 +5601,7 @@ Standard[^note] and inline ^[inline body].
 
     await tester.sendKeyEvent(LogicalKeyboardKey.space);
     await tester.pump();
-    expect(controller.text, '- [!] Critical\n- [x] Moving\n- [-] Cancelled');
+    expect(controller.text, '- [!] Critical\n- [ ] Moving\n- [-] Cancelled');
   });
 
   testWidgets('ordered alternate tasks stay visual and continue unchecked', (
@@ -7284,16 +7328,16 @@ Standard[^note] and inline ^[inline body].
     final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
     final field = find.descendant(of: active, matching: find.byType(TextField));
     final activatedField = tester.widget<TextField>(field);
-    expect(activatedField.controller!.text, '1. A\n    1. B\n    2. C');
+    expect(activatedField.controller!.text, '    1. B');
     activatedField.controller!.selection = const TextSelection.collapsed(
-      offset: 13,
+      offset: 8,
     );
     await tester.pump();
 
     tester.testTextInput.updateEditingValue(
       const TextEditingValue(
-        text: '1. A\n    1. B\n\n    2. C',
-        selection: TextSelection.collapsed(offset: 14),
+        text: '    1. B\n',
+        selection: TextSelection.collapsed(offset: 9),
       ),
     );
     await tester.pumpAndSettle();
@@ -7301,9 +7345,9 @@ Standard[^note] and inline ^[inline body].
 
     final activeField = tester.widget<TextField>(field);
     final beforeOutdent = activeField.controller!.text;
-    expect(beforeOutdent, '1. A\n    1. B\n    2. \n    3. C');
+    expect(beforeOutdent, '    2. ');
     final localCaret = activeField.controller!.selection.extentOffset;
-    expect(localCaret, 21);
+    expect(localCaret, 7);
     tester.testTextInput.updateEditingValue(
       TextEditingValue(
         text: beforeOutdent.replaceRange(localCaret, localCaret, '\n'),

@@ -3,6 +3,117 @@ import 'dart:math' as math;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
+/// Border-theme shapes used for unordered-list nesting levels.
+enum IanvsMarkdownUnorderedListMarkerShape { circle, square, diamond, ring }
+
+/// Paints the compact unordered-list marker used by Obsidian's Border theme.
+///
+/// Source markers (`-`, `*`, and `+`) share the same visual shape. The first
+/// three nesting levels are a filled circle, square, and diamond; deeper
+/// levels use Border's hollow circular fallback.
+class IanvsMarkdownUnorderedListMarker extends StatelessWidget {
+  const IanvsMarkdownUnorderedListMarker({
+    super.key,
+    required this.nestLevel,
+    required this.color,
+    this.fontSize = 14.5,
+    this.height = 1.58,
+  });
+
+  final int nestLevel;
+  final Color color;
+  final double fontSize;
+  final double height;
+
+  IanvsMarkdownUnorderedListMarkerShape get shape => switch (nestLevel) {
+    0 => IanvsMarkdownUnorderedListMarkerShape.circle,
+    1 => IanvsMarkdownUnorderedListMarkerShape.square,
+    2 => IanvsMarkdownUnorderedListMarkerShape.diamond,
+    _ => IanvsMarkdownUnorderedListMarkerShape.ring,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: fontSize,
+      child: CustomPaint(
+        painter: _IanvsMarkdownUnorderedListMarkerPainter(
+          shape: shape,
+          color: color,
+          fontSize: fontSize,
+        ),
+        // Retain text-line metrics and a baseline for the Markdown list row.
+        child: Text(
+          '\u2007',
+          style: TextStyle(
+            color: const Color(0x00000000),
+            fontSize: fontSize,
+            height: height,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _IanvsMarkdownUnorderedListMarkerPainter extends CustomPainter {
+  const _IanvsMarkdownUnorderedListMarkerPainter({
+    required this.shape,
+    required this.color,
+    required this.fontSize,
+  });
+
+  final IanvsMarkdownUnorderedListMarkerShape shape;
+  final Color color;
+  final double fontSize;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    final center = size.center(Offset.zero);
+    final bulletSize = fontSize * .3;
+    final paint = Paint()
+      ..color = color
+      ..isAntiAlias = true;
+    switch (shape) {
+      case IanvsMarkdownUnorderedListMarkerShape.circle:
+        canvas.drawCircle(center, bulletSize / 2, paint);
+      case IanvsMarkdownUnorderedListMarkerShape.square:
+        canvas.drawRect(
+          Rect.fromCenter(
+            center: center,
+            width: bulletSize,
+            height: bulletSize,
+          ),
+          paint,
+        );
+      case IanvsMarkdownUnorderedListMarkerShape.diamond:
+        final radius = bulletSize / 1.4142135623730951;
+        final path = Path()
+          ..moveTo(center.dx, center.dy - radius)
+          ..lineTo(center.dx + radius, center.dy)
+          ..lineTo(center.dx, center.dy + radius)
+          ..lineTo(center.dx - radius, center.dy)
+          ..close();
+        canvas.drawPath(path, paint);
+      case IanvsMarkdownUnorderedListMarkerShape.ring:
+        paint
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = bulletSize / 2;
+        canvas.drawCircle(center, bulletSize / 2, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(
+    covariant _IanvsMarkdownUnorderedListMarkerPainter oldDelegate,
+  ) {
+    return shape != oldDelegate.shape ||
+        color != oldDelegate.color ||
+        fontSize != oldDelegate.fontSize;
+  }
+}
+
 /// One painted Border/Obsidian indentation-guide segment.
 typedef IanvsMarkdownListGuideSegment = ({Offset start, Offset end, int level});
 

@@ -93,7 +93,10 @@ List<IanvsMarkdownBlock> parseMarkdownBlocks(
     }
 
     final first = index;
-    final type = _classifyBlock(lines, first);
+    final nestedListType = splitListItems
+        ? _nestedListItemType(lines, first, blocks)
+        : null;
+    final type = nestedListType ?? _classifyBlock(lines, first);
     final last = switch (type) {
       IanvsMarkdownBlockType.frontMatter => _frontMatterEnd(lines, first),
       IanvsMarkdownBlockType.fencedCode => _fencedCodeEnd(lines, first),
@@ -292,7 +295,7 @@ int _listItemEnd(List<_SourceLine> lines, int first) {
   var last = first;
   for (var index = first + 1; index < lines.length; index += 1) {
     final text = lines[index].text;
-    if (text.trim().isEmpty || _isUnorderedList(text) || _isOrderedList(text)) {
+    if (text.trim().isEmpty || _listItemTypeAtAnyIndent(text) != null) {
       break;
     }
     if (_isIndentedContinuation(text)) {
@@ -302,6 +305,37 @@ int _listItemEnd(List<_SourceLine> lines, int first) {
     break;
   }
   return last;
+}
+
+IanvsMarkdownBlockType? _nestedListItemType(
+  List<_SourceLine> lines,
+  int index,
+  List<IanvsMarkdownBlock> blocks,
+) {
+  if (index <= 0 ||
+      blocks.isEmpty ||
+      blocks.last.lastLine != index - 1 ||
+      lines[index - 1].text.trim().isEmpty) {
+    return null;
+  }
+  final previousType = blocks.last.type;
+  if (previousType != IanvsMarkdownBlockType.unorderedList &&
+      previousType != IanvsMarkdownBlockType.orderedList &&
+      previousType != IanvsMarkdownBlockType.taskList) {
+    return null;
+  }
+  return _listItemTypeAtAnyIndent(lines[index].text);
+}
+
+IanvsMarkdownBlockType? _listItemTypeAtAnyIndent(String text) {
+  final marker = RegExp(
+    r'^[ \t]*(?:([-+*])|(\d{1,9})[.)])[ \t]+(\[[^\r\n]\](?:[ \t]+|$))?',
+  ).firstMatch(text);
+  if (marker == null) return null;
+  if (marker.group(3) != null) return IanvsMarkdownBlockType.taskList;
+  return marker.group(1) != null
+      ? IanvsMarkdownBlockType.unorderedList
+      : IanvsMarkdownBlockType.orderedList;
 }
 
 int _tableEnd(List<_SourceLine> lines, int first) {

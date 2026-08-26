@@ -377,7 +377,11 @@ class IanvsMarkdown extends StatelessWidget {
         nestLevel: listNestingOffset + parameters.nestLevel,
         child:
             bulletBuilder?.call(parameters) ??
-            _IanvsMarkdownListMarker(parameters: parameters, theme: colors),
+            _IanvsMarkdownListMarker(
+              parameters: parameters,
+              nestLevel: listNestingOffset + parameters.nestLevel,
+              theme: colors,
+            ),
       ),
       builders: effectiveBuilders,
       paddingBuilders: paddingBuilders,
@@ -600,35 +604,32 @@ String _appendProjectedTableCell(String source, {required bool separator}) {
 class _IanvsMarkdownListMarker extends StatelessWidget {
   const _IanvsMarkdownListMarker({
     required this.parameters,
+    required this.nestLevel,
     required this.theme,
   });
 
   final MarkdownBulletParameters parameters;
+  final int nestLevel;
   final IanvsMarkdownThemeData theme;
 
   @override
   Widget build(BuildContext context) {
     final ordered = parameters.style == BulletStyle.orderedList;
-    final label = ordered
-        ? '${parameters.index + 1}.'
-        : _unorderedListMarker(parameters.nestLevel);
+    if (!ordered) {
+      return IanvsMarkdownUnorderedListMarker(
+        key: ValueKey('ianvs-markdown-unordered-marker-$nestLevel'),
+        nestLevel: nestLevel,
+        color: theme.textSecondary,
+      );
+    }
     return Text(
-      label,
-      key: ValueKey(
-        'ianvs-markdown-${ordered ? 'ordered' : 'unordered'}-marker-'
-        '${parameters.nestLevel}',
-      ),
-      textAlign: ordered ? TextAlign.right : TextAlign.center,
+      '${parameters.index + 1}.',
+      key: ValueKey('ianvs-markdown-ordered-marker-$nestLevel'),
+      textAlign: TextAlign.right,
       style: TextStyle(color: theme.textPrimary, fontSize: 14.5, height: 1.58),
     );
   }
 }
-
-String _unorderedListMarker(int nestingLevel) => switch (nestingLevel % 3) {
-  0 => '•',
-  1 => '-',
-  _ => '◦',
-};
 
 /// A full document renderer with scrolling, YAML front matter, and an outline.
 ///

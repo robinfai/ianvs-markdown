@@ -2860,24 +2860,21 @@ Done.
     tester,
   ) async {
     await tester.pumpWidget(
-      app(const IanvsMarkdown(data: '- Parent\n  - Nested\n    - Deep')),
+      app(
+        const IanvsMarkdown(
+          data: '- Parent\n  - Nested\n    - Deep\n      - Deeper',
+        ),
+      ),
     );
 
-    expect(
-      find.byKey(const ValueKey('ianvs-markdown-unordered-marker-0')),
-      findsOneWidget,
+    IanvsMarkdownUnorderedListMarker marker(int level) => tester.widget(
+      find.byKey(ValueKey('ianvs-markdown-unordered-marker-$level')),
     );
-    expect(
-      find.byKey(const ValueKey('ianvs-markdown-unordered-marker-1')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('ianvs-markdown-unordered-marker-2')),
-      findsOneWidget,
-    );
-    expect(find.text('•'), findsOneWidget);
-    expect(find.text('-'), findsOneWidget);
-    expect(find.text('◦'), findsOneWidget);
+
+    expect(marker(0).shape, IanvsMarkdownUnorderedListMarkerShape.circle);
+    expect(marker(1).shape, IanvsMarkdownUnorderedListMarkerShape.square);
+    expect(marker(2).shape, IanvsMarkdownUnorderedListMarkerShape.diamond);
+    expect(marker(3).shape, IanvsMarkdownUnorderedListMarkerShape.ring);
   });
 }
 

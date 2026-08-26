@@ -281,19 +281,21 @@ final value = 1;
   });
 
   test('live-preview projection can split contiguous lists into items', () {
-    const source = '- first\n- [ ] second\n  - nested';
+    const source = '- first\n- [ ] second\n  - nested\n    - deep';
 
     final blocks = parseMarkdownBlocks(source, splitListItems: true);
 
-    expect(blocks, hasLength(3));
+    expect(blocks, hasLength(4));
     expect(blocks.map((block) => block.source), <String>[
       '- first',
       '- [ ] second',
       '  - nested',
+      '    - deep',
     ]);
     expect(blocks.map((block) => block.type), <IanvsMarkdownBlockType>[
       IanvsMarkdownBlockType.unorderedList,
       IanvsMarkdownBlockType.taskList,
+      IanvsMarkdownBlockType.unorderedList,
       IanvsMarkdownBlockType.unorderedList,
     ]);
   });
