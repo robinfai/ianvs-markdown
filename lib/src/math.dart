@@ -175,20 +175,13 @@ class IanvsMarkdownMath extends StatelessWidget {
           ),
           mathStyle: displayMode ? MathStyle.display : MathStyle.text,
           textStyle: effectiveStyle,
-          onErrorFallback: (_) => DecoratedBox(
+          // Obsidian keeps malformed TeX readable as ordinary source text. A
+          // neutral fallback also avoids turning an editing mistake into a
+          // visually dominant warning badge.
+          onErrorFallback: (_) => Text(
+            expression,
             key: const ValueKey('ianvs-markdown-math-error'),
-            decoration: BoxDecoration(
-              color: const Color(0xffffc107),
-              borderRadius: BorderRadius.circular(2),
-            ),
-            child: Text(
-              expression,
-              style: effectiveStyle.copyWith(
-                color: const Color(0xff302900),
-                fontFamily: colors.monoFontFamily,
-                fontFamilyFallback: colors.monoFontFamilyFallback,
-              ),
-            ),
+            style: effectiveStyle,
           ),
         );
 

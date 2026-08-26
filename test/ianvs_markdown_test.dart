@@ -2035,7 +2035,7 @@ $$
     );
   });
 
-  testWidgets('invalid TeX uses an Obsidian-style visible fallback', (
+  testWidgets('invalid TeX falls back to neutral source text like Obsidian', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -2048,6 +2048,16 @@ $$
       findsOneWidget,
     );
     expect(find.text(r'\frac{1}{'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is DecoratedBox &&
+            widget.decoration is BoxDecoration &&
+            (widget.decoration as BoxDecoration).color ==
+                const Color(0xffffc107),
+      ),
+      findsNothing,
+    );
   });
 
   testWidgets('styles host-resolved missing Wiki links like Obsidian', (
