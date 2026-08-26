@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../code_block.dart';
+import '../footnote_syntax.dart';
 import '../obsidian_autolink.dart';
 import '../obsidian_html.dart';
 import '../wiki_link_reference.dart';
@@ -2533,14 +2534,35 @@ List<_SyntaxToken> _markdownSyntaxTokens(
     inlineStructuralRanges.add(TextRange(start: match.start, end: match.end));
     tokens.add(_SyntaxToken(match.start, match.end, theme.comment));
   }
-  final footnotePattern = RegExp(
-    r'\[\^[^\]\n]+\](?::)?|\^\[[^\]\n]+\]',
-    multiLine: true,
-  );
-  for (final match in footnotePattern.allMatches(text)) {
+  final standardFootnotePattern = RegExp(r'\[\^[^\] \r\n\x00\t]+\](?::)?');
+  for (final match in standardFootnotePattern.allMatches(text)) {
     if (_overlapsAnyRange(match.start, match.end, excludedRanges)) continue;
     inlineStructuralRanges.add(TextRange(start: match.start, end: match.end));
     tokens.add(_SyntaxToken(match.start, match.end, theme.comment));
+  }
+  var inlineFootnoteStart = text.indexOf('^[');
+  while (inlineFootnoteStart >= 0) {
+    if (!_overlapsAnyRange(
+          inlineFootnoteStart,
+          inlineFootnoteStart + 2,
+          excludedRanges,
+        ) &&
+        !isIanvsMarkdownEscapedAt(text, inlineFootnoteStart)) {
+      final close = findIanvsMarkdownInlineFootnoteEnd(
+        text,
+        inlineFootnoteStart + 2,
+      );
+      if (close >= 0) {
+        final end = close + 1;
+        inlineStructuralRanges.add(
+          TextRange(start: inlineFootnoteStart, end: end),
+        );
+        tokens.add(_SyntaxToken(inlineFootnoteStart, end, theme.comment));
+        inlineFootnoteStart = text.indexOf('^[', end);
+        continue;
+      }
+    }
+    inlineFootnoteStart = text.indexOf('^[', inlineFootnoteStart + 2);
   }
   final codeExcludedRanges = <TextRange>[
     ...excludedRanges,

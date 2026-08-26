@@ -5345,6 +5345,29 @@ Standard[^note] and inline ^[inline body].
     expect(field.controller?.text, 'Visible %%secret%% after. ^block-id');
   });
 
+  testWidgets('live preview shares mixed footnote numbering', (tester) async {
+    const source = '''
+Inline ^[first], missing[^missing], standard[^a], repeated[^a], empty ^[], and second[^b].
+
+[^a]: Alpha.
+
+[^b]: Beta.
+''';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    expect(find.text('^[first]'), findsOneWidget);
+    expect(find.text('[^missing]'), findsOneWidget);
+    expect(find.text('^[]'), findsOneWidget);
+    expect(find.text('2.'), findsOneWidget);
+    expect(find.text('4.'), findsOneWidget);
+    expect(find.textContaining('Alpha.'), findsOneWidget);
+    expect(find.textContaining('Beta.'), findsOneWidget);
+  });
+
   testWidgets('Tab indents an active list item without selecting its text', (
     tester,
   ) async {

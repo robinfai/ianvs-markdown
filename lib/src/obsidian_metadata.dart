@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
+import 'footnote_syntax.dart';
 import 'theme.dart';
 
 /// Determines whether Obsidian editing metadata is shown or consumed.
@@ -50,9 +51,35 @@ final class IanvsMarkdownEditingMetadataInlineSyntax extends md.InlineSyntax {
 
   IanvsMarkdownEditingMetadataInlineSyntax.inlineFootnote()
     : kind = 'inline-footnote',
-      super(r'\^\[[^\]\n]+\]', startCharacter: 0x5e);
+      super(r'\^\[', startCharacter: 0x5e);
 
   final String kind;
+
+  @override
+  bool tryMatch(md.InlineParser parser, [int? startMatchPos]) {
+    if (kind != 'inline-footnote') {
+      return super.tryMatch(parser, startMatchPos);
+    }
+    final start = startMatchPos ?? parser.pos;
+    final source = parser.source;
+    if (start != parser.pos ||
+        start + 1 >= source.length ||
+        source.codeUnitAt(start) != 0x5e ||
+        source.codeUnitAt(start + 1) != 0x5b ||
+        isIanvsMarkdownEscapedAt(source, start)) {
+      return false;
+    }
+    final close = findIanvsMarkdownInlineFootnoteEnd(source, start + 2);
+    if (close < 0) return false;
+    parser.writeText();
+    final literal = source.substring(start, close + 1);
+    final element = md.Element.text('ianvs-editing-metadata', literal)
+      ..attributes['kind'] = kind;
+    parser
+      ..addNode(element)
+      ..consume(close + 1 - start);
+    return true;
+  }
 
   @override
   bool onMatch(md.InlineParser parser, Match match) {
@@ -136,90 +163,140 @@ String? prepareObsidianFootnoteDefinitionForEditing(
   return '$ordinal. ${match.group(2) ?? ''}';
 }
 
-/// Collects referenced standard footnote labels in their first-appearance
-/// order, excluding comments and inline or fenced code.
+/// Collects referenced standard footnote labels using Obsidian's shared
+/// standard/inline footnote order.
+///
+/// Undefined standard references do not consume an ordinal. Comments and
+/// inline or fenced code are excluded from the scan.
 Map<String, int> collectObsidianStandardFootnoteOrdinals(String source) {
-  final result = <String, int>{};
-  var index = 0;
-  var inComment = false;
+  final content = _stripObsidianComments(source);
+  final collector = _ObsidianFootnoteOrdinalCollector(
+    _collectStandardFootnoteDefinitionLabels(content),
+  )..scan(content);
+  return Map<String, int>.unmodifiable(collector.standardOrdinals);
+}
+
+Set<String> _collectStandardFootnoteDefinitionLabels(String source) {
+  final labels = <String>{};
   var fenceCharacter = 0;
   var fenceLength = 0;
-  var inlineCodeLength = 0;
-  var lineStart = true;
+  final definitionPattern = RegExp(
+    r'^[ ]{0,3}\[\^([^\] \r\n\x00\t]+)\]:[ \t]*',
+  );
+  for (final line in source.split('\n')) {
+    final fence = RegExp(r'^ {0,3}(`{3,}|~{3,})').firstMatch(line);
+    if (fence != null) {
+      final marker = fence.group(1)!;
+      if (fenceLength == 0) {
+        fenceCharacter = marker.codeUnitAt(0);
+        fenceLength = marker.length;
+      } else if (marker.codeUnitAt(0) == fenceCharacter &&
+          marker.length >= fenceLength) {
+        fenceCharacter = 0;
+        fenceLength = 0;
+      }
+      continue;
+    }
+    if (fenceLength > 0) continue;
+    final definition = definitionPattern.firstMatch(line);
+    if (definition != null) labels.add(definition.group(1)!.toLowerCase());
+  }
+  return labels;
+}
 
-  while (index < source.length) {
-    if (lineStart && !inComment && inlineCodeLength == 0) {
-      final lineEnd = source.indexOf('\n', index);
-      final end = lineEnd < 0 ? source.length : lineEnd;
-      final line = source.substring(index, end);
-      final fence = RegExp(r'^ {0,3}(`{3,}|~{3,})').firstMatch(line);
-      if (fence != null) {
-        final marker = fence.group(1)!;
-        if (fenceLength == 0) {
-          fenceCharacter = marker.codeUnitAt(0);
-          fenceLength = marker.length;
-        } else if (marker.codeUnitAt(0) == fenceCharacter &&
-            marker.length >= fenceLength) {
-          fenceCharacter = 0;
-          fenceLength = 0;
+final class _ObsidianFootnoteOrdinalCollector {
+  _ObsidianFootnoteOrdinalCollector(this.definedLabels);
+
+  final Set<String> definedLabels;
+  final Map<String, int> standardOrdinals = <String, int>{};
+  int _nextOrdinal = 1;
+
+  void scan(String source, {bool allowFences = true}) {
+    var index = 0;
+    var fenceCharacter = 0;
+    var fenceLength = 0;
+    var inlineCodeLength = 0;
+    var lineStart = true;
+
+    while (index < source.length) {
+      if (allowFences && lineStart && inlineCodeLength == 0) {
+        final lineEnd = source.indexOf('\n', index);
+        final end = lineEnd < 0 ? source.length : lineEnd;
+        final line = source.substring(index, end);
+        final fence = RegExp(r'^ {0,3}(`{3,}|~{3,})').firstMatch(line);
+        if (fence != null) {
+          final marker = fence.group(1)!;
+          if (fenceLength == 0) {
+            fenceCharacter = marker.codeUnitAt(0);
+            fenceLength = marker.length;
+          } else if (marker.codeUnitAt(0) == fenceCharacter &&
+              marker.length >= fenceLength) {
+            fenceCharacter = 0;
+            fenceLength = 0;
+          }
+          index = lineEnd < 0 ? source.length : lineEnd + 1;
+          lineStart = true;
+          continue;
         }
-        index = lineEnd < 0 ? source.length : lineEnd + 1;
-        lineStart = true;
+      }
+
+      final character = source.codeUnitAt(index);
+      if (fenceLength > 0) {
+        lineStart = character == 0x0a;
+        index += 1;
         continue;
       }
-    }
-
-    final character = source.codeUnitAt(index);
-    if (fenceLength > 0) {
-      lineStart = character == 0x0a;
-      index += 1;
-      continue;
-    }
-    if (!inComment && character == 0x60) {
-      final runLength = _characterRunLength(source, index, 0x60);
-      if (inlineCodeLength == 0) {
-        inlineCodeLength = runLength;
-      } else if (inlineCodeLength == runLength) {
-        inlineCodeLength = 0;
+      if (character == 0x60) {
+        final runLength = _characterRunLength(source, index, 0x60);
+        if (inlineCodeLength == 0) {
+          inlineCodeLength = runLength;
+        } else if (inlineCodeLength == runLength) {
+          inlineCodeLength = 0;
+        }
+        index += runLength;
+        lineStart = false;
+        continue;
       }
-      index += runLength;
-      lineStart = false;
-      continue;
-    }
-    if (inlineCodeLength == 0 &&
-        character == 0x25 &&
-        index + 1 < source.length &&
-        source.codeUnitAt(index + 1) == 0x25) {
-      inComment = !inComment;
-      index += 2;
-      lineStart = false;
-      continue;
-    }
-    if (!inComment &&
-        inlineCodeLength == 0 &&
-        character == 0x5b &&
-        index + 2 < source.length &&
-        source.codeUnitAt(index + 1) == 0x5e &&
-        (index == 0 || source.codeUnitAt(index - 1) != 0x5c)) {
-      final close = source.indexOf(']', index + 2);
-      if (close >= 0 &&
-          !source.substring(index + 2, close).contains('\n') &&
-          (close + 1 >= source.length ||
-              source.codeUnitAt(close + 1) != 0x3a)) {
-        final label = source.substring(index + 2, close).trim().toLowerCase();
-        if (label.isNotEmpty && !label.contains(RegExp(r'[ \t]'))) {
-          result.putIfAbsent(label, () => result.length + 1);
+      if (inlineCodeLength == 0 &&
+          character == 0x5e &&
+          index + 1 < source.length &&
+          source.codeUnitAt(index + 1) == 0x5b &&
+          !isIanvsMarkdownEscapedAt(source, index)) {
+        final close = findIanvsMarkdownInlineFootnoteEnd(source, index + 2);
+        if (close >= 0) {
+          _nextOrdinal += 1;
+          scan(source.substring(index + 2, close), allowFences: false);
           index = close + 1;
           lineStart = false;
           continue;
         }
       }
+      if (inlineCodeLength == 0 &&
+          character == 0x5b &&
+          index + 2 < source.length &&
+          source.codeUnitAt(index + 1) == 0x5e &&
+          !isIanvsMarkdownEscapedAt(source, index)) {
+        final close = source.indexOf(']', index + 2);
+        if (close >= 0 &&
+            !source.substring(index + 2, close).contains('\n') &&
+            (close + 1 >= source.length ||
+                source.codeUnitAt(close + 1) != 0x3a)) {
+          final label = source.substring(index + 2, close).toLowerCase();
+          if (label.isNotEmpty &&
+              !label.contains(RegExp(r'[ \t]')) &&
+              definedLabels.contains(label)) {
+            standardOrdinals.putIfAbsent(label, () => _nextOrdinal++);
+            index = close + 1;
+            lineStart = false;
+            continue;
+          }
+        }
+      }
+      lineStart = character == 0x0a;
+      if (lineStart) inlineCodeLength = 0;
+      index += 1;
     }
-    lineStart = character == 0x0a;
-    if (lineStart) inlineCodeLength = 0;
-    index += 1;
   }
-  return Map<String, int>.unmodifiable(result);
 }
 
 String _stripObsidianComments(String source) {
@@ -334,114 +411,126 @@ String _expandInlineFootnotes(String source) {
   final labels = RegExp(
     r'\[\^([^\] \r\n\x00\t]+)\]',
   ).allMatches(source).map((match) => match.group(1)!.toLowerCase()).toSet();
-  final definitions = <({String label, String body})>[];
-  final output = StringBuffer();
-  var index = 0;
-  var fenceCharacter = 0;
-  var fenceLength = 0;
-  var inlineCodeLength = 0;
-  var lineStart = true;
+  final expansion = _InlineFootnoteExpansion(labels);
+  final transformed = expansion.expand(source);
+  if (expansion.definitions.isEmpty) return transformed;
+  final result = StringBuffer(transformed);
+  if (!transformed.endsWith('\n\n')) {
+    result.write(transformed.endsWith('\n') ? '\n' : '\n\n');
+  }
+  for (final definition in expansion.definitions) {
+    result.writeln('[^${definition.label}]: ${definition.body}');
+  }
+  return result.toString().trimRight();
+}
 
-  while (index < source.length) {
-    if (lineStart && inlineCodeLength == 0) {
-      final lineEnd = source.indexOf('\n', index);
-      final end = lineEnd < 0 ? source.length : lineEnd;
-      final line = source.substring(index, end);
-      final fence = RegExp(r'^ {0,3}(`{3,}|~{3,})').firstMatch(line);
-      if (fence != null) {
-        final marker = fence.group(1)!;
-        if (fenceLength == 0) {
-          fenceCharacter = marker.codeUnitAt(0);
-          fenceLength = marker.length;
-        } else if (marker.codeUnitAt(0) == fenceCharacter &&
-            marker.length >= fenceLength) {
-          fenceLength = 0;
-          fenceCharacter = 0;
+final class _ExpandedInlineFootnoteDefinition {
+  _ExpandedInlineFootnoteDefinition(this.label);
+
+  final String label;
+  String body = '';
+}
+
+final class _InlineFootnoteExpansion {
+  _InlineFootnoteExpansion(this.labels);
+
+  final Set<String> labels;
+  final List<_ExpandedInlineFootnoteDefinition> definitions = [];
+  int _nextLabelOrdinal = 1;
+
+  String expand(String source, {bool allowFences = true}) {
+    final output = StringBuffer();
+    var index = 0;
+    var fenceCharacter = 0;
+    var fenceLength = 0;
+    var inlineCodeLength = 0;
+    var lineStart = true;
+
+    while (index < source.length) {
+      if (allowFences && lineStart && inlineCodeLength == 0) {
+        final lineEnd = source.indexOf('\n', index);
+        final end = lineEnd < 0 ? source.length : lineEnd;
+        final line = source.substring(index, end);
+        final fence = RegExp(r'^ {0,3}(`{3,}|~{3,})').firstMatch(line);
+        if (fence != null) {
+          final marker = fence.group(1)!;
+          if (fenceLength == 0) {
+            fenceCharacter = marker.codeUnitAt(0);
+            fenceLength = marker.length;
+          } else if (marker.codeUnitAt(0) == fenceCharacter &&
+              marker.length >= fenceLength) {
+            fenceLength = 0;
+            fenceCharacter = 0;
+          }
+          output.write(line);
+          if (lineEnd >= 0) output.write('\n');
+          index = lineEnd < 0 ? source.length : lineEnd + 1;
+          lineStart = true;
+          continue;
         }
-        output.write(line);
-        if (lineEnd >= 0) output.write('\n');
-        index = lineEnd < 0 ? source.length : lineEnd + 1;
-        lineStart = true;
+      }
+
+      final character = source.codeUnitAt(index);
+      if (fenceLength > 0) {
+        output.writeCharCode(character);
+        lineStart = character == 0x0a;
+        index += 1;
         continue;
       }
-    }
 
-    final character = source.codeUnitAt(index);
-    if (fenceLength > 0) {
-      output.writeCharCode(character);
-      lineStart = character == 0x0a;
-      index += 1;
-      continue;
-    }
-
-    if (character == 0x60) {
-      final runLength = _characterRunLength(source, index, 0x60);
-      if (inlineCodeLength == 0) {
-        inlineCodeLength = runLength;
-      } else if (runLength == inlineCodeLength) {
-        inlineCodeLength = 0;
+      if (character == 0x60) {
+        final runLength = _characterRunLength(source, index, 0x60);
+        if (inlineCodeLength == 0) {
+          inlineCodeLength = runLength;
+        } else if (runLength == inlineCodeLength) {
+          inlineCodeLength = 0;
+        }
+        output.write(source.substring(index, index + runLength));
+        index += runLength;
+        lineStart = false;
+        continue;
       }
-      output.write(source.substring(index, index + runLength));
-      index += runLength;
-      lineStart = false;
-      continue;
-    }
 
-    final canStartFootnote =
-        inlineCodeLength == 0 &&
-        character == 0x5e &&
-        index + 1 < source.length &&
-        source.codeUnitAt(index + 1) == 0x5b &&
-        (index == 0 || source.codeUnitAt(index - 1) != 0x5c);
-    if (canStartFootnote) {
-      final close = _findInlineFootnoteEnd(source, index + 2);
-      if (close >= 0) {
-        final body = source.substring(index + 2, close).trim();
-        if (body.isNotEmpty) {
-          var ordinal = definitions.length + 1;
-          var label = 'ianvs-inline-footnote-$ordinal';
-          while (labels.contains(label)) {
-            ordinal += 1;
-            label = 'ianvs-inline-footnote-$ordinal';
-          }
-          labels.add(label);
-          definitions.add((label: label, body: body));
+      final canStartFootnote =
+          inlineCodeLength == 0 &&
+          character == 0x5e &&
+          index + 1 < source.length &&
+          source.codeUnitAt(index + 1) == 0x5b &&
+          !isIanvsMarkdownEscapedAt(source, index);
+      if (canStartFootnote) {
+        final close = findIanvsMarkdownInlineFootnoteEnd(source, index + 2);
+        if (close >= 0) {
+          final body = source.substring(index + 2, close).trim();
+          final label = _allocateLabel();
+          final definition = _ExpandedInlineFootnoteDefinition(label);
+          definitions.add(definition);
+          definition.body = expand(body, allowFences: false);
           output.write('[^$label]');
           index = close + 1;
           lineStart = false;
           continue;
         }
       }
+
+      output.writeCharCode(character);
+      lineStart = character == 0x0a;
+      if (lineStart) inlineCodeLength = 0;
+      index += 1;
     }
 
-    output.writeCharCode(character);
-    lineStart = character == 0x0a;
-    if (lineStart) inlineCodeLength = 0;
-    index += 1;
+    return output.toString();
   }
 
-  if (definitions.isEmpty) return output.toString();
-  final transformed = output.toString();
-  final result = StringBuffer(transformed);
-  if (!transformed.endsWith('\n\n')) {
-    result.write(transformed.endsWith('\n') ? '\n' : '\n\n');
-  }
-  for (final definition in definitions) {
-    result.writeln('[^${definition.label}]: ${definition.body}');
-  }
-  return result.toString().trimRight();
-}
-
-int _findInlineFootnoteEnd(String source, int start) {
-  for (var index = start; index < source.length; index += 1) {
-    final character = source.codeUnitAt(index);
-    if (character == 0x0a) return -1;
-    if (character == 0x5d &&
-        (index == start || source.codeUnitAt(index - 1) != 0x5c)) {
-      return index;
+  String _allocateLabel() {
+    var label = 'ianvs-inline-footnote-$_nextLabelOrdinal';
+    while (labels.contains(label)) {
+      _nextLabelOrdinal += 1;
+      label = 'ianvs-inline-footnote-$_nextLabelOrdinal';
     }
+    _nextLabelOrdinal += 1;
+    labels.add(label);
+    return label;
   }
-  return -1;
 }
 
 int _characterRunLength(String source, int start, int character) {

@@ -2954,7 +2954,7 @@ void main() {
     );
     const source = '''
 Visible %%secret%% text. ^block-id
-Reference[^1] and inline ^[footnote body].
+Reference[^1], inline ^[footnote body], empty ^[], and nested ^[outer ^[inner]].
 %%
 Hidden **source** block.
 %%
@@ -2976,6 +2976,8 @@ Hidden **source** block.
       ' ^block-id',
       '[^1]',
       '^[footnote body]',
+      '^[]',
+      '^[outer ^[inner]]',
       '%%\nHidden **source** block.\n%%',
     ]) {
       final span = spans.singleWhere((candidate) => candidate.text == metadata);

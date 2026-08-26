@@ -2404,6 +2404,35 @@ Standard[^standard] and inline ^[inline footnote body].
     expect(comment.style?.color, isNotNull);
   });
 
+  testWidgets('editing metadata preserves empty and nested inline footnotes', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(
+          data: 'Empty ^[] and nested ^[outer ^[inner]].',
+          obsidianMetadataMode: IanvsMarkdownObsidianMetadataMode.editing,
+        ),
+      ),
+    );
+
+    expect(find.text('^[]'), findsOneWidget);
+    expect(find.text('^[outer ^[inner]]'), findsOneWidget);
+  });
+
+  testWidgets('reading mode renders empty and nested inline footnotes', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(const IanvsMarkdown(data: 'Empty ^[] and nested ^[outer ^[inner]].')),
+    );
+
+    expect(find.textContaining('^[]'), findsNothing);
+    expect(find.textContaining('^[outer'), findsNothing);
+    expect(find.textContaining('outer'), findsOneWidget);
+    expect(find.textContaining('inner'), findsOneWidget);
+  });
+
   test('Obsidian rendering preprocessing preserves literal code', () {
     const source = '''
 Text %%hidden%% ^[visible note] ^block-id
@@ -2428,6 +2457,22 @@ Text %%hidden%% ^[visible note] ^block-id
     );
     expect(rendered, contains('%%fenced comment%%'));
     expect(rendered, contains('^[not a footnote] ^fenced-id'));
+  });
+
+  test('Obsidian preprocessing expands empty and nested inline footnotes', () {
+    final rendered = prepareObsidianMarkdownForRendering(
+      'Empty ^[] and nested ^[outer ^[inner]].',
+    );
+
+    expect(
+      rendered,
+      'Empty [^ianvs-inline-footnote-1] and nested '
+      '[^ianvs-inline-footnote-2].\n\n'
+      '[^ianvs-inline-footnote-1]: \n'
+      '[^ianvs-inline-footnote-2]: outer '
+      '[^ianvs-inline-footnote-3]\n'
+      '[^ianvs-inline-footnote-3]: inner',
+    );
   });
 
   test('collects standard footnote order outside comments and code', () {
@@ -2461,6 +2506,41 @@ fenced[^fenced]
         mode: IanvsMarkdownObsidianMetadataMode.editing,
       ),
       source,
+    );
+  });
+
+  test('shares footnote order and ignores undefined standard references', () {
+    const source = '''
+Inline ^[first], missing[^missing], standard[^A], repeated[^a], empty ^[], and second[^b].
+
+[^a]: Alpha.
+[^b]: Beta.
+''';
+
+    expect(collectObsidianStandardFootnoteOrdinals(source), <String, int>{
+      'a': 2,
+      'b': 4,
+    });
+    expect(
+      prepareObsidianFootnoteDefinitionForEditing(
+        '[^a]: Alpha.',
+        document: source,
+      ),
+      '2. Alpha.',
+    );
+    expect(
+      prepareObsidianFootnoteDefinitionForEditing(
+        '[^b]: Beta.',
+        document: source,
+      ),
+      '4. Beta.',
+    );
+    expect(
+      prepareObsidianFootnoteDefinitionForEditing(
+        '[^missing]: Missing.',
+        document: source,
+      ),
+      isNull,
     );
   });
 
