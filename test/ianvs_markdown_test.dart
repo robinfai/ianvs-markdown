@@ -1916,8 +1916,8 @@ widget := unknown_token(42)
       app(
         IanvsMarkdown(
           data:
-              '[[Target Note]] [[folder/Source|Alias]] #project/flutter '
-              '[external](https://example.com)',
+              '[[Target Note]] [[folder/Source|Alias]] [[|Leading Pipe]] '
+              '[[]] #project/flutter [external](https://example.com)',
           onTapLink: (text, href, title) => taps.add((text, href)),
         ),
       ),
@@ -1925,24 +1925,31 @@ widget := unknown_token(42)
 
     expect(
       find.byKey(const ValueKey('ianvs-markdown-wiki-link')),
-      findsNWidgets(2),
+      findsNWidgets(3),
     );
     expect(find.byKey(const ValueKey('ianvs-markdown-tag')), findsOneWidget);
     expect(find.text('Target Note'), findsOneWidget);
     expect(find.text('Alias'), findsOneWidget);
+    expect(find.text('|Leading Pipe'), findsOneWidget);
+    expect(find.textContaining('[[]]'), findsOneWidget);
     expect(find.text('#project/flutter'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('ianvs-markdown-external-link-icon')),
       findsOneWidget,
     );
-    expect(find.textContaining('[['), findsNothing);
+    expect(find.textContaining('[[Target Note]]'), findsNothing);
+    expect(find.textContaining('[[folder/Source|Alias]]'), findsNothing);
+    expect(find.textContaining('[[|Leading Pipe]]'), findsNothing);
 
     await tester.tap(find.text('Alias'));
+    await tester.pump();
+    await tester.tap(find.text('|Leading Pipe'));
     await tester.pump();
     await tester.tap(find.text('#project/flutter'));
     await tester.pump();
     expect(taps, <(String, String?)>[
       ('Alias', 'folder/Source'),
+      ('|Leading Pipe', '|Leading Pipe'),
       ('#project/flutter', 'tag:#project/flutter'),
     ]);
   });

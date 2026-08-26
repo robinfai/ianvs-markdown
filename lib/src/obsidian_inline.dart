@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:html/parser.dart' as html_parser;
 import 'package:markdown/markdown.dart' as md;
 
+import 'wiki_link_reference.dart';
+
 enum IanvsMarkdownEntityPresentation { editing, reading }
 
 /// Preserves entity source in live preview and follows the browser-compatible
@@ -132,18 +134,15 @@ class IanvsMarkdownWikiLinkSyntax extends md.InlineSyntax {
   @override
   bool onMatch(md.InlineParser parser, Match match) {
     final source = match.group(1)!;
-    final separator = source.indexOf('|');
-    final target = (separator < 0 ? source : source.substring(0, separator))
-        .trim();
-    var label = (separator < 0 ? source : source.substring(separator + 1))
-        .trim();
-    if (target.isEmpty || label.isEmpty) {
+    final reference = parseIanvsMarkdownWikiLinkBody(source);
+    if (reference == null) {
       parser.addNode(md.Text(match.group(0)!));
       return true;
     }
-    if (separator < 0) {
-      label = _wikiLinkLabel(target, presentation);
-    }
+    final target = reference.target;
+    final label = reference.aliasSeparator == null
+        ? _wikiLinkLabel(target, presentation)
+        : reference.label;
 
     final anchor = md.Element.text('a', label)
       ..attributes['href'] = target

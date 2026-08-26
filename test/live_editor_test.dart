@@ -218,6 +218,47 @@ void main() {
     expect(controller.text, source);
   });
 
+  testWidgets('live leading-pipe Wiki links keep the pipe as their target', (
+    tester,
+  ) async {
+    const source = 'Before [[|Leading Pipe]] and [[]] after.';
+    final controller = IanvsMarkdownController(text: source);
+    String? openedText;
+    String? openedHref;
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1000,
+            height: 720,
+            child: IanvsMarkdownLiveEditor(
+              controller: controller,
+              onTapLink: (text, href, title) {
+                openedText = text;
+                openedHref = href;
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('|Leading Pipe'), findsOneWidget);
+    expect(find.textContaining('[[]]'), findsOneWidget);
+    await tester.tap(find.text('|Leading Pipe'));
+    await tester.pump();
+
+    expect(openedText, '|Leading Pipe');
+    expect(openedHref, '|Leading Pipe');
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
+    expect(controller.text, source);
+  });
+
   testWidgets('live preview resolves document-wide reference links', (
     tester,
   ) async {

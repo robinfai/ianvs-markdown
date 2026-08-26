@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../code_block.dart';
 import '../obsidian_autolink.dart';
 import '../obsidian_html.dart';
+import '../wiki_link_reference.dart';
 import 'editor_models.dart';
 import 'markdown_paste.dart';
 import 'reference_links.dart';
@@ -3526,11 +3527,12 @@ List<TextRange> _addWikiLinkSyntaxTokens(
         _isEscapedAt(text, match.start)) {
       continue;
     }
-    final source = match.group(0)!;
-    final separator = source.indexOf('|', 2);
-    final labelStart = separator < 0
+    final reference = parseIanvsMarkdownWikiLinkBody(match.group(1)!);
+    if (reference == null) continue;
+    final separator = reference.aliasSeparator;
+    final labelStart = separator == null
         ? match.start + 2
-        : match.start + separator + 1;
+        : match.start + separator + 3;
     final labelEnd = match.end - 2;
     if (labelStart >= labelEnd) continue;
     final revealRange = TextRange(start: match.start, end: match.end);

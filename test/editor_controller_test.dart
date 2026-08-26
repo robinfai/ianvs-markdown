@@ -1882,6 +1882,46 @@ void main() {
     );
   });
 
+  test(
+    'leading-pipe Wiki links keep the pipe visible outside their markers',
+    () {
+      const source = 'A [[|Alias]] B [[ ]] C [[]]';
+      const syntax = IanvsMarkdownSyntaxTheme(
+        heading: TextStyle(),
+        marker: TextStyle(color: Color(0xff777777)),
+        link: TextStyle(),
+        code: TextStyle(),
+        comment: TextStyle(),
+        wikiLink: TextStyle(fontWeight: FontWeight.w600),
+      );
+      final spans = buildMarkdownSourceTextSpan(
+        const TextEditingValue(
+          text: source,
+          selection: TextSelection.collapsed(offset: 0),
+        ),
+        style: const TextStyle(fontSize: 14),
+        syntaxTheme: syntax,
+        withComposing: false,
+        hideInactiveInlineMarkers: true,
+      ).children!.cast<TextSpan>().toList();
+
+      expect(spans.map((span) => span.text).join(), source);
+      expect(
+        spans.singleWhere((span) => span.text == '|Alias').style?.fontWeight,
+        FontWeight.w600,
+      );
+      final markers = spans
+          .where((span) => span.text == '[[' || span.text == ']]')
+          .toList();
+      expect(markers, hasLength(2));
+      expect(markers.every((span) => span.style?.fontSize == .01), isTrue);
+      final literal = spans.singleWhere(
+        (span) => span.text?.contains('[[ ]] C [[]]') ?? false,
+      );
+      expect(literal.style?.fontSize, 14);
+    },
+  );
+
   test('live preview hides safe inline HTML and reveals its active range', () {
     const syntax = IanvsMarkdownSyntaxTheme(
       heading: TextStyle(fontWeight: FontWeight.w600),

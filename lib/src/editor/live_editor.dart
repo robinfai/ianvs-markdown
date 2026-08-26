@@ -25,6 +25,7 @@ import '../task_checkbox.dart';
 import '../task_syntax.dart';
 import '../theme.dart';
 import '../wiki_embed.dart';
+import '../wiki_link_reference.dart';
 import 'editor_controller.dart';
 import 'editor_models.dart';
 import 'editor_shortcuts.dart';
@@ -3538,13 +3539,12 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     final tappedLabel = text.trim();
     final pattern = RegExp(r'\[\[([^\]\n]+)\]\]');
     for (final match in pattern.allMatches(source)) {
-      final body = match.group(1)!;
-      final separator = body.indexOf('|');
-      final target = (separator < 0 ? body : body.substring(0, separator))
-          .trim();
-      final label = (separator < 0 ? body : body.substring(separator + 1))
-          .trim();
-      if (target == targetHref && label == tappedLabel) return true;
+      final reference = parseIanvsMarkdownWikiLinkBody(match.group(1)!);
+      if (reference != null &&
+          reference.target == targetHref &&
+          reference.label == tappedLabel) {
+        return true;
+      }
     }
     return false;
   }
