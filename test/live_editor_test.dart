@@ -847,6 +847,155 @@ void main() {
     expect(controller.text, source);
   });
 
+  testWidgets(
+    'mouse drag selects forward and backward across Markdown blocks',
+    (tester) async {
+      const source =
+          'Alpha opening words\n\n'
+          'Bravo middle words\n\n'
+          'Charlie closing words';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      final alpha = find.text('Alpha opening words');
+      final charlie = find.text('Charlie closing words');
+      final alphaRect = tester.getRect(alpha);
+      final charlieRect = tester.getRect(charlie);
+      final alphaPoint = Offset(
+        alphaRect.left + alphaRect.width * .35,
+        alphaRect.center.dy,
+      );
+      final charliePoint = Offset(
+        charlieRect.left + charlieRect.width * .7,
+        charlieRect.center.dy,
+      );
+
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(mouse.removePointer);
+      await mouse.down(alphaPoint);
+      await mouse.moveTo(charliePoint);
+      await tester.pumpAndSettle();
+      await mouse.up();
+      await tester.pumpAndSettle();
+
+      expect(controller.text, source);
+      expect(controller.isDirty, isFalse);
+      expect(
+        controller.selection.baseOffset,
+        lessThan(controller.selection.extentOffset),
+      );
+      expect(
+        controller.selection.textInside(source),
+        contains('\n\nBravo middle words\n\n'),
+      );
+      var active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+      var field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      expect(field.controller?.text, source);
+      expect(field.focusNode?.hasFocus, isTrue);
+
+      final selectionEditable = editableWithin(tester, active);
+      final bravoCaret = selectionEditable.getLocalRectForCaret(
+        TextPosition(offset: source.indexOf('Bravo') + 3),
+      );
+      await mouse.down(selectionEditable.localToGlobal(bravoCaret.center));
+      await mouse.up();
+      await tester.pumpAndSettle();
+      expect(controller.selection.isCollapsed, isTrue);
+
+      await mouse.down(charliePoint);
+      await mouse.moveTo(alphaPoint);
+      await tester.pumpAndSettle();
+      await mouse.up();
+      await tester.pumpAndSettle();
+
+      expect(controller.text, source);
+      expect(controller.isDirty, isFalse);
+      expect(
+        controller.selection.baseOffset,
+        greaterThan(controller.selection.extentOffset),
+      );
+      expect(controller.selection.isDirectional, isTrue);
+      expect(
+        controller.selection.textInside(source),
+        contains('\n\nBravo middle words\n\n'),
+      );
+      active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+      field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      expect(field.controller?.text, source);
+      expect(field.focusNode?.hasFocus, isTrue);
+
+      final replacementStart = controller.selection.start;
+      final replacementEnd = controller.selection.end;
+      final replaced = source.replaceRange(
+        replacementStart,
+        replacementEnd,
+        'Z',
+      );
+      field.controller?.value = TextEditingValue(
+        text: replaced,
+        selection: TextSelection.collapsed(offset: replacementStart + 1),
+      );
+      await tester.pumpAndSettle();
+      expect(controller.text, replaced);
+      expect(
+        controller.selection,
+        TextSelection.collapsed(offset: replacementStart + 1),
+      );
+
+      controller.undo();
+      await tester.pumpAndSettle();
+      expect(controller.text, source);
+    },
+  );
+
+  testWidgets('mouse cross-block selection retains exact Markdown source', (
+    tester,
+  ) async {
+    const source =
+        'Alpha opening words\n\n'
+        '- Bravo list item\n\n'
+        '> Quoted middle words\n\n'
+        '```js\n'
+        'const value = 1;\n'
+        '```\n\n'
+        'Charlie closing words';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final alphaRect = tester.getRect(find.text('Alpha opening words'));
+    final charlieRect = tester.getRect(find.text('Charlie closing words'));
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    addTearDown(mouse.removePointer);
+    await mouse.down(
+      Offset(alphaRect.left + alphaRect.width * .4, alphaRect.center.dy),
+    );
+    await mouse.moveTo(
+      Offset(charlieRect.left + charlieRect.width * .6, charlieRect.center.dy),
+    );
+    await tester.pumpAndSettle();
+    await mouse.up();
+    await tester.pumpAndSettle();
+
+    final selectedSource = controller.selection.textInside(source);
+    expect(selectedSource, contains('- Bravo list item'));
+    expect(selectedSource, contains('> Quoted middle words'));
+    expect(selectedSource, contains('```js\nconst value = 1;\n```'));
+    expect(controller.isDirty, isFalse);
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, source);
+  });
+
   testWidgets('Command vertical arrows move to document boundaries', (
     tester,
   ) async {
@@ -7177,9 +7326,7 @@ Standard[^note] and inline ^[inline body].
     final first = find.byKey(const ValueKey('ianvs-markdown-table-1-0'));
     final firstField = tester.widget<TextField>(first);
     final editable = editableWithin(tester, first);
-    final caret = editable.getLocalRectForCaret(
-      const TextPosition(offset: 5),
-    );
+    final caret = editable.getLocalRectForCaret(const TextPosition(offset: 5));
     await tester.tapAt(
       editable.localToGlobal(Offset(caret.left, caret.center.dy)),
     );

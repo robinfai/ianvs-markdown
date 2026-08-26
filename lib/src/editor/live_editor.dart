@@ -1,6 +1,7 @@
-import 'dart:ui' show BoxHeightStyle;
+import 'dart:ui' show BoxHeightStyle, PointerDeviceKind;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart' show HitTestResult, kPrimaryMouseButton;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -149,6 +150,15 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   var _syncingToBlock = false;
   double? _verticalNavigationX;
   var _verticalNavigationColumn = 0;
+  int? _documentDragPointer;
+  Offset? _documentDragOrigin;
+  Offset? _documentDragLatest;
+  int? _documentDragAnchor;
+  var _documentDragActive = false;
+  var _documentDragEnding = false;
+  var _documentDragUpdateScheduled = false;
+  var _documentDragExpansionAttempts = 0;
+  var _documentDragEpoch = 0;
 
   bool get _ownsFocusNode => widget.focusNode == null;
   bool get _ownsScrollController => widget.scrollController == null;
@@ -204,6 +214,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     if (next == _lastMode) return;
     _lastMode = next;
     if (next != IanvsMarkdownEditorMode.livePreview) {
+      _resetDocumentDragSelection();
       _activeBlockStart = null;
       _activeGapLine = false;
       _blockController.revealLeadingMarker = false;
@@ -2032,6 +2043,229 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     });
   }
 
+  void _handleDocumentDragPointerDown(PointerDownEvent event) {
+    if (event.kind != PointerDeviceKind.mouse ||
+        event.buttons & kPrimaryMouseButton == 0 ||
+        !_pointerHitsEditableText(event)) {
+      return;
+    }
+    _resetDocumentDragSelection();
+    _documentDragPointer = event.pointer;
+    _documentDragOrigin = event.position;
+    _documentDragLatest = event.position;
+  }
+
+  bool _pointerHitsEditableText(PointerDownEvent event) {
+    final result = HitTestResult();
+    RendererBinding.instance.hitTestInView(
+      result,
+      event.position,
+      event.viewId,
+    );
+    return result.path.any((entry) => entry.target is RenderEditable);
+  }
+
+  void _handleDocumentDragPointerMove(PointerMoveEvent event) {
+    if (event.pointer != _documentDragPointer ||
+        event.buttons & kPrimaryMouseButton == 0) {
+      return;
+    }
+    _documentDragLatest = event.position;
+    if (!_documentDragActive) {
+      final origin = _documentDragOrigin;
+      if (origin == null || (event.position - origin).distance < 4) return;
+      _documentDragActive = true;
+      _beginDocumentDragSelection();
+      return;
+    }
+    _scheduleDocumentDragUpdate();
+  }
+
+  void _handleDocumentDragPointerUp(PointerUpEvent event) {
+    if (event.pointer != _documentDragPointer) return;
+    _documentDragLatest = event.position;
+    if (!_documentDragActive) {
+      _resetDocumentDragSelection();
+      return;
+    }
+    _documentDragEnding = true;
+    _scheduleDocumentDragUpdate();
+  }
+
+  void _handleDocumentDragPointerCancel(PointerCancelEvent event) {
+    if (event.pointer == _documentDragPointer) {
+      _resetDocumentDragSelection();
+    }
+  }
+
+  void _beginDocumentDragSelection() {
+    final origin = _documentDragOrigin;
+    if (origin == null) {
+      _resetDocumentDragSelection();
+      return;
+    }
+    final activeOffset = _documentOffsetAtActivePoint(origin);
+    if (activeOffset != null) {
+      _documentDragAnchor = activeOffset;
+      _scheduleDocumentDragUpdate();
+      return;
+    }
+
+    final block = _renderedBlockAtGlobalPoint(origin);
+    if (block == null) {
+      _resetDocumentDragSelection();
+      return;
+    }
+    final epoch = _documentDragEpoch;
+    _activateBlock(block, documentOffset: block.end);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || epoch != _documentDragEpoch || !_documentDragActive) {
+        return;
+      }
+      final anchor = _documentOffsetAtActivePoint(origin);
+      if (anchor == null) {
+        _resetDocumentDragSelection();
+        return;
+      }
+      _documentDragAnchor = anchor;
+      _scheduleDocumentDragUpdate();
+    });
+  }
+
+  int? _documentOffsetAtActivePoint(Offset globalPosition) {
+    final editable = _activeRenderEditable();
+    if (editable == null || !editable.attached || !editable.hasSize) {
+      return null;
+    }
+    final local = editable.globalToLocal(globalPosition);
+    if (local.dy < -1 || local.dy > editable.size.height + 1) return null;
+    final position = editable.getPositionForPoint(globalPosition);
+    return (_editingStart + position.offset).clamp(
+      0,
+      widget.controller.text.length,
+    );
+  }
+
+  IanvsMarkdownBlock? _renderedBlockAtGlobalPoint(Offset globalPosition) {
+    for (final block in _blocks) {
+      final renderObject = _renderedBlockTapKeys[block.start]?.currentContext
+          ?.findRenderObject();
+      if (renderObject is! RenderBox ||
+          !renderObject.attached ||
+          !renderObject.hasSize) {
+        continue;
+      }
+      final local = renderObject.globalToLocal(globalPosition);
+      if ((Offset.zero & renderObject.size).contains(local)) return block;
+    }
+    return null;
+  }
+
+  IanvsMarkdownBlock? _nearestRenderedBlock(Offset globalPosition) {
+    IanvsMarkdownBlock? nearest;
+    var nearestDistance = double.infinity;
+    for (final block in _blocks) {
+      final renderObject = _renderedBlockTapKeys[block.start]?.currentContext
+          ?.findRenderObject();
+      if (renderObject is! RenderBox ||
+          !renderObject.attached ||
+          !renderObject.hasSize ||
+          renderObject.size.height == 0) {
+        continue;
+      }
+      final top = renderObject.localToGlobal(Offset.zero).dy;
+      final bottom = top + renderObject.size.height;
+      final distance = globalPosition.dy < top
+          ? top - globalPosition.dy
+          : globalPosition.dy > bottom
+          ? globalPosition.dy - bottom
+          : 0.0;
+      if (distance < nearestDistance) {
+        nearest = block;
+        nearestDistance = distance;
+      }
+    }
+    return nearest;
+  }
+
+  void _scheduleDocumentDragUpdate() {
+    if (_documentDragUpdateScheduled || !_documentDragActive) return;
+    _documentDragUpdateScheduled = true;
+    final epoch = _documentDragEpoch;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || epoch != _documentDragEpoch) return;
+      _documentDragUpdateScheduled = false;
+      _resolveDocumentDragSelection();
+    });
+  }
+
+  void _resolveDocumentDragSelection() {
+    final anchor = _documentDragAnchor;
+    final latest = _documentDragLatest;
+    if (!_documentDragActive || anchor == null || latest == null) return;
+
+    final exactExtent = _documentOffsetAtActivePoint(latest);
+    if (exactExtent != null) {
+      _documentDragExpansionAttempts = 0;
+      _applyDocumentDragSelection(anchor, exactExtent);
+      if (_documentDragEnding) _resetDocumentDragSelection();
+      return;
+    }
+
+    final target =
+        _renderedBlockAtGlobalPoint(latest) ?? _nearestRenderedBlock(latest);
+    final extent = target == null
+        ? latest.dy < (_documentDragOrigin?.dy ?? latest.dy)
+              ? 0
+              : widget.controller.text.length
+        : target.end <= anchor
+        ? target.start
+        : target.end;
+    final previousStart = _editingStart;
+    final previousEnd = _editingEnd;
+    _applyDocumentDragSelection(anchor, extent);
+    final expanded =
+        previousStart != _editingStart || previousEnd != _editingEnd;
+    if (expanded && _documentDragExpansionAttempts < 2) {
+      _documentDragExpansionAttempts += 1;
+      _scheduleDocumentDragUpdate();
+      return;
+    }
+    if (_documentDragEnding) _resetDocumentDragSelection();
+  }
+
+  void _applyDocumentDragSelection(int anchor, int extent) {
+    if (anchor == extent) return;
+    final selection = TextSelection(
+      baseOffset: anchor,
+      extentOffset: extent,
+      isDirectional: true,
+    );
+    final surface = _selectionSurfaceFor(selection);
+    if (surface == null) return;
+    final current = widget.controller.selection;
+    if (current.baseOffset == selection.baseOffset &&
+        current.extentOffset == selection.extentOffset &&
+        current.isDirectional == selection.isDirectional &&
+        _editingStart == surface.start &&
+        _editingEnd == surface.end) {
+      return;
+    }
+    _activateSelectionSurface(selection, surface);
+  }
+
+  void _resetDocumentDragSelection() {
+    _documentDragEpoch += 1;
+    _documentDragPointer = null;
+    _documentDragOrigin = null;
+    _documentDragLatest = null;
+    _documentDragAnchor = null;
+    _documentDragActive = false;
+    _documentDragEnding = false;
+    _documentDragUpdateScheduled = false;
+    _documentDragExpansionAttempts = 0;
+  }
+
   void _recordPointerDown(PointerDownEvent event) {
     final previousTime = _lastPointerDownTimeStamp;
     final previousPosition = _lastPointerDownGlobal;
@@ -2164,6 +2398,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   }
 
   void _handleActivePointerUp(PointerUpEvent event) {
+    if (_documentDragActive) return;
     final tapCount = _pointerTapCount;
     if (tapCount < 2) return;
     final globalPosition = event.position;
@@ -2520,88 +2755,96 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         (styleSheet.listIndent ?? 24) +
         (styleSheet.listBulletPadding?.horizontal ?? 4);
     final listNestingLevels = _liveListNestingLevels();
-    return IanvsMarkdownListGuideSurface(
-      key: const ValueKey('ianvs-markdown-live-list-guides'),
-      color: colors.listGuideColor,
-      indent: listIndentStep,
-      textDirection: Directionality.of(context),
-      child: ListView.builder(
-        key: const ValueKey('ianvs-markdown-live-blocks'),
-        controller: _scrollController,
-        padding: widget.padding,
-        itemCount: _blocks.length,
-        itemBuilder: (context, index) {
-          final block = _blocks[index];
-          final listNestingLevel = listNestingLevels[index];
-          if (hiddenBlockIndices.contains(index)) {
+    return Listener(
+      key: const ValueKey('ianvs-markdown-document-drag-selection'),
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: _handleDocumentDragPointerDown,
+      onPointerMove: _handleDocumentDragPointerMove,
+      onPointerUp: _handleDocumentDragPointerUp,
+      onPointerCancel: _handleDocumentDragPointerCancel,
+      child: IanvsMarkdownListGuideSurface(
+        key: const ValueKey('ianvs-markdown-live-list-guides'),
+        color: colors.listGuideColor,
+        indent: listIndentStep,
+        textDirection: Directionality.of(context),
+        child: ListView.builder(
+          key: const ValueKey('ianvs-markdown-live-blocks'),
+          controller: _scrollController,
+          padding: widget.padding,
+          itemCount: _blocks.length,
+          itemBuilder: (context, index) {
+            final block = _blocks[index];
+            final listNestingLevel = listNestingLevels[index];
+            if (hiddenBlockIndices.contains(index)) {
+              return KeyedSubtree(
+                key: _blockKeys[block.start],
+                child: const SizedBox.shrink(),
+              );
+            }
+            final headingSection = _headingFoldModel.sectionAtBlockIndex(index);
+            final coveredByActiveSelection =
+                _activeBlockStart != null &&
+                block.start > _editingStart &&
+                block.start < _editingEnd;
+            if (coveredByActiveSelection) {
+              return KeyedSubtree(
+                key: _blockKeys[block.start],
+                child: const SizedBox.shrink(),
+              );
+            }
+            final next = index + 1 < _blocks.length ? _blocks[index + 1] : null;
+            final gapLines = markdownGapLineCount(
+              widget.controller.text,
+              block,
+              next,
+            );
+            final activeGapLine =
+                _activeBlockStart == block.start && _activeGapLine;
             return KeyedSubtree(
               key: _blockKeys[block.start],
-              child: const SizedBox.shrink(),
-            );
-          }
-          final headingSection = _headingFoldModel.sectionAtBlockIndex(index);
-          final coveredByActiveSelection =
-              _activeBlockStart != null &&
-              block.start > _editingStart &&
-              block.start < _editingEnd;
-          if (coveredByActiveSelection) {
-            return KeyedSubtree(
-              key: _blockKeys[block.start],
-              child: const SizedBox.shrink(),
-            );
-          }
-          final next = index + 1 < _blocks.length ? _blocks[index + 1] : null;
-          final gapLines = markdownGapLineCount(
-            widget.controller.text,
-            block,
-            next,
-          );
-          final activeGapLine =
-              _activeBlockStart == block.start && _activeGapLine;
-          return KeyedSubtree(
-            key: _blockKeys[block.start],
-            child: Align(
-              alignment: Alignment.topLeft,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: widget.contentMaxWidth),
-                child: Padding(
-                  padding: EdgeInsetsDirectional.only(
-                    start: listNestingLevel * listIndentStep,
-                  ),
-                  child: Column(
-                    key: ValueKey(
-                      'ianvs-markdown-block-${block.start}-${block.type.name}',
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: widget.contentMaxWidth),
+                  child: Padding(
+                    padding: EdgeInsetsDirectional.only(
+                      start: listNestingLevel * listIndentStep,
                     ),
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (_activeBlockStart == block.start && !activeGapLine)
-                        _buildActiveBlock(
-                          block,
-                          colors,
-                          listNestingLevel: listNestingLevel,
-                          headingSection: headingSection,
-                        )
-                      else
-                        _buildRenderedBlock(
-                          block,
-                          colors,
-                          listNestingLevel: listNestingLevel,
-                          headingSection: headingSection,
-                        ),
-                      if (activeGapLine)
-                        _buildActiveGapLine(colors)
-                      else if (_activeBlockStart == block.start &&
-                          _editingEnd > block.end)
-                        const SizedBox.shrink()
-                      else
-                        _buildBlockGap(block, gapLines: gapLines),
-                    ],
+                    child: Column(
+                      key: ValueKey(
+                        'ianvs-markdown-block-${block.start}-${block.type.name}',
+                      ),
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (_activeBlockStart == block.start && !activeGapLine)
+                          _buildActiveBlock(
+                            block,
+                            colors,
+                            listNestingLevel: listNestingLevel,
+                            headingSection: headingSection,
+                          )
+                        else
+                          _buildRenderedBlock(
+                            block,
+                            colors,
+                            listNestingLevel: listNestingLevel,
+                            headingSection: headingSection,
+                          ),
+                        if (activeGapLine)
+                          _buildActiveGapLine(colors)
+                        else if (_activeBlockStart == block.start &&
+                            _editingEnd > block.end)
+                          const SizedBox.shrink()
+                        else
+                          _buildBlockGap(block, gapLines: gapLines),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }

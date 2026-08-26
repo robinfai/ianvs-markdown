@@ -1,5 +1,8 @@
 ## Unreleased
 
+- Keep Live Preview selection document-wide: Command+A selects the complete
+  Markdown source, while desktop mouse drags extend forward or backward across
+  rendered block boundaries without marking the document dirty.
 - Match Border's one-pixel nested-list indentation guides and 28 px marker
   steps in Reading and Live Preview, including active and split list items.
 - Match Obsidian image dimensions for standard Markdown images, external
