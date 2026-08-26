@@ -1,5 +1,9 @@
 ## Unreleased
 
+- Match Obsidian's Live Preview inline-source boundaries: reveal delimiters at
+  their opening edge, hide them immediately after the closing edge, select the
+  complete formatted source on double click, edit ordinary links without
+  navigating, and route Wiki-link clicks through the host navigation callback.
 - Keep Live Preview selection document-wide: Command+A selects the complete
   Markdown source, while desktop mouse drags extend forward or backward across
   rendered block boundaries without marking the document dirty.

@@ -1756,6 +1756,23 @@ void main() {
     final italicMarkers = active.where((span) => span.text == '*').toList();
     expect(italicMarkers.every((span) => span.style?.fontSize == .01), isTrue);
 
+    final boldStart = source.indexOf('**bold**');
+    final boldEnd = boldStart + '**bold**'.length;
+    final atOpeningBoundary = build(
+      boldStart,
+    ).children!.cast<TextSpan>().where((span) => span.text == '**').toList();
+    expect(
+      atOpeningBoundary.every((span) => span.style?.fontSize == 14),
+      isTrue,
+    );
+    final afterClosingBoundary = build(
+      boldEnd,
+    ).children!.cast<TextSpan>().where((span) => span.text == '**').toList();
+    expect(
+      afterClosingBoundary.every((span) => span.style?.fontSize == .01),
+      isTrue,
+    );
+
     final linkActive = build(
       source.indexOf('link'),
     ).children!.cast<TextSpan>().toList();

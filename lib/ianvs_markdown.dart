@@ -17,7 +17,8 @@ export 'package:flutter_markdown_plus/flutter_markdown_plus.dart'
 export 'src/code_block.dart';
 export 'src/blocked_image.dart';
 export 'src/callout.dart';
-export 'src/editor/editor_controller.dart';
+export 'src/editor/editor_controller.dart'
+    hide ianvsMarkdownInlineSourceRangeAt;
 export 'src/editor/editor_models.dart';
 export 'src/editor/editor_shortcuts.dart';
 export 'src/editor/editor_toolbar.dart';

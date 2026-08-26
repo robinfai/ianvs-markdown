@@ -123,7 +123,7 @@ void main() {
     expect(field.controller?.text, source);
   });
 
-  testWidgets('live links absorb normal clicks while line space edits source', (
+  testWidgets('live ordinary links enter source without navigating', (
     tester,
   ) async {
     const source = 'Before [Label](https://example.com/path) after.';
@@ -147,25 +147,34 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Label'));
-    await tester.pump();
-    expect(openedHref, isNull);
-    expect(
-      find.byKey(const ValueKey('ianvs-markdown-active-block')),
-      findsNothing,
-    );
-
-    final renderedBlock = find.byKey(
-      const ValueKey('ianvs-markdown-block-0-paragraph'),
-    );
-    final rect = tester.getRect(renderedBlock);
-    await tester.tapAt(Offset(rect.right - 16, rect.center.dy));
     await tester.pumpAndSettle();
-
+    expect(openedHref, isNull);
     final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
     final field = tester.widget<TextField>(
       find.descendant(of: active, matching: find.byType(TextField)),
     );
     expect(field.controller?.text, source);
+    final spans = field.controller!
+        .buildTextSpan(
+          context: tester.element(
+            find.descendant(of: active, matching: find.byType(TextField)),
+          ),
+          style: field.style,
+          withComposing: false,
+        )
+        .children!
+        .cast<TextSpan>();
+    expect(
+      spans.singleWhere((span) => span.text == '[').style?.fontSize,
+      greaterThan(1),
+    );
+    expect(
+      spans
+          .singleWhere((span) => span.text == '](https://example.com/path)')
+          .style
+          ?.fontSize,
+      greaterThan(1),
+    );
     expect(controller.text, source);
 
     controller.mode = IanvsMarkdownEditorMode.preview;
@@ -173,6 +182,40 @@ void main() {
     await tester.tap(find.text('Label'));
     await tester.pump();
     expect(openedHref, 'https://example.com/path');
+  });
+
+  testWidgets('live Wiki links navigate through the host callback', (
+    tester,
+  ) async {
+    const source = 'Before [[Target note|Wiki alias]] after.';
+    final controller = IanvsMarkdownController(text: source);
+    String? openedHref;
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1000,
+            height: 720,
+            child: IanvsMarkdownLiveEditor(
+              controller: controller,
+              onTapLink: (text, href, title) => openedHref = href,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Wiki alias'));
+    await tester.pump();
+
+    expect(openedHref, 'Target note');
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
+    expect(controller.text, source);
   });
 
   testWidgets('live preview resolves document-wide reference links', (
@@ -209,20 +252,8 @@ void main() {
     expect(find.textContaining('[guide-ref]:'), findsNothing);
 
     await tester.tap(find.text('Reference label'));
-    await tester.pump();
-    expect(openedHref, isNull);
-    expect(
-      find.byKey(const ValueKey('ianvs-markdown-active-block')),
-      findsNothing,
-    );
-
-    final renderedBlock = find.byKey(
-      const ValueKey('ianvs-markdown-block-0-paragraph'),
-    );
-    final rect = tester.getRect(renderedBlock);
-    await tester.tapAt(Offset(rect.right - 16, rect.center.dy));
     await tester.pumpAndSettle();
-
+    expect(openedHref, isNull);
     final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
     final fieldFinder = find.descendant(
       of: active,
@@ -315,6 +346,32 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(controller.selection.textInside(controller.text), 'beta');
+    expect(controller.text, source);
+  });
+
+  testWidgets('double click selects the complete inline source range', (
+    tester,
+  ) async {
+    const source = 'Left **formattedword** right';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final renderedRect = tester.getRect(find.textContaining('Left'));
+    final target = Offset(
+      renderedRect.left + 85,
+      renderedRect.top + renderedRect.height / 2,
+    );
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(
+      controller.selection.textInside(controller.text),
+      '**formattedword**',
+    );
     expect(controller.text, source);
   });
 

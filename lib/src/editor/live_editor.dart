@@ -2357,7 +2357,15 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           affinity: position.affinity,
         );
       case _RenderedTapSelection.word:
-        range = editable.getWordBoundary(TextPosition(offset: offset));
+        final wordRange = editable.getWordBoundary(
+          TextPosition(offset: offset),
+        );
+        final inlineSourceRange = ianvsMarkdownInlineSourceRangeAt(
+          _blockController.text,
+          wordRange,
+          linkReferenceLabels: _linkReferences.labels,
+        );
+        range = inlineSourceRange ?? wordRange;
         break;
       case _RenderedTapSelection.line:
         range = TextRange(
@@ -3410,14 +3418,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         styleSheet: renderedStyleSheet,
         onTapText: () =>
             _activateRenderedBlock(block, tapCount: _pointerTapCount),
-        // Obsidian's Live Preview consumes a normal click on rendered links:
-        // it focuses the link surface without navigating. The surrounding
-        // line remains available for source activation from its blank area;
-        // Reading mode still receives the host's real link callback.
-        onTapLink:
-            RegExp(r'^ {0,3}!\[\[[^\]\n]+\]\][ \t]*$').hasMatch(block.source)
-            ? widget.onTapLink
-            : (_, _, _) {},
+        onTapLink: (text, href, title) =>
+            _handleRenderedLinkTap(block, text: text, href: href, title: title),
         imageBuilder: widget.imageBuilder,
         onImageResize: (request) => _resizeImage(block, request),
         checkboxBuilder: sourceTasks.isNotEmpty
@@ -3504,6 +3506,47 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         ),
       ),
     );
+  }
+
+  void _handleRenderedLinkTap(
+    IanvsMarkdownBlock block, {
+    required String text,
+    required String? href,
+    required String title,
+  }) {
+    final navigatesInLivePreview =
+        RegExp(r'^ {0,3}!\[\[[^\]\n]+\]\][ \t]*$').hasMatch(block.source) ||
+        _sourceContainsMatchingWikiLink(block.source, text: text, href: href);
+    if (navigatesInLivePreview && widget.onTapLink != null) {
+      _pendingRenderedTapGlobal = null;
+      widget.onTapLink!(text, href, title);
+      return;
+    }
+    // Obsidian keeps ordinary Markdown links in the editor on a normal click
+    // and reveals their source. Navigation remains available in Reading mode,
+    // while Wiki links use the host callback directly in Live Preview.
+    _activateRenderedBlock(block, tapCount: _pointerTapCount);
+  }
+
+  bool _sourceContainsMatchingWikiLink(
+    String source, {
+    required String text,
+    required String? href,
+  }) {
+    final targetHref = href?.trim();
+    if (targetHref == null || targetHref.isEmpty) return false;
+    final tappedLabel = text.trim();
+    final pattern = RegExp(r'\[\[([^\]\n]+)\]\]');
+    for (final match in pattern.allMatches(source)) {
+      final body = match.group(1)!;
+      final separator = body.indexOf('|');
+      final target = (separator < 0 ? body : body.substring(0, separator))
+          .trim();
+      final label = (separator < 0 ? body : body.substring(separator + 1))
+          .trim();
+      if (target == targetHref && label == tappedLabel) return true;
+    }
+    return false;
   }
 
   String _renderedBlockSource(IanvsMarkdownBlock block) {

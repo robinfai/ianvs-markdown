@@ -2220,6 +2220,52 @@ TextSpan buildMarkdownSourceTextSpan(
   return TextSpan(style: style, children: children);
 }
 
+/// Returns the smallest inline syntax range that completely contains
+/// [content], or null when [content] is ordinary Markdown text.
+///
+/// This is kept out of the package export surface and shared with Live
+/// Preview so a desktop double click can select the same revealed source that
+/// Obsidian exposes, including its opening and closing delimiters.
+TextRange? ianvsMarkdownInlineSourceRangeAt(
+  String text,
+  TextRange content, {
+  Set<String>? linkReferenceLabels,
+}) {
+  if (!content.isValid || content.isCollapsed || text.isEmpty) return null;
+  final labels =
+      linkReferenceLabels ?? MarkdownLinkReferenceContext.parse(text).labels;
+  final tokens = _markdownSyntaxTokens(
+    text,
+    _inlineRangeProbeTheme,
+    linkReferenceLabels: labels,
+  );
+  final candidates = <TextRange>{};
+  for (final token in tokens) {
+    final range = token.inlineMarkerRange;
+    if (range == null || !range.isValid || range.isCollapsed) continue;
+    if (content.start >= range.start && content.end <= range.end) {
+      candidates.add(range);
+    }
+  }
+  if (candidates.isEmpty) return null;
+  return candidates.reduce((smallest, candidate) {
+    final smallestLength = smallest.end - smallest.start;
+    final candidateLength = candidate.end - candidate.start;
+    if (candidateLength != smallestLength) {
+      return candidateLength < smallestLength ? candidate : smallest;
+    }
+    return candidate.start > smallest.start ? candidate : smallest;
+  });
+}
+
+const _inlineRangeProbeTheme = IanvsMarkdownSyntaxTheme(
+  heading: TextStyle(),
+  marker: TextStyle(),
+  link: TextStyle(),
+  code: TextStyle(),
+  comment: TextStyle(),
+);
+
 void _addEscapeMarkerSyntaxTokens(
   List<_SyntaxToken> target,
   String text,
@@ -2835,7 +2881,7 @@ bool _selectionReveals(TextSelection selection, TextRange range) {
   if (!selection.isValid) return false;
   if (selection.isCollapsed) {
     return selection.extentOffset >= range.start &&
-        selection.extentOffset <= range.end;
+        selection.extentOffset < range.end;
   }
   return selection.start < range.end && selection.end > range.start;
 }
