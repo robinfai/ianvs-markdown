@@ -7186,7 +7186,7 @@ Standard[^note] and inline ^[inline body].
       tester.getSize(first).width,
       greaterThan(tester.getSize(right).width),
     );
-    expect(tester.getSize(center).height, inInclusiveRange(20, 26));
+    expect(tester.getSize(center).height, 27);
 
     final table = tester.widget<Table>(find.byType(Table));
     expect(

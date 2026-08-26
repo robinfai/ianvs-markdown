@@ -8,9 +8,10 @@
 - Add Obsidian-style desktop image resize handles in Live Preview with
   aspect-ratio preservation, editor-width clamping, width-only source
   writeback, double-click reset, and independent undo steps.
-- Match Obsidian table row and column drag handles, selection and drop
-  feedback, RTL geometry, mobile active-handle visibility, structural source
-  normalization, and the minimum-width alignment markers it emits.
+- Match Obsidian table row and column drag handles, 27 px Live Preview rows,
+  selection and drop feedback, RTL geometry, mobile active-handle visibility,
+  structural source normalization, and the minimum-width alignment markers it
+  emits.
 - Match the active Border theme's fenced-code dot texture, dashed frame,
   dimensions, light and dark syntax palettes, persistent copyable Live Preview
   flair, desktop and mobile reading controls, and one-second copy feedback.

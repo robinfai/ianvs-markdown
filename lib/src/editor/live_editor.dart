@@ -4755,7 +4755,7 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                                       isCollapsed: true,
                                       contentPadding: EdgeInsets.symmetric(
                                         horizontal: 10,
-                                        vertical: 3,
+                                        vertical: 4.5,
                                       ),
                                     ),
                                     onTap: () {
