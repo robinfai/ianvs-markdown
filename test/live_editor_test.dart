@@ -5368,6 +5368,29 @@ Standard[^note] and inline ^[inline body].
     expect(controller.text, source);
   });
 
+  testWidgets('live preview binds a standalone block ID to its paragraph', (
+    tester,
+  ) async {
+    const block = 'Paragraph.\n^standalone_id';
+    const source = '$block\n\nAfter.';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    expect(find.text('^standalone_id'), findsOneWidget);
+    await tester.tap(find.text('^standalone_id'));
+    await tester.pump();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, block);
+    expect(controller.text, source);
+  });
+
   testWidgets('live preview shares mixed footnote numbering', (tester) async {
     const source = '''
 Inline ^[first], missing[^missing], standard[^a], repeated[^a], empty ^[], and second[^b].

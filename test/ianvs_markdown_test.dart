@@ -2525,8 +2525,7 @@ unclosed %% stays''';
     await tester.pumpWidget(
       app(
         const IanvsMarkdown(
-          data:
-              r'Escaped \%%visible%%. Paired %%hidden%%. Unclosed %% tail',
+          data: r'Escaped \%%visible%%. Paired %%hidden%%. Unclosed %% tail',
         ),
       ),
     );
@@ -2550,6 +2549,111 @@ unclosed %% stays''';
     );
 
     expect(find.text(comment), findsOneWidget);
+  });
+
+  test('block IDs match standalone, underscore, table, and escape rules', () {
+    const source =
+        r'''paragraph ^alpha
+underscore ^a_b
+no-space^beta
+dot ^a.b
+trailing spaces ^space-id'''
+        '   \n'
+        r'''multiple ^first-id ^second-id
+^standalone-id
+> ^quote-id
+- list item
+  ^list-id
+| key | value |
+| --- | --- |
+| row | ^table-id |
+escaped \^single-escape
+double \\^double-escape
+`inline ^code-id`
+```
+fenced ^fence-id
+```''';
+
+    final rendered = prepareObsidianMarkdownForRendering(source);
+
+    expect(
+      rendered,
+      r'''paragraph
+underscore
+no-space^beta
+dot ^a.b
+trailing spaces ^space-id'''
+      '   \n'
+      r'''multiple ^first-id
+
+>
+- list item
+
+| key | value |
+| --- | --- |
+| row |  |
+escaped \^single-escape
+double \\
+`inline ^code-id`
+```
+fenced ^fence-id
+```''',
+    );
+  });
+
+  testWidgets('reading hides standalone and underscore block IDs', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(
+          data:
+              'Paragraph ^under_score\n'
+              '^standalone-id\n\n'
+              'Invalid trailing ^space-id   ',
+        ),
+      ),
+    );
+
+    expect(find.textContaining('under_score'), findsNothing);
+    expect(find.textContaining('standalone-id'), findsNothing);
+    expect(find.textContaining('^space-id'), findsOneWidget);
+  });
+
+  testWidgets('editing mode subdues standalone and underscore block IDs', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(
+          data: 'Paragraph ^under_score\n^standalone-id',
+          obsidianMetadataMode: IanvsMarkdownObsidianMetadataMode.editing,
+        ),
+      ),
+    );
+
+    expect(find.text(' ^under_score'), findsOneWidget);
+    expect(find.text('^standalone-id'), findsOneWidget);
+  });
+
+  testWidgets('editing mode subdues a block ID inside a table cell', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(
+          data:
+              '| key | value |\n'
+              '| --- | --- |\n'
+              '| row | ^table_id |',
+          obsidianMetadataMode: IanvsMarkdownObsidianMetadataMode.editing,
+        ),
+      ),
+    );
+
+    final metadata = tester.widget<Text>(find.text('^table_id'));
+    expect(metadata.style?.fontFamily, isNotNull);
+    expect(metadata.style?.color, isNotNull);
   });
 
   test('Obsidian preprocessing expands empty and nested inline footnotes', () {

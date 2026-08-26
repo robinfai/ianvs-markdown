@@ -140,6 +140,116 @@ int _nextUnescapedCommentDelimiter(String source, int start) {
   return -1;
 }
 
+final RegExp _obsidianBlockIdFencePattern = RegExp(
+  r'^ {0,3}(`{3,}|~{3,})(.*)$',
+);
+final RegExp _obsidianTrailingBlockIdPattern = RegExp(r'\^[A-Za-z0-9_-]+$');
+final RegExp _obsidianTableBlockIdPattern = RegExp(
+  r'\|([ \t]*)(\\*)\^([A-Za-z0-9_-]+)([ \t]*)(?=\|)',
+);
+
+/// Finds Obsidian block identifiers outside comments and fenced code.
+///
+/// A normal identifier ends a source line, has no trailing whitespace, and
+/// is either standalone or separated from preceding content by whitespace.
+/// An even backslash run may appear before the caret; it remains literal while
+/// the identifier is consumed. A table cell containing only an identifier is
+/// handled as the equivalent standalone form.
+List<TextRange> ianvsMarkdownBlockIdRanges(String source) {
+  final ranges = <TextRange>[];
+  final commentRanges = ianvsMarkdownCommentRanges(source);
+  final lines = source.split('\n');
+  var offset = 0;
+  var fenceCharacter = 0;
+  var fenceLength = 0;
+
+  for (final line in lines) {
+    final fence = _obsidianBlockIdFencePattern.firstMatch(line);
+    if (fenceLength > 0) {
+      if (fence != null) {
+        final marker = fence.group(1)!;
+        if (marker.codeUnitAt(0) == fenceCharacter &&
+            marker.length >= fenceLength &&
+            fence.group(2)!.trim().isEmpty) {
+          fenceCharacter = 0;
+          fenceLength = 0;
+        }
+      }
+      offset += line.length + 1;
+      continue;
+    }
+    if (fence != null) {
+      final marker = fence.group(1)!;
+      fenceCharacter = marker.codeUnitAt(0);
+      fenceLength = marker.length;
+      offset += line.length + 1;
+      continue;
+    }
+
+    for (final match in _obsidianTableBlockIdPattern.allMatches(line)) {
+      final slashes = match.group(2)!;
+      if (slashes.length.isOdd) continue;
+      final caret = line.indexOf('^', match.start);
+      final range = TextRange(
+        start: offset + caret,
+        end: offset + caret + 1 + match.group(3)!.length,
+      );
+      if (!_overlapsMetadataRange(range, commentRanges)) ranges.add(range);
+    }
+
+    final trailing = _obsidianTrailingBlockIdPattern.firstMatch(line);
+    if (trailing != null) {
+      final start = _blockIdRangeStart(line, trailing.start);
+      if (start != null) {
+        final range = TextRange(
+          start: offset + start,
+          end: offset + trailing.end,
+        );
+        if (!_overlapsMetadataRange(range, commentRanges) &&
+            !_overlapsMetadataRange(range, ranges)) {
+          ranges.add(range);
+        }
+      }
+    }
+    offset += line.length + 1;
+  }
+
+  ranges.sort((a, b) => a.start.compareTo(b.start));
+  return List<TextRange>.unmodifiable(ranges);
+}
+
+int? _blockIdRangeStart(String line, int caret) {
+  if (caret == 0) return 0;
+  var slashStart = caret;
+  while (slashStart > 0 && line.codeUnitAt(slashStart - 1) == 0x5c) {
+    slashStart -= 1;
+  }
+  if (slashStart < caret) {
+    final slashCount = caret - slashStart;
+    if (slashCount.isOdd ||
+        slashStart > 0 &&
+            !_isBlockIdWhitespace(line.codeUnitAt(slashStart - 1))) {
+      return null;
+    }
+    return caret;
+  }
+  if (!_isBlockIdWhitespace(line.codeUnitAt(caret - 1))) return null;
+  var start = caret;
+  while (start > 0 && _isBlockIdWhitespace(line.codeUnitAt(start - 1))) {
+    start -= 1;
+  }
+  return start;
+}
+
+bool _isBlockIdWhitespace(int codeUnit) => codeUnit == 0x20 || codeUnit == 0x09;
+
+bool _overlapsMetadataRange(TextRange range, Iterable<TextRange> others) {
+  for (final other in others) {
+    if (range.start < other.end && range.end > other.start) return true;
+  }
+  return false;
+}
+
 /// Converts Obsidian-only metadata syntax into Markdown understood by the
 /// renderer.
 ///
@@ -169,7 +279,7 @@ final class IanvsMarkdownEditingMetadataInlineSyntax extends md.InlineSyntax {
 
   IanvsMarkdownEditingMetadataInlineSyntax.blockId()
     : kind = 'block-id',
-      super(r'[ \t]+\^[A-Za-z0-9-]+[ \t]*(?=\n|$)');
+      super(r'[ \t]*\\*\^[A-Za-z0-9_-]+(?:[ \t]*(?=\|)|(?=\n|$))');
 
   IanvsMarkdownEditingMetadataInlineSyntax.standardFootnote()
     : kind = 'footnote-ref',
@@ -202,6 +312,27 @@ final class IanvsMarkdownEditingMetadataInlineSyntax extends md.InlineSyntax {
       parser
         ..addNode(element)
         ..consume(comment.end - comment.start);
+      return true;
+    }
+    if (kind == 'block-id') {
+      final start = startMatchPos ?? parser.pos;
+      if (start != parser.pos) return false;
+      TextRange? blockId;
+      for (final range in ianvsMarkdownBlockIdRanges(parser.source)) {
+        if (range.start == start) {
+          blockId = range;
+          break;
+        }
+        if (range.start > start) break;
+      }
+      if (blockId == null) return false;
+      parser.writeText();
+      final literal = parser.source.substring(blockId.start, blockId.end);
+      final element = md.Element.text('ianvs-editing-metadata', literal)
+        ..attributes['kind'] = kind;
+      parser
+        ..addNode(element)
+        ..consume(blockId.end - blockId.start);
       return true;
     }
     if (kind != 'inline-footnote') {
@@ -497,31 +628,14 @@ String _stripObsidianComments(String source) {
 }
 
 String _stripBlockIdentifiers(String source) {
-  final lines = source.split('\n');
-  var fenceCharacter = 0;
-  var fenceLength = 0;
-  final blockId = RegExp(r'[ \t]+\^[A-Za-z0-9-]+[ \t]*$');
-
-  for (var index = 0; index < lines.length; index += 1) {
-    final line = lines[index];
-    final fence = RegExp(r'^ {0,3}(`{3,}|~{3,})').firstMatch(line);
-    if (fence != null) {
-      final marker = fence.group(1)!;
-      if (fenceLength == 0) {
-        fenceCharacter = marker.codeUnitAt(0);
-        fenceLength = marker.length;
-      } else if (marker.codeUnitAt(0) == fenceCharacter &&
-          marker.length >= fenceLength) {
-        fenceLength = 0;
-        fenceCharacter = 0;
-      }
-      continue;
-    }
-    if (fenceLength == 0) {
-      lines[index] = line.replaceFirst(blockId, '');
-    }
+  final output = StringBuffer();
+  var cursor = 0;
+  for (final range in ianvsMarkdownBlockIdRanges(source)) {
+    output.write(source.substring(cursor, range.start));
+    cursor = range.end;
   }
-  return lines.join('\n');
+  output.write(source.substring(cursor));
+  return output.toString();
 }
 
 String _expandInlineFootnotes(String source) {

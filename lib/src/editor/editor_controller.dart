@@ -2540,14 +2540,10 @@ List<_SyntaxToken> _markdownSyntaxTokens(
     inlineStructuralRanges.add(TextRange(start: match.start, end: match.end));
     tokens.add(_SyntaxToken(match.start, match.end, tokenStyle));
   }
-  final blockIdPattern = RegExp(
-    r'[ \t]+\^[A-Za-z0-9-]+[ \t]*$',
-    multiLine: true,
-  );
-  for (final match in blockIdPattern.allMatches(text)) {
-    if (_overlapsAnyRange(match.start, match.end, excludedRanges)) continue;
-    inlineStructuralRanges.add(TextRange(start: match.start, end: match.end));
-    tokens.add(_SyntaxToken(match.start, match.end, theme.comment));
+  for (final range in ianvsMarkdownBlockIdRanges(text)) {
+    if (_overlapsAnyRange(range.start, range.end, excludedRanges)) continue;
+    inlineStructuralRanges.add(range);
+    tokens.add(_SyntaxToken(range.start, range.end, theme.comment));
   }
   final standardFootnotePattern = RegExp(r'\[\^[^\] \r\n\x00\t]+\](?::)?');
   for (final match in standardFootnotePattern.allMatches(text)) {
