@@ -1364,6 +1364,8 @@ void main() {
         '9. [/] ongoing\n10. [ ] ',
       );
       expect(_pressEnter(formatter, '> quote').text, '> quote\n> ');
+      expect(_pressEnter(formatter, '>quote').text, '>quote\n> ');
+      expect(_pressEnter(formatter, '>>child').text, '>>child\n>> ');
     });
 
     test('renumbers following ordered items when Enter inserts a sibling', () {
@@ -1466,13 +1468,14 @@ void main() {
         expect((await shiftEnter('- [x] done')).text, '- [x] done\n      ');
         expect((await shiftEnter('9. item')).text, '9. item\n   ');
         expect((await shiftEnter('10. item')).text, '10. item\n    ');
-        expect((await shiftEnter('> quote')).text, '> quote\n  ');
+        expect((await shiftEnter('> quote')).text, '> quote\n> ');
+        expect((await shiftEnter('>quote')).text, '>quote\n> ');
         expect((await shiftEnter('> - item')).text, '> - item\n>   ');
         expect(
           (await shiftEnter('>     - item')).text,
           '>     - item\n>       ',
         );
-        expect((await shiftEnter('> > quote')).text, '> > quote\n>   ');
+        expect((await shiftEnter('> > quote')).text, '> > quote\n> > ');
         expect((await shiftEnter('    - nested')).text, '    - nested\n      ');
       } finally {
         await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
@@ -1581,7 +1584,21 @@ void main() {
         '>         - item\n>     - ',
       );
       expect(_pressEnter(formatter, '> 9. item\n> 10. ').text, '> 9. item\n> ');
-      expect(_pressEnter(formatter, '> > ').text, '> > \n');
+      expect(_pressEnter(formatter, '> > ').text, '> ');
+      final nestedQuote = _pressEnter(formatter, '> > child');
+      expect(nestedQuote.text, '> > child\n> > ');
+      final outdentedQuote = _pressEnterAt(
+        formatter,
+        nestedQuote.text,
+        nestedQuote.selection.extentOffset,
+      );
+      expect(outdentedQuote.text, '> > child\n> ');
+      final exitedQuote = _pressEnterAt(
+        formatter,
+        outdentedQuote.text,
+        outdentedQuote.selection.extentOffset,
+      );
+      expect(exitedQuote.text, '> > child\n\n');
     });
 
     test('splitting at item content start preserves the empty marker', () {

@@ -891,7 +891,10 @@ class IanvsMarkdownEditingFormatter extends TextInputFormatter {
       );
     }
 
-    if (shiftPressed) {
+    // Obsidian gives a plain quote line the same structural continuation for
+    // Shift+Enter as Enter, including compact `>text` markers and empty-line
+    // exit behavior. Lists nested inside a quote still use their soft prefix.
+    if (shiftPressed && !continuation.components.last.isQuote) {
       final continuationIndent = continuation.softPrefix;
       if (continuationIndent.isEmpty) return newValue;
       final updated = newValue.text.replaceRange(
@@ -918,9 +921,15 @@ class IanvsMarkdownEditingFormatter extends TextInputFormatter {
       }
       final leaf = continuation.components.last;
       if (continuation.components.length > 1 && leaf.isQuote) {
-        // Obsidian leaves an empty nested quote line intact and moves the
-        // caret to a plain line.
-        return newValue;
+        // Repeated Enter on an empty nested quote removes one quote layer at
+        // a time before the remaining root quote exits.
+        final outdented = continuation.parentPrefix;
+        return TextEditingValue(
+          text: newValue.text.replaceRange(lineStart, caret, outdented),
+          selection: TextSelection.collapsed(
+            offset: lineStart + outdented.length,
+          ),
+        );
       }
       if (leaf.leadingIndent.isNotEmpty) {
         // An item indented after a quote container exits one indentation
@@ -1636,14 +1645,14 @@ _MarkdownContinuationLine? _parseMarkdownContinuationLine(String line) {
       componentOffset += leadingIndent.length;
     }
     final remaining = line.substring(componentOffset);
-    final quote = RegExp(r'^> ').firstMatch(remaining);
+    final quote = RegExp(r'^>[ \t]?').firstMatch(remaining);
     if (quote != null) {
-      const marker = '> ';
+      final marker = quote.group(0)!;
       components.add(
         _MarkdownPrefixComponent(
           leadingIndent: leadingIndent,
           source: marker,
-          continuation: marker,
+          continuation: '> ',
           isQuote: true,
         ),
       );

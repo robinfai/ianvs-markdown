@@ -4668,6 +4668,82 @@ empty:
     expect(find.text('After quote.'), findsOneWidget);
   });
 
+  testWidgets('live preview continues compact block quotes', (tester) async {
+    final controller = IanvsMarkdownController(text: '>quote')
+      ..selection = const TextSelection.collapsed(offset: 6);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: IanvsMarkdownLiveEditor(
+            controller: controller,
+            autofocus: true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: '>quote\n',
+        selection: TextSelection.collapsed(offset: 7),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(controller.text, '>quote\n> ');
+    expect(controller.selection, const TextSelection.collapsed(offset: 9));
+  });
+
+  testWidgets('live preview exits nested quotes one layer at a time', (
+    tester,
+  ) async {
+    final controller = IanvsMarkdownController(text: '> > child')
+      ..selection = const TextSelection.collapsed(offset: 9);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: IanvsMarkdownLiveEditor(
+            controller: controller,
+            autofocus: true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: '> > child\n',
+        selection: TextSelection.collapsed(offset: 10),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.text, '> > child\n> > ');
+
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: '> > child\n> > \n',
+        selection: TextSelection.collapsed(offset: 15),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.text, '> > child\n> ');
+    expect(controller.selection, const TextSelection.collapsed(offset: 12));
+
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: '> > child\n> \n',
+        selection: TextSelection.collapsed(offset: 13),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.text, '> > child\n\n');
+    expect(controller.selection, const TextSelection.collapsed(offset: 11));
+  });
+
   testWidgets('callouts render, expand, and enter exact block source editing', (
     tester,
   ) async {
