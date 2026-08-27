@@ -461,6 +461,138 @@ final class IanvsMarkdownEditingMetadataBuilder extends MarkdownElementBuilder {
   }
 }
 
+/// Renders Reading-mode footnote references with Obsidian occurrence labels.
+///
+/// The Markdown AST numbers every repeated reference with the same visible
+/// ordinal but records its occurrence in the anchor id. Obsidian presents the
+/// first reference as `[N]`, then `[N-1]`, `[N-2]`, while keeping every link
+/// pointed at the same definition.
+final class IanvsMarkdownFootnoteSuperscriptBuilder
+    extends MarkdownElementBuilder {
+  IanvsMarkdownFootnoteSuperscriptBuilder({
+    required this.onTapLink,
+    this.superscriptFontFeatureTag,
+    this.theme,
+  });
+
+  final MarkdownTapLinkCallback? onTapLink;
+  final String? superscriptFontFeatureTag;
+  final IanvsMarkdownThemeData? theme;
+
+  @override
+  Widget? visitElementAfterWithContext(
+    BuildContext context,
+    md.Element element,
+    TextStyle? preferredStyle,
+    TextStyle? parentStyle,
+  ) {
+    final colors = IanvsMarkdownThemeData.resolve(context, theme);
+    final base =
+        parentStyle ?? preferredStyle ?? DefaultTextStyle.of(context).style;
+    final superscriptStyle = base.copyWith(
+      fontFeatures: <FontFeature>[
+        const FontFeature.enable('sups'),
+        if (superscriptFontFeatureTag != null)
+          FontFeature.enable(superscriptFontFeatureTag!),
+      ],
+    );
+    final reference = _obsidianFootnoteReferencePresentation(element);
+    if (reference == null) {
+      return Text.rich(
+        TextSpan(text: element.textContent, style: superscriptStyle),
+      );
+    }
+
+    final enabled = onTapLink != null;
+    final link = Semantics(
+      key: const ValueKey('ianvs-markdown-footnote-reference'),
+      link: true,
+      enabled: enabled,
+      label: reference.label,
+      child: MouseRegion(
+        cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: enabled
+              ? () =>
+                    onTapLink!(reference.label, reference.href, reference.title)
+              : null,
+          child: Text(
+            reference.label,
+            style: superscriptStyle.copyWith(
+              color: colors.accentDark,
+              backgroundColor: Colors.transparent,
+              decoration: TextDecoration.none,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
+    return Text.rich(
+      TextSpan(
+        children: <InlineSpan>[
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: link,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+final class _ObsidianFootnoteReferencePresentation {
+  const _ObsidianFootnoteReferencePresentation({
+    required this.label,
+    required this.href,
+    required this.title,
+  });
+
+  final String label;
+  final String href;
+  final String title;
+}
+
+_ObsidianFootnoteReferencePresentation? _obsidianFootnoteReferencePresentation(
+  md.Element element,
+) {
+  if (element.attributes['class'] != 'footnote-ref') return null;
+  md.Element? anchor;
+  for (final child in element.children ?? const <md.Node>[]) {
+    if (child is md.Element && child.tag == 'a') {
+      anchor = child;
+      break;
+    }
+  }
+  if (anchor == null) return null;
+  final href = anchor.attributes['href']?.trim();
+  final id = anchor.attributes['id']?.trim();
+  final ordinal = anchor.textContent.trim();
+  if (href == null ||
+      id == null ||
+      ordinal.isEmpty ||
+      !href.startsWith('#fn-')) {
+    return null;
+  }
+  final referencePrefix = 'fnref-${href.substring(4)}';
+  if (!id.startsWith(referencePrefix)) return null;
+  final suffix = id.substring(referencePrefix.length);
+  var occurrence = 1;
+  if (suffix.isNotEmpty) {
+    final match = RegExp(r'^-(\d+)$').firstMatch(suffix);
+    occurrence = match == null ? 0 : int.tryParse(match.group(1)!) ?? 0;
+    if (occurrence < 2) return null;
+  }
+  final label = occurrence == 1 ? '[$ordinal]' : '[$ordinal-${occurrence - 1}]';
+  return _ObsidianFootnoteReferencePresentation(
+    label: label,
+    href: href,
+    title: anchor.attributes['title'] ?? '',
+  );
+}
+
 /// Returns a standard footnote definition formatted as the numbered list item
 /// Obsidian shows in editing view, or null when [source] is not a referenced
 /// definition.

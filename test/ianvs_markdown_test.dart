@@ -3471,6 +3471,42 @@ Alpha[^a], repeat[^A], and third[^a].
     expect(find.textContaining('First definition.'), findsNothing);
   });
 
+  testWidgets(
+    'reading shows Obsidian footnote occurrence labels and keeps links',
+    (tester) async {
+      final taps = <(String, String?, String)>[];
+      await tester.pumpWidget(
+        app(
+          IanvsMarkdown(
+            data: '''
+Inline ^[inline]. Standard[^a]. Repeat[^A]. Third[^a]. Plain x<sup>plain-sup</sup>.
+
+[^a]: Standard body.
+''',
+            onTapLink: (text, href, title) => taps.add((text, href, title)),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('ianvs-markdown-footnote-reference')),
+        findsNWidgets(4),
+      );
+      for (final label in <String>['[1]', '[2]', '[2-1]', '[2-2]']) {
+        expect(find.text(label), findsOneWidget);
+      }
+      expect(
+        find.textContaining('plain-sup', findRichText: true),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('[2-1]'));
+      await tester.pump();
+      expect(taps, <(String, String?, String)>[('[2-1]', '#fn-a', '')]);
+    },
+  );
+
   test('collects standard footnote order outside comments and code', () {
     const source = '''
 Second[^b], first[^a], repeated[^b], and inline ^[not standard].
