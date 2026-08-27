@@ -3387,6 +3387,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           colors: colors,
           linkReferenceLabels: _linkReferences.labels,
           onCellChanged: _replaceTableCell,
+          onDeleteLine: _deleteTableLine,
           onAddRow: () => _appendTableRow(block),
           onAddRowAbove: () => _prependTableRow(block),
           onAddColumn: () => _appendTableColumn(block),
@@ -3834,6 +3835,16 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       selection: selection,
       composing: TextRange.empty,
     );
+  }
+
+  void _deleteTableLine(_EditableTableCell cell) {
+    final current = widget.controller.value;
+    final caret = (cell.isSynthetic ? cell.lineStart : cell.start).clamp(
+      0,
+      current.text.length,
+    );
+    widget.controller.selection = TextSelection.collapsed(offset: caret);
+    widget.controller.deleteSelectedLines();
   }
 
   void _appendTableRow(IanvsMarkdownBlock block) {
@@ -4623,6 +4634,7 @@ class _EditableMarkdownTable extends StatefulWidget {
     required this.colors,
     required this.linkReferenceLabels,
     required this.onCellChanged,
+    required this.onDeleteLine,
     required this.onAddRow,
     required this.onAddRowAbove,
     required this.onAddColumn,
@@ -4634,6 +4646,7 @@ class _EditableMarkdownTable extends StatefulWidget {
   final IanvsMarkdownThemeData colors;
   final Set<String> linkReferenceLabels;
   final void Function(_EditableTableCell cell, String value) onCellChanged;
+  final ValueChanged<_EditableTableCell> onDeleteLine;
   final VoidCallback onAddRow;
   final VoidCallback onAddRowAbove;
   final VoidCallback onAddColumn;
@@ -4931,6 +4944,21 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
       return KeyEventResult.ignored;
     }
     final key = event.logicalKey;
+    final usesCommandModifier =
+        defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.iOS;
+    final deleteLineModifier = usesCommandModifier
+        ? HardwareKeyboard.instance.isMetaPressed &&
+              !HardwareKeyboard.instance.isControlPressed
+        : HardwareKeyboard.instance.isControlPressed &&
+              !HardwareKeyboard.instance.isMetaPressed;
+    if (key == LogicalKeyboardKey.keyD &&
+        deleteLineModifier &&
+        !HardwareKeyboard.instance.isAltPressed &&
+        !HardwareKeyboard.instance.isShiftPressed) {
+      widget.onDeleteLine(cell);
+      return KeyEventResult.handled;
+    }
     if (key == LogicalKeyboardKey.tab) {
       if (HardwareKeyboard.instance.isControlPressed ||
           HardwareKeyboard.instance.isMetaPressed ||

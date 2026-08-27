@@ -10032,6 +10032,50 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     expect(field('1-1').controller?.selection.extentOffset, 0);
   });
 
+  testWidgets(
+    'table Command+D deletes the focused physical row',
+    (tester) async {
+      const source =
+          'pre\n\n'
+          '| H | I |\n'
+          '| --- | --- |\n'
+          '| a | b |\n'
+          '| c | d |\n\n'
+          'post';
+      final controller = IanvsMarkdownController(text: source)
+        ..selection = const TextSelection.collapsed(offset: 0);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('ianvs-markdown-table-1-0')));
+      await tester.pump();
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyD);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+
+      expect(
+        controller.text,
+        'pre\n\n'
+        '| H | I |\n'
+        '| --- | --- |\n'
+        '| c | d |\n\n'
+        'post',
+      );
+      expect(controller.text, isNot(contains('| a | b |')));
+      expect(controller.text, startsWith('pre\n\n'));
+
+      controller.undo();
+      await tester.pumpAndSettle();
+      expect(controller.text, source);
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
   testWidgets('source editor reports programmatic and history changes', (
     tester,
   ) async {
