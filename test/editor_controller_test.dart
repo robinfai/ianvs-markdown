@@ -2338,53 +2338,75 @@ void main() {
     },
   );
 
-  test(
-    'intraword single underscores stay literal while doubles stay strong',
-    () {
-      const syntax = IanvsMarkdownSyntaxTheme(
-        heading: TextStyle(fontWeight: FontWeight.w600),
-        marker: TextStyle(color: Color(0xff777777)),
-        link: TextStyle(decoration: TextDecoration.underline),
-        code: TextStyle(fontFamily: 'monospace'),
-        comment: TextStyle(fontStyle: FontStyle.italic),
-      );
-      const source = 'foo_single_word foo__double__word a_short_c _standalone_';
-      final spans = buildMarkdownSourceTextSpan(
-        const TextEditingValue(
-          text: source,
-          selection: TextSelection.collapsed(offset: 0),
-        ),
-        style: const TextStyle(fontSize: 14),
-        syntaxTheme: syntax,
-        withComposing: false,
-        hideInactiveInlineMarkers: true,
-      ).children!.cast<TextSpan>().toList();
+  test('intraword single and double underscores stay literal', () {
+    const syntax = IanvsMarkdownSyntaxTheme(
+      heading: TextStyle(fontWeight: FontWeight.w600),
+      marker: TextStyle(color: Color(0xff777777)),
+      link: TextStyle(decoration: TextDecoration.underline),
+      code: TextStyle(fontFamily: 'monospace'),
+      comment: TextStyle(fontStyle: FontStyle.italic),
+    );
+    const source = 'foo_single_word foo__double__word a_short_c _standalone_';
+    final spans = buildMarkdownSourceTextSpan(
+      const TextEditingValue(
+        text: source,
+        selection: TextSelection.collapsed(offset: 0),
+      ),
+      style: const TextStyle(fontSize: 14),
+      syntaxTheme: syntax,
+      withComposing: false,
+      hideInactiveInlineMarkers: true,
+    ).children!.cast<TextSpan>().toList();
 
-      TextSpan spanAt(int offset) {
-        var cursor = 0;
-        for (final span in spans) {
-          final end = cursor + (span.text?.length ?? 0);
-          if (offset >= cursor && offset < end) return span;
-          cursor = end;
-        }
-        throw StateError('No span at $offset');
+    TextSpan spanAt(int offset) {
+      var cursor = 0;
+      for (final span in spans) {
+        final end = cursor + (span.text?.length ?? 0);
+        if (offset >= cursor && offset < end) return span;
+        cursor = end;
       }
+      throw StateError('No span at $offset');
+    }
 
-      final single = source.indexOf('single');
-      final double = source.indexOf('double');
-      final short = source.indexOf('short');
-      final standalone = source.indexOf('standalone');
-      expect(spanAt(single).style?.fontStyle, isNull);
-      expect(spanAt(short).style?.fontStyle, isNull);
-      expect(spanAt(double).style?.fontWeight, FontWeight.w700);
-      expect(spanAt(standalone).style?.fontStyle, FontStyle.italic);
-      expect(spanAt(single - 1).style?.fontSize, 14);
-      expect(spanAt(short - 1).style?.fontSize, 14);
-      expect(spanAt(double - 2).style?.fontSize, .01);
-      expect(spanAt(standalone - 1).style?.fontSize, .01);
-      expect(spans.map((span) => span.text).join(), source);
-    },
-  );
+    final single = source.indexOf('single');
+    final double = source.indexOf('double');
+    final short = source.indexOf('short');
+    final standalone = source.indexOf('standalone');
+    expect(spanAt(single).style?.fontStyle, isNull);
+    expect(spanAt(short).style?.fontStyle, isNull);
+    expect(spanAt(double).style?.fontWeight, isNull);
+    expect(spanAt(standalone).style?.fontStyle, FontStyle.italic);
+    expect(spanAt(single - 1).style?.fontSize, 14);
+    expect(spanAt(short - 1).style?.fontSize, 14);
+    expect(spanAt(double - 2).style?.fontSize, 14);
+    expect(spanAt(standalone - 1).style?.fontSize, .01);
+    expect(spans.map((span) => span.text).join(), source);
+  });
+
+  test('emphasis source ranges cover complete participating runs', () {
+    const source =
+        '***triple***\n\n'
+        '****quad****\n\n'
+        '***left**\n\n'
+        'foo******deep*********baz\n\n'
+        'foo__literal__baz\n\n'
+        'a*"quoted"*';
+
+    TextRange? rangeFor(String content) {
+      final start = source.indexOf(content);
+      return ianvsMarkdownInlineSourceRangeAt(
+        source,
+        TextRange(start: start, end: start + content.length),
+      );
+    }
+
+    expect(rangeFor('triple')!.textInside(source), '***triple***');
+    expect(rangeFor('quad')!.textInside(source), '****quad****');
+    expect(rangeFor('left')!.textInside(source), '***left**');
+    expect(rangeFor('deep')!.textInside(source), '******deep******');
+    expect(rangeFor('literal'), isNull);
+    expect(rangeFor('quoted'), isNull);
+  });
 
   test(
     'nested inline syntax composes styles and keeps local reveal ranges',

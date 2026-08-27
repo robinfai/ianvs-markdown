@@ -24,6 +24,7 @@ export 'src/editor/editor_shortcuts.dart';
 export 'src/editor/editor_toolbar.dart';
 export 'src/editor/live_editor.dart';
 export 'src/editor/source_editor.dart';
+export 'src/emphasis.dart';
 export 'src/front_matter.dart';
 export 'src/front_matter_card.dart';
 export 'src/heading_folding.dart';

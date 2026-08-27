@@ -1,5 +1,9 @@
 ## Unreleased
 
+- Match Obsidian emphasis and strong delimiter stacks for flanking, asymmetric
+  and long runs, Reading/Live Preview-specific surplus presentation, intraword
+  asterisks, literal intraword underscores, escapes, nesting, and source-range
+  selection.
 - Match Obsidian strikethrough parsing for double-tilde-only syntax, odd and
   even delimiter runs, asymmetric and adjacent surplus, whitespace and escape
   boundaries, soft-line and unclosed scopes, nested links/Wiki aliases, code

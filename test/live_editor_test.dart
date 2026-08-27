@@ -470,6 +470,32 @@ void main() {
     expect(controller.text, source);
   });
 
+  testWidgets('double click selects a complete triple emphasis run', (
+    tester,
+  ) async {
+    const source = 'Left ***formattedword*** right';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final renderedRect = tester.getRect(find.textContaining('Left'));
+    final target = Offset(
+      renderedRect.left + 85,
+      renderedRect.top + renderedRect.height / 2,
+    );
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(
+      controller.selection.textInside(controller.text),
+      '***formattedword***',
+    );
+    expect(controller.text, source);
+  });
+
   testWidgets('double click selects complete Obsidian highlight source', (
     tester,
   ) async {

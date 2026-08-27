@@ -1104,7 +1104,7 @@ Literal:A``Z
     );
   });
 
-  testWidgets('reading matches Obsidian intraword underscore emphasis', (
+  testWidgets('reading keeps Obsidian intraword underscores literal', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -1119,21 +1119,13 @@ Literal:A``Z
 
     expect(_renderedPlainTextContains(tester, 'foo_single_word'), isTrue);
     expect(_renderedPlainTextContains(tester, 'a_short_c'), isTrue);
-    expect(_renderedPlainTextContains(tester, 'foodoubleword'), isTrue);
+    expect(_renderedPlainTextContains(tester, 'foo__double__word'), isTrue);
     expect(
       _renderedPlainTextContains(tester, 'Standalone standalone.'),
       isTrue,
     );
-    expect(_renderedTextIsBold(tester, 'double'), isTrue);
+    expect(_renderedTextIsBold(tester, 'double'), isFalse);
     expect(_renderedTextIsItalic(tester, 'standalone'), isTrue);
-    expect(
-      _renderedTextHasColor(
-        tester,
-        'double',
-        IanvsMarkdownThemeData.light.strongForeground,
-      ),
-      isTrue,
-    );
     expect(
       _renderedTextHasColor(
         tester,
@@ -1168,6 +1160,208 @@ Literal:A``Z
     );
     expect(_renderedTextHasBackground(tester, 'mark one'), isTrue);
     expect(_renderedTextHasBackground(tester, 'mark two'), isTrue);
+  });
+
+  test('emphasis scan follows delimiter runs, flanking, and surplus', () {
+    const source =
+        'A****quad****Z\n\n'
+        'B***both***Z\n\n'
+        'C***left**Z\n\n'
+        'D**right***Z\n\n'
+        'Ea*"quoted"*Z\n\n'
+        'Ffoo******deep*********bazZ\n\n'
+        'G*outer **inner***Z\n\n'
+        'Hfoo_bar_bazZ\n\n'
+        'Ifoo__strong__bazZ\n\n'
+        r'J\*odd*Z'
+        '\n\n'
+        r'K\\*even*Z';
+
+    final scan = ianvsMarkdownEmphasisScan(source);
+    final byContent = <String, List<IanvsMarkdownEmphasisMatch>>{};
+    for (final match in scan.matches) {
+      byContent
+          .putIfAbsent(match.content.textInside(source), () => [])
+          .add(match);
+    }
+
+    expect(
+      byContent['quad']!.map((match) => match.kind),
+      everyElement(IanvsMarkdownEmphasisKind.strong),
+    );
+    expect(byContent['quad'], hasLength(2));
+    expect(
+      byContent['both']!.map((match) => match.kind).toSet(),
+      <IanvsMarkdownEmphasisKind>{
+        IanvsMarkdownEmphasisKind.emphasis,
+        IanvsMarkdownEmphasisKind.strong,
+      },
+    );
+    expect(byContent['left']!.single.kind, IanvsMarkdownEmphasisKind.strong);
+    expect(byContent['right']!.single.kind, IanvsMarkdownEmphasisKind.strong);
+    expect(byContent.containsKey('"quoted"'), isFalse);
+    expect(byContent['deep'], hasLength(3));
+    expect(byContent['inner']!.single.kind, IanvsMarkdownEmphasisKind.strong);
+    expect(
+      byContent['outer **inner']!.single.kind,
+      IanvsMarkdownEmphasisKind.emphasis,
+    );
+    expect(byContent.containsKey('bar'), isFalse);
+    expect(byContent.containsKey('strong'), isFalse);
+    expect(byContent.containsKey('odd'), isFalse);
+    expect(byContent['even']!.single.kind, IanvsMarkdownEmphasisKind.emphasis);
+
+    String visibleMarkers(String fixture) {
+      final start = source.indexOf(fixture);
+      final end = start + fixture.length;
+      final hidden = scan.hiddenMarkerRanges
+          .where((range) => range.start >= start && range.end <= end)
+          .toList();
+      final buffer = StringBuffer();
+      for (var offset = start; offset < end; offset += 1) {
+        final concealed = hidden.any(
+          (range) => offset >= range.start && offset < range.end,
+        );
+        if (!concealed &&
+            (source.codeUnitAt(offset) == 0x2a ||
+                source.codeUnitAt(offset) == 0x5f)) {
+          buffer.writeCharCode(source.codeUnitAt(offset));
+        }
+      }
+      return buffer.toString();
+    }
+
+    expect(visibleMarkers('C***left**Z'), '*');
+    expect(visibleMarkers('D**right***Z'), '*');
+    expect(visibleMarkers('Ffoo******deep*********bazZ'), '***');
+  });
+
+  test('emphasis scan stops at paragraphs and respects excluded ranges', () {
+    const source = '*soft\nline* *across\n\nparagraph* `*code*`';
+    final codeStart = source.indexOf('`');
+    final scan = ianvsMarkdownEmphasisScan(
+      source,
+      excludedRanges: <TextRange>[
+        TextRange(start: codeStart, end: source.length),
+      ],
+    );
+
+    expect(scan.matches, hasLength(1));
+    expect(scan.matches.single.content.textInside(source), 'soft\nline');
+  });
+
+  testWidgets('reading projects Obsidian long emphasis runs and surplus', (
+    tester,
+  ) async {
+    const cases = <(String, String, String, bool, bool)>[
+      ('****quad****', '**quad**', 'quad', true, false),
+      ('*****quint*****', '*quint*', 'quint', false, true),
+      ('******six******', '**six**', 'six', true, true),
+      ('*******seven*******', '***seven***', 'seven', false, false),
+      ('***left**', 'left', 'left', true, false),
+      ('**right***', 'right', 'right', true, false),
+      ('**right-four****', 'right-four**', 'right-four', true, false),
+      ('****left-four**', '**left-four', 'left-four', true, false),
+      ('***right-three****', '*right-three**', 'right-three', true, true),
+      ('****left-three***', '**left-three*', 'left-three', true, true),
+      ('****single-close*', '*single-close', 'single-close', false, true),
+      ('*single-open****', 'single-open*', 'single-open', false, true),
+      ('_____under_____', '_under_', 'under', false, true),
+      ('foo******deep*********baz', 'foo***deep***baz', 'deep', true, true),
+    ];
+
+    for (final entry in cases) {
+      await tester.pumpWidget(app(IanvsMarkdown(data: entry.$1)));
+      expect(
+        _renderedPlainTextContains(tester, entry.$2),
+        isTrue,
+        reason: entry.$1,
+      );
+      expect(_renderedTextIsBold(tester, entry.$3), entry.$4, reason: entry.$1);
+      expect(
+        _renderedTextIsItalic(tester, entry.$3),
+        entry.$5,
+        reason: entry.$1,
+      );
+    }
+  });
+
+  testWidgets('editing projects Obsidian inactive long emphasis runs', (
+    tester,
+  ) async {
+    const cases = <(String, String, String, bool, bool)>[
+      ('****quad****', '*quad*', 'quad', false, true),
+      ('*****quint*****', '**quint**', 'quint', true, false),
+      ('******six******', '***six***', 'six', true, true),
+      ('*******seven*******', 'seven', 'seven', false, false),
+      ('**right-four****', 'right-four*', 'right-four', true, false),
+      ('****left-four**', '*left-four', 'left-four', true, false),
+      ('***right-three****', 'right-three*', 'right-three', true, true),
+      ('****left-three***', '*left-three', 'left-three', true, true),
+    ];
+
+    for (final entry in cases) {
+      await tester.pumpWidget(
+        app(
+          IanvsMarkdown(
+            data: entry.$1,
+            obsidianMetadataMode: IanvsMarkdownObsidianMetadataMode.editing,
+          ),
+        ),
+      );
+      expect(
+        _renderedPlainTextContains(tester, entry.$2),
+        isTrue,
+        reason: entry.$1,
+      );
+      expect(_renderedTextIsBold(tester, entry.$3), entry.$4, reason: entry.$1);
+      expect(
+        _renderedTextIsItalic(tester, entry.$3),
+        entry.$5,
+        reason: entry.$1,
+      );
+    }
+  });
+
+  testWidgets('emphasis nesting preserves Obsidian syntax priority', (
+    tester,
+  ) async {
+    const source =
+        '**==outer-highlight==** ==**inner-highlight**==\n\n'
+        '**~~outer-strike~~** ~~**inner-strike**~~\n\n'
+        '**[outer-link](https://example.com)** '
+        '[**inner-link**](https://example.com)\n\n'
+        '**[[Note|outer-alias]]** [[Note|**inner-alias**]]\n\n'
+        '`**literal-code**` **`outer-code`**\n\n'
+        '%% **hidden-comment** %%';
+
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    for (final text in <String>[
+      'outer-highlight',
+      'inner-highlight',
+      'outer-strike',
+      'inner-strike',
+      'outer-link',
+      'inner-link',
+      'outer-alias',
+      'inner-alias',
+      'outer-code',
+    ]) {
+      expect(_renderedTextIsBold(tester, text), isTrue, reason: text);
+    }
+    for (final text in <String>['outer-highlight', 'inner-highlight']) {
+      expect(_renderedTextHasBackground(tester, text), isTrue, reason: text);
+    }
+    for (final text in <String>['outer-strike', 'inner-strike']) {
+      expect(
+        _renderedTextHasDecoration(tester, text, TextDecoration.lineThrough),
+        isTrue,
+        reason: text,
+      );
+    }
+    expect(_renderedTextIsBold(tester, 'literal-code'), isFalse);
+    expect(_renderedPlainTextContains(tester, 'hidden-comment'), isFalse);
   });
 
   test('strikethrough scan matches Obsidian runs and escape parity', () {

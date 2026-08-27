@@ -60,27 +60,6 @@ class IanvsMarkdownRenderedWhitespaceSyntax extends md.InlineSyntax {
   }
 }
 
-/// Matches Obsidian's asymmetric intraword underscore behavior.
-///
-/// Obsidian keeps a single underscore literal inside a word (`foo_bar_baz`),
-/// while a double-underscore run still forms strong text
-/// (`foo__bar__baz`). CommonMark deliberately rejects both intraword forms,
-/// so this syntax gets first refusal for the Obsidian-only strong variant.
-class IanvsMarkdownIntrawordStrongSyntax extends md.InlineSyntax {
-  IanvsMarkdownIntrawordStrongSyntax()
-    : super(
-        r'(?<=[A-Za-z0-9])__(\S(?:[^\n]*?\S)?)(?<!\\)__(?=[A-Za-z0-9])',
-        startCharacter: 0x5f,
-      );
-
-  @override
-  bool onMatch(md.InlineParser parser, Match match) {
-    final content = match.group(1)!;
-    parser.addNode(md.Element('strong', parser.document.parseInline(content)));
-    return true;
-  }
-}
-
 enum IanvsMarkdownCodeSpanPresentation { editing, reading }
 
 /// Matches Obsidian's code-span whitespace behavior in both live preview and

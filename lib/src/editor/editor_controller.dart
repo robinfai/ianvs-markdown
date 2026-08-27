@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../code_block.dart';
+import '../emphasis.dart';
 import '../footnote_syntax.dart';
 import '../highlight.dart';
 import '../obsidian_autolink.dart';
@@ -2665,70 +2666,12 @@ List<_SyntaxToken> _markdownSyntaxTokens(
   ];
   _addTagSyntaxTokens(tokens, text, theme, inlineSyntaxExcludedRanges);
   _addHighlightSyntaxTokens(tokens, text, theme, inlineSyntaxExcludedRanges);
-  _addDelimitedSyntaxTokens(
-    tokens,
-    text,
-    RegExp(
-      r'(?<!\*)(\*\*\*)(?!\*)(\S(?:(?:(?!\n[ \t]*\n)[\s\S])*?\S)?)(?<!\*)\*\*\*(?!\*)',
-    ),
-    theme.strong.merge(theme.emphasis),
-    theme.strong.merge(theme.emphasis),
-    inlineSyntaxExcludedRanges,
-  );
-  _addDelimitedSyntaxTokens(
-    tokens,
-    text,
-    RegExp(
-      r'(?<!_)(___)(?!_)(\S(?:(?:(?!\n[ \t]*\n)[\s\S])*?\S)?)(?<!_)___(?!_)',
-    ),
-    theme.strong.merge(theme.emphasis),
-    theme.strong.merge(theme.emphasis),
-    inlineSyntaxExcludedRanges,
-  );
-  _addDelimitedSyntaxTokens(
-    tokens,
-    text,
-    RegExp(
-      r'(?<!\*)(\*\*)(?!\*)(\S(?:(?:(?!\n[ \t]*\n)[\s\S])*?\S)?)(?<!\*)\*\*(?!\*)',
-    ),
-    theme.strong,
-    theme.strong,
-    inlineSyntaxExcludedRanges,
-  );
-  _addDelimitedSyntaxTokens(
-    tokens,
-    text,
-    RegExp(
-      r'(?<!_)(__)(?!_)(\S(?:(?:(?!\n[ \t]*\n)[\s\S])*?\S)?)(?<!_)__(?!_)',
-    ),
-    theme.strong,
-    theme.strong,
-    inlineSyntaxExcludedRanges,
-  );
+  _addEmphasisSyntaxTokens(tokens, text, theme, inlineSyntaxExcludedRanges);
   _addStrikethroughSyntaxTokens(
     tokens,
     text,
     theme,
     inlineSyntaxExcludedRanges,
-  );
-  _addDelimitedSyntaxTokens(
-    tokens,
-    text,
-    RegExp(
-      r'(?<!\*)(\*)(?!\*)(\S(?:(?:(?!\n[ \t]*\n)[\s\S])*?\S)?)(?<!\*)\*(?!\*)',
-    ),
-    theme.emphasis,
-    theme.emphasis,
-    inlineSyntaxExcludedRanges,
-  );
-  _addDelimitedSyntaxTokens(
-    tokens,
-    text,
-    RegExp(r'(?<!_)(_)(?!_)(\S(?:(?:(?!\n[ \t]*\n)[\s\S])*?\S)?)(?<!_)_(?!_)'),
-    theme.emphasis,
-    theme.emphasis,
-    inlineSyntaxExcludedRanges,
-    disallowIntraWord: true,
   );
   tokens.sort((a, b) => a.start.compareTo(b.start));
   return tokens;
@@ -3050,70 +2993,69 @@ void _appendHighlightedCodeSyntaxTokens(
   visit(span, baseStyle);
 }
 
-List<TextRange> _addDelimitedSyntaxTokens(
+void _addEmphasisSyntaxTokens(
   List<_SyntaxToken> target,
   String text,
-  RegExp pattern,
-  TextStyle contentStyle,
-  TextStyle markerStyle,
-  List<TextRange> excludedRanges, {
-  bool disallowIntraWord = false,
-}) {
-  final ranges = <TextRange>[];
-  for (final match in pattern.allMatches(text)) {
-    final marker = match.group(1)!;
-    final contentStart = match.start + marker.length;
-    final contentEnd = match.end - marker.length;
-    if (contentStart >= contentEnd) continue;
-    if (_containsMarkdownParagraphBreak(text, contentStart, contentEnd)) {
-      continue;
-    }
-    if (disallowIntraWord &&
-        ((_isMarkdownWordLikeAt(text, match.start - 1) &&
-                _isMarkdownWordLikeAt(text, contentStart)) ||
-            (_isMarkdownWordLikeAt(text, contentEnd - 1) &&
-                _isMarkdownWordLikeAt(text, match.end)))) {
-      continue;
-    }
-    if (_overlapsAnyRange(match.start, contentStart, excludedRanges) ||
-        _overlapsAnyRange(contentEnd, match.end, excludedRanges) ||
-        _isEscapedAt(text, match.start) ||
-        _isEscapedAt(text, contentEnd)) {
-      continue;
-    }
-    final revealRange = TextRange(start: match.start, end: match.end);
-    final openingLineEnd = text.indexOf('\n', contentStart);
-    final multiline = openingLineEnd >= 0 && openingLineEnd < contentEnd;
+  IanvsMarkdownSyntaxTheme theme,
+  List<TextRange> excludedRanges,
+) {
+  final scan = ianvsMarkdownEmphasisScan(text, excludedRanges: excludedRanges);
+  final markerTokens = <_SyntaxToken>[];
+  for (final match in scan.matches) {
+    final style = switch (match.kind) {
+      IanvsMarkdownEmphasisKind.emphasis => theme.emphasis,
+      IanvsMarkdownEmphasisKind.strong => theme.strong,
+    };
+    final revealRange = match.sourceRange;
+    final openingLineEnd = text.indexOf('\n', match.content.start);
+    final multiline = openingLineEnd >= 0 && openingLineEnd < match.content.end;
     final closingLineStart = multiline
-        ? text.lastIndexOf('\n', contentEnd - 1) + 1
-        : match.start;
+        ? text.lastIndexOf('\n', match.content.end - 1) + 1
+        : revealRange.start;
     final openingRevealRange = multiline
-        ? TextRange(start: match.start, end: openingLineEnd)
+        ? TextRange(start: revealRange.start, end: openingLineEnd)
         : revealRange;
     final closingRevealRange = multiline
-        ? TextRange(start: closingLineStart, end: match.end)
+        ? TextRange(start: closingLineStart, end: revealRange.end)
         : revealRange;
-    ranges.add(revealRange);
-    target
+    markerTokens
       ..add(
         _SyntaxToken(
-          match.start,
-          contentStart,
-          markerStyle,
+          match.openingDelimiter.start,
+          match.openingDelimiter.end,
+          style,
           inlineMarkerRange: openingRevealRange,
         ),
       )
-      ..add(_SyntaxToken(contentStart, contentEnd, contentStyle))
       ..add(
         _SyntaxToken(
-          contentEnd,
-          match.end,
-          markerStyle,
+          match.closingDelimiter.start,
+          match.closingDelimiter.end,
+          style,
           inlineMarkerRange: closingRevealRange,
         ),
       );
+    target.add(_SyntaxToken(match.content.start, match.content.end, style));
   }
-  return ranges;
+  markerTokens.sort((a, b) => a.start.compareTo(b.start));
+  final mergedMarkers = <_SyntaxToken>[];
+  for (final marker in markerTokens) {
+    if (mergedMarkers.isNotEmpty) {
+      final previous = mergedMarkers.last;
+      if (previous.end == marker.start &&
+          previous.inlineMarkerRange == marker.inlineMarkerRange) {
+        mergedMarkers[mergedMarkers.length - 1] = _SyntaxToken(
+          previous.start,
+          marker.end,
+          previous.style.merge(marker.style),
+          inlineMarkerRange: previous.inlineMarkerRange,
+        );
+        continue;
+      }
+    }
+    mergedMarkers.add(marker);
+  }
+  target.addAll(mergedMarkers);
 }
 
 void _addStrikethroughSyntaxTokens(
@@ -3232,19 +3174,6 @@ void _addHighlightSyntaxTokens(
       );
     }
   }
-}
-
-bool _isMarkdownWordLikeAt(String text, int index) {
-  if (index < 0 || index >= text.length) return false;
-  final codeUnit = text.codeUnitAt(index);
-  if (_isMarkdownWhitespaceAt(text, index) || _isAsciiPunctuation(codeUnit)) {
-    return false;
-  }
-  // Common prose characters, including non-ASCII letters and digits, are
-  // word-like for delimiter flanking. Treating symbols the same way is the
-  // conservative choice: it prevents a stray underscore from becoming
-  // emphasis in the middle of an uninterrupted token.
-  return true;
 }
 
 List<TextRange> _addInlineCodeSyntaxTokens(

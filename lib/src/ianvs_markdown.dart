@@ -6,6 +6,7 @@ import 'blocked_image.dart';
 import 'callout.dart';
 import 'code_block.dart';
 import 'code_surface.dart';
+import 'emphasis.dart';
 import 'front_matter_card.dart';
 import 'heading_folding.dart';
 import 'highlight.dart';
@@ -289,7 +290,12 @@ class IanvsMarkdown extends StatelessWidget {
       // Metadata syntaxes such as block IDs include their leading space, so
       // they must get first refusal before rendered whitespace is collapsed.
       IanvsMarkdownRenderedWhitespaceSyntax(),
-      IanvsMarkdownIntrawordStrongSyntax(),
+      IanvsMarkdownEmphasisSyntax(
+        presentation:
+            obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing
+            ? IanvsMarkdownEmphasisPresentation.editing
+            : IanvsMarkdownEmphasisPresentation.reading,
+      ),
       IanvsMarkdownHighlightSyntax(
         presentation:
             obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing

@@ -118,6 +118,8 @@ IanvsMarkdown(
 
 `==高亮==` 同样使用 Obsidian 1.13.7 的边界：inner 首尾为空格或 Tab、空内容和纯空白内容都保持字面值；合法闭合高亮可以跨一个 soft break，但不能跨空行，未闭合 opening 只着色到当前物理行末。Reading 每侧只隐藏成对的两个 `=` 并保留 surplus，非活动 Live Preview 会隐藏参与语法的完整等号 run，活动块恢复精确源码；`==one====two==` 仍是两个相邻高亮。奇偶反斜线、行内/围栏代码和注释优先级在渲染与源码着色中一致，普通链接和 Wiki alias 内也能叠加高亮，双击正文会选中完整 delimiter 范围。
 
+粗体与斜体使用 Obsidian 1.13.7 的 delimiter-run、左右 flanking 和 rule-of-three 语义：星号允许 `foo*bar*baz` 这样的 intraword emphasis，单/双下划线在 `foo_bar_baz`、`foo__bar__baz` 中均保持字面值；inner 首尾空格或 Tab、奇偶反斜线、soft break 与空段落边界也按实测解析。长 run 在 Reading 与非活动 Live Preview 有意采用不同投影：对称 4/5/6/7 星号在 Reading 分别显示 `**strong**`、`*em*`、`**strong-em**`、`***plain***` 的可见 surplus，而 Live Preview 分别保留 1/2/3/0 枚 marker，并使用 em/strong/两者/plain 样式；2/4、4/2、3/4、4/3、3/2、2/3、4/1、1/4 与 6/9 非对称 run 也保留各自实测 surplus。strong/em 可与 highlight、strikethrough、普通链接、Wiki alias 和标签叠加，代码与 `%%注释%%` 优先；源码 token 与 delimiter stack 共用扫描结果，双击三星号正文会选择完整 `***source***`。
+
 删除线按 Obsidian 的双波浪号规则解析：`~single~` 始终是字面值，inner 首尾空格或 Tab 会使闭合 pair 失效；奇数 run 在 Reading 保留一枚 surplus，偶数 pair 可继续消费，4/2 与 2/4 的多余 pair 显示在删除线正文之后，`~~one~~~~two~~` 则形成两个相邻删除线。非活动 Live Preview 会隐藏参与语法的完整连续 run，包括 Reading 可见的 surplus；闭合 pair 可跨 soft break，未闭合 opening 只作用到当前物理行末，空行终止范围。奇偶反斜线、strong/emphasis/highlight、普通链接、Wiki alias、标签以及行内/围栏代码和注释的优先级均与实测一致，双击删除线正文会选中完整 `~~source~~` 范围。
 
 块 ID 支持字母、数字、连字符和下划线，可位于块末或独占一行；独占标记会与前一个段落、标题、列表、引用、Callout、表格、分隔线或公式块保持同一编辑块。有效标记必须由空白分隔并严格结束该行，因此尾随空格、点号、冒号、中文、空 `^` 和行末标点都会保持字面值；同一行存在多个候选时只隐藏最后一个。奇数反斜线转义 `^`，偶数反斜线保留斜线并继续识别块 ID，行内代码、围栏代码、URL 和 Wiki 块引用始终优先。
