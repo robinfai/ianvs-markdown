@@ -450,6 +450,25 @@ typed:
 Body
 ''',
     );
+    expect(
+      replaceMarkdownFrontMatterListValue(
+        source,
+        entry('aliases'),
+        const <String>[],
+      ),
+      '''
+---
+tags:
+  - one
+  - two
+aliases:
+typed:
+  - one
+  - 2
+---
+Body
+''',
+    );
 
     final stale = source.replaceFirst('tags:', 'draft: true\ntags:');
     expect(
@@ -474,16 +493,21 @@ Body
 ---
 title: Alpha
 tags:
+aliases:
 empty:
 ---
 Body
 ''';
     final document = parseMarkdownFrontMatter(source);
     final tags = document.entries.firstWhere((entry) => entry.key == 'tags');
+    final aliases = document.entries.firstWhere(
+      (entry) => entry.key == 'aliases',
+    );
     final empty = document.entries.firstWhere((entry) => entry.key == 'empty');
 
     expect(tags.type, MarkdownMetadataValueType.empty);
     expect(tags.listValuesEditable, isTrue);
+    expect(aliases.listValuesEditable, isTrue);
     expect(empty.listValuesEditable, isFalse);
     expect(
       replaceMarkdownFrontMatterListValue(source, tags, const ['three']),
@@ -492,6 +516,22 @@ Body
 title: Alpha
 tags:
   - three
+aliases:
+empty:
+---
+Body
+''',
+    );
+    expect(
+      replaceMarkdownFrontMatterListValue(source, aliases, const [
+        'Alias Three',
+      ]),
+      '''
+---
+title: Alpha
+tags:
+aliases:
+  - Alias Three
 empty:
 ---
 Body

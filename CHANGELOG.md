@@ -11,6 +11,9 @@
   immediately, removing the last item preserves an empty `tags:` property,
   and Tab/Enter adds a block-list value from either populated or empty state.
   Typed, nested, truncated, or oversized lists remain source-only.
+- Add neutral editable alias chips for complete string sequences. Removing an
+  alias immediately rewrites safe flow lists, removing the last item preserves
+  `aliases:`, and Tab adds a block-list alias from an empty property.
 - Add in-place property-key renaming with Tab, Enter, and focus-loss commits,
   Escape cancellation, exact source-order and value-type preservation, YAML
   quoting for ambiguous names, and empty/case-insensitive duplicate/lossy-key

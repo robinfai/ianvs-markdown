@@ -4741,6 +4741,89 @@ aliases:
     );
   });
 
+  testWidgets('alias properties remove and Tab-add without opening YAML', (
+    tester,
+  ) async {
+    const source = '''
+---
+title: Alpha
+aliases: [Alias One, Alias Two]
+tags: [one, two]
+---
+# Body
+''';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(
+        const ValueKey('ianvs-markdown-front-matter-chip-remove-aliases-1'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.text, '''
+---
+title: Alpha
+aliases:
+  - Alias One
+tags:
+  - one
+  - two
+---
+# Body
+''');
+
+    controller.undo();
+    await tester.pumpAndSettle();
+    expect(controller.text, source);
+    controller.redo();
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(
+        const ValueKey('ianvs-markdown-front-matter-chip-remove-aliases-0'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.text, '''
+---
+title: Alpha
+aliases:
+tags:
+  - one
+  - two
+---
+# Body
+''');
+
+    final input = find.byKey(
+      const ValueKey('ianvs-markdown-front-matter-list-input-aliases'),
+    );
+    expect(input, findsOneWidget);
+    expect(tester.widget<TextField>(input).decoration?.hintText, '添加别名');
+    await tester.tap(input);
+    await tester.enterText(input, 'Alias Three');
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+    expect(controller.text, '''
+---
+title: Alpha
+aliases:
+  - Alias Three
+tags:
+  - one
+  - two
+---
+# Body
+''');
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
+  });
+
   testWidgets('lossy typed tag lists remain presentation-only', (tester) async {
     const source = '''
 ---

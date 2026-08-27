@@ -714,16 +714,21 @@ class _ObsidianMetadataValue extends StatelessWidget {
       );
     }
     final tags = normalizedKey == 'tags' || normalizedKey == 'tag';
-    if (tags && entry.listValuesEditable && onListChanged != null) {
+    final aliases = normalizedKey == 'aliases' || normalizedKey == 'alias';
+    if ((tags || aliases) &&
+        entry.listValuesEditable &&
+        onListChanged != null) {
       return _ObsidianEditableListValue(
         key: ValueKey('ianvs-markdown-front-matter-list-editor-${entry.key}'),
         entry: entry,
         colors: colors,
+        tag: tags,
+        hintText: tags ? '添加标签' : '添加别名',
+        commitOnSubmitted: tags,
         onChanged: onListChanged!,
       );
     }
     if (items.isNotEmpty) {
-      final aliases = normalizedKey == 'aliases' || normalizedKey == 'alias';
       final cssClasses =
           normalizedKey == 'cssclasses' || normalizedKey == 'cssclass';
       if (cssClasses) {
@@ -783,11 +788,17 @@ class _ObsidianEditableListValue extends StatefulWidget {
     super.key,
     required this.entry,
     required this.colors,
+    required this.tag,
+    required this.hintText,
+    required this.commitOnSubmitted,
     required this.onChanged,
   });
 
   final MarkdownMetadataEntry entry;
   final IanvsMarkdownThemeData colors;
+  final bool tag;
+  final String hintText;
+  final bool commitOnSubmitted;
   final IanvsMarkdownMetadataListChanged onChanged;
 
   @override
@@ -878,7 +889,7 @@ class _ObsidianEditableListValueState
               'ianvs-markdown-front-matter-chip-${widget.entry.key}-$index',
             ),
             value: _items[index],
-            tag: true,
+            tag: widget.tag,
             linksEnabled: false,
             colors: widget.colors,
             onTapLink: null,
@@ -904,7 +915,9 @@ class _ObsidianEditableListValueState
                 smartQuotesType: SmartQuotesType.disabled,
                 autocorrect: false,
                 enableSuggestions: false,
-                onSubmitted: (_) => _commitInput(),
+                onSubmitted: widget.commitOnSubmitted
+                    ? (_) => _commitInput()
+                    : null,
                 onTapOutside: (_) => _focusNode.unfocus(),
                 style: TextStyle(
                   color: widget.colors.textPrimary,
@@ -914,7 +927,7 @@ class _ObsidianEditableListValueState
                 cursorColor: widget.colors.accent,
                 decoration: InputDecoration(
                   isDense: true,
-                  hintText: _items.isEmpty ? '添加标签' : null,
+                  hintText: _items.isEmpty ? widget.hintText : null,
                   hintStyle: TextStyle(
                     color: widget.colors.textTertiary,
                     fontSize: 10.5,
