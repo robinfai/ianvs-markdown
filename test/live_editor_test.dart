@@ -10761,6 +10761,258 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
   );
 
   testWidgets(
+    'table smart paste targets the focused cell instead of stale selection',
+    (tester) async {
+      const url = 'https://example.com';
+      const source =
+          'pre\n\n'
+          '| H | I |\n'
+          '| --- | --- |\n'
+          '| alpha | beta |\n\n'
+          'post';
+      const expected =
+          'pre\n\n'
+          '| H | I |\n'
+          '| --- | --- |\n'
+          '| [alpha](https://example.com) | beta |\n\n'
+          'post';
+      final controller = IanvsMarkdownController(text: source)
+        ..selection = const TextSelection(baseOffset: 0, extentOffset: 3);
+      addTearDown(controller.dispose);
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (methodCall) async => methodCall.method == 'Clipboard.getData'
+            ? const <String, dynamic>{'text': url}
+            : null,
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+      final cell = find.byKey(const ValueKey('ianvs-markdown-table-1-0'));
+      await tester.tap(cell);
+      tester.widget<TextField>(cell).controller?.selection =
+          const TextSelection(baseOffset: 0, extentOffset: 5);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyV);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+
+      expect(controller.text, expected);
+      expect(tester.widget<TextField>(cell).controller?.text, '[alpha]($url)');
+
+      controller.undo();
+      await tester.pumpAndSettle();
+      expect(controller.text, source);
+      expect(tester.widget<TextField>(cell).controller?.text, 'alpha');
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
+    'table Option+Backspace deletes focused cell Markdown punctuation',
+    (tester) async {
+      const source =
+          '**doc**\n\n'
+          '| H | I |\n'
+          '| --- | --- |\n'
+          '| **cell** | beta |';
+      const expected =
+          '**doc**\n\n'
+          '| H | I |\n'
+          '| --- | --- |\n'
+          '| **cell | beta |';
+      final documentCaret = source.indexOf('**doc**') + '**doc**'.length;
+      final controller = IanvsMarkdownController(text: source)
+        ..selection = TextSelection.collapsed(offset: documentCaret);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+      final cell = find.byKey(const ValueKey('ianvs-markdown-table-1-0'));
+      await tester.tap(cell);
+      tester.widget<TextField>(cell).controller?.selection =
+          const TextSelection.collapsed(offset: '**cell**'.length);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+      await tester.pumpAndSettle();
+
+      expect(controller.text, expected);
+      expect(tester.widget<TextField>(cell).controller?.text, '**cell');
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
+    'table Option+Left moves within focused cell Markdown punctuation',
+    (tester) async {
+      const source =
+          '**doc**\n\n'
+          '| H | I |\n'
+          '| --- | --- |\n'
+          '| **cell** | beta |';
+      final documentCaret = source.indexOf('**doc**') + '**doc**'.length;
+      final controller = IanvsMarkdownController(text: source)
+        ..selection = TextSelection.collapsed(offset: documentCaret);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+      final cell = find.byKey(const ValueKey('ianvs-markdown-table-1-0'));
+      await tester.tap(cell);
+      tester.widget<TextField>(cell).controller?.selection =
+          const TextSelection.collapsed(offset: '**cell**'.length);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+      await tester.pumpAndSettle();
+
+      expect(controller.text, source);
+      expect(
+        controller.selection,
+        TextSelection.collapsed(offset: documentCaret),
+      );
+      expect(
+        tester.widget<TextField>(cell).controller?.selection,
+        const TextSelection.collapsed(offset: 6),
+      );
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
+    'table Option+Delete deletes forward focused cell punctuation',
+    (tester) async {
+      const source =
+          '**doc**\n\n'
+          '| H | I |\n'
+          '| --- | --- |\n'
+          '| **cell** | beta |';
+      const expected =
+          '**doc**\n\n'
+          '| H | I |\n'
+          '| --- | --- |\n'
+          '| cell** | beta |';
+      final controller = IanvsMarkdownController(text: source)
+        ..selection = const TextSelection.collapsed(offset: 0);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+      final cell = find.byKey(const ValueKey('ianvs-markdown-table-1-0'));
+      await tester.tap(cell);
+      tester.widget<TextField>(cell).controller?.selection =
+          const TextSelection.collapsed(offset: 0);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.delete);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+      await tester.pumpAndSettle();
+
+      expect(controller.text, expected);
+      expect(tester.widget<TextField>(cell).controller?.text, 'cell**');
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
+    'table Shift+Option+Right extends within focused cell punctuation',
+    (tester) async {
+      const source =
+          '**doc**\n\n'
+          '| H | I |\n'
+          '| --- | --- |\n'
+          '| **cell** | beta |';
+      final controller = IanvsMarkdownController(text: source)
+        ..selection = const TextSelection.collapsed(offset: 0);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+      final cell = find.byKey(const ValueKey('ianvs-markdown-table-1-0'));
+      await tester.tap(cell);
+      tester.widget<TextField>(cell).controller?.selection =
+          const TextSelection.collapsed(offset: 0);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.pumpAndSettle();
+
+      expect(controller.text, source);
+      expect(controller.selection, const TextSelection.collapsed(offset: 0));
+      expect(
+        tester.widget<TextField>(cell).controller?.selection,
+        const TextSelection(
+          baseOffset: 0,
+          extentOffset: 2,
+          isDirectional: true,
+        ),
+      );
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
+    'table Option+Backspace keeps native fallback inside a plain cell',
+    (tester) async {
+      const source =
+          '**doc**\n\n'
+          '| H | I |\n'
+          '| --- | --- |\n'
+          '| alpha | beta |';
+      const expected =
+          '**doc**\n\n'
+          '| H | I |\n'
+          '| --- | --- |\n'
+          '|  | beta |';
+      final documentCaret = source.indexOf('**doc**') + '**doc**'.length;
+      final controller = IanvsMarkdownController(text: source)
+        ..selection = TextSelection.collapsed(offset: documentCaret);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+      final cell = find.byKey(const ValueKey('ianvs-markdown-table-1-0'));
+      await tester.tap(cell);
+      tester.widget<TextField>(cell).controller?.selection =
+          const TextSelection.collapsed(offset: 'alpha'.length);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+      await tester.pumpAndSettle();
+
+      expect(controller.text, expected);
+      expect(tester.widget<TextField>(cell).controller?.text, isEmpty);
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
     'table Command+D deletes the focused physical row',
     (tester) async {
       const source =

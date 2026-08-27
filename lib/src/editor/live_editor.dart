@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' show BoxHeightStyle, PointerDeviceKind;
 
 import 'package:flutter/foundation.dart';
@@ -33,6 +34,7 @@ import 'editor_controller.dart';
 import 'editor_models.dart';
 import 'editor_shortcuts.dart';
 import 'editor_toolbar.dart';
+import 'markdown_paste.dart';
 import 'reference_links.dart';
 import 'source_editor.dart';
 
@@ -4655,6 +4657,127 @@ int _liveListIndentationColumns(String source) {
 bool _isMarkerOnlyListSource(String source) =>
     RegExp(r'^[ \t]*(?:[-+*]|\d{1,9}[.)])[ \t]*$').hasMatch(source);
 
+class _TablePasteAction extends ContextAction<PasteTextIntent> {
+  _TablePasteAction({required this.controller, required this.onChanged});
+
+  final TextEditingController controller;
+  final ValueChanged<TextEditingValue> onChanged;
+
+  @override
+  Object? invoke(PasteTextIntent intent, [BuildContext? context]) {
+    final defaultAction = callingAction;
+    final selection = controller.selection;
+    if (!selection.isValid || selection.isCollapsed) {
+      return defaultAction?.invoke(intent);
+    }
+    unawaited(_pasteSelectedText(intent, defaultAction));
+    return null;
+  }
+
+  Future<void> _pasteSelectedText(
+    PasteTextIntent intent,
+    Action<PasteTextIntent>? defaultAction,
+  ) async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final pastedText = data?.text;
+    final replacement = pastedText == null
+        ? null
+        : smartUrlPasteValue(controller.value, pastedText);
+    if (replacement == null) {
+      defaultAction?.invoke(intent);
+      return;
+    }
+    controller.value = replacement;
+    onChanged(replacement);
+  }
+}
+
+TextEditingValue? _runTableMarkdownCommand(
+  TextEditingValue value,
+  bool Function(IanvsMarkdownController controller) command,
+) {
+  final commandController = IanvsMarkdownController(text: value.text)
+    ..value = value.copyWith(composing: TextRange.empty);
+  final handled = command(commandController);
+  final replacement = handled ? commandController.value : null;
+  commandController.dispose();
+  return replacement;
+}
+
+class _TableWordDeletionAction
+    extends ContextAction<DeleteToNextWordBoundaryIntent> {
+  _TableWordDeletionAction({required this.controller, required this.onChanged});
+
+  final TextEditingController controller;
+  final ValueChanged<TextEditingValue> onChanged;
+
+  @override
+  Object? invoke(
+    DeleteToNextWordBoundaryIntent intent, [
+    BuildContext? context,
+  ]) {
+    final replacement = _runTableMarkdownCommand(
+      controller.value,
+      (commandController) => commandController.deleteMarkdownPunctuationSegment(
+        forward: intent.forward,
+      ),
+    );
+    if (replacement == null) return callingAction?.invoke(intent);
+    controller.value = replacement;
+    onChanged(replacement);
+    return null;
+  }
+}
+
+class _TableWordMovementAction
+    extends ContextAction<ExtendSelectionToNextWordBoundaryIntent> {
+  _TableWordMovementAction(this.controller);
+
+  final TextEditingController controller;
+
+  @override
+  Object? invoke(
+    ExtendSelectionToNextWordBoundaryIntent intent, [
+    BuildContext? context,
+  ]) {
+    final replacement = _runTableMarkdownCommand(
+      controller.value,
+      (commandController) => commandController.moveAcrossMarkdownPunctuation(
+        forward: intent.forward,
+        extendSelection: !intent.collapseSelection,
+      ),
+    );
+    if (replacement == null) return callingAction?.invoke(intent);
+    controller.value = replacement;
+    return null;
+  }
+}
+
+class _TableWordSelectionAction
+    extends
+        ContextAction<ExtendSelectionToNextWordBoundaryOrCaretLocationIntent> {
+  _TableWordSelectionAction(this.controller);
+
+  final TextEditingController controller;
+
+  @override
+  Object? invoke(
+    ExtendSelectionToNextWordBoundaryOrCaretLocationIntent intent, [
+    BuildContext? context,
+  ]) {
+    final replacement = _runTableMarkdownCommand(
+      controller.value,
+      (commandController) => commandController.moveAcrossMarkdownPunctuation(
+        forward: intent.forward,
+        extendSelection: true,
+      ),
+    );
+    if (replacement == null) return callingAction?.invoke(intent);
+    controller.value = replacement;
+    return null;
+  }
+}
+
 class _EditableMarkdownTable extends StatefulWidget {
   const _EditableMarkdownTable({
     required this.block,
@@ -5285,52 +5408,71 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                               final editor = Focus(
                                 onKeyEvent: (_, event) =>
                                     _handleCellKey(cell, event),
-                                child: Listener(
-                                  behavior: HitTestBehavior.translucent,
-                                  onPointerDown: (_) {
-                                    _clearTableSelection();
+                                child: Actions(
+                                  actions: <Type, Action<Intent>>{
+                                    PasteTextIntent: _TablePasteAction(
+                                      controller: controller,
+                                      onChanged: (value) =>
+                                          widget.onCellFormatted(cell, value),
+                                    ),
+                                    DeleteToNextWordBoundaryIntent:
+                                        _TableWordDeletionAction(
+                                          controller: controller,
+                                          onChanged: (value) => widget
+                                              .onCellFormatted(cell, value),
+                                        ),
+                                    ExtendSelectionToNextWordBoundaryIntent:
+                                        _TableWordMovementAction(controller),
+                                    ExtendSelectionToNextWordBoundaryOrCaretLocationIntent:
+                                        _TableWordSelectionAction(controller),
                                   },
-                                  child: TextField(
-                                    key: ValueKey(
-                                      'ianvs-markdown-table-${cell.key}',
-                                    ),
-                                    controller: controller,
-                                    focusNode: focusNode,
-                                    maxLines: null,
-                                    keyboardType: TextInputType.text,
-                                    textInputAction: TextInputAction.next,
-                                    smartDashesType: SmartDashesType.disabled,
-                                    smartQuotesType: SmartQuotesType.disabled,
-                                    autocorrect: false,
-                                    enableSuggestions: false,
-                                    inputFormatters: [
-                                      FilteringTextInputFormatter.deny(
-                                        RegExp(r'[\r\n|]'),
+                                  child: Listener(
+                                    behavior: HitTestBehavior.translucent,
+                                    onPointerDown: (_) {
+                                      _clearTableSelection();
+                                    },
+                                    child: TextField(
+                                      key: ValueKey(
+                                        'ianvs-markdown-table-${cell.key}',
                                       ),
-                                    ],
-                                    textAlign: cell.alignment,
-                                    style: TextStyle(
-                                      color: widget.colors.textPrimary,
-                                      fontSize: 13.5,
-                                      height: 1.35,
-                                      fontWeight: cell.isHeader
-                                          ? FontWeight.w600
-                                          : FontWeight.w400,
-                                    ),
-                                    cursorColor: widget.colors.accent,
-                                    cursorWidth: 1.5,
-                                    decoration: const InputDecoration(
-                                      border: InputBorder.none,
-                                      enabledBorder: InputBorder.none,
-                                      focusedBorder: InputBorder.none,
-                                      isCollapsed: true,
-                                      contentPadding: EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 4.5,
+                                      controller: controller,
+                                      focusNode: focusNode,
+                                      maxLines: null,
+                                      keyboardType: TextInputType.text,
+                                      textInputAction: TextInputAction.next,
+                                      smartDashesType: SmartDashesType.disabled,
+                                      smartQuotesType: SmartQuotesType.disabled,
+                                      autocorrect: false,
+                                      enableSuggestions: false,
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.deny(
+                                          RegExp(r'[\r\n|]'),
+                                        ),
+                                      ],
+                                      textAlign: cell.alignment,
+                                      style: TextStyle(
+                                        color: widget.colors.textPrimary,
+                                        fontSize: 13.5,
+                                        height: 1.35,
+                                        fontWeight: cell.isHeader
+                                            ? FontWeight.w600
+                                            : FontWeight.w400,
                                       ),
+                                      cursorColor: widget.colors.accent,
+                                      cursorWidth: 1.5,
+                                      decoration: const InputDecoration(
+                                        border: InputBorder.none,
+                                        enabledBorder: InputBorder.none,
+                                        focusedBorder: InputBorder.none,
+                                        isCollapsed: true,
+                                        contentPadding: EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4.5,
+                                        ),
+                                      ),
+                                      onChanged: (value) =>
+                                          widget.onCellChanged(cell, value),
                                     ),
-                                    onChanged: (value) =>
-                                        widget.onCellChanged(cell, value),
                                   ),
                                 ),
                               );
