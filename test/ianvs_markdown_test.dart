@@ -3755,6 +3755,10 @@ visible''';
       r'`inline ^code-id`',
     );
     expect(
+      prepareObsidianMarkdownForRendering(r'`| ^inline-cell |`'),
+      r'`| ^inline-cell |`',
+    );
+    expect(
       prepareObsidianMarkdownForRendering(
         '''
 ```
@@ -3768,6 +3772,32 @@ fenced ^fence-id
 ```'''
           .trim(),
     );
+    expect(
+      prepareObsidianMarkdownForRendering(
+        '    code ^indented-id\n\t| ^indented-cell |',
+      ),
+      '    code ^indented-id\n\t| ^indented-cell |',
+    );
+  });
+
+  testWidgets('reading keeps block IDs literal in indented code', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(
+          data: '    code ^indented-id\n\t| ^indented-cell |',
+        ),
+      ),
+    );
+
+    final rendered = tester.widget<SelectableText>(
+      find.descendant(
+        of: find.byType(IanvsMarkdownIndentedCodeBlock),
+        matching: find.byType(SelectableText),
+      ),
+    );
+    expect(rendered.data, 'code ^indented-id\n| ^indented-cell |');
   });
 
   test('block IDs only consume a Markdown block-ending marker', () {

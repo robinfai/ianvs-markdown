@@ -3561,6 +3561,13 @@ paired %%secret%%
       r'`inline ^code-id`',
     ).singleWhere((span) => span.text?.contains('^code-id') ?? false);
     expect(inlineCode.style?.fontFamily, 'monospace');
+
+    const indentedCode = '    code ^indented-id\n\t| ^indented-cell |';
+    expect(metadataFor(indentedCode), isEmpty);
+    expect(
+      spansFor(indentedCode).map((span) => span.text).join(),
+      indentedCode,
+    );
   });
 
   test('live source only styles block IDs at Markdown block ends', () {

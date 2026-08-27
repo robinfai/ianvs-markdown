@@ -1,5 +1,8 @@
 ## Unreleased
 
+- Keep trailing and table-cell-shaped `^block-id` text literal inside inline,
+  fenced, and true indented code blocks across Reading, source styling, and
+  Live Preview.
 - Prevent comment-shaped text inside inline, fenced, or indented code from
   prematurely closing an outer Obsidian comment; source styling and Reading
   now consume the complete outer range.

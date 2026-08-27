@@ -27,7 +27,7 @@ final RegExp _obsidianCommentFencePattern = RegExp(
 /// unescaped close remains ordinary source text.
 List<TextRange> ianvsMarkdownCommentRanges(String source) {
   final ranges = <TextRange>[];
-  final codeRanges = _obsidianCommentCodeRanges(source);
+  final codeRanges = _obsidianLiteralCodeRanges(source);
   var index = 0;
   var codeRangeIndex = 0;
   var lineStart = true;
@@ -134,7 +134,7 @@ List<TextRange> ianvsMarkdownCommentRanges(String source) {
   return List<TextRange>.unmodifiable(ranges);
 }
 
-List<TextRange> _obsidianCommentCodeRanges(String source) {
+List<TextRange> _obsidianLiteralCodeRanges(String source) {
   final ranges = <TextRange>[];
   for (final block in parseMarkdownBlocks(
     source,
@@ -232,7 +232,7 @@ final RegExp _obsidianTableBlockIdPattern = RegExp(
   r'\|([ \t]*)(\\*)\^([A-Za-z0-9_-]+)([ \t]*)(?=\|)',
 );
 
-/// Finds Obsidian block identifiers outside comments and fenced code.
+/// Finds Obsidian block identifiers outside comments and literal code.
 ///
 /// A normal identifier ends its Markdown block, may be followed by ASCII
 /// spaces, and is either standalone or separated from preceding content by
@@ -242,6 +242,7 @@ final RegExp _obsidianTableBlockIdPattern = RegExp(
 List<TextRange> ianvsMarkdownBlockIdRanges(String source) {
   final ranges = <TextRange>[];
   final commentRanges = ianvsMarkdownCommentRanges(source);
+  final codeRanges = _obsidianLiteralCodeRanges(source);
   final blocks = parseMarkdownBlocks(source);
   final lines = source.split('\n');
   var offset = 0;
@@ -279,7 +280,10 @@ List<TextRange> ianvsMarkdownBlockIdRanges(String source) {
         start: offset + caret,
         end: offset + caret + 1 + match.group(3)!.length,
       );
-      if (!_overlapsMetadataRange(range, commentRanges)) ranges.add(range);
+      if (!_overlapsMetadataRange(range, commentRanges) &&
+          !_overlapsMetadataRange(range, codeRanges)) {
+        ranges.add(range);
+      }
     }
 
     final trailing = _obsidianTrailingBlockIdPattern.firstMatch(line);
@@ -291,6 +295,7 @@ List<TextRange> ianvsMarkdownBlockIdRanges(String source) {
           end: offset + trailing.end,
         );
         if (!_overlapsMetadataRange(range, commentRanges) &&
+            !_overlapsMetadataRange(range, codeRanges) &&
             !_overlapsMetadataRange(range, ranges) &&
             _endsMarkdownBlock(range.end, blocks)) {
           ranges.add(range);

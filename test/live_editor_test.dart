@@ -7494,9 +7494,9 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     (tester) async {
       const source =
           'Before.\n\n'
-          '    const first = %%inside%%;\n'
+          '    const first = %%inside%%; ^inside-id\n'
           '\n'
-          '\treturn %%tab%% first;\n\n'
+          '\treturn %%tab%% first; ^tab-id\n\n'
           'After.';
       final controller = IanvsMarkdownController(text: source);
       addTearDown(controller.dispose);
@@ -7510,8 +7510,8 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
       );
       expect(find.byType(IanvsMarkdownCodeBlock), findsNothing);
       expect(find.byTooltip('复制'), findsNothing);
-      expect(find.text('const first = %%inside%%;'), findsOneWidget);
-      expect(find.text('return %%tab%% first;'), findsOneWidget);
+      expect(find.text('const first = %%inside%%; ^inside-id'), findsOneWidget);
+      expect(find.text('return %%tab%% first; ^tab-id'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('ianvs-markdown-indented-code-line-1')),
         findsOneWidget,
@@ -7522,7 +7522,7 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
       final lineDecoration = firstLine.decoration! as BoxDecoration;
       expect((lineDecoration.border! as Border).left.width, 1);
 
-      await tester.tap(find.text('const first = %%inside%%;'));
+      await tester.tap(find.text('const first = %%inside%%; ^inside-id'));
       await tester.pumpAndSettle();
       final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
       final field = tester.widget<TextField>(
@@ -7530,7 +7530,8 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
       );
       expect(
         field.controller?.text,
-        '    const first = %%inside%%;\n\n\treturn %%tab%% first;',
+        '    const first = %%inside%%; ^inside-id\n\n'
+        '\treturn %%tab%% first; ^tab-id',
       );
       expect(controller.text, source);
     },
