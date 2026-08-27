@@ -54,10 +54,7 @@ String _serializeDefinition(md.LinkReference reference) {
   ).replaceAll('\r', '').replaceAll('\n', ' ');
   final title = reference.title;
   if (title == null || title.isEmpty) return '[$label]: <$destination>';
-  final escapedTitle = _escapeUnescaped(
-    title,
-    0x22,
-  ).replaceAll('\r', '').replaceAll('\n', ' ');
+  final escapedTitle = _escapeUnescaped(title, 0x22).replaceAll('\r', '');
   return '[$label]: <$destination> "$escapedTitle"';
 }
 

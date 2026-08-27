@@ -24,6 +24,22 @@ void main() {
     }
   });
 
+  test('isolated reference definitions preserve multiline titles', () {
+    const document =
+        '[click][ref]\n\n'
+        '[ref]: /docs\n'
+        '"line one\n'
+        'line two"';
+    final context = MarkdownLinkReferenceContext.parse(document);
+    final isolated = context.appendDefinitionsTo('[click][ref]');
+
+    expect(isolated, '[click][ref]\n\n[ref]: </docs> "line one\nline two"');
+    expect(
+      md.markdownToHtml(isolated, extensionSet: md.ExtensionSet.gitHubFlavored),
+      md.markdownToHtml(document, extensionSet: md.ExtensionSet.gitHubFlavored),
+    );
+  });
+
   test('isolated blocks receive only definitions they reference', () {
     const source =
         '[first]: docs/first.md\n'
