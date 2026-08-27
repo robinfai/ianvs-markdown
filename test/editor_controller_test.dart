@@ -3495,6 +3495,40 @@ paired %%secret%%
     );
   });
 
+  test('live source keeps code-shaped closers inside the outer comment', () {
+    const syntax = IanvsMarkdownSyntaxTheme(
+      heading: TextStyle(),
+      marker: TextStyle(),
+      link: TextStyle(),
+      code: TextStyle(fontFamily: 'monospace'),
+      comment: TextStyle(color: Color(0xff555555)),
+    );
+    const source = '%%open `%%inside%%` tail%% visible';
+
+    final spans = buildMarkdownSourceTextSpan(
+      const TextEditingValue(
+        text: source,
+        selection: TextSelection.collapsed(offset: 0),
+      ),
+      style: const TextStyle(fontSize: 14),
+      syntaxTheme: syntax,
+      withComposing: false,
+    ).children!.cast<TextSpan>().toList();
+
+    expect(spans.map((span) => span.text).join(), source);
+    expect(
+      spans
+          .where((span) => span.style?.color == const Color(0xff555555))
+          .map((span) => span.text)
+          .join(),
+      '%%open `%%inside%%` tail%%',
+    );
+    expect(
+      spans.where((span) => span.style?.fontFamily == 'monospace'),
+      isEmpty,
+    );
+  });
+
   test('live source block IDs share standalone and escape boundaries', () {
     const syntax = IanvsMarkdownSyntaxTheme(
       heading: TextStyle(),

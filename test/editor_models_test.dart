@@ -245,6 +245,27 @@ $$
     expect(markdownGapLineCount(source, blocks[1], blocks.last), 2);
   });
 
+  test('syntax scans can expose code inside standalone comment grouping', () {
+    const source = '''%%
+
+    %%inside%%
+%%
+visible''';
+
+    final grouped = parseMarkdownBlocks(source);
+    final structural = parseMarkdownBlocks(
+      source,
+      groupStandaloneComments: false,
+    );
+
+    expect(grouped.first.source, '%%\n\n    %%inside%%\n%%');
+    expect(structural.map((block) => block.type), <IanvsMarkdownBlockType>[
+      IanvsMarkdownBlockType.paragraph,
+      IanvsMarkdownBlockType.indentedCode,
+      IanvsMarkdownBlockType.paragraph,
+    ]);
+  });
+
   test('unclosed standalone comments remain ordinary source blocks', () {
     const source = 'Before.\n\n%%\nunclosed\n\nAfter.';
 

@@ -65,10 +65,13 @@ final class IanvsMarkdownBlock {
 ///
 /// This parser deliberately does not normalize or reserialize Markdown. Each
 /// block retains exact offsets into [source], while newlines between blocks
-/// remain outside replacement ranges.
+/// remain outside replacement ranges. Set [groupStandaloneComments] to false
+/// for structural syntax scans that must still see code blocks nested between
+/// paired line-only Obsidian comment delimiters.
 List<IanvsMarkdownBlock> parseMarkdownBlocks(
   String source, {
   bool splitListItems = false,
+  bool groupStandaloneComments = true,
 }) {
   if (source.isEmpty) {
     return const <IanvsMarkdownBlock>[
@@ -106,7 +109,9 @@ List<IanvsMarkdownBlock> parseMarkdownBlocks(
         ? _nestedListItemType(lines, first, blocks)
         : null;
     final type = nestedListType ?? _classifyBlock(lines, first);
-    final standaloneCommentEnd = _standaloneCommentEnd(lines, first);
+    final standaloneCommentEnd = groupStandaloneComments
+        ? _standaloneCommentEnd(lines, first)
+        : null;
     final last =
         standaloneCommentEnd ??
         switch (type) {

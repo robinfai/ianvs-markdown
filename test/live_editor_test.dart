@@ -6444,6 +6444,29 @@ Standard[^note] and inline ^[inline body].
     expect(controller.text, source);
   });
 
+  testWidgets('live preview keeps code-shaped closers in one comment range', (
+    tester,
+  ) async {
+    const comment = '%%open `%%inside%%` tail%%';
+    const source = 'Before $comment after.';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    expect(find.text(comment), findsOneWidget);
+    await tester.tap(find.text(comment));
+    await tester.pump();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, source);
+    expect(controller.text, source);
+  });
+
   testWidgets('live preview binds blank-separated block IDs to source blocks', (
     tester,
   ) async {

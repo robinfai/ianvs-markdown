@@ -2436,6 +2436,17 @@ After.
     expect(rendered.data, 'code %%inside%% tail\nmore %%tab%% code');
   });
 
+  testWidgets('reading ignores comment closers inside inline code', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(const IanvsMarkdown(data: '%%open `%%inside%%` tail%% visible')),
+    );
+
+    expect(find.textContaining('inside'), findsNothing);
+    expect(find.textContaining('visible'), findsOneWidget);
+  });
+
   testWidgets('long code blocks stay fully expanded like Obsidian by default', (
     tester,
   ) async {
@@ -3592,6 +3603,52 @@ paragraph
     expect(rendered, contains('\tmore %%tab%% code'));
     expect(rendered, isNot(contains('%%gone%%')));
     expect(rendered, isNot(contains('%%also gone%%')));
+  });
+
+  test('Obsidian comment closers ignore every literal code form', () {
+    const sources = <String>[
+      '%%open `%%inside%%` tail%% visible',
+      '''%%open
+
+```text
+%%inside%%
+```
+tail%% visible''',
+      '''%%open
+
+    %%inside%%
+tail%% visible''',
+    ];
+
+    for (final source in sources) {
+      final comments = ianvsMarkdownCommentRanges(
+        source,
+      ).map((range) => source.substring(range.start, range.end));
+
+      expect(comments, <String>[
+        source.substring(0, source.indexOf(' visible')),
+      ]);
+      final rendered = prepareObsidianMarkdownForRendering(source);
+      expect(rendered.replaceAll('\n', ''), ' visible');
+      expect(rendered, isNot(contains('inside')));
+    }
+
+    const unclosed = 'before %%open `%%inside%%` tail';
+    expect(ianvsMarkdownCommentRanges(unclosed), isEmpty);
+    expect(prepareObsidianMarkdownForRendering(unclosed), unclosed);
+
+    const standalone = '''%%
+
+    %%inside%%
+%%
+visible''';
+    final standaloneComments = ianvsMarkdownCommentRanges(
+      standalone,
+    ).map((range) => standalone.substring(range.start, range.end));
+    expect(standaloneComments, <String>['%%\n\n    %%inside%%\n%%']);
+    final standaloneRendered = prepareObsidianMarkdownForRendering(standalone);
+    expect(standaloneRendered.replaceAll('\n', ''), 'visible');
+    expect(standaloneRendered, isNot(contains('inside')));
   });
 
   testWidgets('editing comments keep escaped and unclosed source literal', (

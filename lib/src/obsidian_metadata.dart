@@ -27,23 +27,20 @@ final RegExp _obsidianCommentFencePattern = RegExp(
 /// unescaped close remains ordinary source text.
 List<TextRange> ianvsMarkdownCommentRanges(String source) {
   final ranges = <TextRange>[];
-  final indentedCodeRanges = parseMarkdownBlocks(source)
-      .where((block) => block.type == IanvsMarkdownBlockType.indentedCode)
-      .map((block) => TextRange(start: block.start, end: block.end))
-      .toList(growable: false);
+  final codeRanges = _obsidianCommentCodeRanges(source);
   var index = 0;
-  var indentedCodeIndex = 0;
+  var codeRangeIndex = 0;
   var lineStart = true;
   var fenceCharacter = 0;
   var fenceLength = 0;
 
   while (index < source.length) {
-    while (indentedCodeIndex < indentedCodeRanges.length &&
-        index >= indentedCodeRanges[indentedCodeIndex].end) {
-      indentedCodeIndex += 1;
+    while (codeRangeIndex < codeRanges.length &&
+        index >= codeRanges[codeRangeIndex].end) {
+      codeRangeIndex += 1;
     }
-    if (indentedCodeIndex < indentedCodeRanges.length) {
-      final range = indentedCodeRanges[indentedCodeIndex];
+    if (codeRangeIndex < codeRanges.length) {
+      final range = codeRanges[codeRangeIndex];
       if (index >= range.start && index < range.end) {
         index = range.end;
         lineStart = false;
@@ -83,16 +80,6 @@ List<TextRange> ianvsMarkdownCommentRanges(String source) {
     final character = source.codeUnitAt(index);
     if (character == 0x60 && !isIanvsMarkdownEscapedAt(source, index)) {
       final runLength = _characterRunLength(source, index, 0x60);
-      final close = _matchingCodeSpanClose(
-        source,
-        index + runLength,
-        runLength,
-      );
-      if (close >= 0) {
-        index = close + runLength;
-        lineStart = false;
-        continue;
-      }
       index += runLength;
       lineStart = false;
       continue;
@@ -106,7 +93,11 @@ List<TextRange> ianvsMarkdownCommentRanges(String source) {
       // well (`\%%x%%`). Do not reinterpret that close as the start of a
       // comment on the following text.
       final lineEnd = source.indexOf('\n', index + 2);
-      final close = _nextUnescapedCommentDelimiter(source, index + 2);
+      final close = _nextUnescapedCommentDelimiter(
+        source,
+        index + 2,
+        codeRanges,
+      );
       if (close >= 0 && (lineEnd < 0 || close < lineEnd)) {
         index = close + _characterRunLength(source, close, 0x25);
       } else {
@@ -119,7 +110,11 @@ List<TextRange> ianvsMarkdownCommentRanges(String source) {
     if (character == 0x25 &&
         index + 1 < source.length &&
         source.codeUnitAt(index + 1) == 0x25) {
-      final close = _nextUnescapedCommentDelimiter(source, index + 2);
+      final close = _nextUnescapedCommentDelimiter(
+        source,
+        index + 2,
+        codeRanges,
+      );
       if (close >= 0) {
         ranges.add(TextRange(start: index, end: close + 2));
         // Any percent signs left in the same closing run are literal residue,
@@ -139,23 +134,92 @@ List<TextRange> ianvsMarkdownCommentRanges(String source) {
   return List<TextRange>.unmodifiable(ranges);
 }
 
-int _matchingCodeSpanClose(String source, int start, int openingLength) {
+List<TextRange> _obsidianCommentCodeRanges(String source) {
+  final ranges = <TextRange>[];
+  for (final block in parseMarkdownBlocks(
+    source,
+    groupStandaloneComments: false,
+  )) {
+    if (block.type == IanvsMarkdownBlockType.fencedCode ||
+        block.type == IanvsMarkdownBlockType.indentedCode) {
+      ranges.add(TextRange(start: block.start, end: block.end));
+      continue;
+    }
+
+    var index = block.start;
+    while (index < block.end) {
+      if (source.codeUnitAt(index) != 0x60 ||
+          isIanvsMarkdownEscapedAt(source, index)) {
+        index += 1;
+        continue;
+      }
+      final openingLength = _characterRunLength(source, index, 0x60);
+      final close = _matchingCodeSpanClose(
+        source,
+        index + openingLength,
+        openingLength,
+        limit: block.end,
+      );
+      if (close < 0) {
+        index += openingLength;
+        continue;
+      }
+      final end = close + openingLength;
+      ranges.add(TextRange(start: index, end: end));
+      index = end;
+    }
+  }
+  return List<TextRange>.unmodifiable(ranges);
+}
+
+int _matchingCodeSpanClose(
+  String source,
+  int start,
+  int openingLength, {
+  required int limit,
+}) {
   var index = start;
-  while (index < source.length) {
+  while (index < limit) {
     final next = source.indexOf('`', index);
-    if (next < 0) return -1;
+    if (next < 0 || next >= limit) return -1;
     final length = _characterRunLength(source, next, 0x60);
-    if (length == openingLength) return next;
+    if (length == openingLength && next + length <= limit) return next;
     index = next + length;
   }
   return -1;
 }
 
-int _nextUnescapedCommentDelimiter(String source, int start) {
+int _nextUnescapedCommentDelimiter(
+  String source,
+  int start,
+  List<TextRange> codeRanges,
+) {
   var index = source.indexOf('%%', start);
   while (index >= 0) {
+    final codeRangeEnd = _rangeEndContainingOffset(codeRanges, index);
+    if (codeRangeEnd >= 0) {
+      index = source.indexOf('%%', codeRangeEnd);
+      continue;
+    }
     if (!isIanvsMarkdownEscapedAt(source, index)) return index;
     index = source.indexOf('%%', index + 2);
+  }
+  return -1;
+}
+
+int _rangeEndContainingOffset(List<TextRange> ranges, int offset) {
+  var low = 0;
+  var high = ranges.length - 1;
+  while (low <= high) {
+    final middle = low + ((high - low) >> 1);
+    final range = ranges[middle];
+    if (offset < range.start) {
+      high = middle - 1;
+    } else if (offset >= range.end) {
+      low = middle + 1;
+    } else {
+      return range.end;
+    }
   }
   return -1;
 }

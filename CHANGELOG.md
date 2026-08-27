@@ -1,5 +1,8 @@
 ## Unreleased
 
+- Prevent comment-shaped text inside inline, fenced, or indented code from
+  prematurely closing an outer Obsidian comment; source styling and Reading
+  now consume the complete outer range.
 - Preserve literal `%%comment-shaped%%` text inside true four-space or tab
   indented code blocks in Reading and source styling, without treating an
   indented paragraph continuation as code.
