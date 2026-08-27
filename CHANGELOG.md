@@ -1,5 +1,8 @@
 ## Unreleased
 
+- Keep inline and standard footnote-shaped text literal inside true indented
+  code blocks, excluding it from Reading expansion, shared ordinal collection,
+  Live Preview presentation ranges, and source metadata styling.
 - Keep trailing and table-cell-shaped `^block-id` text literal inside inline,
   fenced, and true indented code blocks across Reading, source styling, and
   Live Preview.

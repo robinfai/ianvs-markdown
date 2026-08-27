@@ -2483,6 +2483,11 @@ List<_SyntaxToken> _markdownSyntaxTokens(
   for (final range in fencedRanges) {
     _addFencedCodeSyntaxTokens(tokens, text, range, theme);
   }
+  final indentedCodeRanges =
+      parseMarkdownBlocks(text, groupStandaloneComments: false)
+          .where((block) => block.type == IanvsMarkdownBlockType.indentedCode)
+          .map((block) => TextRange(start: block.start, end: block.end))
+          .toList(growable: false);
 
   final obsidianCommentRanges = ianvsMarkdownCommentRanges(text);
   for (final range in obsidianCommentRanges) {
@@ -2492,10 +2497,15 @@ List<_SyntaxToken> _markdownSyntaxTokens(
     tokens,
     text,
     theme,
-    <TextRange>[...fencedRanges, ...obsidianCommentRanges],
+    <TextRange>[
+      ...fencedRanges,
+      ...indentedCodeRanges,
+      ...obsidianCommentRanges,
+    ],
   );
   final excludedRanges = <TextRange>[
     ...fencedRanges,
+    ...indentedCodeRanges,
     ...obsidianCommentRanges,
     ...displayMathRanges,
   ];

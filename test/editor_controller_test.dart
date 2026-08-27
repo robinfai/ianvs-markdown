@@ -3495,6 +3495,41 @@ paired %%secret%%
     );
   });
 
+  test('live source footnotes yield to true indented code blocks', () {
+    const syntax = IanvsMarkdownSyntaxTheme(
+      heading: TextStyle(),
+      marker: TextStyle(),
+      link: TextStyle(),
+      code: TextStyle(fontFamily: 'monospace'),
+      comment: TextStyle(color: Color(0xff555555)),
+    );
+    const source = '''
+    code ^[inside] and [^inside]
+
+Outside ^[outside] and [^outside].
+''';
+
+    final spans = buildMarkdownSourceTextSpan(
+      const TextEditingValue(
+        text: source,
+        selection: TextSelection.collapsed(offset: 0),
+      ),
+      style: const TextStyle(fontSize: 14),
+      syntaxTheme: syntax,
+      withComposing: false,
+    ).children!.cast<TextSpan>().toList();
+
+    expect(spans.map((span) => span.text).join(), source);
+    final metadata = spans
+        .where((span) => span.style?.color == const Color(0xff555555))
+        .map((span) => span.text)
+        .join();
+    expect(metadata, contains('^[outside]'));
+    expect(metadata, contains('[^outside]'));
+    expect(metadata, isNot(contains('^[inside]')));
+    expect(metadata, isNot(contains('[^inside]')));
+  });
+
   test('live source keeps code-shaped closers inside the outer comment', () {
     const syntax = IanvsMarkdownSyntaxTheme(
       heading: TextStyle(),

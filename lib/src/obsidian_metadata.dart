@@ -134,15 +134,23 @@ List<TextRange> ianvsMarkdownCommentRanges(String source) {
   return List<TextRange>.unmodifiable(ranges);
 }
 
-List<TextRange> _obsidianLiteralCodeRanges(String source) {
-  final ranges = <TextRange>[];
+final class _ObsidianCodeRanges {
+  const _ObsidianCodeRanges({required this.block, required this.inline});
+
+  final List<TextRange> block;
+  final List<TextRange> inline;
+}
+
+_ObsidianCodeRanges _obsidianCodeRanges(String source) {
+  final blockRanges = <TextRange>[];
+  final inlineRanges = <TextRange>[];
   for (final block in parseMarkdownBlocks(
     source,
     groupStandaloneComments: false,
   )) {
     if (block.type == IanvsMarkdownBlockType.fencedCode ||
         block.type == IanvsMarkdownBlockType.indentedCode) {
-      ranges.add(TextRange(start: block.start, end: block.end));
+      blockRanges.add(TextRange(start: block.start, end: block.end));
       continue;
     }
 
@@ -165,10 +173,20 @@ List<TextRange> _obsidianLiteralCodeRanges(String source) {
         continue;
       }
       final end = close + openingLength;
-      ranges.add(TextRange(start: index, end: end));
+      inlineRanges.add(TextRange(start: index, end: end));
       index = end;
     }
   }
+  return _ObsidianCodeRanges(
+    block: List<TextRange>.unmodifiable(blockRanges),
+    inline: List<TextRange>.unmodifiable(inlineRanges),
+  );
+}
+
+List<TextRange> _obsidianLiteralCodeRanges(String source) {
+  final codeRanges = _obsidianCodeRanges(source);
+  final ranges = <TextRange>[...codeRanges.block, ...codeRanges.inline]
+    ..sort((a, b) => a.start.compareTo(b.start));
   return List<TextRange>.unmodifiable(ranges);
 }
 
@@ -1100,8 +1118,25 @@ final class _ObsidianFootnoteOrdinalCollector {
     var fenceCharacter = 0;
     var fenceLength = 0;
     var lineStart = true;
+    final blockCodeRanges = allowFences
+        ? _obsidianCodeRanges(source).block
+        : const <TextRange>[];
+    var blockCodeRangeIndex = 0;
 
     while (index < source.length) {
+      while (blockCodeRangeIndex < blockCodeRanges.length &&
+          index >= blockCodeRanges[blockCodeRangeIndex].end) {
+        blockCodeRangeIndex += 1;
+      }
+      if (blockCodeRangeIndex < blockCodeRanges.length) {
+        final range = blockCodeRanges[blockCodeRangeIndex];
+        if (index >= range.start && index < range.end) {
+          index = range.end;
+          lineStart = false;
+          continue;
+        }
+      }
+
       if (allowFences && lineStart) {
         final lineEnd = source.indexOf('\n', index);
         final end = lineEnd < 0 ? source.length : lineEnd;
@@ -1293,8 +1328,26 @@ final class _InlineFootnoteExpansion {
     var fenceCharacter = 0;
     var fenceLength = 0;
     var lineStart = true;
+    final blockCodeRanges = allowFences
+        ? _obsidianCodeRanges(source).block
+        : const <TextRange>[];
+    var blockCodeRangeIndex = 0;
 
     while (index < source.length) {
+      while (blockCodeRangeIndex < blockCodeRanges.length &&
+          index >= blockCodeRanges[blockCodeRangeIndex].end) {
+        blockCodeRangeIndex += 1;
+      }
+      if (blockCodeRangeIndex < blockCodeRanges.length) {
+        final range = blockCodeRanges[blockCodeRangeIndex];
+        if (index >= range.start && index < range.end) {
+          output.write(source.substring(index, range.end));
+          index = range.end;
+          lineStart = false;
+          continue;
+        }
+      }
+
       if (allowFences && lineStart) {
         final lineEnd = source.indexOf('\n', index);
         final end = lineEnd < 0 ? source.length : lineEnd;

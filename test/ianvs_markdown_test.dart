@@ -4092,6 +4092,32 @@ Inline ^[first], missing[^missing], standard[^A], repeated[^a], empty ^[], and s
       <String>['^[first]', '[^A]', '[^a]', '^[]', '[^b]'],
     );
 
+    const indentedCode = '''
+    code ^[ignored] and [^inside]
+
+Outside ^[real] and [^outside].
+
+    [^fake]: code
+[^inside]: Inside.
+[^outside]: Outside.
+''';
+    expect(collectObsidianStandardFootnoteOrdinals(indentedCode), <String, int>{
+      'outside': 2,
+    });
+    final indentedPresentations = ianvsMarkdownLivePreviewFootnoteReferences(
+      indentedCode,
+    );
+    expect(indentedPresentations.map((reference) => reference.label), <String>[
+      '[1]',
+      '[2]',
+    ]);
+    expect(
+      indentedPresentations.map(
+        (reference) => reference.sourceRange.textInside(indentedCode),
+      ),
+      <String>['^[real]', '[^outside]'],
+    );
+
     const nested = '''
 Outer ^[one ^[two]], standard[^a].
 
@@ -4180,6 +4206,30 @@ code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     await tester.pumpAndSettle();
 
     expect(_renderedPlainTextContains(tester, 'code ^[not-footnote]'), isTrue);
+    expect(find.text('[1]'), findsOneWidget);
+    expect(find.textContaining('Body.'), findsOneWidget);
+  });
+
+  testWidgets('reading keeps indented-code footnotes literal', (tester) async {
+    const source = '''
+Before.
+
+    code ^[inside] and [^standard]
+
+Outside[^standard].
+
+[^standard]: Body.
+''';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+    await tester.pumpAndSettle();
+
+    final rendered = tester.widget<SelectableText>(
+      find.descendant(
+        of: find.byType(IanvsMarkdownIndentedCodeBlock),
+        matching: find.byType(SelectableText),
+      ),
+    );
+    expect(rendered.data, 'code ^[inside] and [^standard]');
     expect(find.text('[1]'), findsOneWidget);
     expect(find.textContaining('Body.'), findsOneWidget);
   });
