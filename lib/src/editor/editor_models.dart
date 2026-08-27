@@ -93,6 +93,15 @@ List<IanvsMarkdownBlock> parseMarkdownBlocks(
     }
 
     final first = index;
+    if (blocks.isNotEmpty &&
+        _standaloneBlockIdExtends(lines[first].text, blocks.last.type)) {
+      final previous = blocks.removeLast();
+      blocks.add(
+        _block(source, lines, previous.firstLine, first, previous.type),
+      );
+      index = first + 1;
+      continue;
+    }
     final nestedListType = splitListItems
         ? _nestedListItemType(lines, first, blocks)
         : null;
@@ -139,6 +148,29 @@ List<IanvsMarkdownBlock> parseMarkdownBlocks(
     ];
   }
   return List<IanvsMarkdownBlock>.unmodifiable(blocks);
+}
+
+bool _standaloneBlockIdExtends(
+  String line,
+  IanvsMarkdownBlockType previousType,
+) {
+  if (previousType == IanvsMarkdownBlockType.frontMatter ||
+      previousType == IanvsMarkdownBlockType.fencedCode ||
+      previousType == IanvsMarkdownBlockType.indentedCode ||
+      previousType == IanvsMarkdownBlockType.html) {
+    return false;
+  }
+  final quotePrefix = RegExp(r'^(?: {0,3}>[ \t]?)+').firstMatch(line);
+  if ((quotePrefix != null &&
+          previousType != IanvsMarkdownBlockType.blockquote) ||
+      (quotePrefix == null &&
+          previousType == IanvsMarkdownBlockType.blockquote)) {
+    return false;
+  }
+  final candidate = quotePrefix == null
+      ? line
+      : line.substring(quotePrefix.end);
+  return RegExp(r'^[ \t]*\^[A-Za-z0-9_-]+ *$').hasMatch(candidate);
 }
 
 int? _standaloneCommentEnd(List<_SourceLine> lines, int first) {

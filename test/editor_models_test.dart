@@ -79,6 +79,56 @@ final value = 1;
     expect(markdownGapLineCount(source, blocks.first, blocks[1]), 2);
   });
 
+  test('standalone block IDs extend supported blocks across blank lines', () {
+    const source =
+        '# Heading\n\n^heading-id\n\n'
+        '---\n\n^rule-id\n\n'
+        r'''$$
+x^2
+$$
+
+^math-id
+
+> Quote
+
+> ^quote-id
+
+- List item
+
+  ^list-id
+
+After.''';
+
+    final blocks = parseMarkdownBlocks(source, splitListItems: true);
+
+    expect(blocks.map((block) => block.type), <IanvsMarkdownBlockType>[
+      IanvsMarkdownBlockType.heading,
+      IanvsMarkdownBlockType.thematicBreak,
+      IanvsMarkdownBlockType.displayMath,
+      IanvsMarkdownBlockType.blockquote,
+      IanvsMarkdownBlockType.unorderedList,
+      IanvsMarkdownBlockType.paragraph,
+    ]);
+    expect(blocks.map((block) => block.source), <String>[
+      '# Heading\n\n^heading-id',
+      '---\n\n^rule-id',
+      r'''$$
+x^2
+$$
+
+^math-id''',
+      '> Quote\n\n> ^quote-id',
+      '- List item\n\n  ^list-id',
+      'After.',
+    ]);
+    expect(
+      blocks.every(
+        (block) => source.substring(block.start, block.end) == block.source,
+      ),
+      isTrue,
+    );
+  });
+
   test('keeps marker-only ATX prefixes as literal paragraphs', () {
     const source = '# \n\n###### \n\n#\n\n# #\n\n# Title';
 

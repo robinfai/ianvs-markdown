@@ -6207,26 +6207,34 @@ Standard[^note] and inline ^[inline body].
     expect(controller.text, source);
   });
 
-  testWidgets('live preview binds a standalone block ID to its paragraph', (
+  testWidgets('live preview binds blank-separated block IDs to source blocks', (
     tester,
   ) async {
-    const block = 'Paragraph.\n^standalone_id';
-    const source = '$block\n\nAfter.';
+    const paragraphBlock = 'Paragraph.\n\n^paragraph_id';
+    const headingBlock = '# Heading\n\n^heading_id';
+    const source = '$paragraphBlock\n\n$headingBlock\n\nAfter.';
     final controller = IanvsMarkdownController(text: source);
     addTearDown(controller.dispose);
 
     await tester.pumpWidget(app(controller));
     await tester.pumpAndSettle();
 
-    expect(find.text('^standalone_id'), findsOneWidget);
-    await tester.tap(find.text('^standalone_id'));
+    expect(find.text('^paragraph_id'), findsOneWidget);
+    await tester.tap(find.text('^paragraph_id'));
     await tester.pump();
 
     final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
-    final field = tester.widget<TextField>(
+    var field = tester.widget<TextField>(
       find.descendant(of: active, matching: find.byType(TextField)),
     );
-    expect(field.controller?.text, block);
+    expect(field.controller?.text, paragraphBlock);
+
+    await tester.tap(find.text('^heading_id'));
+    await tester.pump();
+    field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, headingBlock);
     expect(controller.text, source);
   });
 

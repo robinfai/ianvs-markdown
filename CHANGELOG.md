@@ -59,7 +59,8 @@
   source styling.
 - Match Obsidian block-ID boundaries for standalone markers, underscores,
   table cells, ASCII spaces after valid IDs, multiple candidates, escape
-  parity, and code precedence across Reading, Live Preview, and source styling.
+  parity, blank-separated ownership by the preceding supported block, and code
+  precedence across Reading, Live Preview, and source styling.
 - Match Obsidian comment pairing, backslash escape parity, adjacent-percent
   residue, literal unclosed delimiters, code precedence, and standalone
   comments that remain one editable Live Preview block across blank lines.
