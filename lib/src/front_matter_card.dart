@@ -24,6 +24,58 @@ bool _isOuterMarkdownFormattingShortcut(KeyEvent event) {
       defaultTargetPlatform != TargetPlatform.iOS;
 }
 
+bool _isOuterMarkdownDeleteLineShortcut(KeyEvent event) {
+  if (event is! KeyDownEvent && event is! KeyRepeatEvent) return false;
+  if (event.logicalKey != LogicalKeyboardKey.keyD) return false;
+  final keyboard = HardwareKeyboard.instance;
+  if (keyboard.isAltPressed || keyboard.isShiftPressed) return false;
+  if (keyboard.isMetaPressed && !keyboard.isControlPressed) return true;
+  final usesCommandModifier =
+      defaultTargetPlatform == TargetPlatform.macOS ||
+      defaultTargetPlatform == TargetPlatform.iOS;
+  return !usesCommandModifier &&
+      keyboard.isControlPressed &&
+      !keyboard.isMetaPressed;
+}
+
+enum _PropertyHistoryCommand { undo, redo }
+
+_PropertyHistoryCommand? _propertyHistoryCommand(KeyEvent event) {
+  if (event is! KeyDownEvent && event is! KeyRepeatEvent) return null;
+  final keyboard = HardwareKeyboard.instance;
+  if (keyboard.isAltPressed) return null;
+  if (event.logicalKey == LogicalKeyboardKey.keyZ &&
+      keyboard.isMetaPressed != keyboard.isControlPressed) {
+    return keyboard.isShiftPressed
+        ? _PropertyHistoryCommand.redo
+        : _PropertyHistoryCommand.undo;
+  }
+  if (event.logicalKey == LogicalKeyboardKey.keyY &&
+      keyboard.isControlPressed &&
+      !keyboard.isMetaPressed &&
+      !keyboard.isShiftPressed) {
+    return _PropertyHistoryCommand.redo;
+  }
+  return null;
+}
+
+bool _applyPropertyHistoryShortcut(
+  KeyEvent event,
+  UndoHistoryController controller,
+) {
+  final command = _propertyHistoryCommand(event);
+  if (command == null) return false;
+  switch (command) {
+    case _PropertyHistoryCommand.undo:
+      controller.undo();
+      break;
+    case _PropertyHistoryCommand.redo:
+      controller.redo();
+      break;
+  }
+  return true;
+}
+
 bool _isPropertyTraversalShortcut(KeyEvent event) {
   if (event is! KeyDownEvent || event.logicalKey != LogicalKeyboardKey.tab) {
     return false;
@@ -468,6 +520,7 @@ class _ObsidianEditableKey extends StatefulWidget {
 
 class _ObsidianEditableKeyState extends State<_ObsidianEditableKey> {
   late final TextEditingController _controller;
+  late final UndoHistoryController _undoController;
   late final FocusNode _focusNode;
   late String _committedKey;
   var _cancelled = false;
@@ -477,6 +530,7 @@ class _ObsidianEditableKeyState extends State<_ObsidianEditableKey> {
     super.initState();
     _committedKey = widget.entry.key;
     _controller = TextEditingController(text: _committedKey);
+    _undoController = UndoHistoryController();
     _focusNode = FocusNode()..addListener(_handleFocusChanged);
   }
 
@@ -533,6 +587,10 @@ class _ObsidianEditableKeyState extends State<_ObsidianEditableKey> {
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (_applyPropertyHistoryShortcut(event, _undoController) ||
+        _isOuterMarkdownDeleteLineShortcut(event)) {
+      return KeyEventResult.handled;
+    }
     if (_isOuterMarkdownFormattingShortcut(event)) {
       return KeyEventResult.handled;
     }
@@ -555,6 +613,7 @@ class _ObsidianEditableKeyState extends State<_ObsidianEditableKey> {
     _focusNode
       ..removeListener(_handleFocusChanged)
       ..dispose();
+    _undoController.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -568,6 +627,7 @@ class _ObsidianEditableKeyState extends State<_ObsidianEditableKey> {
           'ianvs-markdown-front-matter-key-input-${widget.entry.key}',
         ),
         controller: _controller,
+        undoController: _undoController,
         focusNode: _focusNode,
         maxLines: 1,
         textInputAction: TextInputAction.done,
@@ -848,6 +908,7 @@ class _ObsidianEditableListValue extends StatefulWidget {
 class _ObsidianEditableListValueState
     extends State<_ObsidianEditableListValue> {
   late final TextEditingController _controller;
+  late final UndoHistoryController _undoController;
   late final FocusNode _focusNode;
   late List<String> _items;
 
@@ -856,6 +917,7 @@ class _ObsidianEditableListValueState
     super.initState();
     _items = List<String>.of(widget.entry.items);
     _controller = TextEditingController();
+    _undoController = UndoHistoryController();
     _focusNode = FocusNode();
     _focusNode.addListener(_handleFocusChanged);
   }
@@ -901,6 +963,10 @@ class _ObsidianEditableListValueState
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (_applyPropertyHistoryShortcut(event, _undoController) ||
+        _isOuterMarkdownDeleteLineShortcut(event)) {
+      return KeyEventResult.handled;
+    }
     if (_isOuterMarkdownFormattingShortcut(event)) {
       return KeyEventResult.handled;
     }
@@ -926,6 +992,7 @@ class _ObsidianEditableListValueState
   void dispose() {
     _focusNode.removeListener(_handleFocusChanged);
     _focusNode.dispose();
+    _undoController.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -963,6 +1030,7 @@ class _ObsidianEditableListValueState
                   'ianvs-markdown-front-matter-list-input-${widget.entry.key}',
                 ),
                 controller: _controller,
+                undoController: _undoController,
                 focusNode: _focusNode,
                 maxLines: 1,
                 textInputAction: TextInputAction.done,
@@ -1022,6 +1090,9 @@ class _ObsidianEditableDateValueState
   late final TextEditingController _yearController;
   late final TextEditingController _monthController;
   late final TextEditingController _dayController;
+  late final UndoHistoryController _yearUndoController;
+  late final UndoHistoryController _monthUndoController;
+  late final UndoHistoryController _dayUndoController;
   late final FocusNode _yearFocusNode;
   late final FocusNode _monthFocusNode;
   late final FocusNode _dayFocusNode;
@@ -1034,6 +1105,9 @@ class _ObsidianEditableDateValueState
     _yearController = TextEditingController();
     _monthController = TextEditingController();
     _dayController = TextEditingController();
+    _yearUndoController = UndoHistoryController();
+    _monthUndoController = UndoHistoryController();
+    _dayUndoController = UndoHistoryController();
     _yearFocusNode = FocusNode();
     _monthFocusNode = FocusNode();
     _dayFocusNode = FocusNode();
@@ -1111,7 +1185,15 @@ class _ObsidianEditableDateValueState
     _dayFocusNode.unfocus();
   }
 
-  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+  KeyEventResult _handleKeyEvent(
+    FocusNode node,
+    KeyEvent event,
+    UndoHistoryController undoController,
+  ) {
+    if (_applyPropertyHistoryShortcut(event, undoController) ||
+        _isOuterMarkdownDeleteLineShortcut(event)) {
+      return KeyEventResult.handled;
+    }
     if (_isOuterMarkdownFormattingShortcut(event)) {
       return KeyEventResult.handled;
     }
@@ -1141,6 +1223,9 @@ class _ObsidianEditableDateValueState
     _yearController.dispose();
     _monthController.dispose();
     _dayController.dispose();
+    _yearUndoController.dispose();
+    _monthUndoController.dispose();
+    _dayUndoController.dispose();
     _yearFocusNode.dispose();
     _monthFocusNode.dispose();
     _dayFocusNode.dispose();
@@ -1153,6 +1238,7 @@ class _ObsidianEditableDateValueState
     required double width,
     required int maximumLength,
     required TextEditingController controller,
+    required UndoHistoryController undoController,
     required FocusNode focusNode,
   }) {
     return Semantics(
@@ -1160,12 +1246,14 @@ class _ObsidianEditableDateValueState
       child: SizedBox(
         width: width,
         child: Focus(
-          onKeyEvent: _handleKeyEvent,
+          onKeyEvent: (node, event) =>
+              _handleKeyEvent(node, event, undoController),
           child: TextField(
             key: ValueKey(
               'ianvs-markdown-front-matter-date-$keySuffix-${widget.entry.key}',
             ),
             controller: controller,
+            undoController: undoController,
             focusNode: focusNode,
             maxLines: 1,
             maxLength: maximumLength,
@@ -1232,6 +1320,7 @@ class _ObsidianEditableDateValueState
           width: 34,
           maximumLength: 4,
           controller: _yearController,
+          undoController: _yearUndoController,
           focusNode: _yearFocusNode,
         ),
         Text(' / ', style: separatorStyle),
@@ -1241,6 +1330,7 @@ class _ObsidianEditableDateValueState
           width: 20,
           maximumLength: 2,
           controller: _monthController,
+          undoController: _monthUndoController,
           focusNode: _monthFocusNode,
         ),
         Text(' / ', style: separatorStyle),
@@ -1250,6 +1340,7 @@ class _ObsidianEditableDateValueState
           width: 20,
           maximumLength: 2,
           controller: _dayController,
+          undoController: _dayUndoController,
           focusNode: _dayFocusNode,
         ),
       ],
@@ -1277,6 +1368,7 @@ class _ObsidianEditableNumberValue extends StatefulWidget {
 class _ObsidianEditableNumberValueState
     extends State<_ObsidianEditableNumberValue> {
   late final TextEditingController _controller;
+  late final UndoHistoryController _undoController;
   late final FocusNode _focusNode;
   late String _committedValue;
   var _cancelled = false;
@@ -1286,6 +1378,7 @@ class _ObsidianEditableNumberValueState
     super.initState();
     _committedValue = widget.entry.value;
     _controller = TextEditingController(text: _committedValue);
+    _undoController = UndoHistoryController();
     _focusNode = FocusNode()..addListener(_handleFocusChanged);
   }
 
@@ -1346,6 +1439,10 @@ class _ObsidianEditableNumberValueState
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (_applyPropertyHistoryShortcut(event, _undoController) ||
+        _isOuterMarkdownDeleteLineShortcut(event)) {
+      return KeyEventResult.handled;
+    }
     if (_isOuterMarkdownFormattingShortcut(event)) {
       return KeyEventResult.handled;
     }
@@ -1368,6 +1465,7 @@ class _ObsidianEditableNumberValueState
     _focusNode
       ..removeListener(_handleFocusChanged)
       ..dispose();
+    _undoController.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -1381,6 +1479,7 @@ class _ObsidianEditableNumberValueState
           'ianvs-markdown-front-matter-number-input-${widget.entry.key}',
         ),
         controller: _controller,
+        undoController: _undoController,
         focusNode: _focusNode,
         maxLines: 1,
         keyboardType: const TextInputType.numberWithOptions(
@@ -1437,6 +1536,7 @@ class _ObsidianEditableTextValue extends StatefulWidget {
 class _ObsidianEditableTextValueState
     extends State<_ObsidianEditableTextValue> {
   late final TextEditingController _controller;
+  late final UndoHistoryController _undoController;
   late final FocusNode _focusNode;
   late String _committedValue;
   var _cancelled = false;
@@ -1446,6 +1546,7 @@ class _ObsidianEditableTextValueState
     super.initState();
     _committedValue = widget.entry.value;
     _controller = TextEditingController(text: _committedValue);
+    _undoController = UndoHistoryController();
     _focusNode = FocusNode()..addListener(_handleFocusChanged);
   }
 
@@ -1481,6 +1582,10 @@ class _ObsidianEditableTextValueState
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (_applyPropertyHistoryShortcut(event, _undoController) ||
+        _isOuterMarkdownDeleteLineShortcut(event)) {
+      return KeyEventResult.handled;
+    }
     if (_isOuterMarkdownFormattingShortcut(event)) {
       return KeyEventResult.handled;
     }
@@ -1506,6 +1611,7 @@ class _ObsidianEditableTextValueState
     _focusNode
       ..removeListener(_handleFocusChanged)
       ..dispose();
+    _undoController.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -1517,6 +1623,7 @@ class _ObsidianEditableTextValueState
       child: TextField(
         key: ValueKey('ianvs-markdown-front-matter-input-${widget.entry.key}'),
         controller: _controller,
+        undoController: _undoController,
         focusNode: _focusNode,
         maxLines: 1,
         keyboardType: TextInputType.text,

@@ -4803,6 +4803,100 @@ title: Alpha
   );
 
   testWidgets(
+    'property Command+D cannot delete a stale document line',
+    (tester) async {
+      const source = '''
+---
+title: Alpha
+---
+first
+second
+''';
+      final controller = IanvsMarkdownController(text: source)
+        ..selection = TextSelection.collapsed(
+          offset: source.indexOf('second') + 2,
+        );
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      final input = find.byKey(
+        const ValueKey('ianvs-markdown-front-matter-input-title'),
+      );
+      await tester.tap(input);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyD);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+
+      expect(controller.text, source);
+      expect(tester.widget<TextField>(input).controller?.text, 'Alpha');
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
+    'property Command+Z cannot undo stale document history',
+    (tester) async {
+      const source = '''
+---
+title: Alpha
+---
+first
+''';
+      const updated = '''
+---
+title: Alpha
+---
+second
+''';
+      final controller = IanvsMarkdownController(text: source)
+        ..value = const TextEditingValue(
+          text: updated,
+          selection: TextSelection.collapsed(offset: 0),
+        );
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      final input = find.byKey(
+        const ValueKey('ianvs-markdown-front-matter-input-title'),
+      );
+      await tester.tap(input);
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.enterText(input, 'Pending');
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyZ);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+
+      expect(controller.text, updated);
+      expect(tester.widget<TextField>(input).controller?.text, 'Alpha');
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyZ);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+      expect(controller.text, updated);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyZ);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.pumpAndSettle();
+      expect(controller.text, updated);
+      expect(tester.widget<TextField>(input).controller?.text, 'Pending');
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
     'property Tab traversal never indents a stale document selection',
     (tester) async {
       const source = '''
