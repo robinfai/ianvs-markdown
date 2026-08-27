@@ -3388,6 +3388,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           block: block,
           colors: colors,
           linkReferenceLabels: _linkReferences.labels,
+          onCommitHistoryGroup: widget.controller.commitHistoryGroup,
           onCellChanged: _replaceTableCell,
           onCellFormatted: _replaceFormattedTableCell,
           onSelectAll: _handleSelectAllDocument,
@@ -4660,11 +4661,13 @@ bool _isMarkerOnlyListSource(String source) =>
 class _TablePasteAction extends ContextAction<PasteTextIntent> {
   _TablePasteAction({
     required this.controller,
+    required this.commitHistoryGroup,
     required this.isCurrent,
     required this.onChanged,
   });
 
   final TextEditingController controller;
+  final VoidCallback commitHistoryGroup;
   final bool Function() isCurrent;
   final ValueChanged<TextEditingValue> onChanged;
 
@@ -4693,8 +4696,10 @@ class _TablePasteAction extends ContextAction<PasteTextIntent> {
       defaultAction?.invoke(intent);
       return;
     }
+    commitHistoryGroup();
     controller.value = replacement;
     onChanged(replacement);
+    commitHistoryGroup();
   }
 }
 
@@ -4789,6 +4794,7 @@ class _EditableMarkdownTable extends StatefulWidget {
     required this.block,
     required this.colors,
     required this.linkReferenceLabels,
+    required this.onCommitHistoryGroup,
     required this.onCellChanged,
     required this.onCellFormatted,
     required this.onSelectAll,
@@ -4803,6 +4809,7 @@ class _EditableMarkdownTable extends StatefulWidget {
   final IanvsMarkdownBlock block;
   final IanvsMarkdownThemeData colors;
   final Set<String> linkReferenceLabels;
+  final VoidCallback onCommitHistoryGroup;
   final void Function(_EditableTableCell cell, String value) onCellChanged;
   final void Function(_EditableTableCell cell, TextEditingValue value)
   onCellFormatted;
@@ -5450,6 +5457,8 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                                   actions: <Type, Action<Intent>>{
                                     PasteTextIntent: _TablePasteAction(
                                       controller: controller,
+                                      commitHistoryGroup:
+                                          widget.onCommitHistoryGroup,
                                       isCurrent: () =>
                                           mounted &&
                                           identical(
