@@ -412,6 +412,21 @@ $$
     expect(blocks.last.source, 'After code.');
   });
 
+  test('backtick fence info strings reject embedded backticks', () {
+    const invalid = '```js`bad\ncode';
+    final invalidBlocks = parseMarkdownBlocks(invalid);
+
+    expect(invalidBlocks, hasLength(1));
+    expect(invalidBlocks.single.type, IanvsMarkdownBlockType.paragraph);
+    expect(invalidBlocks.single.source, invalid);
+
+    const validTilde = '~~~js`allowed\ncode\n~~~';
+    final tildeBlocks = parseMarkdownBlocks(validTilde);
+    expect(tildeBlocks, hasLength(1));
+    expect(tildeBlocks.single.type, IanvsMarkdownBlockType.fencedCode);
+    expect(tildeBlocks.single.source, validTilde);
+  });
+
   test(
     'indented code requires a boundary and preserves internal blank lines',
     () {

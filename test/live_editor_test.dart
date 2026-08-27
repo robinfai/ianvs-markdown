@@ -7357,6 +7357,36 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     expect(field.controller?.text, '- [ ] ');
   });
 
+  testWidgets('invalid backtick info strings stay ordinary paragraph source', (
+    tester,
+  ) async {
+    const invalid = '```js`bad\ncode';
+    final controller = IanvsMarkdownController(text: '$invalid\n\nAfter');
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.textContaining('code').first);
+    await tester.pumpAndSettle();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, invalid);
+    expect(field.style?.fontFamily, isNull);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-code-pattern')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-code-line-rail')),
+      findsNothing,
+    );
+    expect(find.text('After'), findsOneWidget);
+  });
+
   testWidgets('active fenced code preserves the rendered surface hierarchy', (
     tester,
   ) async {

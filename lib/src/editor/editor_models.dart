@@ -717,10 +717,12 @@ _Fence? _fence(String text) {
   final match = RegExp(r'^ {0,3}(`{3,}|~{3,})(.*)$').firstMatch(text);
   if (match == null) return null;
   final marker = match.group(1)!;
+  final trailing = match.group(2) ?? '';
+  if (marker.codeUnitAt(0) == 0x60 && trailing.contains('`')) return null;
   return _Fence(
     character: marker.codeUnitAt(0),
     length: marker.length,
-    trailing: match.group(2) ?? '',
+    trailing: trailing,
   );
 }
 
