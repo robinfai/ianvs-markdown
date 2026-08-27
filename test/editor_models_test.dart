@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
+import 'package:ianvs_markdown/src/editor/markdown_code_ranges.dart';
 
 void main() {
   test(
@@ -231,6 +232,38 @@ $$
       expect(blocks.last.source, 'After code.');
     },
   );
+
+  test('code ranges map nested quoted blocks to original UTF-16 offsets', () {
+    const source =
+        'Before 😀.\r\n'
+        '\r\n'
+        '>     code 😀 ^[inside]\r\n'
+        '>\r\n'
+        '> ```md\r\n'
+        '> \r\n'
+        '> fenced [^inside]\r\n'
+        '> ```\r\n'
+        '>\r\n'
+        '> >     nested %%inside%% ^inside-id\r\n'
+        '\r\n'
+        'After.';
+
+    final ranges = ianvsMarkdownBlockCodeRanges(source);
+
+    expect(ranges, hasLength(6));
+    expect(ranges.map((range) => range.textInside(source)), <String>[
+      '    code 😀 ^[inside]',
+      '```md\r\n',
+      '\r\n',
+      'fenced [^inside]\r\n',
+      '```',
+      '    nested %%inside%% ^inside-id',
+    ]);
+    expect(
+      ianvsMarkdownBlockCodeRanges('> paragraph\n>     indented continuation'),
+      isEmpty,
+    );
+  });
 
   test('paired standalone comments keep internal blank lines in one block', () {
     const comment = '%%\nhidden first\n\nhidden second\n%%';

@@ -1,5 +1,8 @@
 ## Unreleased
 
+- Preserve footnote, comment, and block-ID-shaped text inside fenced or
+  indented code nested in one or more block-quote containers, with original
+  UTF-16 source ranges shared by Reading, Live Preview, and source styling.
 - Keep inline and standard footnote-shaped text literal inside true indented
   code blocks, excluding it from Reading expansion, shared ordinal collection,
   Live Preview presentation ranges, and source metadata styling.

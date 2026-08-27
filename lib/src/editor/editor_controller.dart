@@ -16,6 +16,7 @@ import '../obsidian_metadata.dart';
 import '../strikethrough.dart';
 import '../wiki_link_reference.dart';
 import 'editor_models.dart';
+import 'markdown_code_ranges.dart';
 import 'markdown_paste.dart';
 import 'reference_links.dart';
 
@@ -2483,11 +2484,7 @@ List<_SyntaxToken> _markdownSyntaxTokens(
   for (final range in fencedRanges) {
     _addFencedCodeSyntaxTokens(tokens, text, range, theme);
   }
-  final indentedCodeRanges =
-      parseMarkdownBlocks(text, groupStandaloneComments: false)
-          .where((block) => block.type == IanvsMarkdownBlockType.indentedCode)
-          .map((block) => TextRange(start: block.start, end: block.end))
-          .toList(growable: false);
+  final blockCodeRanges = ianvsMarkdownBlockCodeRanges(text);
 
   final obsidianCommentRanges = ianvsMarkdownCommentRanges(text);
   for (final range in obsidianCommentRanges) {
@@ -2497,15 +2494,10 @@ List<_SyntaxToken> _markdownSyntaxTokens(
     tokens,
     text,
     theme,
-    <TextRange>[
-      ...fencedRanges,
-      ...indentedCodeRanges,
-      ...obsidianCommentRanges,
-    ],
+    <TextRange>[...blockCodeRanges, ...obsidianCommentRanges],
   );
   final excludedRanges = <TextRange>[
-    ...fencedRanges,
-    ...indentedCodeRanges,
+    ...blockCodeRanges,
     ...obsidianCommentRanges,
     ...displayMathRanges,
   ];

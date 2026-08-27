@@ -3530,6 +3530,82 @@ Outside ^[outside] and [^outside].
     expect(metadata, isNot(contains('[^inside]')));
   });
 
+  test('live source metadata yields to code inside block quotes', () {
+    const syntax = IanvsMarkdownSyntaxTheme(
+      heading: TextStyle(),
+      marker: TextStyle(color: Color(0xff777777)),
+      link: TextStyle(),
+      code: TextStyle(fontFamily: 'monospace'),
+      comment: TextStyle(color: Color(0xff555555)),
+    );
+    const source = '''
+>     code ^[inside] and [^inside] %%inside%% ^inside-id
+>
+> ```md
+> fenced ^[fenced] and [^fenced] %%fenced%% ^fenced-id
+> ```
+>
+> >     nested ^[nested] and [^nested] %%nested%% ^nested-id
+>
+> - item
+>
+>       list code ^[list] and [^list] %%list%% ^list-id
+
+Outside ^[outside] and [^outside] %%outside%% ^outside-id
+''';
+
+    final spans = buildMarkdownSourceTextSpan(
+      const TextEditingValue(
+        text: source,
+        selection: TextSelection.collapsed(offset: 0),
+      ),
+      style: const TextStyle(fontSize: 14),
+      syntaxTheme: syntax,
+      withComposing: false,
+    ).children!.cast<TextSpan>().toList();
+
+    expect(spans.map((span) => span.text).join(), source);
+    final metadata = spans
+        .where((span) => span.style?.color == const Color(0xff555555))
+        .map((span) => span.text)
+        .join();
+    expect(
+      spans
+          .where((span) => span.style?.color == const Color(0xff777777))
+          .map((span) => span.text)
+          .where((text) => text?.startsWith('>') ?? false),
+      hasLength(5),
+    );
+    for (final outside in <String>[
+      '^[outside]',
+      '[^outside]',
+      '%%outside%%',
+      ' ^outside-id',
+    ]) {
+      expect(metadata, contains(outside));
+    }
+    for (final inside in <String>[
+      '^[inside]',
+      '[^inside]',
+      '%%inside%%',
+      '^inside-id',
+      '^[fenced]',
+      '[^fenced]',
+      '%%fenced%%',
+      '^fenced-id',
+      '^[nested]',
+      '[^nested]',
+      '%%nested%%',
+      '^nested-id',
+      '^[list]',
+      '[^list]',
+      '%%list%%',
+      '^list-id',
+    ]) {
+      expect(metadata, isNot(contains(inside)));
+    }
+  });
+
   test('live source keeps code-shaped closers inside the outer comment', () {
     const syntax = IanvsMarkdownSyntaxTheme(
       heading: TextStyle(),

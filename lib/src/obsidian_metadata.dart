@@ -3,6 +3,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import 'editor/editor_models.dart';
+import 'editor/markdown_code_ranges.dart';
 import 'footnote_syntax.dart';
 import 'markdown_link_source.dart';
 import 'theme.dart';
@@ -142,7 +143,7 @@ final class _ObsidianCodeRanges {
 }
 
 _ObsidianCodeRanges _obsidianCodeRanges(String source) {
-  final blockRanges = <TextRange>[];
+  final blockRanges = ianvsMarkdownBlockCodeRanges(source);
   final inlineRanges = <TextRange>[];
   for (final block in parseMarkdownBlocks(
     source,
@@ -150,7 +151,6 @@ _ObsidianCodeRanges _obsidianCodeRanges(String source) {
   )) {
     if (block.type == IanvsMarkdownBlockType.fencedCode ||
         block.type == IanvsMarkdownBlockType.indentedCode) {
-      blockRanges.add(TextRange(start: block.start, end: block.end));
       continue;
     }
 
@@ -173,6 +173,13 @@ _ObsidianCodeRanges _obsidianCodeRanges(String source) {
         continue;
       }
       final end = close + openingLength;
+      if (_overlapsMetadataRange(
+        TextRange(start: index, end: end),
+        blockRanges,
+      )) {
+        index += openingLength;
+        continue;
+      }
       inlineRanges.add(TextRange(start: index, end: end));
       index = end;
     }

@@ -4118,6 +4118,66 @@ Outside ^[real] and [^outside].
       <String>['^[real]', '[^outside]'],
     );
 
+    const quotedCode = '''
+>     code ^[ignored] and [^inside] %%inside%% ^inside-id
+>
+> ```md
+> fenced ^[also ignored] and [^inside] %%fenced%% ^fenced-id
+> ```
+>
+> >     nested ^[nested ignored] and [^inside]
+>
+> - item
+>
+>       list code ^[list ignored] and [^inside] %%list%% ^list-id
+
+Outside ^[real] and [^outside]. %%outside%% ^outside-id
+
+[^inside]: Inside.
+[^outside]: Outside.
+''';
+    expect(collectObsidianStandardFootnoteOrdinals(quotedCode), <String, int>{
+      'outside': 2,
+    });
+    final quotedPresentations = ianvsMarkdownLivePreviewFootnoteReferences(
+      quotedCode,
+    );
+    expect(quotedPresentations.map((reference) => reference.label), <String>[
+      '[1]',
+      '[2]',
+    ]);
+    expect(
+      quotedPresentations.map(
+        (reference) => reference.sourceRange.textInside(quotedCode),
+      ),
+      <String>['^[real]', '[^outside]'],
+    );
+    expect(
+      ianvsMarkdownCommentRanges(
+        quotedCode,
+      ).map((range) => range.textInside(quotedCode)),
+      <String>['%%outside%%'],
+    );
+    expect(
+      ianvsMarkdownBlockIdRanges(
+        quotedCode,
+      ).map((range) => range.textInside(quotedCode)),
+      <String>[' ^outside-id'],
+    );
+    final preparedQuotedCode = prepareObsidianMarkdownForRendering(quotedCode);
+    expect(
+      preparedQuotedCode,
+      contains('>     code ^[ignored] and [^inside] %%inside%% ^inside-id'),
+    );
+    expect(
+      preparedQuotedCode,
+      contains('> fenced ^[also ignored] and [^inside] %%fenced%% ^fenced-id'),
+    );
+    expect(preparedQuotedCode, contains('nested ^[nested ignored]'));
+    expect(preparedQuotedCode, contains('list code ^[list ignored]'));
+    expect(preparedQuotedCode, isNot(contains('%%outside%%')));
+    expect(preparedQuotedCode, isNot(contains('^outside-id')));
+
     const nested = '''
 Outer ^[one ^[two]], standard[^a].
 
