@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 
-import '../callout.dart';
 import '../markdown_list_syntax.dart';
 import '../markdown_table_syntax.dart';
 
@@ -340,24 +339,34 @@ int _displayMathEnd(List<_SourceLine> lines, int first) {
 }
 
 int _blockquoteEnd(List<_SourceLine> lines, int first) {
-  final callout = parseIanvsMarkdownCalloutHeader(lines[first].text) != null;
   var last = first;
+  var previousChild = _blockquoteChild(lines[first].text);
   for (var index = first + 1; index < lines.length; index += 1) {
     final text = lines[index].text;
     if (_isBlockquote(text)) {
       last = index;
+      previousChild = _blockquoteChild(text);
       continue;
     }
     // Obsidian follows CommonMark's lazy block-quote continuation: a
     // non-blank paragraph line may omit `>` and still belongs to the current
-    // quote. A blank line or another block opener ends that continuation.
+    // quote. Indented code cannot interrupt that paragraph, unless the
+    // previous quote child was already an indented code block.
+    final indentedParagraphContinuation =
+        _isIndentedCode(text) && !_isIndentedCode(previousChild);
     if (text.trim().isEmpty ||
-        _startsNewBlock(lines, index) && !(callout && _isIndentedCode(text))) {
+        _startsNewBlock(lines, index) && !indentedParagraphContinuation) {
       break;
     }
     last = index;
+    previousChild = text;
   }
   return last;
+}
+
+String _blockquoteChild(String text) {
+  final marker = RegExp(r'^ {0,3}>[ \t]?').firstMatch(text);
+  return marker == null ? text : text.substring(marker.end);
 }
 
 int _listEnd(List<_SourceLine> lines, int first) {

@@ -778,6 +778,35 @@ visible''';
     expect(blocks.single.source, source);
   });
 
+  test('quotes retain code-indented lazy paragraph continuations', () {
+    const lazyParagraph =
+        '> paragraph\n'
+        '    lazy code-looking\n'
+        '> tail';
+    final lazyBlocks = parseMarkdownBlocks(lazyParagraph);
+
+    expect(lazyBlocks, hasLength(1));
+    expect(lazyBlocks.single.type, IanvsMarkdownBlockType.blockquote);
+    expect(lazyBlocks.single.source, lazyParagraph);
+
+    const quotedCode =
+        '>     code\n'
+        '    outside code\n'
+        '> tail';
+    final codeBlocks = parseMarkdownBlocks(quotedCode);
+
+    expect(codeBlocks.map((block) => block.type), <IanvsMarkdownBlockType>[
+      IanvsMarkdownBlockType.blockquote,
+      IanvsMarkdownBlockType.indentedCode,
+      IanvsMarkdownBlockType.blockquote,
+    ]);
+    expect(codeBlocks.map((block) => block.source), <String>[
+      '>     code',
+      '    outside code',
+      '> tail',
+    ]);
+  });
+
   test('lazy quote continuations stop at blank lines and block openers', () {
     const source =
         '> # Quoted heading\n'

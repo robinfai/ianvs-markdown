@@ -5791,6 +5791,38 @@ url: https://example.com/path
     expect(find.text('After quote.'), findsOneWidget);
   });
 
+  testWidgets('code-indented lazy quote lines edit as paragraph source', (
+    tester,
+  ) async {
+    const quote =
+        '> Paragraph before indentation\n'
+        '    lazy code-looking continuation\n'
+        '> Explicit quoted tail';
+    final controller = IanvsMarkdownController(text: '$quote\n\nOutside.');
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('lazy code-looking continuation'),
+      findsOneWidget,
+    );
+    await tester.tap(find.textContaining('lazy code-looking continuation'));
+    await tester.pump();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, quote);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-quote-rail')),
+      findsOneWidget,
+    );
+    expect(controller.text, '$quote\n\nOutside.');
+  });
+
   testWidgets('live preview continues compact block quotes', (tester) async {
     final controller = IanvsMarkdownController(text: '>quote')
       ..selection = const TextSelection.collapsed(offset: 6);
