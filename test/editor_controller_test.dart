@@ -3484,7 +3484,12 @@ Hidden **source** block.
       spans
           .where((span) => span.style?.color == const Color(0xff555555))
           .map((span) => span.text),
-      <String>[' ^under_score', '^standalone-id', '^double-id'],
+      <String>[
+        ' ^under_score',
+        '^standalone-id',
+        '^double-id',
+        ' ^space-id   ',
+      ],
     );
     final inlineCode = spans.singleWhere(
       (span) => span.text?.contains('^code-id') ?? false,

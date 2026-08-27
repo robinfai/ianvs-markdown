@@ -3317,8 +3317,8 @@ fenced ^fence-id
 underscore
 no-space^beta
 dot ^a.b
-trailing spaces ^space-id'''
-      '   \n'
+trailing spaces'''
+      '\n'
       r'''multiple ^first-id
 
 >
@@ -3336,7 +3336,7 @@ fenced ^fence-id
     );
   });
 
-  testWidgets('reading hides standalone and underscore block IDs', (
+  testWidgets('reading hides standalone and trailing-space block IDs', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -3345,29 +3345,31 @@ fenced ^fence-id
           data:
               'Paragraph ^under_score\n'
               '^standalone-id\n\n'
-              'Invalid trailing ^space-id   ',
+              'Valid trailing ^space-id   ',
         ),
       ),
     );
 
     expect(find.textContaining('under_score'), findsNothing);
     expect(find.textContaining('standalone-id'), findsNothing);
-    expect(find.textContaining('^space-id'), findsOneWidget);
+    expect(find.textContaining('^space-id'), findsNothing);
   });
 
-  testWidgets('editing mode subdues standalone and underscore block IDs', (
-    tester,
-  ) async {
+  testWidgets('editing mode subdues trailing-space block IDs', (tester) async {
     await tester.pumpWidget(
       app(
         const IanvsMarkdown(
-          data: 'Paragraph ^under_score\n^standalone-id',
+          data:
+              'Paragraph ^under_score\n'
+              'Trailing ^space-id   \n'
+              '^standalone-id',
           obsidianMetadataMode: IanvsMarkdownObsidianMetadataMode.editing,
         ),
       ),
     );
 
     expect(find.text(' ^under_score'), findsOneWidget);
+    expect(find.text(' ^space-id   '), findsOneWidget);
     expect(find.text('^standalone-id'), findsOneWidget);
   });
 

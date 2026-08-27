@@ -143,15 +143,15 @@ int _nextUnescapedCommentDelimiter(String source, int start) {
 final RegExp _obsidianBlockIdFencePattern = RegExp(
   r'^ {0,3}(`{3,}|~{3,})(.*)$',
 );
-final RegExp _obsidianTrailingBlockIdPattern = RegExp(r'\^[A-Za-z0-9_-]+$');
+final RegExp _obsidianTrailingBlockIdPattern = RegExp(r'\^[A-Za-z0-9_-]+ *$');
 final RegExp _obsidianTableBlockIdPattern = RegExp(
   r'\|([ \t]*)(\\*)\^([A-Za-z0-9_-]+)([ \t]*)(?=\|)',
 );
 
 /// Finds Obsidian block identifiers outside comments and fenced code.
 ///
-/// A normal identifier ends a source line, has no trailing whitespace, and
-/// is either standalone or separated from preceding content by whitespace.
+/// A normal identifier ends a source line, may be followed by ASCII spaces,
+/// and is either standalone or separated from preceding content by whitespace.
 /// An even backslash run may appear before the caret; it remains literal while
 /// the identifier is consumed. A table cell containing only an identifier is
 /// handled as the equivalent standalone form.
@@ -279,7 +279,7 @@ final class IanvsMarkdownEditingMetadataInlineSyntax extends md.InlineSyntax {
 
   IanvsMarkdownEditingMetadataInlineSyntax.blockId()
     : kind = 'block-id',
-      super(r'[ \t]*\\*\^[A-Za-z0-9_-]+(?:[ \t]*(?=\|)|(?=\n|$))');
+      super(r'[ \t]*\\*\^[A-Za-z0-9_-]+(?:[ \t]*(?=\|)| *(?=\n|$))');
 
   IanvsMarkdownEditingMetadataInlineSyntax.standardFootnote()
     : kind = 'footnote-ref',
