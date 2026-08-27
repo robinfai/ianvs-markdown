@@ -724,7 +724,6 @@ class _ObsidianMetadataValue extends StatelessWidget {
         colors: colors,
         tag: tags,
         hintText: tags ? '添加标签' : '添加别名',
-        commitOnSubmitted: tags,
         onChanged: onListChanged!,
       );
     }
@@ -790,7 +789,6 @@ class _ObsidianEditableListValue extends StatefulWidget {
     required this.colors,
     required this.tag,
     required this.hintText,
-    required this.commitOnSubmitted,
     required this.onChanged,
   });
 
@@ -798,7 +796,6 @@ class _ObsidianEditableListValue extends StatefulWidget {
   final IanvsMarkdownThemeData colors;
   final bool tag;
   final String hintText;
-  final bool commitOnSubmitted;
   final IanvsMarkdownMetadataListChanged onChanged;
 
   @override
@@ -915,9 +912,7 @@ class _ObsidianEditableListValueState
                 smartQuotesType: SmartQuotesType.disabled,
                 autocorrect: false,
                 enableSuggestions: false,
-                onSubmitted: widget.commitOnSubmitted
-                    ? (_) => _commitInput()
-                    : null,
+                onSubmitted: (_) => _commitInput(),
                 onTapOutside: (_) => _focusNode.unfocus(),
                 style: TextStyle(
                   color: widget.colors.textPrimary,

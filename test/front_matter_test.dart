@@ -539,6 +539,39 @@ Body
     );
   });
 
+  test('populated block-list properties retain their trailing line break', () {
+    const source = '''
+---
+aliases:
+  - Alias One
+tags:
+  - one
+---
+Body
+''';
+    final document = parseMarkdownFrontMatter(source);
+    final aliases = document.entries.firstWhere(
+      (entry) => entry.key == 'aliases',
+    );
+
+    expect(
+      replaceMarkdownFrontMatterListValue(source, aliases, const [
+        'Alias One',
+        'Alias Two',
+      ]),
+      '''
+---
+aliases:
+  - Alias One
+  - Alias Two
+tags:
+  - one
+---
+Body
+''',
+    );
+  });
+
   test('list property rewrites preserve CRLF around empty values', () {
     const source =
         '---\r\n'

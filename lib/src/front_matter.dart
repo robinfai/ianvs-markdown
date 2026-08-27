@@ -354,15 +354,17 @@ String replaceMarkdownFrontMatterListValue(
   final lineBreak = source.contains('\r\n') ? '\r\n' : '\n';
   final sourceRetainsLineBreak =
       source.startsWith('\n', valueEnd) || source.startsWith('\r\n', valueEnd);
+  final valueConsumesLineBreak = source
+      .substring(valueStart, valueEnd)
+      .endsWith(lineBreak);
+  final blockList = values
+      .map((value) => '$lineBreak$indentation  - ${_yamlTextScalar(value)}')
+      .join();
   final replacement = values.isEmpty
       ? emptyScalarAtSeparator || sourceRetainsLineBreak
             ? ''
             : lineBreak
-      : values
-            .map(
-              (value) => '$lineBreak$indentation  - ${_yamlTextScalar(value)}',
-            )
-            .join();
+      : '$blockList${valueConsumesLineBreak ? lineBreak : ''}';
   return _replaceMarkdownFrontMatterEntrySource(
     source,
     entry,

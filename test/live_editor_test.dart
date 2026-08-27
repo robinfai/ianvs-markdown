@@ -4741,7 +4741,7 @@ aliases:
     );
   });
 
-  testWidgets('alias properties remove and Tab-add without opening YAML', (
+  testWidgets('alias properties remove and Tab or Return add without YAML', (
     tester,
   ) async {
     const source = '''
@@ -4812,6 +4812,23 @@ tags:
 title: Alpha
 aliases:
   - Alias Three
+tags:
+  - one
+  - two
+---
+# Body
+''');
+
+    await tester.tap(input);
+    await tester.enterText(input, 'Alias Four');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(controller.text, '''
+---
+title: Alpha
+aliases:
+  - Alias Three
+  - Alias Four
 tags:
   - one
   - two
