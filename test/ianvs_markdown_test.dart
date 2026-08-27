@@ -4422,6 +4422,27 @@ code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
       ),
       <String>['^[visible]'],
     );
+
+    const escapedRun = r'''\``^[code]` and ^[visible]''';
+    final escapedRunPresentations = ianvsMarkdownLivePreviewFootnoteReferences(
+      escapedRun,
+    );
+    expect(
+      escapedRunPresentations.map(
+        (reference) => reference.sourceRange.textInside(escapedRun),
+      ),
+      <String>['^[visible]'],
+    );
+    expect(
+      escapedRunPresentations.map((reference) => reference.label),
+      <String>['[1]'],
+    );
+    final escapedRunRendered = prepareObsidianMarkdownForRendering(escapedRun);
+    expect(
+      escapedRunRendered,
+      contains(r'''\``^[code]` and [^ianvs-inline-footnote-1]'''),
+    );
+    expect(escapedRunRendered, isNot(contains('[^ianvs-inline-footnote-2]')));
   });
 
   test('keeps Obsidian metadata literal inside list-contained code', () {

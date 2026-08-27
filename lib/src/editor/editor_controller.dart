@@ -2544,14 +2544,26 @@ List<_SyntaxToken> _markdownSyntaxTokens(
     inlineStructuralRanges.add(TextRange(start: match.start, end: match.end));
     tokens.add(_SyntaxToken(match.start, match.end, tokenStyle));
   }
+  final codeRanges = _addInlineCodeSyntaxTokens(
+    tokens,
+    text,
+    theme.code,
+    theme.inlineCodeMarker ?? theme.marker,
+    <TextRange>[...excludedRanges, ...inlineStructuralRanges],
+  );
+  final metadataExcludedRanges = <TextRange>[...excludedRanges, ...codeRanges];
   for (final range in ianvsMarkdownBlockIdRanges(text)) {
-    if (_overlapsAnyRange(range.start, range.end, excludedRanges)) continue;
+    if (_overlapsAnyRange(range.start, range.end, metadataExcludedRanges)) {
+      continue;
+    }
     inlineStructuralRanges.add(range);
     tokens.add(_SyntaxToken(range.start, range.end, theme.comment));
   }
   final standardFootnotePattern = RegExp(r'\[\^[^\] \r\n\x00\t]+\](?::)?');
   for (final match in standardFootnotePattern.allMatches(text)) {
-    if (_overlapsAnyRange(match.start, match.end, excludedRanges)) continue;
+    if (_overlapsAnyRange(match.start, match.end, metadataExcludedRanges)) {
+      continue;
+    }
     inlineStructuralRanges.add(TextRange(start: match.start, end: match.end));
     tokens.add(_SyntaxToken(match.start, match.end, theme.comment));
   }
@@ -2560,7 +2572,7 @@ List<_SyntaxToken> _markdownSyntaxTokens(
     if (!_overlapsAnyRange(
           inlineFootnoteStart,
           inlineFootnoteStart + 2,
-          excludedRanges,
+          metadataExcludedRanges,
         ) &&
         !isIanvsMarkdownEscapedAt(text, inlineFootnoteStart)) {
       final close = findIanvsMarkdownInlineFootnoteEnd(
@@ -2583,13 +2595,6 @@ List<_SyntaxToken> _markdownSyntaxTokens(
     ...excludedRanges,
     ...inlineStructuralRanges,
   ];
-  final codeRanges = _addInlineCodeSyntaxTokens(
-    tokens,
-    text,
-    theme.code,
-    theme.inlineCodeMarker ?? theme.marker,
-    codeExcludedRanges,
-  );
   final mathRanges = _addInlineMathSyntaxTokens(
     tokens,
     text,

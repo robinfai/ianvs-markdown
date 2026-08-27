@@ -439,7 +439,7 @@ String projectObsidianInlineLinkDestinationBackslashesForRendering(
         lineStart = false;
         continue;
       }
-      index += runLength;
+      index += isIanvsMarkdownEscapedAt(source, index) ? 1 : runLength;
       lineStart = false;
       continue;
     }
@@ -1143,7 +1143,7 @@ final class _ObsidianFootnoteOrdinalCollector {
           lineStart = false;
           continue;
         }
-        index += runLength;
+        index += isIanvsMarkdownEscapedAt(source, index) ? 1 : runLength;
         lineStart = false;
         continue;
       }
@@ -1359,8 +1359,11 @@ final class _InlineFootnoteExpansion {
           lineStart = false;
           continue;
         }
-        output.write(source.substring(index, index + runLength));
-        index += runLength;
+        final literalLength = isIanvsMarkdownEscapedAt(source, index)
+            ? 1
+            : runLength;
+        output.write(source.substring(index, index + literalLength));
+        index += literalLength;
         lineStart = false;
         continue;
       }
@@ -1418,7 +1421,9 @@ int? _ianvsMarkdownInlineCodeSpanEnd(String source, int openingStart) {
       openingStart >= source.length ||
       source.codeUnitAt(openingStart) != 0x60 ||
       isIanvsMarkdownEscapedAt(source, openingStart) ||
-      (openingStart > 0 && source.codeUnitAt(openingStart - 1) == 0x60)) {
+      (openingStart > 0 &&
+          source.codeUnitAt(openingStart - 1) == 0x60 &&
+          !isIanvsMarkdownEscapedAt(source, openingStart - 1))) {
     return null;
   }
   final openingLength = _characterRunLength(source, openingStart, 0x60);

@@ -2951,6 +2951,48 @@ void main() {
     },
   );
 
+  test('escaped first backtick leaves the remaining run as code', () {
+    const syntax = IanvsMarkdownSyntaxTheme(
+      heading: TextStyle(fontWeight: FontWeight.w600),
+      marker: TextStyle(color: Color(0xff777777)),
+      link: TextStyle(decoration: TextDecoration.underline),
+      code: TextStyle(fontFamily: 'monospace'),
+      comment: TextStyle(fontStyle: FontStyle.italic),
+    );
+    const source = r'''\``^[code]` and ^[visible]''';
+    final spans = buildMarkdownSourceTextSpan(
+      const TextEditingValue(
+        text: source,
+        selection: TextSelection.collapsed(offset: 0),
+      ),
+      style: const TextStyle(fontSize: 14),
+      syntaxTheme: syntax,
+      withComposing: false,
+      hideInactiveInlineMarkers: true,
+    ).children!.cast<TextSpan>().toList();
+
+    TextSpan spanAt(int offset) {
+      var cursor = 0;
+      for (final span in spans) {
+        final end = cursor + (span.text?.length ?? 0);
+        if (offset >= cursor && offset < end) return span;
+        cursor = end;
+      }
+      throw StateError('No span at $offset');
+    }
+
+    expect(spanAt(source.indexOf('^[code]')).style?.fontFamily, 'monospace');
+    expect(
+      spanAt(source.indexOf('^[code]')).style?.fontStyle,
+      isNot(FontStyle.italic),
+    );
+    expect(
+      spanAt(source.indexOf('^[visible]')).style?.fontStyle,
+      FontStyle.italic,
+    );
+    expect(spans.map((span) => span.text).join(), source);
+  });
+
   test('inline code never crosses a Markdown paragraph break', () {
     const syntax = IanvsMarkdownSyntaxTheme(
       heading: TextStyle(fontWeight: FontWeight.w600),
