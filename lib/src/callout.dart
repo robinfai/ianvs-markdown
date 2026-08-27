@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
+import 'markdown_list_syntax.dart';
 import 'theme.dart';
 
 typedef IanvsMarkdownCalloutBodyBuilder =
@@ -63,7 +64,7 @@ class IanvsMarkdownCalloutSyntax extends md.BlockSyntax {
   static final RegExp _quoteLine = RegExp(r'^ {0,3}>[ \t]?(.*)$');
   static final RegExp _unquotedBlockOpener = RegExp(
     r'^ {0,3}(?:#{1,6}(?:[ \t]+|$)|`{3,}|~{3,}|\$\$[ \t]*$|'
-    r'[-+*][ \t]+|\d{1,9}[.)][ \t]+|<[A-Za-z!/])',
+    r'<[A-Za-z!/])',
   );
 
   @override
@@ -98,7 +99,10 @@ class IanvsMarkdownCalloutSyntax extends md.BlockSyntax {
   }
 
   static bool _startsUnquotedBlock(String source) {
-    if (_unquotedBlockOpener.hasMatch(source)) return true;
+    if (_unquotedBlockOpener.hasMatch(source) ||
+        isMarkdownInterruptingListItemStart(source)) {
+      return true;
+    }
     final leadingSpaces = RegExp(r'^ *').firstMatch(source)!.group(0)!.length;
     if (leadingSpaces > 3) return false;
     final compact = source.trim().replaceAll(RegExp(r'[ \t]'), '');

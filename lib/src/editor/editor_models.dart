@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../callout.dart';
+import '../markdown_list_syntax.dart';
 import '../markdown_table_syntax.dart';
 
 /// Display modes supported by [IanvsMarkdownLiveEditor].
@@ -233,14 +234,7 @@ bool ianvsMarkdownTableBodyContinues(String text, {String? nextLine}) {
     return false;
   }
 
-  final list = RegExp(
-    r'^ {0,3}(?:(\d{1,9})[.)]|[*+-])(?:[ \t]+(.*))?$',
-  ).firstMatch(text);
-  if (list != null &&
-      (list.group(2)?.trim().isNotEmpty ?? false) &&
-      (list.group(1) == null || list.group(1) == '1')) {
-    return false;
-  }
+  if (isMarkdownInterruptingListItemStart(text)) return false;
 
   if (nextLine != null) {
     if (_isSetextUnderline(nextLine)) return false;
@@ -550,8 +544,7 @@ bool _startsNewBlock(List<_SourceLine> lines, int index) {
       _isAtxHeading(text) ||
       _isThematicBreak(text) ||
       _isBlockquote(text) ||
-      _isUnorderedList(text) ||
-      _isOrderedList(text) ||
+      isMarkdownInterruptingListItemStart(text) ||
       _isIndentedCode(text) ||
       _isInterruptingHtmlBlockStart(text) ||
       _isTableStart(lines, index);
@@ -582,12 +575,6 @@ bool _isBlockquote(String text) => RegExp(r'^ {0,3}>').hasMatch(text);
 bool _isTaskList(String text) => RegExp(
   r'^\s{0,3}(?:[-+*]|\d{1,9}[.)])\s+\[[^\r\n]\](?:[ \t]+|$)',
 ).hasMatch(text);
-
-bool _isUnorderedList(String text) =>
-    RegExp(r'^\s{0,3}[-+*]\s+').hasMatch(text);
-
-bool _isOrderedList(String text) =>
-    RegExp(r'^\s{0,3}\d{1,9}[.)]\s+').hasMatch(text);
 
 bool _isIndentedContinuation(String text, {required int minimumColumns}) =>
     text.trim().isNotEmpty && _leadingIndentColumns(text) >= minimumColumns;

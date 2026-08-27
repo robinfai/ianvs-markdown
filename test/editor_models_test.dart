@@ -675,6 +675,39 @@ visible''';
     expect(blocks.last.source, 'After quote.');
   });
 
+  test(
+    'list interruption requires non-empty content and ordered start one',
+    () {
+      for (final source in <String>[
+        'Paragraph\n2. item',
+        'Paragraph\n* ',
+        'Paragraph\n1. ',
+      ]) {
+        final blocks = parseMarkdownBlocks(source);
+        expect(blocks, hasLength(1), reason: source);
+        expect(
+          blocks.single.type,
+          IanvsMarkdownBlockType.paragraph,
+          reason: source,
+        );
+        expect(blocks.single.source, source, reason: source);
+      }
+
+      const valid = 'Paragraph\n1. item';
+      final validBlocks = parseMarkdownBlocks(valid);
+      expect(validBlocks.map((block) => block.type), <IanvsMarkdownBlockType>[
+        IanvsMarkdownBlockType.paragraph,
+        IanvsMarkdownBlockType.orderedList,
+      ]);
+
+      const lazyQuote = '> Paragraph\n2. item\n> tail';
+      final quoteBlocks = parseMarkdownBlocks(lazyQuote);
+      expect(quoteBlocks, hasLength(1));
+      expect(quoteBlocks.single.type, IanvsMarkdownBlockType.blockquote);
+      expect(quoteBlocks.single.source, lazyQuote);
+    },
+  );
+
   test('callouts retain code-indented lazy paragraph continuations', () {
     const source =
         '> [!note] Four-space boundary\n'

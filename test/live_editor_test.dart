@@ -6097,6 +6097,37 @@ url: https://example.com/path
     expect(controller.text, '$source\n\nOutside.');
   });
 
+  testWidgets('callout lazy paragraphs ignore non-interrupting list markers', (
+    tester,
+  ) async {
+    const source =
+        '> [!note] List interruption\n'
+        '> paragraph\n'
+        '2. item\n'
+        '> tail';
+    final controller = IanvsMarkdownController(text: '$source\n\nOutside.');
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final callout = find.byKey(const ValueKey('ianvs-markdown-callout-note'));
+    expect(callout, findsOneWidget);
+    expect(
+      find.descendant(of: callout, matching: find.textContaining('2. item')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.textContaining('2. item'));
+    await tester.pumpAndSettle();
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, source);
+    expect(find.text('Outside.'), findsOneWidget);
+  });
+
   testWidgets('Wiki embeds render and enter exact block source editing', (
     tester,
   ) async {
