@@ -1003,6 +1003,38 @@ Unclosed <https://open.example/path tail.
     ));
   });
 
+  testWidgets('angle www falls back to an Obsidian bare link through >', (
+    tester,
+  ) async {
+    final taps = <(String, String?)>[];
+    await tester.pumpWidget(
+      app(
+        IanvsMarkdown(
+          data:
+              r'<www.example.com> and www.plain.example/path and \<www.escaped.example>.',
+          onTapLink: (text, href, title) => taps.add((text, href)),
+        ),
+      ),
+    );
+
+    expect(_renderedPlainTextContains(tester, '<'), isTrue);
+    expect(find.text('www.example.com>'), findsOneWidget);
+    expect(find.text('www.plain.example/path'), findsOneWidget);
+    expect(find.text('www.escaped.example'), findsOneWidget);
+
+    await tester.tap(find.text('www.example.com>'));
+    await tester.pump();
+    await tester.tap(find.text('www.plain.example/path'));
+    await tester.pump();
+    await tester.tap(find.text('www.escaped.example'));
+    await tester.pump();
+    expect(taps, <(String, String?)>[
+      ('www.example.com>', 'http://www.example.com%3E'),
+      ('www.plain.example/path', 'http://www.plain.example/path'),
+      ('www.escaped.example', 'http://www.escaped.example'),
+    ]);
+  });
+
   testWidgets('preserves Obsidian-style soft breaks by default', (
     tester,
   ) async {

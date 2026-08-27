@@ -453,6 +453,30 @@ void main() {
     },
   );
 
+  testWidgets('live preview preserves exact angle www fallback source', (
+    tester,
+  ) async {
+    const source = '<www.example.com> tail.';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('<', findRichText: true), findsOneWidget);
+    expect(find.text('www.example.com>'), findsOneWidget);
+    expect(controller.text, source);
+
+    await tester.tap(find.text('www.example.com>'));
+    await tester.pumpAndSettle();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, source);
+    expect(controller.text, source);
+  });
+
   testWidgets('ordinary active rail follows only the caret line', (
     tester,
   ) async {

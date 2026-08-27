@@ -3257,6 +3257,7 @@ void main() {
         'WWW www.web.example/path tail. '
         'Email user@mail.example tail. '
         'Angle <https://angle.example/a_(b)> tail. '
+        'Angle WWW <www.angle-www.example/path> tail. '
         r'Escaped \<https://escaped.example/path> tail. '
         'Mixed https://punct.example/a_(b).,;:!? tail. '
         'Bracket https://bracket.example/a] tail. '
@@ -3294,6 +3295,7 @@ void main() {
       'www.web.example/path',
       'user@mail.example',
       'https://angle.example/a_(b)',
+      'www.angle-www.example/path>',
       'https://escaped.example/path',
       'https://punct.example/a_(b)',
       'https://bracket.example/a]',
@@ -3320,6 +3322,12 @@ void main() {
     final angleClose = source.indexOf('>', angleUrl);
     expect(spanAt(inactive, angleOpen).style?.fontSize, .01);
     expect(spanAt(inactive, angleClose).style?.fontSize, .01);
+    final angleWww = source.indexOf('www.angle-www.example');
+    expect(spanAt(inactive, angleWww - 1).style?.fontSize, 14);
+    expect(
+      spanAt(inactive, source.indexOf('>', angleWww)).style?.decoration,
+      TextDecoration.underline,
+    );
     final escapedUrl = source.indexOf('https://escaped.example');
     expect(spanAt(inactive, escapedUrl - 1).style?.fontSize, .01);
     expect(spanAt(inactive, escapedUrl - 2).style?.fontSize, 14);

@@ -14,11 +14,26 @@ List<md.InlineSyntax> ianvsMarkdownInlineHtmlSyntaxes(
   IanvsMarkdownObsidianMetadataMode mode,
 ) => <md.InlineSyntax>[
   _IanvsMarkdownEscapedHtmlSyntax(mode),
+  _IanvsMarkdownAngleWwwPrefixSyntax(),
   _IanvsMarkdownDangerousHtmlSyntax(mode),
   _IanvsMarkdownPairedHtmlSyntax(mode),
   _IanvsMarkdownBreakHtmlSyntax(mode),
   _IanvsMarkdownStandaloneHtmlSyntax(mode),
 ];
+
+/// Leaves the opening angle of Obsidian's `<www…>` bare-link fallback
+/// literal instead of letting the standalone-HTML sanitizer consume it.
+/// The following `www` token is handled by the bare-link syntax.
+final class _IanvsMarkdownAngleWwwPrefixSyntax extends md.InlineSyntax {
+  _IanvsMarkdownAngleWwwPrefixSyntax()
+    : super(r'<(?=www\.[^\s<>]+>)', startCharacter: 0x3c, caseSensitive: false);
+
+  @override
+  bool onMatch(md.InlineParser parser, Match match) {
+    parser.addNode(md.Text('<'));
+    return true;
+  }
+}
 
 final class _IanvsMarkdownEscapedHtmlSyntax extends md.InlineSyntax {
   _IanvsMarkdownEscapedHtmlSyntax(this.mode)

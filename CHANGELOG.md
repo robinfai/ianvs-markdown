@@ -1,5 +1,8 @@
 ## Unreleased
 
+- Match Obsidian's non-standard `<www…>` fallback by preserving the leading
+  `<` as literal text while including the trailing `>` in the bare-link label
+  and percent-encoded destination; ordinary `www` links remain unchanged.
 - Preserve Obsidian inline-link destination backslash parity: odd runs that
   escape a parenthesis now retain one encoded literal backslash per preceding
   pair in Reading and inactive Live Preview, while exact source, code,

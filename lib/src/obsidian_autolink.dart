@@ -107,6 +107,14 @@ IanvsMarkdownAutolinkMatch? matchIanvsMarkdownAutolinkAt(
   if (url != null) {
     var end = _obsidianUrlEnd(source, offset, url.end);
     if (end <= offset) return null;
+    final angleWwwFallback =
+        offset > 0 &&
+        source.codeUnitAt(offset - 1) == 0x3c &&
+        !isIanvsMarkdownEscapedAt(source, offset - 1) &&
+        source.substring(offset, end).toLowerCase().startsWith('www.') &&
+        end < source.length &&
+        source.codeUnitAt(end) == 0x3e;
+    if (angleWwwFallback) end += 1;
     final label = source.substring(offset, end);
     final destination = label.toLowerCase().startsWith('www.')
         ? 'http://$label'
