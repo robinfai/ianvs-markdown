@@ -215,6 +215,41 @@ int markdownGapLineCount(
   return newlines;
 }
 
+/// Whether a non-header line remains inside a GFM table body.
+///
+/// Body rows may omit every pipe (GFM example 202). They continue until a
+/// blank line or syntax that can interrupt a leaf block; an empty list marker
+/// and an ordered marker not starting at `1` do not interrupt the table.
+bool ianvsMarkdownTableBodyContinues(String text, {String? nextLine}) {
+  if (text.trim().isEmpty ||
+      _fence(text) != null ||
+      _isDisplayMathFence(text) ||
+      _isAtxHeading(text) ||
+      _isThematicBreak(text) ||
+      _isBlockquote(text) ||
+      RegExp(r'^(?: {4}| {0,3}\t)').hasMatch(text) ||
+      _isHtmlStart(text) ||
+      RegExp(r'^ {0,3}\[[^\]\r\n]+\]:').hasMatch(text)) {
+    return false;
+  }
+
+  final list = RegExp(
+    r'^ {0,3}(?:(\d{1,9})[.)]|[*+-])(?:[ \t]+(.*))?$',
+  ).firstMatch(text);
+  if (list != null &&
+      (list.group(2)?.trim().isNotEmpty ?? false) &&
+      (list.group(1) == null || list.group(1) == '1')) {
+    return false;
+  }
+
+  if (nextLine != null) {
+    if (_isSetextUnderline(nextLine)) return false;
+    final candidate = _sourceLines('$text\n$nextLine');
+    if (_isTableStart(candidate, 0)) return false;
+  }
+  return true;
+}
+
 IanvsMarkdownBlock _block(
   String source,
   List<_SourceLine> lines,
@@ -394,7 +429,12 @@ int _tableEnd(List<_SourceLine> lines, int first) {
   var last = first + 1;
   for (var index = first + 2; index < lines.length; index += 1) {
     final text = lines[index].text;
-    if (text.trim().isEmpty || !text.contains('|')) break;
+    if (!ianvsMarkdownTableBodyContinues(
+      text,
+      nextLine: index + 1 < lines.length ? lines[index + 1].text : null,
+    )) {
+      break;
+    }
     last = index;
   }
   return last;

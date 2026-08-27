@@ -1,5 +1,7 @@
 ## Unreleased
 
+- Keep pipe-less GFM body rows inside tables until a blank line or real block
+  opener, including exact Live Preview cell editing and missing-cell writes.
 - Keep irregular-table projection active after fenced code nested in list
   containers, while leaving table-shaped lines inside that code byte-exact.
 - Preserve footnote, comment, and block-ID-shaped text inside code blocks that

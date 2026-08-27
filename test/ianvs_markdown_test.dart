@@ -684,6 +684,32 @@ final answer = 42;
     semanticsHandle.dispose();
   });
 
+  testWidgets('reading tables retain pipe-less body rows before extra cells', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(
+          data:
+              '| A | B | C |\n'
+              '| --- | --- | --- |\n'
+              'one\n'
+              '| x | y | z | extra |\n'
+              '\n'
+              'After.',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final table = tester.widget<Table>(find.byType(Table));
+    expect(table.children, hasLength(3));
+    expect(table.children.map((row) => row.children.length), everyElement(4));
+    expect(find.text('one'), findsOneWidget);
+    expect(find.text('extra'), findsOneWidget);
+    expect(find.text('After.'), findsOneWidget);
+  });
+
   testWidgets('reading mode accepts Obsidian minimum-width alignments', (
     tester,
   ) async {

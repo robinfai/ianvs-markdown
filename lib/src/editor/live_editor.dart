@@ -5960,7 +5960,17 @@ List<(int, int)> _tableLineCellRanges(_EditableTableLine line) {
     }
     if (slashes.isEven) pipes.add(index);
   }
-  if (pipes.isEmpty) return const [];
+  if (pipes.isEmpty) {
+    var start = 0;
+    var end = line.text.length;
+    while (start < end && _isTableWhitespace(line.text.codeUnitAt(start))) {
+      start += 1;
+    }
+    while (end > start && _isTableWhitespace(line.text.codeUnitAt(end - 1))) {
+      end -= 1;
+    }
+    return <(int, int)>[(start, end)];
+  }
 
   final trimmedLeft = line.text.length - line.text.trimLeft().length;
   final trimmedRight = line.text.trimRight().length;

@@ -9219,6 +9219,44 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     semanticsHandle.dispose();
   });
 
+  testWidgets('pipe-less table rows stay editable until a blank boundary', (
+    tester,
+  ) async {
+    const source =
+        '| A | B |\n'
+        '| --- | --- |\n'
+        '| one | two |\n'
+        'three\n'
+        '\n'
+        'After.';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final fields = find.descendant(
+      of: find.bySemanticsLabel('Editable Markdown table'),
+      matching: find.byType(TextField),
+    );
+    expect(fields, findsNWidgets(6));
+    expect(tester.widget<TextField>(fields.at(4)).controller?.text, 'three');
+    expect(tester.widget<TextField>(fields.at(5)).controller?.text, isEmpty);
+
+    await tester.enterText(fields.at(5), 'filled');
+    await tester.pumpAndSettle();
+
+    expect(
+      controller.text,
+      '| A | B |\n'
+      '| --- | --- |\n'
+      '| one | two |\n'
+      'three | filled |\n'
+      '\n'
+      'After.',
+    );
+  });
+
   testWidgets('table structure controls append and focus rows and columns', (
     tester,
   ) async {

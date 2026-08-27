@@ -80,6 +80,44 @@ final value = 1;
     expect(markdownGapLineCount(source, blocks.first, blocks[1]), 2);
   });
 
+  test('table blocks retain pipe-less body rows until a real boundary', () {
+    const source =
+        '| abc | def |\n'
+        '| --- | --- |\n'
+        '| bar | baz |\n'
+        'bar\n'
+        '\n'
+        'bar';
+
+    final blocks = parseMarkdownBlocks(source);
+
+    expect(blocks.map((block) => block.type), <IanvsMarkdownBlockType>[
+      IanvsMarkdownBlockType.table,
+      IanvsMarkdownBlockType.paragraph,
+    ]);
+    expect(
+      blocks.first.source,
+      '| abc | def |\n| --- | --- |\n| bar | baz |\nbar',
+    );
+    expect(blocks.last.source, 'bar');
+
+    const interrupted =
+        '| abc | def |\n'
+        '| --- | --- |\n'
+        '2. still a row\n'
+        '> quote';
+    final interruptedBlocks = parseMarkdownBlocks(interrupted);
+    expect(
+      interruptedBlocks.map((block) => block.type),
+      <IanvsMarkdownBlockType>[
+        IanvsMarkdownBlockType.table,
+        IanvsMarkdownBlockType.blockquote,
+      ],
+    );
+    expect(interruptedBlocks.first.source, contains('2. still a row'));
+    expect(interruptedBlocks.last.source, '> quote');
+  });
+
   test('standalone block IDs extend supported blocks across blank lines', () {
     const source =
         '# Heading\n\n^heading-id\n\n'

@@ -6,6 +6,7 @@ import 'blocked_image.dart';
 import 'callout.dart';
 import 'code_block.dart';
 import 'code_surface.dart';
+import 'editor/editor_models.dart';
 import 'editor/markdown_code_ranges.dart';
 import 'emphasis.dart';
 import 'front_matter_card.dart';
@@ -545,8 +546,10 @@ String _projectIrregularObsidianTables(String source) {
     var end = index + 1;
     while (end + 1 < lines.length &&
         !codeLines[end + 1] &&
-        lines[end + 1].trim().isNotEmpty &&
-        _hasProjectedTablePipe(lines[end + 1])) {
+        ianvsMarkdownTableBodyContinues(
+          lines[end + 1],
+          nextLine: end + 2 < lines.length ? lines[end + 2] : null,
+        )) {
       end += 1;
     }
     var columnCount = 0;
@@ -614,22 +617,6 @@ int _projectedTableCellCount(String source) {
   final leading = trimmedLeft < source.length && source[trimmedLeft] == '|';
   final trailing = trimmedRight > 0 && source[trimmedRight - 1] == '|';
   return pipes.length + 1 - (leading ? 1 : 0) - (trailing ? 1 : 0);
-}
-
-bool _hasProjectedTablePipe(String source) {
-  for (var index = 0; index < source.length; index += 1) {
-    if (source.codeUnitAt(index) != 0x7c) continue;
-    var slashes = 0;
-    for (
-      var cursor = index - 1;
-      cursor >= 0 && source.codeUnitAt(cursor) == 0x5c;
-      cursor -= 1
-    ) {
-      slashes += 1;
-    }
-    if (slashes.isEven) return true;
-  }
-  return false;
 }
 
 String _appendProjectedTableCell(String source, {required bool separator}) {
