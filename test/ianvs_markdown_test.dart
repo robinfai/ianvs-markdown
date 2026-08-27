@@ -2893,6 +2893,127 @@ $$
     );
   });
 
+  test('highlight keeps a cross-paragraph attempted pair literal', () {
+    const source = 'L==before\n\nafter==R';
+
+    expect(ianvsMarkdownHighlightMatches(source), isEmpty);
+    expect(ianvsMarkdownCrossParagraphHighlightLiteralRuns(source), <TextRange>[
+      const TextRange(start: 1, end: 3),
+      const TextRange(start: 16, end: 18),
+    ]);
+    expect(
+      projectObsidianCrossParagraphHighlightsForRendering(source),
+      'L\\==before\n\nafter\\==R',
+    );
+    const localSource = 'L==open\n\nX==local==Y';
+    final local = ianvsMarkdownHighlightMatches(localSource);
+    expect(
+      local.map((match) => match.content.textInside(localSource)),
+      <String>['open', 'local'],
+    );
+    expect(local.first.isClosed, isFalse);
+    expect(local.last.isClosed, isTrue);
+
+    for (final separated in <String>[
+      'L==before\n  \nafter==R',
+      'L==before\r\n\r\nafter==R',
+    ]) {
+      expect(ianvsMarkdownHighlightMatches(separated), isEmpty);
+      expect(
+        ianvsMarkdownCrossParagraphHighlightLiteralRuns(separated),
+        hasLength(2),
+      );
+    }
+
+    const multiple = 'A==one\n\nend==B\n\n\nC==two\n\nlast==D\n\nX==local==Y';
+    expect(
+      ianvsMarkdownCrossParagraphHighlightLiteralRuns(multiple),
+      hasLength(4),
+    );
+    expect(
+      ianvsMarkdownHighlightMatches(
+        multiple,
+      ).map((match) => match.content.textInside(multiple)),
+      <String>['local'],
+    );
+  });
+
+  test('cross-paragraph highlight projection preserves literal contexts', () {
+    const inlineCode = '`L==before`\n\n`after==R`';
+    const fencedCode = '```text\nL==before\n\nafter==R\n```';
+    const comment = '%% L==before\n\nafter==R %%';
+    const inlineMath =
+        r'$L==before$'
+        '\n\n'
+        r'$after==R$';
+    const inlineDisplayMath =
+        r'$$L==before$$'
+        '\n\n'
+        r'$$after==R$$';
+    const displayMath = r'''$$
+L==before
+
+after==R
+$$''';
+    const html =
+        '<span data-value="==before">one</span>\n\n'
+        '<span data-value="after==R">two</span>';
+    const linkDestinations =
+        '[one](https://example.com/==before)\n\n'
+        '[two](https://example.com/after==R)';
+    const wikiTargets = '[[L==before]]\n\n[[after==R]]';
+
+    for (final source in <String>[
+      inlineCode,
+      fencedCode,
+      comment,
+      inlineMath,
+      inlineDisplayMath,
+      displayMath,
+      html,
+      linkDestinations,
+      wikiTargets,
+    ]) {
+      expect(
+        ianvsMarkdownCrossParagraphHighlightLiteralRuns(source),
+        isEmpty,
+        reason: source,
+      );
+      expect(
+        projectObsidianCrossParagraphHighlightsForRendering(source),
+        source,
+        reason: source,
+      );
+    }
+
+    for (final source in <String>[
+      '[L==before](https://example.com)\n\n'
+          '[after==R](https://example.com)',
+      '[[Target|L==before]]\n\n[[Target|after==R]]',
+    ]) {
+      expect(
+        ianvsMarkdownCrossParagraphHighlightLiteralRuns(source),
+        hasLength(2),
+        reason: source,
+      );
+    }
+  });
+
+  testWidgets('reading keeps a cross-paragraph attempted highlight literal', (
+    tester,
+  ) async {
+    const source = 'L==before\n\nafter==R';
+
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-highlight')),
+      findsNothing,
+    );
+    expect(_renderedPlainTextContains(tester, 'L==before'), isTrue);
+    expect(_renderedPlainTextContains(tester, 'after==R'), isTrue);
+  });
+
   testWidgets('reading follows Obsidian highlight runs and line scope', (
     tester,
   ) async {
@@ -2907,6 +3028,8 @@ $$
         'L==closed-soft\nnext==R\n\n'
         'L==open-soft\nnextR\n\n'
         'L==one====two==R';
+
+    expect(ianvsMarkdownCrossParagraphHighlightLiteralRuns(source), isEmpty);
 
     await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
 

@@ -116,7 +116,7 @@ IanvsMarkdown(
 
 标签词法与 Obsidian 对齐：标签通常从文首或空白后开始，也接受实测的全角冒号起始边界，并允许 `#one#two` 这样的相邻标签；内容支持 Unicode、emoji 和 `/` 路径，但不能只有 ASCII 数字。ASCII 标点及 Obsidian 排除的两个 Unicode 标点区会结束标签，全角标点等范围外字符仍可成为标签的一部分；奇数个反斜线转义 `#`，偶数个则恢复解析。阅读态和非活动 Live Preview 显示标签胶囊，活动块恢复精确 Markdown 源码，点击标签仍通过 `onTapLink` 交给宿主。
 
-`==高亮==` 同样使用 Obsidian 1.13.7 的边界：inner 首尾为空格或 Tab、空内容和纯空白内容都保持字面值；合法闭合高亮可以跨一个 soft break，但不能跨空行，未闭合 opening 只着色到当前物理行末。Reading 每侧只隐藏成对的两个 `=` 并保留 surplus，非活动 Live Preview 会隐藏参与语法的完整等号 run，活动块恢复精确源码；`==one====two==` 仍是两个相邻高亮。奇偶反斜线、行内/围栏代码和注释优先级在渲染与源码着色中一致，普通链接和 Wiki alias 内也能叠加高亮，双击正文会选中完整 delimiter 范围。
+`==高亮==` 同样使用 Obsidian 1.13.7 的边界：inner 首尾为空格或 Tab、空内容和纯空白内容都保持字面值；合法闭合高亮可以跨一个 soft break，但不能跨空行，未闭合 opening 只着色到当前物理行末。若两个孤立 `==` run 只可能跨空段配对，两侧会在 Reading 与非活动 Live Preview 中完整保留为字面值，不会各自退化成未闭合高亮；活动块仍恢复未经投影的精确源码。Reading 每侧只隐藏成对的两个 `=` 并保留 surplus，非活动 Live Preview 会隐藏参与语法的完整等号 run；`==one====two==` 仍是两个相邻高亮。奇偶反斜线、行内/围栏代码、数学、HTML、链接目标、Wiki target 和注释优先级在渲染与源码着色中一致，普通链接和 Wiki alias 内也能叠加高亮，双击正文会选中完整 delimiter 范围。
 
 粗体与斜体使用 Obsidian 1.13.7 的 delimiter-run、左右 flanking 和 rule-of-three 语义：星号允许 `foo*bar*baz` 这样的 intraword emphasis，单/双下划线在 `foo_bar_baz`、`foo__bar__baz` 中均保持字面值；inner 首尾空格或 Tab、奇偶反斜线、soft break 与空段落边界也按实测解析。长 run 在 Reading 与非活动 Live Preview 有意采用不同投影：对称 4/5/6/7 星号在 Reading 分别显示 `**strong**`、`*em*`、`**strong-em**`、`***plain***` 的可见 surplus，而 Live Preview 分别保留 1/2/3/0 枚 marker，并使用 em/strong/两者/plain 样式；2/4、4/2、3/4、4/3、3/2、2/3、4/1、1/4 与 6/9 非对称 run 也保留各自实测 surplus。strong/em 可与 highlight、strikethrough、普通链接、Wiki alias 和标签叠加，代码与 `%%注释%%` 优先；源码 token 与 delimiter stack 共用扫描结果，双击三星号正文会选择完整 `***source***`。
 

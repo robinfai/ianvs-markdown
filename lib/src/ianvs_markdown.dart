@@ -327,14 +327,15 @@ class IanvsMarkdown extends StatelessWidget {
       ),
       IanvsMarkdownTagSyntax(),
     ];
+    final preparedData = _projectIrregularObsidianTables(
+      prepareObsidianMarkdownForRendering(
+        decision.text,
+        mode: obsidianMetadataMode,
+      ),
+    );
     final renderedData =
         projectObsidianInlineLinkDestinationBackslashesForRendering(
-          _projectIrregularObsidianTables(
-            prepareObsidianMarkdownForRendering(
-              decision.text,
-              mode: obsidianMetadataMode,
-            ),
-          ),
+          projectObsidianCrossParagraphHighlightsForRendering(preparedData),
         );
     final taskProjection = projectObsidianTaskMarkers(renderedData);
     final listIndentStep =

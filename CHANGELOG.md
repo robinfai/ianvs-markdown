@@ -1,5 +1,9 @@
 ## Unreleased
 
+- Keep an isolated `==before / blank line / after==` attempt fully literal in
+  Reading and inactive Live Preview instead of projecting both sides as
+  independent unclosed highlights; exact source and higher-priority literal
+  contexts remain unchanged.
 - Parse Obsidian angle scheme and email autolinks before the safe raw-HTML
   fallback, preserving `<https:…>`, `<user@example.com>`, `mailto`, `ftp`, and
   `obsidian` targets in Reading and exact-source Live Preview.

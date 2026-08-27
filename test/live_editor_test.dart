@@ -238,6 +238,62 @@ void main() {
     expect(controller.text, source);
   });
 
+  testWidgets(
+    'live preview keeps a cross-paragraph attempted highlight literal',
+    (tester) async {
+      const source = 'L==before\n\nafter==R';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('ianvs-markdown-highlight')),
+        findsNothing,
+      );
+      expect(find.textContaining('L==before'), findsOneWidget);
+      expect(find.textContaining('after==R'), findsOneWidget);
+      expect(controller.text, source);
+
+      await tester.tap(find.textContaining('L==before'));
+      await tester.pumpAndSettle();
+
+      final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+      final field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      expect(field.controller?.text, 'L==before');
+      final sourceLeaves = _textSpanLeaves(
+        field.controller!.buildTextSpan(
+          context: tester.element(
+            find.descendant(of: active, matching: find.byType(TextField)),
+          ),
+          style: field.style,
+          withComposing: false,
+        ),
+      );
+      expect(
+        sourceLeaves
+            .where((leaf) => leaf.text?.contains('before') ?? false)
+            .every(
+              (leaf) => leaf.style?.backgroundColor != const Color(0x66ffd54f),
+            ),
+        isTrue,
+      );
+      expect(controller.text, source);
+
+      await tester.tap(find.textContaining('after==R'));
+      await tester.pumpAndSettle();
+
+      final secondField = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      expect(secondField.controller?.text, 'after==R');
+      expect(controller.text, source);
+    },
+  );
+
   testWidgets('live Wiki links navigate through the host callback', (
     tester,
   ) async {

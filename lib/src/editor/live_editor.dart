@@ -14,6 +14,7 @@ import '../code_surface.dart';
 import '../front_matter.dart';
 import '../front_matter_card.dart';
 import '../heading_folding.dart';
+import '../highlight.dart';
 import '../ianvs_markdown.dart';
 import '../inline_code.dart';
 import '../inline_link.dart';
@@ -134,13 +135,20 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   late FocusNode _focusNode;
   late ScrollController _scrollController;
   late List<IanvsMarkdownBlock> _blocks;
+  late List<TextRange> _crossParagraphHighlightLiteralRuns;
   late IanvsMarkdownHeadingFoldModel _headingFoldModel;
   late MarkdownLinkReferenceContext _linkReferences;
   late String _lastText;
   late IanvsMarkdownEditorMode _lastMode;
   int? _activeBlockStart;
   int? _activeHeadingStart;
-  var _editingStart = 0;
+  var _editingStartValue = 0;
+  int get _editingStart => _editingStartValue;
+  set _editingStart(int value) {
+    _editingStartValue = value;
+    _blockController.sourceOffset = value;
+  }
+
   var _editingEnd = 0;
   var _activeGapLine = false;
   var _activeGapPrefixLength = 0;
@@ -335,6 +343,10 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   void _refreshBlocks(String source) {
     _linkReferences = MarkdownLinkReferenceContext.parse(source);
     _blockController.linkReferenceLabels = _linkReferences.labels;
+    _crossParagraphHighlightLiteralRuns =
+        ianvsMarkdownCrossParagraphHighlightLiteralRuns(source);
+    _blockController.documentHighlightLiteralRuns =
+        _crossParagraphHighlightLiteralRuns;
     _blocks = parseMarkdownBlocks(source, splitListItems: true);
     _headingFoldModel = IanvsMarkdownHeadingFoldModel.fromBlocks(
       source,
@@ -3570,11 +3582,16 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   }
 
   String _renderedBlockSource(IanvsMarkdownBlock block) {
-    final footnoteDefinition = prepareObsidianFootnoteDefinitionForEditing(
+    final projectedBlock = projectObsidianCrossParagraphHighlightsForRendering(
       block.source,
+      literalRuns: _crossParagraphHighlightLiteralRuns,
+      sourceOffset: block.start,
+    );
+    final footnoteDefinition = prepareObsidianFootnoteDefinitionForEditing(
+      projectedBlock,
       document: widget.controller.text,
     );
-    var source = footnoteDefinition ?? block.source;
+    var source = footnoteDefinition ?? projectedBlock;
     if (footnoteDefinition == null && _isEmptyAtxHeadingSource(source)) {
       // Obsidian keeps marker-only ATX prefixes literal in Live Preview. The
       // Markdown renderer otherwise interprets them as empty headings and
@@ -6458,12 +6475,29 @@ class _ActiveQuoteRailsPainter extends CustomPainter {
 class _BlockEditingController extends TextEditingController {
   IanvsMarkdownSyntaxTheme? syntaxTheme;
   Set<String> linkReferenceLabels = const <String>{};
+  List<TextRange> documentHighlightLiteralRuns = const <TextRange>[];
+  int sourceOffset = 0;
   bool highlightFencedCode = false;
   int leadingMarkerCharacters = 0;
   bool revealLeadingMarker = false;
   int hiddenLeadingCharacters = 0;
   int collapsedLeadingCharacters = 0;
   List<_HiddenMarkerSpan> hiddenMarkerRanges = const <_HiddenMarkerSpan>[];
+
+  List<TextRange> get _localHighlightLiteralRanges =>
+      documentHighlightLiteralRuns
+          .where(
+            (range) =>
+                range.start >= sourceOffset &&
+                range.end <= sourceOffset + value.text.length,
+          )
+          .map(
+            (range) => TextRange(
+              start: range.start - sourceOffset,
+              end: range.end - sourceOffset,
+            ),
+          )
+          .toList(growable: false);
 
   @override
   TextSpan buildTextSpan({
@@ -6495,6 +6529,7 @@ class _BlockEditingController extends TextEditingController {
       0,
       value.text.length,
     );
+    final localHighlightLiteralRanges = _localHighlightLiteralRanges;
     if (collapsedCharacters > 0) {
       final tailValue = TextEditingValue(
         text: value.text.substring(collapsedCharacters),
@@ -6518,6 +6553,11 @@ class _BlockEditingController extends TextEditingController {
               withComposing: withComposing,
               hideInactiveInlineMarkers: true,
               linkReferenceLabels: linkReferenceLabels,
+              highlightLiteralRanges: _sliceTextRanges(
+                localHighlightLiteralRanges,
+                collapsedCharacters,
+                value.text.length,
+              ),
             ),
         ],
       );
@@ -6530,6 +6570,7 @@ class _BlockEditingController extends TextEditingController {
         syntaxTheme: syntax,
         withComposing: withComposing,
         linkReferenceLabels: linkReferenceLabels,
+        highlightLiteralRanges: localHighlightLiteralRanges,
       );
     }
     final hiddenCharacters = hiddenLeadingCharacters.clamp(
@@ -6557,6 +6598,11 @@ class _BlockEditingController extends TextEditingController {
               withComposing: withComposing,
               hideInactiveInlineMarkers: true,
               linkReferenceLabels: linkReferenceLabels,
+              highlightLiteralRanges: _sliceTextRanges(
+                localHighlightLiteralRanges,
+                hiddenCharacters,
+                value.text.length,
+              ),
             ),
         ],
       );
@@ -6568,6 +6614,7 @@ class _BlockEditingController extends TextEditingController {
       withComposing: withComposing,
       hideInactiveInlineMarkers: true,
       linkReferenceLabels: linkReferenceLabels,
+      highlightLiteralRanges: localHighlightLiteralRanges,
     );
   }
 }
@@ -6579,6 +6626,7 @@ TextSpan _buildTextSpanWithHiddenRanges(
   required IanvsMarkdownSyntaxTheme syntaxTheme,
   required bool withComposing,
   required Set<String> linkReferenceLabels,
+  required List<TextRange> highlightLiteralRanges,
 }) {
   final children = <InlineSpan>[];
   var cursor = 0;
@@ -6595,6 +6643,7 @@ TextSpan _buildTextSpanWithHiddenRanges(
           syntaxTheme: syntaxTheme,
           withComposing: withComposing,
           linkReferenceLabels: linkReferenceLabels,
+          highlightLiteralRanges: highlightLiteralRanges,
         ),
       );
     }
@@ -6615,6 +6664,7 @@ TextSpan _buildTextSpanWithHiddenRanges(
         syntaxTheme: syntaxTheme,
         withComposing: withComposing,
         linkReferenceLabels: linkReferenceLabels,
+        highlightLiteralRanges: highlightLiteralRanges,
       ),
     );
   }
@@ -6629,6 +6679,7 @@ TextSpan _buildMarkdownSegmentSpan(
   required IanvsMarkdownSyntaxTheme syntaxTheme,
   required bool withComposing,
   required Set<String> linkReferenceLabels,
+  required List<TextRange> highlightLiteralRanges,
 }) {
   final selection =
       value.selection.isValid &&
@@ -6661,6 +6712,11 @@ TextSpan _buildMarkdownSegmentSpan(
     withComposing: withComposing,
     hideInactiveInlineMarkers: true,
     linkReferenceLabels: linkReferenceLabels,
+    highlightLiteralRanges: _sliceTextRanges(
+      highlightLiteralRanges,
+      start,
+      end,
+    ),
   );
 }
 
@@ -6697,6 +6753,17 @@ TextRange _shiftTextRange(TextRange range, int delta) {
     end: (range.end + delta).clamp(0, 1 << 30),
   );
 }
+
+List<TextRange> _sliceTextRanges(
+  Iterable<TextRange> ranges,
+  int start,
+  int end,
+) => ranges
+    .where((range) => range.start >= start && range.end <= end)
+    .map(
+      (range) => TextRange(start: range.start - start, end: range.end - start),
+    )
+    .toList(growable: false);
 
 TextSpan _buildHighlightedFencedCodeSpan(
   String source, {

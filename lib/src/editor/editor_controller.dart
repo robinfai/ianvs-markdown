@@ -2235,6 +2235,7 @@ TextSpan buildMarkdownSourceTextSpan(
   bool hideInactiveInlineMarkers = false,
   bool hideInactiveEscapeMarkers = false,
   Set<String>? linkReferenceLabels,
+  List<TextRange> highlightLiteralRanges = const <TextRange>[],
 }) {
   final text = value.text;
   final effectiveLinkReferenceLabels =
@@ -2243,6 +2244,7 @@ TextSpan buildMarkdownSourceTextSpan(
     text,
     syntaxTheme,
     linkReferenceLabels: effectiveLinkReferenceLabels,
+    highlightLiteralRanges: highlightLiteralRanges,
   );
   if (hideInactiveEscapeMarkers) {
     _addEscapeMarkerSyntaxTokens(tokens, text, syntaxTheme.marker);
@@ -2447,6 +2449,7 @@ List<_SyntaxToken> _markdownSyntaxTokens(
   String text,
   IanvsMarkdownSyntaxTheme theme, {
   required Set<String> linkReferenceLabels,
+  List<TextRange> highlightLiteralRanges = const <TextRange>[],
 }) {
   final tokens = <_SyntaxToken>[];
   final fencedRanges = <TextRange>[];
@@ -2669,7 +2672,10 @@ List<_SyntaxToken> _markdownSyntaxTokens(
     ...codeRanges,
   ];
   _addTagSyntaxTokens(tokens, text, theme, inlineSyntaxExcludedRanges);
-  _addHighlightSyntaxTokens(tokens, text, theme, inlineSyntaxExcludedRanges);
+  _addHighlightSyntaxTokens(tokens, text, theme, <TextRange>[
+    ...inlineSyntaxExcludedRanges,
+    ...highlightLiteralRanges,
+  ]);
   _addEmphasisSyntaxTokens(tokens, text, theme, inlineSyntaxExcludedRanges);
   _addStrikethroughSyntaxTokens(
     tokens,
