@@ -47,6 +47,22 @@ bool _isOuterMarkdownSaveShortcut(KeyEvent event) {
       keyboard.isMetaPressed != keyboard.isControlPressed;
 }
 
+bool _isOuterMarkdownModeShortcut(KeyEvent event) {
+  if (event is! KeyDownEvent && event is! KeyRepeatEvent) return false;
+  final keyboard = HardwareKeyboard.instance;
+  if (keyboard.isAltPressed || keyboard.isShiftPressed) return false;
+  if (keyboard.isMetaPressed == keyboard.isControlPressed) return false;
+  if (event.logicalKey == LogicalKeyboardKey.digit1 ||
+      event.logicalKey == LogicalKeyboardKey.digit2 ||
+      event.logicalKey == LogicalKeyboardKey.digit3) {
+    return true;
+  }
+  if (event.logicalKey != LogicalKeyboardKey.keyE) return false;
+  if (keyboard.isMetaPressed) return true;
+  return defaultTargetPlatform != TargetPlatform.macOS &&
+      defaultTargetPlatform != TargetPlatform.iOS;
+}
+
 enum _PropertyHistoryCommand { undo, redo }
 
 _PropertyHistoryCommand? _propertyHistoryCommand(KeyEvent event) {
@@ -603,7 +619,8 @@ class _ObsidianEditableKeyState extends State<_ObsidianEditableKey> {
     if (_isOuterMarkdownFormattingShortcut(event)) {
       return KeyEventResult.handled;
     }
-    if (_isOuterMarkdownSaveShortcut(event)) {
+    if (_isOuterMarkdownSaveShortcut(event) ||
+        _isOuterMarkdownModeShortcut(event)) {
       _commit();
       return KeyEventResult.ignored;
     }
@@ -983,7 +1000,8 @@ class _ObsidianEditableListValueState
     if (_isOuterMarkdownFormattingShortcut(event)) {
       return KeyEventResult.handled;
     }
-    if (_isOuterMarkdownSaveShortcut(event)) {
+    if (_isOuterMarkdownSaveShortcut(event) ||
+        _isOuterMarkdownModeShortcut(event)) {
       _commitInput();
       return KeyEventResult.ignored;
     }
@@ -1214,7 +1232,8 @@ class _ObsidianEditableDateValueState
     if (_isOuterMarkdownFormattingShortcut(event)) {
       return KeyEventResult.handled;
     }
-    if (_isOuterMarkdownSaveShortcut(event)) {
+    if (_isOuterMarkdownSaveShortcut(event) ||
+        _isOuterMarkdownModeShortcut(event)) {
       _commit();
       return KeyEventResult.ignored;
     }
@@ -1467,7 +1486,8 @@ class _ObsidianEditableNumberValueState
     if (_isOuterMarkdownFormattingShortcut(event)) {
       return KeyEventResult.handled;
     }
-    if (_isOuterMarkdownSaveShortcut(event)) {
+    if (_isOuterMarkdownSaveShortcut(event) ||
+        _isOuterMarkdownModeShortcut(event)) {
       _commit();
       return KeyEventResult.ignored;
     }
@@ -1614,7 +1634,8 @@ class _ObsidianEditableTextValueState
     if (_isOuterMarkdownFormattingShortcut(event)) {
       return KeyEventResult.handled;
     }
-    if (_isOuterMarkdownSaveShortcut(event)) {
+    if (_isOuterMarkdownSaveShortcut(event) ||
+        _isOuterMarkdownModeShortcut(event)) {
       _commit();
       return KeyEventResult.ignored;
     }

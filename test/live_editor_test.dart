@@ -5007,6 +5007,106 @@ due: 2026-08-27
   );
 
   testWidgets(
+    'date pending value survives Command+E mode switch',
+    (tester) async {
+      const source = '''
+---
+due: 2026-08-28
+---
+# Body
+''';
+      const expected = '''
+---
+due: 2026-08-27
+---
+# Body
+''';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 1000,
+              height: 720,
+              child: IanvsMarkdownLiveEditor(controller: controller),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final day = find.byKey(
+        const ValueKey('ianvs-markdown-front-matter-date-day-due'),
+      );
+      await tester.tap(day);
+      await tester.enterText(day, '27');
+      expect(controller.text, source);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyE);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+
+      expect(controller.mode, IanvsMarkdownEditorMode.preview);
+      expect(controller.text, expected);
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
+    'date pending value survives Command+3 mode switch',
+    (tester) async {
+      const source = '''
+---
+due: 2026-08-28
+---
+# Body
+''';
+      const expected = '''
+---
+due: 2026-08-27
+---
+# Body
+''';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 1000,
+              height: 720,
+              child: IanvsMarkdownLiveEditor(controller: controller),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final day = find.byKey(
+        const ValueKey('ianvs-markdown-front-matter-date-day-due'),
+      );
+      await tester.tap(day);
+      await tester.enterText(day, '27');
+      expect(controller.text, source);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.digit3);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+
+      expect(controller.mode, IanvsMarkdownEditorMode.preview);
+      expect(controller.text, expected);
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
     'property Tab traversal never indents a stale document selection',
     (tester) async {
       const source = '''
