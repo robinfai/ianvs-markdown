@@ -4741,9 +4741,7 @@ aliases:
     );
   });
 
-  testWidgets('alias properties remove and Tab or Return add without YAML', (
-    tester,
-  ) async {
+  testWidgets('alias properties match Obsidian commits', (tester) async {
     const source = '''
 ---
 title: Alpha
@@ -4829,6 +4827,63 @@ title: Alpha
 aliases:
   - Alias Three
   - Alias Four
+tags:
+  - one
+  - two
+---
+# Body
+''');
+
+    final afterReturn = controller.text;
+    await tester.tap(input);
+    await tester.enterText(input, 'Alias Four');
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+    expect(controller.text, afterReturn);
+    expect(tester.widget<TextField>(input).controller?.text, 'Alias Four');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(controller.text, afterReturn);
+    expect(tester.widget<TextField>(input).controller?.text, 'Alias Four');
+
+    await tester.tap(input);
+    await tester.enterText(input, '    ');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(controller.text, afterReturn);
+
+    await tester.tap(input);
+    await tester.enterText(input, '  Alias Escape  ');
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(controller.text, '''
+---
+title: Alpha
+aliases:
+  - Alias Three
+  - Alias Four
+  - Alias Escape
+tags:
+  - one
+  - two
+---
+# Body
+''');
+
+    await tester.tap(input);
+    await tester.enterText(input, 'Alias Blur');
+    await tester.tap(
+      find.byKey(const ValueKey('ianvs-markdown-front-matter-input-title')),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.text, '''
+---
+title: Alpha
+aliases:
+  - Alias Three
+  - Alias Four
+  - Alias Escape
+  - Alias Blur
 tags:
   - one
   - two

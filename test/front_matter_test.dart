@@ -414,6 +414,8 @@ Body
         'true',
         '42',
         '#hash',
+        'Alias: Two # Three',
+        'O\'Brien "Quoted"',
       ]),
       '''
 ---
@@ -423,6 +425,8 @@ tags:
   - "true"
   - "42"
   - "#hash"
+  - "Alias: Two # Three"
+  - O'Brien "Quoted"
 aliases:
   - Alias One
 typed:

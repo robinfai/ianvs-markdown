@@ -815,6 +815,7 @@ class _ObsidianEditableListValueState
     _items = List<String>.of(widget.entry.items);
     _controller = TextEditingController();
     _focusNode = FocusNode();
+    _focusNode.addListener(_handleFocusChanged);
   }
 
   @override
@@ -842,8 +843,13 @@ class _ObsidianEditableListValueState
   void _commitInput() {
     final value = _controller.text.trim();
     if (!_validItem(value) || _items.length >= 16) return;
+    if (!widget.tag && _items.contains(value)) return;
     _controller.clear();
     _emit(<String>[..._items, value]);
+  }
+
+  void _handleFocusChanged() {
+    if (!_focusNode.hasFocus && !widget.tag) _commitInput();
   }
 
   void _removeAt(int index) {
@@ -855,7 +861,11 @@ class _ObsidianEditableListValueState
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
     if (event.logicalKey == LogicalKeyboardKey.escape) {
-      _controller.clear();
+      if (widget.tag) {
+        _controller.clear();
+      } else {
+        _commitInput();
+      }
       node.unfocus();
       return KeyEventResult.handled;
     }
@@ -867,6 +877,7 @@ class _ObsidianEditableListValueState
 
   @override
   void dispose() {
+    _focusNode.removeListener(_handleFocusChanged);
     _focusNode.dispose();
     _controller.dispose();
     super.dispose();

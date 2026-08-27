@@ -14,7 +14,9 @@
 - Add neutral editable alias chips for complete string sequences. Removing an
   alias immediately rewrites safe flow lists, removing the last item preserves
   `aliases:`, and Tab/Return add block-list aliases from empty or populated
-  properties while retaining existing item order.
+  properties while retaining existing item order. Focus loss and Escape commit
+  pending aliases, surrounding spaces are trimmed, and exact duplicates are
+  not appended.
 - Add in-place property-key renaming with Tab, Enter, and focus-loss commits,
   Escape cancellation, exact source-order and value-type preservation, YAML
   quoting for ambiguous names, and empty/case-insensitive duplicate/lossy-key
