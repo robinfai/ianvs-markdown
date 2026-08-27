@@ -10965,6 +10965,58 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
   );
 
   testWidgets(
+    'table smart paste escapes URL pipes without adding a column',
+    (tester) async {
+      const url = 'https://example.com/a|b';
+      const source =
+          '| H | I |\n'
+          '| --- | --- |\n'
+          '| alpha | beta |';
+      const expected =
+          '| H | I |\n'
+          '| --- | --- |\n'
+          r'| [alpha](https://example.com/a\|b) | beta |';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (methodCall) async => methodCall.method == 'Clipboard.getData'
+            ? const <String, dynamic>{'text': url}
+            : null,
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+      final first = find.byKey(const ValueKey('ianvs-markdown-table-1-0'));
+      final second = find.byKey(const ValueKey('ianvs-markdown-table-1-1'));
+      await tester.tap(first);
+      tester.widget<TextField>(first).controller?.selection =
+          const TextSelection(baseOffset: 0, extentOffset: 5);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyV);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+
+      expect(controller.text, expected);
+      expect(tester.widget<TextField>(second).controller?.text, 'beta');
+      expect(
+        find.byKey(const ValueKey('ianvs-markdown-table-1-2')),
+        findsNothing,
+      );
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
     'table Option+Backspace deletes focused cell Markdown punctuation',
     (tester) async {
       const source =

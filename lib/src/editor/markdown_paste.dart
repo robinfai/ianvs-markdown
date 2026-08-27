@@ -4,8 +4,9 @@ import 'package:flutter/services.dart';
 /// single HTTP(S) URL and [value] has a non-empty selection.
 TextEditingValue? smartUrlPasteValue(
   TextEditingValue value,
-  String pastedText,
-) {
+  String pastedText, {
+  bool escapeTablePipes = false,
+}) {
   final selection = value.selection;
   if (!selection.isValid || selection.isCollapsed) return null;
   if (!_isHttpUrl(pastedText)) return null;
@@ -14,7 +15,10 @@ TextEditingValue? smartUrlPasteValue(
   final end = selection.end;
   if (start < 0 || end > value.text.length) return null;
   final selected = value.text.substring(start, end);
-  final replacement = '[$selected]($pastedText)';
+  final destination = escapeTablePipes
+      ? pastedText.replaceAll('|', r'\|')
+      : pastedText;
+  final replacement = '[$selected]($destination)';
   return TextEditingValue(
     text: value.text.replaceRange(start, end, replacement),
     selection: TextSelection.collapsed(offset: start + replacement.length),

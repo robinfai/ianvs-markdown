@@ -993,13 +993,14 @@ final answer = 42;
 [Even](https://example.com/a\(b\))
 [Odd](https://example.com/a\\\(b\))
 [Close](https://example.com/a\)tail)
+[Pipe](https://example.com/a\|b)
 ''',
           onTapLink: (text, href, title) => taps.add((text, href)),
         ),
       ),
     );
 
-    for (final label in <String>['Even', 'Odd', 'Close']) {
+    for (final label in <String>['Even', 'Odd', 'Close', 'Pipe']) {
       await tester.tap(find.text(label));
       await tester.pump();
     }
@@ -1007,6 +1008,7 @@ final answer = 42;
       ('Even', 'https://example.com/a(b)'),
       ('Odd', r'https://example.com/a%5C(b)'),
       ('Close', 'https://example.com/a)tail'),
+      ('Pipe', 'https://example.com/a%7Cb'),
     ]);
   });
 

@@ -4691,7 +4691,11 @@ class _TablePasteAction extends ContextAction<PasteTextIntent> {
     final pastedText = data?.text;
     final replacement = pastedText == null
         ? null
-        : smartUrlPasteValue(controller.value, pastedText);
+        : smartUrlPasteValue(
+            controller.value,
+            pastedText,
+            escapeTablePipes: true,
+          );
     if (replacement == null) {
       defaultAction?.invoke(intent);
       return;
