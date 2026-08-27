@@ -251,6 +251,86 @@ Body
     );
   });
 
+  test(
+    'property key renames preserve order, value type, and YAML validity',
+    () {
+      const source = '''
+---
+title: Alpha
+count: 42
+tags: [one, two]
+---
+Body
+''';
+      final document = parseMarkdownFrontMatter(source);
+      MarkdownMetadataEntry entry(String key) =>
+          document.entries.firstWhere((item) => item.key == key);
+      final count = entry('count');
+
+      expect(count.keyEditable, isTrue);
+      final renamed = replaceMarkdownFrontMatterKey(source, count, 'weight');
+      expect(renamed, '''
+---
+title: Alpha
+weight: 42
+tags:
+  - one
+  - two
+---
+Body
+''');
+      final renamedDocument = parseMarkdownFrontMatter(renamed);
+      expect(renamedDocument.entries.map((entry) => entry.key), const <String>[
+        'title',
+        'weight',
+        'tags',
+      ]);
+      expect(renamedDocument.entries[1].type, MarkdownMetadataValueType.number);
+
+      expect(replaceMarkdownFrontMatterKey(source, count, 'title'), source);
+      expect(replaceMarkdownFrontMatterKey(source, count, ''), source);
+      expect(replaceMarkdownFrontMatterKey(source, count, 'bad\nkey'), source);
+      expect(
+        replaceMarkdownFrontMatterKey(
+          source.replaceFirst('title:', 'draft: true\ntitle:'),
+          count,
+          'weight',
+        ),
+        source.replaceFirst('title:', 'draft: true\ntitle:'),
+      );
+
+      expect(
+        replaceMarkdownFrontMatterKey(source, count, 'true'),
+        contains('"true": 42'),
+      );
+      expect(
+        replaceMarkdownFrontMatterKey(source, count, 'display name'),
+        contains('display name: 42'),
+      );
+      expect(
+        parseMarkdownFrontMatter(
+          replaceMarkdownFrontMatterKey(source, count, 'foo: bar'),
+        ).entries[1].key,
+        'foo: bar',
+      );
+    },
+  );
+
+  test('only complete string keys opt into structured rename', () {
+    final longKey = List<String>.filled(81, 'a').join();
+    final document = parseMarkdownFrontMatter('''
+---
+42: numeric key
+"display name": quoted key
+$longKey: long key
+---
+''');
+
+    expect(document.entries[0].keyEditable, isFalse);
+    expect(document.entries[1].keyEditable, isTrue);
+    expect(document.entries[2].keyEditable, isFalse);
+  });
+
   test('safe string-list properties rewrite as typed block scalars', () {
     const source = '''
 ---

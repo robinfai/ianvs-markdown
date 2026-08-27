@@ -4324,7 +4324,9 @@ empty:
       await tester.pumpAndSettle();
       expect(find.text('status'), findsOneWidget);
 
-      await tester.tap(find.text('status'));
+      await tester.tap(
+        find.byKey(const ValueKey('ianvs-markdown-front-matter-type-status')),
+      );
       await tester.pump();
 
       final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
@@ -4435,6 +4437,81 @@ title: Alpha
     await tester.tap(find.text('Body'));
     await tester.pumpAndSettle();
     expect(controller.text, contains('title: Committed'));
+  });
+
+  testWidgets('property keys rename in place and reject empty or duplicate', (
+    tester,
+  ) async {
+    const source = '''
+---
+title: Alpha
+count: 42
+tags:
+  - one
+---
+# Body
+''';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final countInput = find.byKey(
+      const ValueKey('ianvs-markdown-front-matter-key-input-count'),
+    );
+    expect(countInput, findsOneWidget);
+    await tester.tap(countInput);
+    await tester.enterText(countInput, 'weight');
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+
+    expect(controller.text, '''
+---
+title: Alpha
+weight: 42
+tags:
+  - one
+---
+# Body
+''');
+    final renamedEntry = parseMarkdownFrontMatter(
+      controller.text,
+    ).entries.firstWhere((entry) => entry.key == 'weight');
+    expect(renamedEntry.type, MarkdownMetadataValueType.number);
+
+    controller.undo();
+    await tester.pumpAndSettle();
+    expect(controller.text, source);
+    controller.redo();
+    await tester.pumpAndSettle();
+
+    final weightInput = find.byKey(
+      const ValueKey('ianvs-markdown-front-matter-key-input-weight'),
+    );
+    await tester.tap(weightInput);
+    await tester.enterText(weightInput, 'pending');
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(controller.text, contains('weight: 42'));
+    expect(tester.widget<TextField>(weightInput).controller?.text, 'weight');
+
+    await tester.tap(weightInput);
+    await tester.enterText(weightInput, '');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(controller.text, contains('weight: 42'));
+    expect(tester.widget<TextField>(weightInput).controller?.text, 'weight');
+
+    await tester.tap(weightInput);
+    await tester.enterText(weightInput, 'title');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(controller.text, contains('weight: 42'));
+    expect(tester.widget<TextField>(weightInput).controller?.text, 'weight');
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
   });
 
   testWidgets('number properties commit finite values and stay numeric', (

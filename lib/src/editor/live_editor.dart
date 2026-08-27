@@ -3404,6 +3404,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
                   _setFrontMatterNumber(block, entry, value),
               onListChanged: (entry, values) =>
                   _setFrontMatterList(block, entry, values),
+              onKeyChanged: (entry, key) =>
+                  _setFrontMatterKey(block, entry, key),
             );
     } else if (block.type == IanvsMarkdownBlockType.indentedCode) {
       rendered = _LivePreviewIndentedCode(
@@ -3710,6 +3712,16 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       entry,
       values,
     );
+    if (replacement == block.source) return;
+    _replaceBlockSource(block, replacement);
+  }
+
+  void _setFrontMatterKey(
+    IanvsMarkdownBlock block,
+    MarkdownMetadataEntry entry,
+    String key,
+  ) {
+    final replacement = replaceMarkdownFrontMatterKey(block.source, entry, key);
     if (replacement == block.source) return;
     _replaceBlockSource(block, replacement);
   }

@@ -39,6 +39,7 @@ final class MarkdownMetadataEntry {
     this.sourceKeyEnd,
     this.sourceValueStart,
     this.sourceValueEnd,
+    this.keyEditable = false,
     this.listValuesEditable = false,
   });
 
@@ -57,6 +58,9 @@ final class MarkdownMetadataEntry {
   final int? sourceKeyEnd;
   final int? sourceValueStart;
   final int? sourceValueEnd;
+
+  /// Whether the complete YAML key is a safe, editable string property name.
+  final bool keyEditable;
 
   /// Whether [items] contains the complete, safely editable string sequence.
   ///
@@ -149,7 +153,8 @@ void _collectMetadata(
     if (result.length >= markdownFrontMatterEntryLimit) return;
     final keyNode = entry.key as YamlNode;
     final valueNode = entry.value;
-    final key = _boundedText(keyNode.value, 80);
+    final rawKey = keyNode.value;
+    final key = _boundedText(rawKey, 80);
     if (key.isEmpty) continue;
     final value = valueNode.value;
     final type = _metadataValueType(value);
@@ -183,6 +188,8 @@ void _collectMetadata(
         sourceKeyEnd: sourceOffset + keyNode.span.end.offset,
         sourceValueStart: sourceOffset + valueNode.span.start.offset,
         sourceValueEnd: sourceOffset + valueNode.span.end.offset,
+        keyEditable:
+            rawKey is String && rawKey == key && _editableMetadataKey(rawKey),
         listValuesEditable:
             (type == MarkdownMetadataValueType.list &&
                 sequence != null &&
@@ -204,7 +211,7 @@ String replaceMarkdownFrontMatterTextValue(
   String source,
   MarkdownMetadataEntry entry,
   String value,
-) => _replaceMarkdownFrontMatterValue(
+) => _replaceMarkdownFrontMatterEntrySource(
   source,
   entry,
   _yamlTextScalar(value),
@@ -216,7 +223,7 @@ String replaceMarkdownFrontMatterBooleanValue(
   String source,
   MarkdownMetadataEntry entry,
   bool value,
-) => _replaceMarkdownFrontMatterValue(
+) => _replaceMarkdownFrontMatterEntrySource(
   source,
   entry,
   value ? 'true' : 'false',
@@ -233,11 +240,47 @@ String replaceMarkdownFrontMatterNumberValue(
   num value,
 ) {
   if (!value.isFinite) return source;
-  return _replaceMarkdownFrontMatterValue(
+  return _replaceMarkdownFrontMatterEntrySource(
     source,
     entry,
     '$value',
     canonicalizeFlowLists: true,
+  );
+}
+
+/// Replaces one top-level front-matter property name.
+///
+/// Empty, lossy, or duplicate keys are rejected. A successful rename keeps
+/// the property in place and mirrors Obsidian's observed flow-list
+/// canonicalization while retaining the property's value type.
+String replaceMarkdownFrontMatterKey(
+  String source,
+  MarkdownMetadataEntry entry,
+  String key,
+) {
+  if (!entry.keyEditable || !_editableMetadataKey(key) || key == entry.key) {
+    return source;
+  }
+  final document = parseMarkdownFrontMatter(source);
+  if (!document.hasFrontMatter ||
+      document.entries.any(
+        (candidate) =>
+            candidate.sourceKeyStart != entry.sourceKeyStart &&
+            candidate.key == key,
+      )) {
+    return source;
+  }
+  final keyStart = entry.sourceKeyStart;
+  final keyEnd = entry.sourceKeyEnd;
+  if (keyStart == null || keyEnd == null) return source;
+  return _replaceMarkdownFrontMatterEntrySource(
+    source,
+    entry,
+    _yamlTextScalar(key),
+    canonicalizeFlowLists: true,
+    editStart: keyStart,
+    editEnd: keyEnd,
+    editsKey: true,
   );
 }
 
@@ -295,7 +338,7 @@ String replaceMarkdownFrontMatterListValue(
               (value) => '$lineBreak$indentation  - ${_yamlTextScalar(value)}',
             )
             .join();
-  return _replaceMarkdownFrontMatterValue(
+  return _replaceMarkdownFrontMatterEntrySource(
     source,
     entry,
     replacement,
@@ -305,13 +348,14 @@ String replaceMarkdownFrontMatterListValue(
   );
 }
 
-String _replaceMarkdownFrontMatterValue(
+String _replaceMarkdownFrontMatterEntrySource(
   String source,
   MarkdownMetadataEntry entry,
   String replacement, {
   required bool canonicalizeFlowLists,
   int? editStart,
   int? editEnd,
+  bool editsKey = false,
 }) {
   final valueStart = entry.sourceValueStart;
   final valueEnd = entry.sourceValueEnd;
@@ -330,10 +374,17 @@ String _replaceMarkdownFrontMatterValue(
       replacementEnd == replacementStart &&
       valueStart < source.length &&
       source.codeUnitAt(valueStart) == 0x3a;
-  if (replacementStart < (entry.sourceKeyEnd ?? 0) ||
+  final editsExactKey =
+      editsKey &&
+      replacementStart == entry.sourceKeyStart &&
+      replacementEnd == entry.sourceKeyEnd;
+  final editsValue =
+      !editsKey &&
+      replacementStart >= (entry.sourceKeyEnd ?? 0) &&
+      (replacementStart <= valueStart || insertsAfterEmptyScalar);
+  if ((!editsExactKey && !editsValue) ||
       replacementEnd < replacementStart ||
-      replacementEnd > source.length ||
-      (replacementStart > valueStart && !insertsAfterEmptyScalar)) {
+      replacementEnd > source.length) {
     return source;
   }
 
@@ -385,7 +436,7 @@ String _replaceMarkdownFrontMatterValue(
     }
     final flowStart = rawOffset + valueNode.span.start.offset;
     final flowEnd = rawOffset + valueNode.span.end.offset;
-    if (valueStart < flowEnd && valueEnd > flowStart) continue;
+    if (replacementStart < flowEnd && replacementEnd > flowStart) continue;
     final keyEnd = rawOffset + keyNode.span.end.offset;
     final separator = source.indexOf(':', keyEnd);
     if (separator < keyEnd || separator >= flowStart) continue;
@@ -426,6 +477,17 @@ bool _editableMetadataListItem(Object? value) {
   if (value is! String ||
       value.isEmpty ||
       value.length > 160 ||
+      value.trim() != value ||
+      value.contains('\n') ||
+      value.contains('\r')) {
+    return false;
+  }
+  return !value.codeUnits.any((unit) => unit < 0x20);
+}
+
+bool _editableMetadataKey(String value) {
+  if (value.isEmpty ||
+      value.length > 80 ||
       value.trim() != value ||
       value.contains('\n') ||
       value.contains('\r')) {

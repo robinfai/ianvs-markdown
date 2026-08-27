@@ -11,6 +11,9 @@
   immediately, removing the last item preserves an empty `tags:` property,
   and Tab/Enter adds a block-list value from either populated or empty state.
   Typed, nested, truncated, or oversized lists remain source-only.
+- Add in-place property-key renaming with Tab, Enter, and focus-loss commits,
+  Escape cancellation, exact source-order and value-type preservation, YAML
+  quoting for ambiguous names, and empty/duplicate/lossy-key rejection.
 - Match Obsidian properties for source-order keys, an ordinary `title` row,
   default-expanded panels, triple-dash-only closing markers, distinct aliases,
   tags, and `cssclasses`, linked Wiki/URL scalar values, and invisible empty

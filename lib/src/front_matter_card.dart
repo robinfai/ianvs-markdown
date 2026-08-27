@@ -16,6 +16,8 @@ typedef IanvsMarkdownMetadataNumberChanged =
     void Function(MarkdownMetadataEntry entry, num value);
 typedef IanvsMarkdownMetadataListChanged =
     void Function(MarkdownMetadataEntry entry, List<String> values);
+typedef IanvsMarkdownMetadataKeyChanged =
+    void Function(MarkdownMetadataEntry entry, String key);
 
 class IanvsMarkdownFrontMatterCard extends StatefulWidget {
   const IanvsMarkdownFrontMatterCard({
@@ -33,6 +35,7 @@ class IanvsMarkdownFrontMatterCard extends StatefulWidget {
     this.onBooleanChanged,
     this.onNumberChanged,
     this.onListChanged,
+    this.onKeyChanged,
   });
 
   final List<MarkdownMetadataEntry> entries;
@@ -48,6 +51,7 @@ class IanvsMarkdownFrontMatterCard extends StatefulWidget {
   final IanvsMarkdownMetadataBooleanChanged? onBooleanChanged;
   final IanvsMarkdownMetadataNumberChanged? onNumberChanged;
   final IanvsMarkdownMetadataListChanged? onListChanged;
+  final IanvsMarkdownMetadataKeyChanged? onKeyChanged;
 
   @override
   State<IanvsMarkdownFrontMatterCard> createState() =>
@@ -201,6 +205,7 @@ class _IanvsMarkdownFrontMatterCardState
               .where((entry) => !identical(entry, titleEntry))
               .toList()
         : widget.entries;
+    final existingKeys = widget.entries.map((entry) => entry.key).toSet();
     return Column(
       key: const ValueKey('ianvs-markdown-front-matter'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -270,6 +275,8 @@ class _IanvsMarkdownFrontMatterCardState
                           onBooleanChanged: widget.onBooleanChanged,
                           onNumberChanged: widget.onNumberChanged,
                           onListChanged: widget.onListChanged,
+                          onKeyChanged: widget.onKeyChanged,
+                          existingKeys: existingKeys,
                         ),
                       Padding(
                         padding: const EdgeInsets.fromLTRB(7, 4, 7, 2),
@@ -314,6 +321,8 @@ class _ObsidianMetadataRow extends StatelessWidget {
     required this.onBooleanChanged,
     required this.onNumberChanged,
     required this.onListChanged,
+    required this.onKeyChanged,
+    required this.existingKeys,
   });
 
   final MarkdownMetadataEntry entry;
@@ -323,6 +332,8 @@ class _ObsidianMetadataRow extends StatelessWidget {
   final IanvsMarkdownMetadataBooleanChanged? onBooleanChanged;
   final IanvsMarkdownMetadataNumberChanged? onNumberChanged;
   final IanvsMarkdownMetadataListChanged? onListChanged;
+  final IanvsMarkdownMetadataKeyChanged? onKeyChanged;
+  final Set<String> existingKeys;
 
   @override
   Widget build(BuildContext context) {
@@ -349,17 +360,27 @@ class _ObsidianMetadataRow extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
                 Expanded(
-                  child: Text(
-                    entry.key,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: colors.textSecondary,
-                      fontSize: 11.5,
-                      height: 1.35,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
+                  child: entry.keyEditable && onKeyChanged != null
+                      ? _ObsidianEditableKey(
+                          key: ValueKey(
+                            'ianvs-markdown-front-matter-key-editor-${entry.key}',
+                          ),
+                          entry: entry,
+                          colors: colors,
+                          existingKeys: existingKeys,
+                          onChanged: onKeyChanged!,
+                        )
+                      : Text(
+                          entry.key,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: colors.textSecondary,
+                            fontSize: 11.5,
+                            height: 1.35,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                 ),
               ],
             ),
@@ -379,6 +400,149 @@ class _ObsidianMetadataRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ObsidianEditableKey extends StatefulWidget {
+  const _ObsidianEditableKey({
+    super.key,
+    required this.entry,
+    required this.colors,
+    required this.existingKeys,
+    required this.onChanged,
+  });
+
+  final MarkdownMetadataEntry entry;
+  final IanvsMarkdownThemeData colors;
+  final Set<String> existingKeys;
+  final IanvsMarkdownMetadataKeyChanged onChanged;
+
+  @override
+  State<_ObsidianEditableKey> createState() => _ObsidianEditableKeyState();
+}
+
+class _ObsidianEditableKeyState extends State<_ObsidianEditableKey> {
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+  late String _committedKey;
+  var _cancelled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _committedKey = widget.entry.key;
+    _controller = TextEditingController(text: _committedKey);
+    _focusNode = FocusNode()..addListener(_handleFocusChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ObsidianEditableKey oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.entry.key != widget.entry.key) {
+      _committedKey = widget.entry.key;
+      _restore();
+    }
+  }
+
+  bool _validKey(String value) {
+    return value.isNotEmpty &&
+        value.length <= 80 &&
+        value.trim() == value &&
+        !value.contains('\n') &&
+        !value.contains('\r') &&
+        !value.codeUnits.any((unit) => unit < 0x20) &&
+        (value == _committedKey || !widget.existingKeys.contains(value));
+  }
+
+  void _restore() {
+    _controller.value = TextEditingValue(
+      text: _committedKey,
+      selection: TextSelection.collapsed(offset: _committedKey.length),
+    );
+  }
+
+  void _handleFocusChanged() {
+    if (_focusNode.hasFocus) {
+      _cancelled = false;
+      return;
+    }
+    if (_cancelled) {
+      _cancelled = false;
+      return;
+    }
+    _commit();
+  }
+
+  void _commit() {
+    final value = _controller.text;
+    if (!_validKey(value)) {
+      _restore();
+      return;
+    }
+    if (value == _committedKey) return;
+    _committedKey = value;
+    widget.onChanged(widget.entry, value);
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent ||
+        event.logicalKey != LogicalKeyboardKey.escape) {
+      return KeyEventResult.ignored;
+    }
+    _cancelled = true;
+    _restore();
+    node.unfocus();
+    return KeyEventResult.handled;
+  }
+
+  @override
+  void dispose() {
+    _focusNode
+      ..removeListener(_handleFocusChanged)
+      ..dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      onKeyEvent: _handleKeyEvent,
+      child: TextField(
+        key: ValueKey(
+          'ianvs-markdown-front-matter-key-input-${widget.entry.key}',
+        ),
+        controller: _controller,
+        focusNode: _focusNode,
+        maxLines: 1,
+        textInputAction: TextInputAction.done,
+        smartDashesType: SmartDashesType.disabled,
+        smartQuotesType: SmartQuotesType.disabled,
+        autocorrect: false,
+        enableSuggestions: false,
+        onSubmitted: (_) {
+          _commit();
+          _focusNode.unfocus();
+        },
+        onTapOutside: (_) => _focusNode.unfocus(),
+        style: TextStyle(
+          color: widget.colors.textSecondary,
+          fontSize: 11.5,
+          height: 1.35,
+          fontWeight: FontWeight.w500,
+        ),
+        cursorColor: widget.colors.accent,
+        decoration: InputDecoration(
+          isDense: true,
+          contentPadding: EdgeInsets.zero,
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: UnderlineInputBorder(
+            borderSide: BorderSide(color: widget.colors.accentSoft),
+          ),
+        ),
       ),
     );
   }
