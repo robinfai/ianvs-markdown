@@ -96,6 +96,42 @@ void main() {
     );
   });
 
+  testWidgets('HTML comments and inline tags keep exact block boundaries', (
+    tester,
+  ) async {
+    final commentController = IanvsMarkdownController(
+      text: '<!--\nhidden\n-->\nAfter',
+    );
+    addTearDown(commentController.dispose);
+    await tester.pumpWidget(app(commentController));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('After'));
+    await tester.pumpAndSettle();
+    var active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    var field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, 'After');
+    expect(field.style?.fontFamily, isNull);
+
+    final inlineController = IanvsMarkdownController(
+      text: '<em>inline</em> continuation\nnext',
+    );
+    addTearDown(inlineController.dispose);
+    await tester.pumpWidget(app(inlineController));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.textContaining('continuation'));
+    await tester.pumpAndSettle();
+    active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, '<em>inline</em> continuation\nnext');
+    expect(field.style?.fontFamily, isNull);
+  });
+
   testWidgets('rendered text click places the caret at its visual character', (
     tester,
   ) async {

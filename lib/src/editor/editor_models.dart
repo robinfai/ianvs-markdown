@@ -293,7 +293,7 @@ IanvsMarkdownBlockType _classifyBlock(List<_SourceLine> lines, int index) {
         : IanvsMarkdownBlockType.unorderedList;
   }
   if (_isTableStart(lines, index)) return IanvsMarkdownBlockType.table;
-  if (_isHtmlStart(text)) return IanvsMarkdownBlockType.html;
+  if (_htmlBlockStart(text) != null) return IanvsMarkdownBlockType.html;
   if (index + 1 < lines.length && _isSetextUnderline(lines[index + 1].text)) {
     return IanvsMarkdownBlockType.heading;
   }
@@ -489,10 +489,20 @@ int _tableEnd(List<_SourceLine> lines, int first) {
 }
 
 int _htmlEnd(List<_SourceLine> lines, int first) {
+  final block = _htmlBlockStart(lines[first].text);
+  if (block == null) return first;
+  final endPattern = block.endPattern;
+  if (endPattern != null) {
+    for (var index = first; index < lines.length; index += 1) {
+      if (endPattern.hasMatch(lines[index].text)) return index;
+    }
+    return lines.length - 1;
+  }
+
   var last = first;
   for (var index = first + 1; index < lines.length; index += 1) {
     final text = lines[index].text;
-    if (text.trim().isEmpty || _startsNewBlock(lines, index)) break;
+    if (text.trim().isEmpty) break;
     last = index;
   }
   return last;
@@ -527,7 +537,7 @@ bool _startsNewBlock(List<_SourceLine> lines, int index) {
       _isUnorderedList(text) ||
       _isOrderedList(text) ||
       _isIndentedCode(text) ||
-      _isHtmlStart(text) ||
+      _isInterruptingHtmlBlockStart(text) ||
       _isTableStart(lines, index);
 }
 
@@ -636,31 +646,69 @@ bool _isTableStart(List<_SourceLine> lines, int index) {
       countMarkdownTableCells(delimiter) == headerCellCount;
 }
 
-bool _isHtmlStart(String text) =>
-    RegExp(r'^ {0,3}</?[A-Za-z][^>]*>').hasMatch(text);
-
-final RegExp _interruptingHtmlBlockStartPattern = RegExp(
-  r'^ {0,3}(?:'
-  r'<(?:pre|script|style|textarea)(?:[ \t]|>|$)'
-  r'|<!--'
-  r'|<\?'
-  r'|<![A-Za-z]'
-  r'|<!\[CDATA\['
-  r'|</?(?:address|article|aside|base|basefont|blockquote|body|caption|center|'
+final RegExp _rawHtmlBlockStartPattern = RegExp(
+  r'^ {0,3}<(?:pre|script|style|textarea)(?:[ \t]|>|$)',
+  caseSensitive: false,
+);
+final RegExp _rawHtmlBlockEndPattern = RegExp(
+  r'</(?:pre|script|style|textarea)>',
+  caseSensitive: false,
+);
+final RegExp _htmlCommentStartPattern = RegExp(r'^ {0,3}<!--');
+final RegExp _htmlCommentEndPattern = RegExp(r'-->');
+final RegExp _htmlProcessingStartPattern = RegExp(r'^ {0,3}<\?');
+final RegExp _htmlProcessingEndPattern = RegExp(r'\?>');
+final RegExp _htmlDeclarationStartPattern = RegExp(r'^ {0,3}<![A-Za-z]');
+final RegExp _htmlDeclarationEndPattern = RegExp(r'>');
+final RegExp _htmlCdataStartPattern = RegExp(
+  r'^ {0,3}<!\[CDATA\[',
+  caseSensitive: false,
+);
+final RegExp _htmlCdataEndPattern = RegExp(r'\]\]>');
+final RegExp _htmlBlockTagStartPattern = RegExp(
+  r'^ {0,3}</?(?:address|article|aside|base|basefont|blockquote|body|caption|center|'
   r'col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|'
   r'footer|form|frame|frameset|h1|h2|h3|h4|h5|h6|head|header|hr|html|iframe|'
   r'legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|'
   r'section|source|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)'
-  r'(?:[ \t]|>|/>|$))',
+  r'(?:[ \t]|>|/>|$)',
   caseSensitive: false,
 );
+final RegExp _completeHtmlTagLinePattern = RegExp(
+  r'''^ {0,3}(?:<[A-Za-z][A-Za-z0-9-]*(?:\s+[A-Za-z_:][A-Za-z0-9._:-]*(?:\s*=\s*(?:[^\s"'=<>`]+|'[^']*'|"[^"]*"))?)*\s*/?>|</[A-Za-z][A-Za-z0-9-]*\s*>)[ \t]*$''',
+);
+
+_HtmlBlockStart? _htmlBlockStart(String text) {
+  if (_rawHtmlBlockStartPattern.hasMatch(text)) {
+    return _HtmlBlockStart(_rawHtmlBlockEndPattern, canInterrupt: true);
+  }
+  if (_htmlCommentStartPattern.hasMatch(text)) {
+    return _HtmlBlockStart(_htmlCommentEndPattern, canInterrupt: true);
+  }
+  if (_htmlProcessingStartPattern.hasMatch(text)) {
+    return _HtmlBlockStart(_htmlProcessingEndPattern, canInterrupt: true);
+  }
+  if (_htmlDeclarationStartPattern.hasMatch(text)) {
+    return _HtmlBlockStart(_htmlDeclarationEndPattern, canInterrupt: true);
+  }
+  if (_htmlCdataStartPattern.hasMatch(text)) {
+    return _HtmlBlockStart(_htmlCdataEndPattern, canInterrupt: true);
+  }
+  if (_htmlBlockTagStartPattern.hasMatch(text)) {
+    return const _HtmlBlockStart(null, canInterrupt: true);
+  }
+  if (_completeHtmlTagLinePattern.hasMatch(text)) {
+    return const _HtmlBlockStart(null, canInterrupt: false);
+  }
+  return null;
+}
 
 /// HTML block starts that can interrupt an already-open leaf block.
 ///
 /// CommonMark's generic complete-tag condition cannot interrupt a paragraph
 /// or table, so inline HTML such as `<em>cell</em>` remains valid cell text.
 bool _isInterruptingHtmlBlockStart(String text) =>
-    _interruptingHtmlBlockStartPattern.hasMatch(text);
+    _htmlBlockStart(text)?.canInterrupt ?? false;
 
 _Fence? _fence(String text) {
   final match = RegExp(r'^ {0,3}(`{3,}|~{3,})(.*)$').firstMatch(text);
@@ -741,4 +789,12 @@ final class _Fence {
   final int character;
   final int length;
   final String trailing;
+}
+
+final class _HtmlBlockStart {
+  const _HtmlBlockStart(this.endPattern, {required this.canInterrupt});
+
+  /// Null for the HTML block forms that end at the next blank line.
+  final RegExp? endPattern;
+  final bool canInterrupt;
 }

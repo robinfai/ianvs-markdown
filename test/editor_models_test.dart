@@ -142,7 +142,83 @@ final value = 1;
       interruptedBlocks.first.source,
       '| A | B |\n| --- | --- |\n| one | two |',
     );
-    expect(interruptedBlocks.last.source, '<!-- stop -->\nAfter');
+    expect(
+      interruptedBlocks.map((block) => block.type),
+      <IanvsMarkdownBlockType>[
+        IanvsMarkdownBlockType.table,
+        IanvsMarkdownBlockType.html,
+        IanvsMarkdownBlockType.paragraph,
+      ],
+    );
+    expect(interruptedBlocks[1].source, '<!-- stop -->');
+    expect(interruptedBlocks.last.source, 'After');
+  });
+
+  test('HTML blocks use their condition-specific end markers', () {
+    const comment = '<!-- one line -->\nAfter';
+    final commentBlocks = parseMarkdownBlocks(comment);
+    expect(commentBlocks.map((block) => block.type), <IanvsMarkdownBlockType>[
+      IanvsMarkdownBlockType.html,
+      IanvsMarkdownBlockType.paragraph,
+    ]);
+    expect(commentBlocks.first.source, '<!-- one line -->');
+    expect(commentBlocks.last.source, 'After');
+
+    const multilineComment = '<!--\nhidden\n-->\nAfter';
+    final multilineBlocks = parseMarkdownBlocks(multilineComment);
+    expect(multilineBlocks.map((block) => block.type), <IanvsMarkdownBlockType>[
+      IanvsMarkdownBlockType.html,
+      IanvsMarkdownBlockType.paragraph,
+    ]);
+    expect(multilineBlocks.first.source, '<!--\nhidden\n-->');
+    expect(multilineBlocks.last.source, 'After');
+
+    for (final fixture in <(String, String)>[
+      ('<script>\nraw\n</script>\nAfter', '<script>\nraw\n</script>'),
+      ('<?target\nvalue\n?>\nAfter', '<?target\nvalue\n?>'),
+      ('<!DOCTYPE html>\nAfter', '<!DOCTYPE html>'),
+      ('<![CDATA[\nvalue\n]]>\nAfter', '<![CDATA[\nvalue\n]]>'),
+    ]) {
+      final blocks = parseMarkdownBlocks(fixture.$1);
+      expect(blocks.map((block) => block.type), <IanvsMarkdownBlockType>[
+        IanvsMarkdownBlockType.html,
+        IanvsMarkdownBlockType.paragraph,
+      ], reason: fixture.$1);
+      expect(blocks.first.source, fixture.$2, reason: fixture.$1);
+      expect(blocks.last.source, 'After', reason: fixture.$1);
+    }
+
+    const blockTag = '<div>\nbody\n</div>\nAfter';
+    final blockTagBlocks = parseMarkdownBlocks(blockTag);
+    expect(blockTagBlocks, hasLength(1));
+    expect(blockTagBlocks.single.type, IanvsMarkdownBlockType.html);
+    expect(blockTagBlocks.single.source, blockTag);
+
+    const completeTag = '<custom data-x="1">\nbody\n\nAfter';
+    final completeTagBlocks = parseMarkdownBlocks(completeTag);
+    expect(
+      completeTagBlocks.map((block) => block.type),
+      <IanvsMarkdownBlockType>[
+        IanvsMarkdownBlockType.html,
+        IanvsMarkdownBlockType.paragraph,
+      ],
+    );
+    expect(completeTagBlocks.first.source, '<custom data-x="1">\nbody');
+    expect(completeTagBlocks.last.source, 'After');
+  });
+
+  test('inline HTML remains inside its surrounding paragraph', () {
+    const paired = '<em>inline</em> continuation\nnext';
+    final pairedBlocks = parseMarkdownBlocks(paired);
+    expect(pairedBlocks, hasLength(1));
+    expect(pairedBlocks.single.type, IanvsMarkdownBlockType.paragraph);
+    expect(pairedBlocks.single.source, paired);
+
+    const nonInterrupting = 'Before\n<em>\nAfter';
+    final nonInterruptingBlocks = parseMarkdownBlocks(nonInterrupting);
+    expect(nonInterruptingBlocks, hasLength(1));
+    expect(nonInterruptingBlocks.single.type, IanvsMarkdownBlockType.paragraph);
+    expect(nonInterruptingBlocks.single.source, nonInterrupting);
   });
 
   test('standalone block IDs extend supported blocks across blank lines', () {
