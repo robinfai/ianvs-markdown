@@ -4723,6 +4723,51 @@ title: Alpha
     expect(controller.text, contains('title: Committed'));
   });
 
+  testWidgets(
+    'property inputs contain outer Markdown formatting shortcuts',
+    (tester) async {
+      const source = '''
+---
+title: Alpha
+---
+# Body
+''';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      final input = find.byKey(
+        const ValueKey('ianvs-markdown-front-matter-input-title'),
+      );
+      for (final key in <LogicalKeyboardKey>[
+        LogicalKeyboardKey.keyB,
+        LogicalKeyboardKey.keyI,
+        LogicalKeyboardKey.keyK,
+      ]) {
+        controller.selection = const TextSelection.collapsed(offset: 0);
+        await tester.tap(input);
+        tester.widget<TextField>(input).controller?.selection =
+            const TextSelection(baseOffset: 0, extentOffset: 5);
+
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+        await tester.sendKeyEvent(key);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+        await tester.pumpAndSettle();
+
+        expect(controller.text, source, reason: 'shortcut: ${key.keyLabel}');
+        expect(
+          tester.widget<TextField>(input).controller?.text,
+          'Alpha',
+          reason: 'shortcut: ${key.keyLabel}',
+        );
+      }
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
   testWidgets('property keys rename in place and reject empty or duplicate', (
     tester,
   ) async {

@@ -8,6 +8,18 @@ import 'theme.dart';
 
 const int _collapsedMetadataItems = 6;
 
+bool _isOuterMarkdownFormattingShortcut(KeyEvent event) {
+  if (event is! KeyDownEvent && event is! KeyRepeatEvent) return false;
+  if (event.logicalKey != LogicalKeyboardKey.keyB &&
+      event.logicalKey != LogicalKeyboardKey.keyI &&
+      event.logicalKey != LogicalKeyboardKey.keyK) {
+    return false;
+  }
+  final keyboard = HardwareKeyboard.instance;
+  if (keyboard.isAltPressed || keyboard.isShiftPressed) return false;
+  return keyboard.isMetaPressed != keyboard.isControlPressed;
+}
+
 typedef IanvsMarkdownMetadataTextChanged =
     void Function(MarkdownMetadataEntry entry, String value);
 typedef IanvsMarkdownMetadataBooleanChanged =
@@ -498,6 +510,9 @@ class _ObsidianEditableKeyState extends State<_ObsidianEditableKey> {
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (_isOuterMarkdownFormattingShortcut(event)) {
+      return KeyEventResult.handled;
+    }
     if (event is! KeyDownEvent ||
         event.logicalKey != LogicalKeyboardKey.escape) {
       return KeyEventResult.ignored;
@@ -859,6 +874,9 @@ class _ObsidianEditableListValueState
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (_isOuterMarkdownFormattingShortcut(event)) {
+      return KeyEventResult.handled;
+    }
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
     if (event.logicalKey == LogicalKeyboardKey.escape) {
       if (widget.tag) {
@@ -1285,6 +1303,9 @@ class _ObsidianEditableNumberValueState
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (_isOuterMarkdownFormattingShortcut(event)) {
+      return KeyEventResult.handled;
+    }
     if (event is! KeyDownEvent ||
         event.logicalKey != LogicalKeyboardKey.escape) {
       return KeyEventResult.ignored;
@@ -1413,6 +1434,9 @@ class _ObsidianEditableTextValueState
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (_isOuterMarkdownFormattingShortcut(event)) {
+      return KeyEventResult.handled;
+    }
     if (event is! KeyDownEvent ||
         event.logicalKey != LogicalKeyboardKey.escape) {
       return KeyEventResult.ignored;
