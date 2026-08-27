@@ -3388,6 +3388,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           linkReferenceLabels: _linkReferences.labels,
           onCellChanged: _replaceTableCell,
           onCellFormatted: _replaceFormattedTableCell,
+          onSelectAll: _handleSelectAllDocument,
           onDeleteLine: _deleteTableLine,
           onAddRow: () => _appendTableRow(block),
           onAddRowAbove: () => _prependTableRow(block),
@@ -4661,6 +4662,7 @@ class _EditableMarkdownTable extends StatefulWidget {
     required this.linkReferenceLabels,
     required this.onCellChanged,
     required this.onCellFormatted,
+    required this.onSelectAll,
     required this.onDeleteLine,
     required this.onAddRow,
     required this.onAddRowAbove,
@@ -4675,6 +4677,7 @@ class _EditableMarkdownTable extends StatefulWidget {
   final void Function(_EditableTableCell cell, String value) onCellChanged;
   final void Function(_EditableTableCell cell, TextEditingValue value)
   onCellFormatted;
+  final VoidCallback onSelectAll;
   final ValueChanged<_EditableTableCell> onDeleteLine;
   final VoidCallback onAddRow;
   final VoidCallback onAddRowAbove;
@@ -4973,14 +4976,26 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
       return KeyEventResult.ignored;
     }
     final key = event.logicalKey;
+    final usesCommandModifier =
+        defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.iOS;
+    final selectAllModifier = usesCommandModifier
+        ? HardwareKeyboard.instance.isMetaPressed &&
+              !HardwareKeyboard.instance.isControlPressed
+        : HardwareKeyboard.instance.isControlPressed &&
+              !HardwareKeyboard.instance.isMetaPressed;
+    if (key == LogicalKeyboardKey.keyA &&
+        selectAllModifier &&
+        !HardwareKeyboard.instance.isAltPressed &&
+        !HardwareKeyboard.instance.isShiftPressed) {
+      widget.onSelectAll();
+      return KeyEventResult.handled;
+    }
     final inlineCommand = _tableInlineCommandForKey(key);
     if (inlineCommand != null && _hasTableInlineCommandModifier(key)) {
       _applyTableInlineCommand(cell, inlineCommand);
       return KeyEventResult.handled;
     }
-    final usesCommandModifier =
-        defaultTargetPlatform == TargetPlatform.macOS ||
-        defaultTargetPlatform == TargetPlatform.iOS;
     final deleteLineModifier = usesCommandModifier
         ? HardwareKeyboard.instance.isMetaPressed &&
               !HardwareKeyboard.instance.isControlPressed

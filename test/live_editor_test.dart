@@ -10078,6 +10078,60 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
   });
 
   testWidgets(
+    'table Command+A selects and replaces the entire Markdown document',
+    (tester) async {
+      const source =
+          'pre\n\n'
+          '| H | I |\n'
+          '| --- | --- |\n'
+          '| alpha | beta |\n\n'
+          'post';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('ianvs-markdown-table-1-0')));
+      await tester.pump();
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+
+      expect(
+        controller.selection,
+        TextSelection(
+          baseOffset: 0,
+          extentOffset: source.length,
+          isDirectional: true,
+        ),
+      );
+      expect(controller.selection.textInside(controller.text), source);
+      final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+      expect(active, findsOneWidget);
+      final field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      expect(field.controller?.text, source);
+
+      field.controller?.value = const TextEditingValue(
+        text: 'Z',
+        selection: TextSelection.collapsed(offset: 1),
+      );
+      await tester.pumpAndSettle();
+      expect(controller.text, 'Z');
+
+      controller.undo();
+      await tester.pumpAndSettle();
+      expect(controller.text, source);
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
     'table formatting shortcuts target the focused cell and undo cleanly',
     (tester) async {
       const source =
