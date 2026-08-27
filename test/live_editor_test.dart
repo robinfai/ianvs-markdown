@@ -4173,6 +4173,37 @@ void main() {
     },
   );
 
+  testWidgets('multiline Setext headings activate as one exact source block', (
+    tester,
+  ) async {
+    const heading = 'First title line\nsecond title line\n---';
+    final controller = IanvsMarkdownController(text: '$heading\n\nAfter');
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-setext-underline-source')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-live-heading-rail-2')),
+      findsOneWidget,
+    );
+    await tester.tap(find.textContaining('second title line'));
+    await tester.pumpAndSettle();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, heading);
+    expect(field.style?.fontSize, 21);
+    expect(find.text('H2'), findsOneWidget);
+    expect(controller.text, '$heading\n\nAfter');
+  });
+
   testWidgets('active ATX headings expose compact H1-H6 badges', (
     tester,
   ) async {

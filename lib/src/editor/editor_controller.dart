@@ -2513,29 +2513,20 @@ List<_SyntaxToken> _markdownSyntaxTokens(
       ..add(_SyntaxToken(markerEnd, match.end, theme.heading));
   }
 
-  final setextHeadingPattern = RegExp(
-    r'^( {0,3})([^\n]+)\n( {0,3})(?:=+|-+)[ \t]*$',
-    multiLine: true,
-  );
-  for (final match in setextHeadingPattern.allMatches(text)) {
-    if (_overlapsAnyRange(match.start, match.end, excludedRanges)) continue;
-    final titleLine = match.group(1)! + match.group(2)!;
-    if (RegExp(r'^ {0,3}#{1,6}(?:[ \t]+|$)').hasMatch(titleLine)) {
-      continue;
-    }
-    final underlineStart = match.start + titleLine.length + 1;
+  for (final block in parseMarkdownBlocks(text)) {
+    if (block.type != IanvsMarkdownBlockType.heading) continue;
+    final lastBreak = block.source.lastIndexOf('\n');
+    if (lastBreak < 0) continue;
+    final underline = block.source.substring(lastBreak + 1);
+    if (!RegExp(r'^ {0,3}(?:=+|-+)[ \t]*$').hasMatch(underline)) continue;
+    if (_overlapsAnyRange(block.start, block.end, excludedRanges)) continue;
+    final underlineStart = block.start + lastBreak + 1;
     inlineStructuralRanges.add(
-      TextRange(start: underlineStart, end: match.end),
+      TextRange(start: underlineStart, end: block.end),
     );
     tokens
-      ..add(
-        _SyntaxToken(
-          match.start,
-          match.start + titleLine.length,
-          theme.heading,
-        ),
-      )
-      ..add(_SyntaxToken(underlineStart, match.end, theme.marker));
+      ..add(_SyntaxToken(block.start, underlineStart - 1, theme.heading))
+      ..add(_SyntaxToken(underlineStart, block.end, theme.marker));
   }
 
   final pattern = RegExp(

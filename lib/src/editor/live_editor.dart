@@ -4068,8 +4068,8 @@ bool _isEmptyAtxHeadingSource(String source) {
 
 String? _setextHeadingUnderline(String source) {
   final lines = source.split('\n');
-  if (lines.length != 2 || lines.first.trim().isEmpty) return null;
-  final underline = lines[1].trimRight();
+  if (lines.length < 2 || lines.first.trim().isEmpty) return null;
+  final underline = lines.last.trimRight();
   return RegExp(r'^ {0,3}(?:=+|-+)$').hasMatch(underline) ? underline : null;
 }
 

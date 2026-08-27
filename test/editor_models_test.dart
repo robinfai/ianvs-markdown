@@ -640,6 +640,19 @@ visible''';
     ]);
   });
 
+  test('multiline Setext headings consume the complete paragraph', () {
+    const levelOne = 'First title line\nsecond title line\n===';
+    const levelTwo = 'Another title line\ncontinued title line\n---';
+    final blocks = parseMarkdownBlocks('$levelOne\n\n$levelTwo');
+
+    expect(blocks, hasLength(2));
+    expect(
+      blocks.map((block) => block.type),
+      everyElement(IanvsMarkdownBlockType.heading),
+    );
+    expect(blocks.map((block) => block.source), <String>[levelOne, levelTwo]);
+  });
+
   test('keeps lazy paragraph continuations inside block quotes', () {
     const source =
         '> Quoted first line\n'

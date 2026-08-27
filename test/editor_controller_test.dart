@@ -3354,7 +3354,10 @@ void main() {
       code: TextStyle(fontFamily: 'monospace'),
       comment: TextStyle(fontStyle: FontStyle.italic),
     );
-    const source = 'Setext one\n==========\n\nSetext two\n----------';
+    const source =
+        'Setext one\n==========\n\n'
+        'Setext two\n----------\n\n'
+        'Multiline first\nMultiline second\n----------';
     final spans = buildMarkdownSourceTextSpan(
       const TextEditingValue(
         text: source,
@@ -3373,10 +3376,32 @@ void main() {
     }
     for (final underline in <String>['==========', '----------']) {
       expect(
-        spans.singleWhere((span) => span.text == underline).style?.color,
+        spans.firstWhere((span) => span.text == underline).style?.color,
         const Color(0xff777777),
       );
     }
+    TextSpan spanAt(int offset) {
+      var cursor = 0;
+      for (final span in spans) {
+        final end = cursor + (span.text?.length ?? 0);
+        if (offset >= cursor && offset < end) return span;
+        cursor = end;
+      }
+      throw StateError('No span at $offset');
+    }
+
+    expect(
+      spanAt(source.indexOf('Multiline first')).style?.fontWeight,
+      FontWeight.w600,
+    );
+    expect(
+      spanAt(source.indexOf('Multiline second')).style?.fontWeight,
+      FontWeight.w600,
+    );
+    expect(
+      spanAt(source.lastIndexOf('----------')).style?.color,
+      const Color(0xff777777),
+    );
   });
 
   test('live source styles Obsidian editing metadata without hiding it', () {

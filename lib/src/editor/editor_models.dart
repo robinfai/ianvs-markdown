@@ -129,11 +129,8 @@ List<IanvsMarkdownBlock> parseMarkdownBlocks(
                 ? _listItemEnd(lines, first)
                 : _listEnd(lines, first),
           IanvsMarkdownBlockType.table => _tableEnd(lines, first),
-          IanvsMarkdownBlockType.heading
-              when first + 1 < lines.length &&
-                  _isSetextUnderline(lines[first + 1].text) =>
-            first + 1,
-          IanvsMarkdownBlockType.heading ||
+          IanvsMarkdownBlockType.heading =>
+            _setextHeadingEnd(lines, first) ?? first,
           IanvsMarkdownBlockType.thematicBreak => first,
           IanvsMarkdownBlockType.html => _htmlEnd(lines, first),
           IanvsMarkdownBlockType.paragraph => _paragraphEnd(lines, first),
@@ -294,7 +291,7 @@ IanvsMarkdownBlockType _classifyBlock(List<_SourceLine> lines, int index) {
   }
   if (_isTableStart(lines, index)) return IanvsMarkdownBlockType.table;
   if (_htmlBlockStart(text) != null) return IanvsMarkdownBlockType.html;
-  if (index + 1 < lines.length && _isSetextUnderline(lines[index + 1].text)) {
+  if (_setextHeadingEnd(lines, index) != null) {
     return IanvsMarkdownBlockType.heading;
   }
   return IanvsMarkdownBlockType.paragraph;
@@ -525,6 +522,20 @@ int _paragraphEnd(List<_SourceLine> lines, int first) {
     last = index;
   }
   return last;
+}
+
+int? _setextHeadingEnd(List<_SourceLine> lines, int first) {
+  for (var index = first + 1; index < lines.length; index += 1) {
+    final text = lines[index].text;
+    if (text.trim().isEmpty) return null;
+    // A Setext underline transforms the complete uninterrupted paragraph,
+    // not only the source line immediately above it.
+    if (_isSetextUnderline(text)) return index;
+    // Indented code cannot interrupt a paragraph and therefore remains
+    // eligible heading content until a later underline.
+    if (_startsNewBlock(lines, index) && !_isIndentedCode(text)) return null;
+  }
+  return null;
 }
 
 bool _startsNewBlock(List<_SourceLine> lines, int index) {
