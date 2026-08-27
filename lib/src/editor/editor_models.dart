@@ -381,7 +381,10 @@ int _listEnd(List<_SourceLine> lines, int first) {
 
     final candidate = _blockListMarker(text);
     if (candidate != null && candidate.leadingColumns < marker.contentIndent) {
-      if (candidate.ordered != marker.ordered) break;
+      if (candidate.ordered != marker.ordered ||
+          candidate.delimiter != marker.delimiter) {
+        break;
+      }
       marker = candidate;
       last = index;
       pendingBlank = false;
@@ -587,10 +590,12 @@ _BlockListMarker? _blockListMarker(String text) {
   final leadingColumns = match.group(1)!.length;
   final digits = match.group(2);
   final markerWidth = digits == null ? 1 : digits.length + 1;
+  final delimiter = text.codeUnitAt(markerEnd - 1);
   final precedingWhitespace = leadingColumns + markerWidth + 1;
   if (markerEnd == text.length) {
     return _BlockListMarker(
       ordered: digits != null,
+      delimiter: delimiter,
       leadingColumns: leadingColumns,
       contentIndent: precedingWhitespace,
       blank: true,
@@ -607,6 +612,7 @@ _BlockListMarker? _blockListMarker(String text) {
   final extraWhitespace = content - contentStart;
   return _BlockListMarker(
     ordered: digits != null,
+    delimiter: delimiter,
     leadingColumns: leadingColumns,
     contentIndent: content == text.length || extraWhitespace >= 4
         ? precedingWhitespace
@@ -685,12 +691,14 @@ final class _SourceLine {
 final class _BlockListMarker {
   const _BlockListMarker({
     required this.ordered,
+    required this.delimiter,
     required this.leadingColumns,
     required this.contentIndent,
     required this.blank,
   });
 
   final bool ordered;
+  final int delimiter;
   final int leadingColumns;
   final int contentIndent;
   final bool blank;

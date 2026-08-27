@@ -1,5 +1,8 @@
 ## Unreleased
 
+- Start a new source list block when an unordered bullet changes between
+  `-`, `*`, and `+`, or an ordered delimiter changes between `.` and `)`,
+  while keeping same-delimiter siblings grouped.
 - Keep loose lists structurally continuous across blank-separated siblings and
   indented child blocks, including marker-only items, visual-column Tab
   continuations, per-item Live Preview editing, and nested guide depth.

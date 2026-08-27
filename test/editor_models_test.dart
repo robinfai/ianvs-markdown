@@ -596,6 +596,36 @@ visible''';
     ]);
   });
 
+  test('changing a list delimiter starts a new source block', () {
+    const source =
+        '- dash\n'
+        '* star\n'
+        '+ plus\n'
+        '\n'
+        '1. dot\n'
+        '2) paren';
+
+    final blocks = parseMarkdownBlocks(source);
+    expect(blocks.map((block) => block.type), <IanvsMarkdownBlockType>[
+      IanvsMarkdownBlockType.unorderedList,
+      IanvsMarkdownBlockType.unorderedList,
+      IanvsMarkdownBlockType.unorderedList,
+      IanvsMarkdownBlockType.orderedList,
+      IanvsMarkdownBlockType.orderedList,
+    ]);
+    expect(blocks.map((block) => block.source), <String>[
+      '- dash',
+      '* star',
+      '+ plus',
+      '1. dot',
+      '2) paren',
+    ]);
+
+    final sameDelimiter = parseMarkdownBlocks('- one\n- two');
+    expect(sameDelimiter, hasLength(1));
+    expect(sameDelimiter.single.source, '- one\n- two');
+  });
+
   test('marker-only lists retain visual-column Tab continuations', () {
     const source =
         '-\n'
