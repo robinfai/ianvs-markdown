@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../callout.dart';
 import '../markdown_table_syntax.dart';
 
 /// Display modes supported by [IanvsMarkdownLiveEditor].
@@ -349,6 +350,7 @@ int _displayMathEnd(List<_SourceLine> lines, int first) {
 }
 
 int _blockquoteEnd(List<_SourceLine> lines, int first) {
+  final callout = parseIanvsMarkdownCalloutHeader(lines[first].text) != null;
   var last = first;
   for (var index = first + 1; index < lines.length; index += 1) {
     final text = lines[index].text;
@@ -359,7 +361,10 @@ int _blockquoteEnd(List<_SourceLine> lines, int first) {
     // Obsidian follows CommonMark's lazy block-quote continuation: a
     // non-blank paragraph line may omit `>` and still belongs to the current
     // quote. A blank line or another block opener ends that continuation.
-    if (text.trim().isEmpty || _startsNewBlock(lines, index)) break;
+    if (text.trim().isEmpty ||
+        _startsNewBlock(lines, index) && !(callout && _isIndentedCode(text))) {
+      break;
+    }
     last = index;
   }
   return last;

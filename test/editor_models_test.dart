@@ -675,6 +675,20 @@ visible''';
     expect(blocks.last.source, 'After quote.');
   });
 
+  test('callouts retain code-indented lazy paragraph continuations', () {
+    const source =
+        '> [!note] Four-space boundary\n'
+        '> before\n'
+        '    lazy code-looking\n'
+        '> after';
+
+    final blocks = parseMarkdownBlocks(source);
+
+    expect(blocks, hasLength(1));
+    expect(blocks.single.type, IanvsMarkdownBlockType.blockquote);
+    expect(blocks.single.source, source);
+  });
+
   test('lazy quote continuations stop at blank lines and block openers', () {
     const source =
         '> # Quoted heading\n'

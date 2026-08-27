@@ -6061,6 +6061,42 @@ url: https://example.com/path
     },
   );
 
+  testWidgets('callouts keep four-space lazy continuations in one card', (
+    tester,
+  ) async {
+    const source =
+        '> [!note] Four-space boundary\n'
+        '> before\n'
+        '    lazy code-looking\n'
+        '> after';
+    final controller = IanvsMarkdownController(text: '$source\n\nOutside.');
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final callout = find.byKey(const ValueKey('ianvs-markdown-callout-note'));
+    expect(callout, findsOneWidget);
+    expect(
+      find.descendant(
+        of: callout,
+        matching: find.textContaining('lazy code-looking'),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.textContaining('lazy code-looking'));
+    await tester.pumpAndSettle();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, source);
+    expect(find.text('Outside.'), findsOneWidget);
+    expect(controller.text, '$source\n\nOutside.');
+  });
+
   testWidgets('Wiki embeds render and enter exact block source editing', (
     tester,
   ) async {
