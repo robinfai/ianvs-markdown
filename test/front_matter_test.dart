@@ -119,6 +119,138 @@ Body
     ]);
   });
 
+  test('retains top-level YAML spans for property field edits', () {
+    const source = '''
+---
+title: Alpha
+enabled: true
+tags: [one, two]
+---
+Body
+''';
+    final document = parseMarkdownFrontMatter(source);
+    final title = document.entries.firstWhere((entry) => entry.key == 'title');
+    final enabled = document.entries.firstWhere(
+      (entry) => entry.key == 'enabled',
+    );
+
+    expect(
+      source.substring(title.sourceKeyStart!, title.sourceKeyEnd),
+      'title',
+    );
+    expect(
+      source.substring(title.sourceValueStart!, title.sourceValueEnd),
+      'Alpha',
+    );
+    expect(
+      source.substring(enabled.sourceValueStart!, enabled.sourceValueEnd),
+      'true',
+    );
+  });
+
+  test('property commits match Obsidian flow-list canonicalization', () {
+    const source = '''
+---
+title: Alpha
+enabled: true
+quoted_number: "42"
+tags: [one, two]
+cssclasses: [wide]
+---
+Body
+''';
+    final document = parseMarkdownFrontMatter(source);
+    MarkdownMetadataEntry entry(String key) =>
+        document.entries.firstWhere((item) => item.key == key);
+
+    expect(
+      replaceMarkdownFrontMatterTextValue(source, entry('title'), 'Beta'),
+      '''
+---
+title: Beta
+enabled: true
+quoted_number: "42"
+tags:
+  - one
+  - two
+cssclasses:
+  - wide
+---
+Body
+''',
+    );
+    expect(
+      replaceMarkdownFrontMatterBooleanValue(source, entry('enabled'), false),
+      '''
+---
+title: Alpha
+enabled: false
+quoted_number: "42"
+tags: [one, two]
+cssclasses: [wide]
+---
+Body
+''',
+    );
+    expect(
+      replaceMarkdownFrontMatterTextValue(source, entry('quoted_number'), '43'),
+      contains('quoted_number: "43"'),
+    );
+  });
+
+  test(
+    'property rewrites preserve CRLF and avoid stale or commented spans',
+    () {
+      const crlf =
+          '---\r\n'
+          'title: Alpha\r\n'
+          'tags: [one, two]\r\n'
+          '---\r\n'
+          'Body';
+      final crlfTitle = parseMarkdownFrontMatter(
+        crlf,
+      ).entries.firstWhere((entry) => entry.key == 'title');
+      expect(
+        replaceMarkdownFrontMatterTextValue(crlf, crlfTitle, 'Beta'),
+        '---\r\n'
+        'title: Beta\r\n'
+        'tags:\r\n'
+        '  - one\r\n'
+        '  - two\r\n'
+        '---\r\n'
+        'Body',
+      );
+
+      const commented = '''
+---
+title: Alpha
+tags: [one, two] # preserve this unsupported source comment
+---
+Body
+''';
+      final commentedTitle = parseMarkdownFrontMatter(
+        commented,
+      ).entries.firstWhere((entry) => entry.key == 'title');
+      expect(
+        replaceMarkdownFrontMatterTextValue(commented, commentedTitle, 'Beta'),
+        commented.replaceFirst('title: Alpha', 'title: Beta'),
+      );
+
+      final staleSource = commented.replaceFirst(
+        'title: Alpha',
+        'draft: true\ntitle: Alpha',
+      );
+      expect(
+        replaceMarkdownFrontMatterTextValue(
+          staleSource,
+          commentedTitle,
+          'Beta',
+        ),
+        staleSource,
+      );
+    },
+  );
+
   test('accepts only the Obsidian triple-dash closing marker', () {
     const invalidSources = <String>[
       '---\ntitle: Ellipsis\n...\nBody',

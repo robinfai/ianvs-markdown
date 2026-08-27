@@ -35,6 +35,10 @@ final class MarkdownMetadataEntry {
     required this.value,
     this.items = const <String>[],
     this.type = MarkdownMetadataValueType.text,
+    this.sourceKeyStart,
+    this.sourceKeyEnd,
+    this.sourceValueStart,
+    this.sourceValueEnd,
   });
 
   final String key;
@@ -42,6 +46,16 @@ final class MarkdownMetadataEntry {
   final String value;
   final List<String> items;
   final MarkdownMetadataValueType type;
+
+  /// UTF-16 source offsets for the top-level YAML key and value.
+  ///
+  /// These offsets are relative to the complete Markdown source passed to
+  /// [parseMarkdownFrontMatter]. They let an editor update one property while
+  /// retaining comments and unsupported YAML that Obsidian leaves untouched.
+  final int? sourceKeyStart;
+  final int? sourceKeyEnd;
+  final int? sourceValueStart;
+  final int? sourceValueEnd;
 
   bool get isLong => value.length > 72 || value.contains('\n');
 }
@@ -70,7 +84,7 @@ MarkdownFrontMatterDocument parseMarkdownFrontMatter(String source) {
       if (utf8.encode(raw).length > markdownFrontMatterByteLimit) {
         return _withoutFrontMatter(source);
       }
-      final parsed = _parseMetadata(raw);
+      final parsed = _parseMetadata(raw, sourceOffset: openingEnd + 1);
       if (parsed == null) return _withoutFrontMatter(source);
       final bodyStart = newline < 0 ? source.length : newline + 1;
       return MarkdownFrontMatterDocument(
@@ -97,32 +111,40 @@ MarkdownFrontMatterDocument _withoutFrontMatter(String source) {
   );
 }
 
-List<MarkdownMetadataEntry>? _parseMetadata(String raw) {
-  final Object? value;
+List<MarkdownMetadataEntry>? _parseMetadata(
+  String raw, {
+  required int sourceOffset,
+}) {
+  final YamlNode value;
   try {
-    value = loadYaml(raw);
+    value = loadYamlNode(raw);
   } on Object {
     return null;
   }
-  if (value == null) return const <MarkdownMetadataEntry>[];
-  if (value is! Map<Object?, Object?>) return null;
+  if (value is YamlScalar && value.value == null) {
+    return const <MarkdownMetadataEntry>[];
+  }
+  if (value is! YamlMap) return null;
 
   final result = <MarkdownMetadataEntry>[];
-  _collectMetadata(value, result: result);
+  _collectMetadata(value, result: result, sourceOffset: sourceOffset);
   // Obsidian's properties panel follows YAML source order. Reordering common
   // keys such as title/author makes the structured view disagree with Source.
   return List<MarkdownMetadataEntry>.unmodifiable(result);
 }
 
 void _collectMetadata(
-  Map<Object?, Object?> values, {
+  YamlMap values, {
   required List<MarkdownMetadataEntry> result,
+  required int sourceOffset,
 }) {
-  for (final entry in values.entries) {
+  for (final entry in values.nodes.entries) {
     if (result.length >= markdownFrontMatterEntryLimit) return;
-    final key = _boundedText(entry.key, 80);
+    final keyNode = entry.key as YamlNode;
+    final valueNode = entry.value;
+    final key = _boundedText(keyNode.value, 80);
     if (key.isEmpty) continue;
-    final value = entry.value;
+    final value = valueNode.value;
     final type = _metadataValueType(value);
     final items = value is Iterable<Object?>
         ? value
@@ -147,9 +169,209 @@ void _collectMetadata(
         value: displayValue,
         items: items,
         type: type,
+        sourceKeyStart: sourceOffset + keyNode.span.start.offset,
+        sourceKeyEnd: sourceOffset + keyNode.span.end.offset,
+        sourceValueStart: sourceOffset + valueNode.span.start.offset,
+        sourceValueEnd: sourceOffset + valueNode.span.end.offset,
       ),
     );
   }
+}
+
+/// Replaces one top-level front-matter property with a text scalar.
+///
+/// Obsidian's Properties editor rewrites top-level flow lists to block lists
+/// when a field is committed. This function mirrors that observed rewrite but
+/// otherwise edits source spans in place, preserving key order, comments, and
+/// YAML constructs that the property panel does not own.
+String replaceMarkdownFrontMatterTextValue(
+  String source,
+  MarkdownMetadataEntry entry,
+  String value,
+) => _replaceMarkdownFrontMatterValue(
+  source,
+  entry,
+  _yamlTextScalar(value),
+  canonicalizeFlowLists: true,
+);
+
+/// Replaces one top-level front-matter property with a boolean scalar.
+String replaceMarkdownFrontMatterBooleanValue(
+  String source,
+  MarkdownMetadataEntry entry,
+  bool value,
+) => _replaceMarkdownFrontMatterValue(
+  source,
+  entry,
+  value ? 'true' : 'false',
+  canonicalizeFlowLists: false,
+);
+
+String _replaceMarkdownFrontMatterValue(
+  String source,
+  MarkdownMetadataEntry entry,
+  String replacement, {
+  required bool canonicalizeFlowLists,
+}) {
+  final valueStart = entry.sourceValueStart;
+  final valueEnd = entry.sourceValueEnd;
+  if (valueStart == null ||
+      valueEnd == null ||
+      valueStart < 0 ||
+      valueEnd < valueStart ||
+      valueEnd > source.length) {
+    return source;
+  }
+
+  final openingEnd = source.indexOf('\n');
+  if (openingEnd < 0 ||
+      _frontMatterMarkerLine(source.substring(0, openingEnd)) != '---') {
+    return source;
+  }
+  final closingStart = _frontMatterClosingStart(source, openingEnd + 1);
+  if (closingStart == null || valueEnd > closingStart) return source;
+  final raw = source.substring(openingEnd + 1, closingStart);
+  final YamlNode root;
+  try {
+    root = loadYamlNode(raw);
+  } on Object {
+    return source;
+  }
+  if (root is! YamlMap) return source;
+
+  final rawOffset = openingEnd + 1;
+  final targetFound = root.nodes.entries.any((nodeEntry) {
+    final keyNode = nodeEntry.key as YamlNode;
+    final valueNode = nodeEntry.value;
+    return rawOffset + keyNode.span.start.offset == entry.sourceKeyStart &&
+        rawOffset + keyNode.span.end.offset == entry.sourceKeyEnd &&
+        rawOffset + valueNode.span.start.offset == valueStart &&
+        rawOffset + valueNode.span.end.offset == valueEnd;
+  });
+  if (!targetFound) return source;
+
+  final edits = <_FrontMatterSourceEdit>[
+    _FrontMatterSourceEdit(
+      start: valueStart,
+      end: valueEnd,
+      replacement: replacement,
+    ),
+  ];
+  final lineBreak = source.contains('\r\n') ? '\r\n' : '\n';
+  for (final nodeEntry
+      in canonicalizeFlowLists
+          ? root.nodes.entries
+          : const <MapEntry<dynamic, YamlNode>>[]) {
+    final keyNode = nodeEntry.key as YamlNode;
+    final valueNode = nodeEntry.value;
+    if (valueNode is! YamlList ||
+        valueNode.style != CollectionStyle.FLOW ||
+        valueNode.nodes.any((node) => node is! YamlScalar)) {
+      continue;
+    }
+    final flowStart = rawOffset + valueNode.span.start.offset;
+    final flowEnd = rawOffset + valueNode.span.end.offset;
+    if (valueStart < flowEnd && valueEnd > flowStart) continue;
+    final keyEnd = rawOffset + keyNode.span.end.offset;
+    final separator = source.indexOf(':', keyEnd);
+    if (separator < keyEnd || separator >= flowStart) continue;
+    final flowLineEnd = source.indexOf('\n', flowEnd);
+    final trailing = source.substring(
+      flowEnd,
+      flowLineEnd < 0 ? source.length : flowLineEnd,
+    );
+    if (trailing.trim().isNotEmpty) continue;
+    final lineStart = source.lastIndexOf('\n', keyEnd - 1) + 1;
+    final keyStart = rawOffset + keyNode.span.start.offset;
+    final indentation = source.substring(lineStart, keyStart);
+    final items = valueNode.nodes
+        .cast<YamlScalar>()
+        .map((node) => '$indentation  - ${_yamlScalarNodeSource(node)}')
+        .join(lineBreak);
+    edits.add(
+      _FrontMatterSourceEdit(
+        start: separator + 1,
+        end: flowEnd,
+        replacement: items.isEmpty ? ' []' : '$lineBreak$items',
+      ),
+    );
+  }
+
+  edits.sort((left, right) => right.start.compareTo(left.start));
+  var updated = source;
+  for (final edit in edits) {
+    if (edit.start < 0 || edit.end < edit.start || edit.end > updated.length) {
+      return source;
+    }
+    updated = updated.replaceRange(edit.start, edit.end, edit.replacement);
+  }
+  return updated;
+}
+
+int? _frontMatterClosingStart(String source, int lineStart) {
+  var start = lineStart;
+  while (start <= source.length) {
+    final newline = source.indexOf('\n', start);
+    final end = newline < 0 ? source.length : newline;
+    if (_frontMatterMarkerLine(source.substring(start, end)) == '---') {
+      return start;
+    }
+    if (newline < 0) return null;
+    start = newline + 1;
+  }
+  return null;
+}
+
+String _yamlScalarNodeSource(YamlScalar node) {
+  final value = node.value;
+  return switch (value) {
+    null => 'null',
+    bool() => value ? 'true' : 'false',
+    num() => '$value',
+    DateTime()
+        when value.hour == 0 &&
+            value.minute == 0 &&
+            value.second == 0 &&
+            value.millisecond == 0 &&
+            value.microsecond == 0 =>
+      _metadataDateText(value),
+    DateTime() => value.toIso8601String(),
+    _ => _yamlTextScalar('$value'),
+  };
+}
+
+String _yamlTextScalar(String value) {
+  if (value.isEmpty ||
+      value.trim() != value ||
+      value.contains('\n') ||
+      value.contains('\r') ||
+      value.codeUnits.any((unit) => unit < 0x20) ||
+      RegExp(
+        r'^(?:null|~|true|false|yes|no|on|off)$',
+        caseSensitive: false,
+      ).hasMatch(value) ||
+      num.tryParse(value) != null ||
+      RegExp(r'^\d{4}-\d{2}-\d{2}(?:[Tt ].*)?$').hasMatch(value) ||
+      RegExp(r'''^[\-?:,!&*#{}\[\]|>@`"'%]''').hasMatch(value) ||
+      value.endsWith(':') ||
+      value.contains(': ') ||
+      value.contains(':\t') ||
+      value.contains(' #')) {
+    return jsonEncode(value);
+  }
+  return value;
+}
+
+final class _FrontMatterSourceEdit {
+  const _FrontMatterSourceEdit({
+    required this.start,
+    required this.end,
+    required this.replacement,
+  });
+
+  final int start;
+  final int end;
+  final String replacement;
 }
 
 MarkdownMetadataValueType _metadataValueType(Object? value) {

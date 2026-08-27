@@ -4324,9 +4324,7 @@ empty:
       await tester.pumpAndSettle();
       expect(find.text('status'), findsOneWidget);
 
-      await tester.tap(
-        find.byKey(const ValueKey('ianvs-markdown-front-matter-row-status')),
-      );
+      await tester.tap(find.text('status'));
       await tester.pump();
 
       final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
@@ -4349,6 +4347,147 @@ empty:
       );
     },
   );
+
+  testWidgets(
+    'compact properties edit text and boolean values without opening YAML',
+    (tester) async {
+      const source = '''
+---
+title: Alpha
+enabled: true
+tags: [one, two]
+cssclasses: [wide]
+---
+# Body
+''';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      final titleInput = find.byKey(
+        const ValueKey('ianvs-markdown-front-matter-input-title'),
+      );
+      expect(titleInput, findsOneWidget);
+      await tester.tap(titleInput);
+      await tester.enterText(titleInput, 'Beta');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
+      expect(controller.text, '''
+---
+title: Beta
+enabled: true
+tags:
+  - one
+  - two
+cssclasses:
+  - wide
+---
+# Body
+''');
+      expect(
+        find.byKey(const ValueKey('ianvs-markdown-active-block')),
+        findsNothing,
+      );
+
+      final boolean = find.byKey(
+        const ValueKey('ianvs-markdown-front-matter-boolean-enabled'),
+      );
+      expect(boolean, findsOneWidget);
+      await tester.tap(boolean);
+      await tester.pumpAndSettle();
+      expect(controller.text, contains('enabled: false'));
+
+      controller.undo();
+      await tester.pumpAndSettle();
+      expect(controller.text, contains('enabled: true'));
+    },
+  );
+
+  testWidgets('property text Escape cancels and focus loss commits', (
+    tester,
+  ) async {
+    const source = '''
+---
+title: Alpha
+---
+# Body
+''';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final input = find.byKey(
+      const ValueKey('ianvs-markdown-front-matter-input-title'),
+    );
+    await tester.tap(input);
+    await tester.enterText(input, 'Pending');
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(controller.text, source);
+    expect(tester.widget<TextField>(input).controller?.text, 'Alpha');
+
+    await tester.tap(input);
+    await tester.enterText(input, 'Committed');
+    await tester.tap(find.text('Body'));
+    await tester.pumpAndSettle();
+    expect(controller.text, contains('title: Committed'));
+  });
+
+  testWidgets('editable properties retain Wiki and URL link callbacks', (
+    tester,
+  ) async {
+    const source = '''
+---
+title: Alpha
+wiki: "[[Target Note]]"
+url: https://example.com/path
+---
+# Body
+''';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    final taps = <(String, String?)>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1000,
+            height: 720,
+            child: IanvsMarkdownLiveEditor(
+              controller: controller,
+              onTapLink: (text, href, title) => taps.add((text, href)),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-front-matter-input-title')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-front-matter-input-wiki')),
+      findsNothing,
+    );
+    await tester.tap(find.text('Target Note'));
+    await tester.tap(find.text('https://example.com/path'));
+    await tester.pumpAndSettle();
+
+    expect(taps, <(String, String?)>[
+      ('Target Note', 'Target Note'),
+      ('https://example.com/path', 'https://example.com/path'),
+    ]);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
+  });
 
   testWidgets('live preview edits one list item without flattening neighbors', (
     tester,

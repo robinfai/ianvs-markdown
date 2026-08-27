@@ -1,5 +1,9 @@
 ## Unreleased
 
+- Add Obsidian-style Live Preview property editing for text fields and boolean
+  controls: Enter or focus loss commits one undoable source edit, Escape
+  cancels pending text, and a committed text field canonicalizes top-level
+  inline scalar lists to the block-list form emitted by Obsidian Properties.
 - Match Obsidian properties for source-order keys, an ordinary `title` row,
   default-expanded panels, triple-dash-only closing markers, distinct aliases,
   tags, and `cssclasses`, linked Wiki/URL scalar values, and invisible empty

@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import 'front_matter.dart';
 import 'theme.dart';
 
 const int _collapsedMetadataItems = 6;
+
+typedef IanvsMarkdownMetadataTextChanged =
+    void Function(MarkdownMetadataEntry entry, String value);
+typedef IanvsMarkdownMetadataBooleanChanged =
+    void Function(MarkdownMetadataEntry entry, bool value);
 
 class IanvsMarkdownFrontMatterCard extends StatefulWidget {
   const IanvsMarkdownFrontMatterCard({
@@ -18,6 +24,8 @@ class IanvsMarkdownFrontMatterCard extends StatefulWidget {
     this.initiallyExpanded = true,
     this.showDocumentTitle = false,
     this.onTapLink,
+    this.onTextChanged,
+    this.onBooleanChanged,
   });
 
   final List<MarkdownMetadataEntry> entries;
@@ -29,6 +37,8 @@ class IanvsMarkdownFrontMatterCard extends StatefulWidget {
   final bool initiallyExpanded;
   final bool showDocumentTitle;
   final MarkdownTapLinkCallback? onTapLink;
+  final IanvsMarkdownMetadataTextChanged? onTextChanged;
+  final IanvsMarkdownMetadataBooleanChanged? onBooleanChanged;
 
   @override
   State<IanvsMarkdownFrontMatterCard> createState() =>
@@ -247,6 +257,8 @@ class _IanvsMarkdownFrontMatterCardState
                           entry: entry,
                           colors: colors,
                           onTapLink: widget.onTapLink,
+                          onTextChanged: widget.onTextChanged,
+                          onBooleanChanged: widget.onBooleanChanged,
                         ),
                       Padding(
                         padding: const EdgeInsets.fromLTRB(7, 4, 7, 2),
@@ -287,11 +299,15 @@ class _ObsidianMetadataRow extends StatelessWidget {
     required this.entry,
     required this.colors,
     required this.onTapLink,
+    required this.onTextChanged,
+    required this.onBooleanChanged,
   });
 
   final MarkdownMetadataEntry entry;
   final IanvsMarkdownThemeData colors;
   final MarkdownTapLinkCallback? onTapLink;
+  final IanvsMarkdownMetadataTextChanged? onTextChanged;
+  final IanvsMarkdownMetadataBooleanChanged? onBooleanChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -341,6 +357,8 @@ class _ObsidianMetadataRow extends StatelessWidget {
               items: items,
               colors: colors,
               onTapLink: onTapLink,
+              onTextChanged: onTextChanged,
+              onBooleanChanged: onBooleanChanged,
             ),
           ),
         ],
@@ -392,6 +410,8 @@ class _ObsidianMetadataValue extends StatelessWidget {
     required this.items,
     required this.colors,
     required this.onTapLink,
+    required this.onTextChanged,
+    required this.onBooleanChanged,
   });
 
   final MarkdownMetadataEntry entry;
@@ -399,6 +419,8 @@ class _ObsidianMetadataValue extends StatelessWidget {
   final List<String> items;
   final IanvsMarkdownThemeData colors;
   final MarkdownTapLinkCallback? onTapLink;
+  final IanvsMarkdownMetadataTextChanged? onTextChanged;
+  final IanvsMarkdownMetadataBooleanChanged? onBooleanChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -409,14 +431,25 @@ class _ObsidianMetadataValue extends StatelessWidget {
         alignment: Alignment.centerLeft,
         child: Semantics(
           checked: checked,
+          enabled: onBooleanChanged != null,
           label: '${entry.key}: ${checked ? '已启用' : '未启用'}',
-          child: Icon(
-            checked
-                ? Icons.check_circle_rounded
-                : Icons.radio_button_unchecked_rounded,
-            key: valueKey,
-            size: 15,
-            color: checked ? colors.headingAccent(4) : colors.textTertiary,
+          child: InkWell(
+            key: ValueKey('ianvs-markdown-front-matter-boolean-${entry.key}'),
+            onTap: onBooleanChanged == null
+                ? null
+                : () => onBooleanChanged!(entry, !checked),
+            borderRadius: BorderRadius.circular(4),
+            child: Padding(
+              padding: const EdgeInsets.all(2),
+              child: Icon(
+                checked
+                    ? Icons.check_circle_rounded
+                    : Icons.radio_button_unchecked_rounded,
+                key: valueKey,
+                size: 15,
+                color: checked ? colors.headingAccent(4) : colors.textTertiary,
+              ),
+            ),
           ),
         ),
       );
@@ -446,6 +479,17 @@ class _ObsidianMetadataValue extends StatelessWidget {
       );
     }
     final propertyLink = _propertyLink(entry.value);
+    if (entry.type == MarkdownMetadataValueType.text &&
+        onTextChanged != null &&
+        propertyLink == null &&
+        !entry.value.contains('\n')) {
+      return _ObsidianEditableTextValue(
+        key: ValueKey('ianvs-markdown-front-matter-editor-${entry.key}'),
+        entry: entry,
+        colors: colors,
+        onChanged: onTextChanged!,
+      );
+    }
     if (entry.type == MarkdownMetadataValueType.text && propertyLink != null) {
       return _ObsidianMetadataLink(
         key: valueKey,
@@ -506,6 +550,138 @@ class _ObsidianMetadataValue extends StatelessWidget {
         fontSize: object ? 10.5 : 11.5,
         height: 1.35,
         fontStyle: empty ? FontStyle.italic : FontStyle.normal,
+      ),
+    );
+  }
+}
+
+class _ObsidianEditableTextValue extends StatefulWidget {
+  const _ObsidianEditableTextValue({
+    super.key,
+    required this.entry,
+    required this.colors,
+    required this.onChanged,
+  });
+
+  final MarkdownMetadataEntry entry;
+  final IanvsMarkdownThemeData colors;
+  final IanvsMarkdownMetadataTextChanged onChanged;
+
+  @override
+  State<_ObsidianEditableTextValue> createState() =>
+      _ObsidianEditableTextValueState();
+}
+
+class _ObsidianEditableTextValueState
+    extends State<_ObsidianEditableTextValue> {
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+  late String _committedValue;
+  var _cancelled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _committedValue = widget.entry.value;
+    _controller = TextEditingController(text: _committedValue);
+    _focusNode = FocusNode()..addListener(_handleFocusChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ObsidianEditableTextValue oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.entry.value != widget.entry.value) {
+      _committedValue = widget.entry.value;
+      _controller.value = TextEditingValue(
+        text: _committedValue,
+        selection: TextSelection.collapsed(offset: _committedValue.length),
+      );
+    }
+  }
+
+  void _handleFocusChanged() {
+    if (_focusNode.hasFocus) {
+      _cancelled = false;
+      return;
+    }
+    if (_cancelled) {
+      _cancelled = false;
+      return;
+    }
+    _commit();
+  }
+
+  void _commit() {
+    final value = _controller.text;
+    if (value == _committedValue) return;
+    _committedValue = value;
+    widget.onChanged(widget.entry, value);
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent ||
+        event.logicalKey != LogicalKeyboardKey.escape) {
+      return KeyEventResult.ignored;
+    }
+    _cancelled = true;
+    _controller.value = TextEditingValue(
+      text: _committedValue,
+      selection: TextSelection.collapsed(offset: _committedValue.length),
+    );
+    node.unfocus();
+    return KeyEventResult.handled;
+  }
+
+  @override
+  void dispose() {
+    _focusNode
+      ..removeListener(_handleFocusChanged)
+      ..dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      onKeyEvent: _handleKeyEvent,
+      child: TextField(
+        key: ValueKey('ianvs-markdown-front-matter-input-${widget.entry.key}'),
+        controller: _controller,
+        focusNode: _focusNode,
+        maxLines: 1,
+        keyboardType: TextInputType.text,
+        textInputAction: TextInputAction.done,
+        smartDashesType: SmartDashesType.disabled,
+        smartQuotesType: SmartQuotesType.disabled,
+        autocorrect: false,
+        enableSuggestions: false,
+        onSubmitted: (_) {
+          _commit();
+          _focusNode.unfocus();
+        },
+        onTapOutside: (_) => _focusNode.unfocus(),
+        style: TextStyle(
+          color: widget.colors.textPrimary,
+          fontSize: 11.5,
+          height: 1.35,
+        ),
+        cursorColor: widget.colors.accent,
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: widget.entry.value.isEmpty ? '没有值' : null,
+          hintStyle: TextStyle(
+            color: widget.colors.textTertiary,
+            fontSize: 11.5,
+            fontStyle: FontStyle.italic,
+          ),
+          contentPadding: const EdgeInsets.symmetric(vertical: 2),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: UnderlineInputBorder(
+            borderSide: BorderSide(color: widget.colors.accentSoft),
+          ),
+        ),
       ),
     );
   }

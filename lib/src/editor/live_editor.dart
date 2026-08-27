@@ -3396,6 +3396,10 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
               initiallyExpanded: true,
               showDocumentTitle: widget.showDocumentTitle,
               onTapLink: widget.onTapLink,
+              onTextChanged: (entry, value) =>
+                  _setFrontMatterText(block, entry, value),
+              onBooleanChanged: (entry, value) =>
+                  _setFrontMatterBoolean(block, entry, value),
             );
     } else if (block.type == IanvsMarkdownBlockType.indentedCode) {
       rendered = _LivePreviewIndentedCode(
@@ -3648,6 +3652,34 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       ),
       composing: TextRange.empty,
     );
+  }
+
+  void _setFrontMatterText(
+    IanvsMarkdownBlock block,
+    MarkdownMetadataEntry entry,
+    String value,
+  ) {
+    final replacement = replaceMarkdownFrontMatterTextValue(
+      block.source,
+      entry,
+      value,
+    );
+    if (replacement == block.source) return;
+    _replaceBlockSource(block, replacement);
+  }
+
+  void _setFrontMatterBoolean(
+    IanvsMarkdownBlock block,
+    MarkdownMetadataEntry entry,
+    bool value,
+  ) {
+    final replacement = replaceMarkdownFrontMatterBooleanValue(
+      block.source,
+      entry,
+      value,
+    );
+    if (replacement == block.source) return;
+    _replaceBlockSource(block, replacement);
   }
 
   void _replaceTableCell(_EditableTableCell cell, String replacement) {
