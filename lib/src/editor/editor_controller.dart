@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../code_block.dart';
 import '../footnote_syntax.dart';
+import '../highlight.dart';
 import '../obsidian_autolink.dart';
 import '../obsidian_html.dart';
 import '../obsidian_inline.dart';
@@ -2662,14 +2663,7 @@ List<_SyntaxToken> _markdownSyntaxTokens(
     ...codeRanges,
   ];
   _addTagSyntaxTokens(tokens, text, theme, inlineSyntaxExcludedRanges);
-  _addDelimitedSyntaxTokens(
-    tokens,
-    text,
-    RegExp(r'(==)(\S(?:(?:(?!\n[ \t]*\n)[\s\S])*?\S)?)=='),
-    theme.highlight,
-    theme.marker,
-    inlineSyntaxExcludedRanges,
-  );
+  _addHighlightSyntaxTokens(tokens, text, theme, inlineSyntaxExcludedRanges);
   _addDelimitedSyntaxTokens(
     tokens,
     text,
@@ -3121,6 +3115,57 @@ List<TextRange> _addDelimitedSyntaxTokens(
       );
   }
   return ranges;
+}
+
+void _addHighlightSyntaxTokens(
+  List<_SyntaxToken> target,
+  String text,
+  IanvsMarkdownSyntaxTheme theme,
+  List<TextRange> excludedRanges,
+) {
+  for (final match in ianvsMarkdownHighlightMatches(
+    text,
+    excludedRanges: excludedRanges,
+  )) {
+    final revealRange = match.sourceRange;
+    final openingLineEnd = text.indexOf('\n', match.content.start);
+    final multiline =
+        match.isClosed &&
+        openingLineEnd >= 0 &&
+        openingLineEnd < match.content.end;
+    final closingLineStart = multiline
+        ? text.lastIndexOf('\n', match.content.end - 1) + 1
+        : match.openingRun.start;
+    final openingRevealRange = multiline
+        ? TextRange(start: match.openingRun.start, end: openingLineEnd)
+        : revealRange;
+    final closingRevealRange = multiline
+        ? TextRange(start: closingLineStart, end: match.closingRun!.end)
+        : revealRange;
+    target
+      ..add(
+        _SyntaxToken(
+          match.openingRun.start,
+          match.openingRun.end,
+          theme.marker,
+          inlineMarkerRange: openingRevealRange,
+        ),
+      )
+      ..add(
+        _SyntaxToken(match.content.start, match.content.end, theme.highlight),
+      );
+    final closing = match.closingRun;
+    if (closing != null) {
+      target.add(
+        _SyntaxToken(
+          closing.start,
+          closing.end,
+          theme.marker,
+          inlineMarkerRange: closingRevealRange,
+        ),
+      );
+    }
+  }
 }
 
 bool _isMarkdownWordLikeAt(String text, int index) {

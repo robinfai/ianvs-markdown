@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
+import 'package:ianvs_markdown/src/editor/editor_controller.dart'
+    show ianvsMarkdownInlineSourceRangeAt;
 
 void main() {
   test('controller owns mode, dirty state, and document-wide history', () {
@@ -1944,6 +1946,85 @@ void main() {
       'monospace',
     );
   });
+
+  test(
+    'source highlight styling hides full runs and stops unclosed at EOL',
+    () {
+      const markerColor = Color(0xff777777);
+      const highlightColor = Color(0xffffe184);
+      const syntax = IanvsMarkdownSyntaxTheme(
+        heading: TextStyle(),
+        marker: TextStyle(color: markerColor),
+        link: TextStyle(),
+        code: TextStyle(fontFamily: 'monospace'),
+        comment: TextStyle(),
+        highlight: TextStyle(backgroundColor: highlightColor),
+      );
+      const source = 'L====x===R M==openR\n\nnextR N== leading==R';
+
+      List<TextSpan> build(int caret) => buildMarkdownSourceTextSpan(
+        TextEditingValue(
+          text: source,
+          selection: TextSelection.collapsed(offset: caret),
+        ),
+        style: const TextStyle(fontSize: 14),
+        syntaxTheme: syntax,
+        withComposing: false,
+        hideInactiveInlineMarkers: true,
+      ).children!.cast<TextSpan>().toList();
+
+      TextSpan spanAt(List<TextSpan> spans, int offset) {
+        var cursor = 0;
+        for (final span in spans) {
+          final end = cursor + (span.text?.length ?? 0);
+          if (offset >= cursor && offset < end) return span;
+          cursor = end;
+        }
+        throw StateError('No span at $offset');
+      }
+
+      final inactive = build(source.indexOf('nextR'));
+      expect(
+        inactive.singleWhere((span) => span.text == '====').style?.fontSize,
+        .01,
+      );
+      expect(
+        inactive.singleWhere((span) => span.text == '===').style?.fontSize,
+        .01,
+      );
+      expect(
+        spanAt(inactive, source.indexOf('x')).style?.backgroundColor,
+        highlightColor,
+      );
+      expect(
+        spanAt(inactive, source.indexOf('openR')).style?.backgroundColor,
+        highlightColor,
+      );
+      expect(
+        spanAt(inactive, source.indexOf('nextR')).style?.backgroundColor,
+        isNot(highlightColor),
+      );
+      expect(
+        spanAt(inactive, source.indexOf('leading')).style?.backgroundColor,
+        isNot(highlightColor),
+      );
+
+      final active = build(source.indexOf('x'));
+      expect(
+        active.singleWhere((span) => span.text == '====').style?.fontSize,
+        14,
+      );
+      expect(
+        active.singleWhere((span) => span.text == '===').style?.fontSize,
+        14,
+      );
+      final inlineRange = ianvsMarkdownInlineSourceRangeAt(
+        source,
+        TextRange(start: source.indexOf('x'), end: source.indexOf('x') + 1),
+      );
+      expect(inlineRange?.textInside(source), '====x===');
+    },
+  );
 
   test(
     'leading-pipe Wiki links keep the pipe visible outside their markers',

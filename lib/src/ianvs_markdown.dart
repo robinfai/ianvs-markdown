@@ -289,7 +289,12 @@ class IanvsMarkdown extends StatelessWidget {
       // they must get first refusal before rendered whitespace is collapsed.
       IanvsMarkdownRenderedWhitespaceSyntax(),
       IanvsMarkdownIntrawordStrongSyntax(),
-      IanvsMarkdownHighlightSyntax(),
+      IanvsMarkdownHighlightSyntax(
+        presentation:
+            obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing
+            ? IanvsMarkdownHighlightPresentation.editing
+            : IanvsMarkdownHighlightPresentation.reading,
+      ),
       IanvsMarkdownWikiLinkSyntax(
         presentation:
             obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing

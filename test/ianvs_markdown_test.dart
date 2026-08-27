@@ -2260,6 +2260,142 @@ $$
     expect(find.byType(IanvsMarkdownCodeBlock), findsOneWidget);
   });
 
+  test('highlight matches share Obsidian boundaries and escape parity', () {
+    const source =
+        '==basic==\n\n'
+        '== leading==\n\n'
+        '==trailing ==\n\n'
+        '== both sides ==\n\n'
+        '==\tindent==\n\n'
+        '====\n\n'
+        '==   ==\n\n'
+        '===triple===\n\n'
+        '====quad====\n\n'
+        '==open\n\n'
+        '==closed-soft\nnext==\n\n'
+        '==open-soft\nnext\n\n'
+        '==first ==second== tail\n\n'
+        r'\==odd=='
+        '\n\n'
+        r'\\==even=='
+        '\n\n'
+        '==one====two==';
+
+    final matches = ianvsMarkdownHighlightMatches(source);
+    expect(
+      matches.map((match) => match.content.textInside(source)).toList(),
+      <String>[
+        'basic',
+        'triple',
+        'quad',
+        'open',
+        'closed-soft\nnext',
+        'open-soft',
+        'first ==second',
+        'even',
+        'one',
+        'two',
+      ],
+    );
+
+    final triple = matches.singleWhere(
+      (match) => match.content.textInside(source) == 'triple',
+    );
+    expect(triple.openingRun.end - triple.openingRun.start, 3);
+    expect(triple.closingRun!.end - triple.closingRun!.start, 3);
+    final quad = matches.singleWhere(
+      (match) => match.content.textInside(source) == 'quad',
+    );
+    expect(quad.openingRun.end - quad.openingRun.start, 4);
+    expect(quad.closingRun!.end - quad.closingRun!.start, 4);
+    expect(
+      matches
+          .singleWhere(
+            (match) => match.content.textInside(source) == 'open-soft',
+          )
+          .isClosed,
+      isFalse,
+    );
+  });
+
+  testWidgets('reading follows Obsidian highlight runs and line scope', (
+    tester,
+  ) async {
+    const source =
+        'L==basic==R\n\n'
+        'L== leading==R\n\n'
+        'L==trailing ==R\n\n'
+        'L====R\n\n'
+        'L===triple===R\n\n'
+        'L====quad====R\n\n'
+        'L==openR\n\n'
+        'L==closed-soft\nnext==R\n\n'
+        'L==open-soft\nnextR\n\n'
+        'L==one====two==R';
+
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-highlight')),
+      findsNWidgets(8),
+    );
+    for (final visible in <String>[
+      'L== leading==R',
+      'L==trailing ==R',
+      'L====R',
+    ]) {
+      expect(
+        _renderedPlainTextContains(tester, visible),
+        isTrue,
+        reason: visible,
+      );
+    }
+    expect(_renderedTextHasBackground(tester, 'basic'), isTrue);
+    expect(_renderedTextHasBackground(tester, 'closed-soft'), isTrue);
+    expect(_renderedTextHasBackground(tester, 'next'), isTrue);
+    expect(_renderedTextHasBackground(tester, 'open-soft'), isTrue);
+    expect(_renderedTextHasBackground(tester, 'nextR'), isFalse);
+  });
+
+  testWidgets(
+    'highlight nesting keeps links, Wiki aliases, and code priority',
+    (tester) async {
+      final taps = <(String, String?)>[];
+      await tester.pumpWidget(
+        app(
+          IanvsMarkdown(
+            data:
+                '**==bold==** [==link==](https://example.com) '
+                '[[Target|==wiki==]] `==code==` '
+                '%% ==comment== %% ==outside==',
+            onTapLink: (text, href, title) => taps.add((text, href)),
+          ),
+        ),
+      );
+
+      expect(
+        find.byKey(const ValueKey('ianvs-markdown-highlight')),
+        findsNWidgets(2),
+      );
+      expect(_renderedTextIsBold(tester, 'bold'), isTrue);
+      expect(_renderedTextHasBackground(tester, 'link'), isTrue);
+      expect(_renderedTextHasBackground(tester, 'wiki'), isTrue);
+      expect(find.text('wiki'), findsOneWidget);
+      expect(
+        _renderedTextUsesInlineCodeStyle(
+          tester,
+          '==code==',
+          IanvsMarkdownThemeData.light,
+        ),
+        isTrue,
+      );
+
+      await tester.tap(find.text('wiki'));
+      await tester.pump();
+      expect(taps, <(String, String?)>[('wiki', 'Target')]);
+    },
+  );
+
   testWidgets('renders Obsidian highlights and collapsible callouts', (
     tester,
   ) async {

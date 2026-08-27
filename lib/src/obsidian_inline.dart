@@ -145,7 +145,10 @@ class IanvsMarkdownWikiLinkSyntax extends md.InlineSyntax {
         ? _wikiLinkLabel(target, presentation)
         : reference.label;
 
-    final anchor = md.Element.text('a', label)
+    final children = reference.aliasSeparator == null
+        ? <md.Node>[md.Text(label)]
+        : parser.document.parseInline(label);
+    final anchor = md.Element('a', children)
       ..attributes['href'] = target
       ..attributes['data-ianvs-wiki-link'] = 'true';
     parser.addNode(anchor);

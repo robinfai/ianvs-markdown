@@ -1,5 +1,9 @@
 ## Unreleased
 
+- Match Obsidian highlight parsing for whitespace boundaries, surplus and
+  adjacent `=` runs, escape parity, closed soft-line spans, unclosed line
+  scope, nested links, Reading/Live Preview presentation, and source-range
+  selection.
 - Match Obsidian tag tokenization for Unicode and emoji, numeric rejection,
   slash paths, adjacent tags, punctuation boundaries, and backslash parity
   with code, comment, and link precedence across Reading, Live Preview, and

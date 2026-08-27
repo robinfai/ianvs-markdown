@@ -211,6 +211,33 @@ void main() {
     expect(controller.text, source);
   });
 
+  testWidgets('live preview hides surplus highlight runs until activation', (
+    tester,
+  ) async {
+    const source = 'L====x===R';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-highlight')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('='), findsNothing);
+
+    await tester.tap(find.text('x'));
+    await tester.pumpAndSettle();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, source);
+    expect(controller.text, source);
+  });
+
   testWidgets('live Wiki links navigate through the host callback', (
     tester,
   ) async {
@@ -439,6 +466,32 @@ void main() {
     expect(
       controller.selection.textInside(controller.text),
       '**formattedword**',
+    );
+    expect(controller.text, source);
+  });
+
+  testWidgets('double click selects complete Obsidian highlight source', (
+    tester,
+  ) async {
+    const source = 'Left ==highlightword== right';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final renderedRect = tester.getRect(find.textContaining('Left'));
+    final target = Offset(
+      renderedRect.left + 95,
+      renderedRect.top + renderedRect.height / 2,
+    );
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(
+      controller.selection.textInside(controller.text),
+      '==highlightword==',
     );
     expect(controller.text, source);
   });
