@@ -32,6 +32,23 @@ settings:
     );
   });
 
+  test('front matter has no arbitrary 256-line boundary', () {
+    final source = <String>[
+      '---',
+      for (var index = 0; index < 256; index += 1) 'key$index: value',
+      '---',
+      'Body',
+    ].join('\n');
+
+    final document = parseMarkdownFrontMatter(source);
+
+    expect(document.hasFrontMatter, isTrue);
+    expect(document.body, 'Body');
+    expect(document.entries, hasLength(markdownFrontMatterEntryLimit));
+    expect(document.entries.first.key, 'key0');
+    expect(document.entries.last.key, 'key39');
+  });
+
   test('preserves YAML value types for Obsidian property presentation', () {
     final document = parseMarkdownFrontMatter('''
 ---

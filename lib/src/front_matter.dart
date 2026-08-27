@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:yaml/yaml.dart';
 
 const int markdownFrontMatterByteLimit = 64 * 1024;
+@Deprecated('Front matter is limited by markdownFrontMatterByteLimit instead.')
 const int markdownFrontMatterLineLimit = 256;
 const int markdownFrontMatterEntryLimit = 40;
 
@@ -71,7 +72,7 @@ final class MarkdownMetadataEntry {
   bool get isLong => value.length > 72 || value.contains('\n');
 }
 
-/// Parses a bounded YAML front matter mapping at the start of [source].
+/// Parses a byte-bounded YAML front matter mapping at the start of [source].
 ///
 /// Invalid, oversized, or non-map front matter is left in the document body.
 /// Values are flattened and bounded before they are exposed to the UI.
@@ -83,9 +84,7 @@ MarkdownFrontMatterDocument parseMarkdownFrontMatter(String source) {
   }
 
   var lineStart = openingEnd + 1;
-  var lineCount = 0;
   while (lineStart <= source.length &&
-      lineCount < markdownFrontMatterLineLimit &&
       lineStart - openingEnd <= markdownFrontMatterByteLimit) {
     final newline = source.indexOf('\n', lineStart);
     final lineEnd = newline < 0 ? source.length : newline;
@@ -106,7 +105,6 @@ MarkdownFrontMatterDocument parseMarkdownFrontMatter(String source) {
     }
     if (newline < 0) break;
     lineStart = newline + 1;
-    lineCount += 1;
   }
   return _withoutFrontMatter(source);
 }

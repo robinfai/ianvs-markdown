@@ -294,11 +294,7 @@ IanvsMarkdownBlockType _classifyBlock(List<_SourceLine> lines, int index) {
 
 int _frontMatterEnd(List<_SourceLine> lines, int first) {
   if (first != 0 || !_isFrontMatterOpening(lines[first].text)) return first;
-  for (
-    var index = first + 1;
-    index < lines.length && index <= first + 256;
-    index += 1
-  ) {
+  for (var index = first + 1; index < lines.length; index += 1) {
     final text = lines[index].text;
     if (text == '---') return index;
   }

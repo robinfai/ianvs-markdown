@@ -623,6 +623,21 @@ visible''';
     }
   });
 
+  test('front matter block ranges have no arbitrary 256-line boundary', () {
+    final frontMatter = <String>[
+      '---',
+      for (var index = 0; index < 256; index += 1) 'key$index: value',
+      '---',
+    ].join('\n');
+    final blocks = parseMarkdownBlocks('$frontMatter\nBody');
+
+    expect(blocks, hasLength(2));
+    expect(blocks.first.type, IanvsMarkdownBlockType.frontMatter);
+    expect(blocks.first.source, frontMatter);
+    expect(blocks.last.type, IanvsMarkdownBlockType.paragraph);
+    expect(blocks.last.source, 'Body');
+  });
+
   test('Setext dashes win after text while thematic variants stay rules', () {
     const source =
         'Setext level two\n'
