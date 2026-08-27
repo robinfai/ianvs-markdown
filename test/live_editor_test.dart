@@ -6366,10 +6366,10 @@ $$''');
     expect(controller.text, source);
   });
 
-  testWidgets('live preview keeps Obsidian editing metadata visible', (
-    tester,
-  ) async {
-    const source = '''
+  testWidgets(
+    'live preview hides inactive footnotes and reveals exact source',
+    (tester) async {
+      const source = '''
 # Metadata
 
 Visible %%secret%% after. ^block-id
@@ -6378,28 +6378,48 @@ Standard[^note] and inline ^[inline body].
 
 [^note]: Definition with **bold**.
 ''';
-    final controller = IanvsMarkdownController(text: source);
-    addTearDown(controller.dispose);
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
 
-    await tester.pumpWidget(app(controller));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
 
-    expect(find.text('%%secret%%'), findsOneWidget);
-    expect(find.text(' ^block-id'), findsOneWidget);
-    expect(find.text('[^note]'), findsOneWidget);
-    expect(find.text('^[inline body]'), findsOneWidget);
-    expect(find.text('1.'), findsOneWidget);
-    expect(find.textContaining('Definition with'), findsOneWidget);
-    expect(find.textContaining('[^note]:'), findsNothing);
+      expect(find.text('%%secret%%'), findsOneWidget);
+      expect(find.text(' ^block-id'), findsOneWidget);
+      expect(find.text('[^note]'), findsNothing);
+      expect(find.text('^[inline body]'), findsNothing);
+      final footnotePreview = find.byWidgetPredicate(
+        (widget) =>
+            widget is SelectableText &&
+            (widget.data ?? widget.textSpan?.toPlainText() ?? '') ==
+                'Standard[1] and inline [2].',
+      );
+      expect(footnotePreview, findsOneWidget);
+      expect(find.text('1.'), findsOneWidget);
+      expect(find.textContaining('Definition with'), findsOneWidget);
+      expect(find.textContaining('[^note]:'), findsNothing);
 
-    await tester.tap(find.text('%%secret%%'));
-    await tester.pump();
-    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
-    final field = tester.widget<TextField>(
-      find.descendant(of: active, matching: find.byType(TextField)),
-    );
-    expect(field.controller?.text, 'Visible %%secret%% after. ^block-id');
-  });
+      await tester.tap(footnotePreview);
+      await tester.pump();
+      var active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+      var field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      expect(
+        field.controller?.text,
+        'Standard[^note] and inline ^[inline body].',
+      );
+      expect(controller.text, source);
+
+      await tester.tap(find.text('%%secret%%'));
+      await tester.pump();
+      active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+      field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      expect(field.controller?.text, 'Visible %%secret%% after. ^block-id');
+    },
+  );
 
   testWidgets('live preview edits a standalone comment across blank lines', (
     tester,
@@ -6469,13 +6489,132 @@ Inline ^[first], missing[^missing], standard[^a], repeated[^a], empty ^[], and s
     await tester.pumpWidget(app(controller));
     await tester.pumpAndSettle();
 
-    expect(find.text('^[first]'), findsOneWidget);
+    expect(find.text('^[first]'), findsNothing);
     expect(find.text('[^missing]'), findsOneWidget);
-    expect(find.text('^[]'), findsOneWidget);
+    expect(find.text('[^a]'), findsNothing);
+    expect(find.text('^[]'), findsNothing);
+    final footnotePreview = find.byWidgetPredicate(
+      (widget) =>
+          widget is SelectableText &&
+          (widget.data ?? widget.textSpan?.toPlainText() ?? '').contains(
+            'Inline [1]',
+          ),
+    );
+    expect(footnotePreview, findsOneWidget);
+    final preview = tester.widget<SelectableText>(footnotePreview);
+    expect(
+      preview.data ?? preview.textSpan?.toPlainText(),
+      'Inline [1], missing',
+    );
+    final footnotePreviewTail = find.byWidgetPredicate(
+      (widget) =>
+          widget is SelectableText &&
+          (widget.data ?? widget.textSpan?.toPlainText() ?? '').contains(
+            'standard[2]',
+          ),
+    );
+    expect(footnotePreviewTail, findsOneWidget);
+    final previewTail = tester.widget<SelectableText>(footnotePreviewTail);
+    expect(
+      previewTail.data ?? previewTail.textSpan?.toPlainText(),
+      ', standard[2], repeated[2-1], empty [3], and second[4].',
+    );
     expect(find.text('2.'), findsOneWidget);
     expect(find.text('4.'), findsOneWidget);
     expect(find.textContaining('Alpha.'), findsOneWidget);
     expect(find.textContaining('Beta.'), findsOneWidget);
+
+    await tester.tap(footnotePreview);
+    await tester.pump();
+    final field = tester.widget<TextField>(
+      find.descendant(
+        of: find.byKey(const ValueKey('ianvs-markdown-active-block')),
+        matching: find.byType(TextField),
+      ),
+    );
+    expect(
+      field.controller?.text,
+      'Inline ^[first], missing[^missing], standard[^a], repeated[^a], '
+      'empty ^[], and second[^b].',
+    );
+    expect(controller.text, source);
+  });
+
+  testWidgets('live preview projects inline footnotes inside formatting', (
+    tester,
+  ) async {
+    const source = r'''
+Bold **before ^[bold body] after** and link [linked ^[link body]](https://example.com).
+
+Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
+''';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    expect(find.text('^[bold body]'), findsNothing);
+    expect(find.text('^[link body]'), findsNothing);
+    final visibleSegments = <String>[
+      ...tester
+          .widgetList<SelectableText>(find.byType(SelectableText))
+          .map((widget) => widget.data ?? widget.textSpan?.toPlainText() ?? ''),
+      ...tester
+          .widgetList<Text>(find.byType(Text))
+          .map((widget) => widget.data ?? widget.textSpan?.toPlainText() ?? ''),
+    ];
+    expect(
+      visibleSegments.any((text) => text.contains('before [1] after')),
+      isTrue,
+    );
+    expect(visibleSegments.any((text) => text.contains('linked [2]')), isTrue);
+    expect(controller.text, source);
+  });
+
+  testWidgets('multiline inline code keeps footnotes literal in live preview', (
+    tester,
+  ) async {
+    const source = '''
+`code
+^[not-footnote]` standard[^a]
+
+[^a]: Body.
+''';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final code = find.byWidgetPredicate((widget) {
+      final text = switch (widget) {
+        Text() => widget.data ?? widget.textSpan?.toPlainText() ?? '',
+        SelectableText() => widget.data ?? widget.textSpan?.toPlainText() ?? '',
+        _ => '',
+      };
+      return text.contains('^[not-footnote]');
+    });
+    expect(code, findsAtLeastNWidgets(1));
+    expect(find.text('[^a]'), findsNothing);
+    final previewTail = find.byWidgetPredicate(
+      (widget) =>
+          widget is SelectableText &&
+          (widget.data ?? widget.textSpan?.toPlainText() ?? '').contains(
+            'standard[1]',
+          ),
+    );
+    expect(previewTail, findsOneWidget);
+    expect(find.text('1.'), findsOneWidget);
+
+    await tester.tap(previewTail);
+    await tester.pump();
+    final field = tester.widget<TextField>(
+      find.descendant(
+        of: find.byKey(const ValueKey('ianvs-markdown-active-block')),
+        matching: find.byType(TextField),
+      ),
+    );
+    expect(field.controller?.text, '`code\n^[not-footnote]` standard[^a]');
+    expect(controller.text, source);
   });
 
   testWidgets('Tab indents an active list item without selecting its text', (

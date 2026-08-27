@@ -3861,6 +3861,111 @@ Inline ^[first], missing[^missing], standard[^A], repeated[^a], empty ^[], and s
       ),
       isNull,
     );
+    final presentations = ianvsMarkdownLivePreviewFootnoteReferences(source);
+    expect(presentations.map((reference) => reference.label), <String>[
+      '[1]',
+      '[2]',
+      '[2-1]',
+      '[3]',
+      '[4]',
+    ]);
+    expect(
+      presentations.map(
+        (reference) => reference.sourceRange.textInside(source),
+      ),
+      <String>['^[first]', '[^A]', '[^a]', '^[]', '[^b]'],
+    );
+
+    const nested = '''
+Outer ^[one ^[two]], standard[^a].
+
+[^a]: Alpha.
+''';
+    final nestedPresentations = ianvsMarkdownLivePreviewFootnoteReferences(
+      nested,
+    );
+    expect(nestedPresentations.map((reference) => reference.label), <String>[
+      '[1]',
+      '[3]',
+    ]);
+    expect(
+      nestedPresentations.map(
+        (reference) => reference.sourceRange.textInside(nested),
+      ),
+      <String>['^[one ^[two]]', '[^a]'],
+    );
+
+    const boundaries = r'''
+Bold **^[bold]**, link [label ^[linked]](https://example.com),
+code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
+''';
+    final boundaryPresentations = ianvsMarkdownLivePreviewFootnoteReferences(
+      boundaries,
+    );
+    expect(boundaryPresentations.map((reference) => reference.label), <String>[
+      '[1]',
+      '[2]',
+    ]);
+    expect(
+      boundaryPresentations.map(
+        (reference) => reference.sourceRange.textInside(boundaries),
+      ),
+      <String>['^[bold]', '^[linked]'],
+    );
+
+    const multilineCode = '''
+`code
+^[not-footnote]` standard[^a]
+
+[^a]: Body.
+''';
+    final multilinePresentations = ianvsMarkdownLivePreviewFootnoteReferences(
+      multilineCode,
+    );
+    expect(multilinePresentations.map((reference) => reference.label), <String>[
+      '[1]',
+    ]);
+    expect(
+      multilinePresentations.map(
+        (reference) => reference.sourceRange.textInside(multilineCode),
+      ),
+      <String>['[^a]'],
+    );
+    expect(prepareObsidianMarkdownForRendering(multilineCode), multilineCode);
+
+    const unmatchedCode = '''
+`literal ^[inline] and standard[^a]
+
+[^a]: Body.
+''';
+    final unmatchedPresentations = ianvsMarkdownLivePreviewFootnoteReferences(
+      unmatchedCode,
+    );
+    expect(unmatchedPresentations.map((reference) => reference.label), <String>[
+      '[1]',
+      '[2]',
+    ]);
+    expect(
+      unmatchedPresentations.map(
+        (reference) => reference.sourceRange.textInside(unmatchedCode),
+      ),
+      <String>['^[inline]', '[^a]'],
+    );
+  });
+
+  testWidgets('reading keeps multiline-code footnotes literal', (tester) async {
+    const source = '''
+`code
+^[not-footnote]` standard[^a]
+
+[^a]: Body.
+''';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+    await tester.pumpAndSettle();
+
+    expect(_renderedPlainTextContains(tester, 'code ^[not-footnote]'), isTrue);
+    expect(find.text('[1]'), findsOneWidget);
+    expect(find.textContaining('Body.'), findsOneWidget);
   });
 
   testWidgets('supports custom image and Mermaid renderers', (tester) async {

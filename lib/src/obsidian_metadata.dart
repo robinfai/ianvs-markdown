@@ -294,7 +294,6 @@ String projectObsidianInlineLinkDestinationBackslashesForRendering(
   var commentIndex = 0;
   var fenceCharacter = 0;
   var fenceLength = 0;
-  var inlineCodeLength = 0;
   var lineStart = true;
 
   while (index < source.length) {
@@ -309,7 +308,7 @@ String projectObsidianInlineLinkDestinationBackslashesForRendering(
       continue;
     }
 
-    if (lineStart && inlineCodeLength == 0) {
+    if (lineStart) {
       final lineEnd = source.indexOf('\n', index);
       final end = lineEnd < 0 ? source.length : lineEnd;
       final line = source.substring(index, end);
@@ -338,10 +337,11 @@ String projectObsidianInlineLinkDestinationBackslashesForRendering(
     }
     if (character == 0x60) {
       final runLength = _characterRunLength(source, index, 0x60);
-      if (inlineCodeLength == 0) {
-        inlineCodeLength = runLength;
-      } else if (inlineCodeLength == runLength) {
-        inlineCodeLength = 0;
+      final codeEnd = _ianvsMarkdownInlineCodeSpanEnd(source, index);
+      if (codeEnd != null) {
+        index = codeEnd;
+        lineStart = false;
+        continue;
       }
       index += runLength;
       lineStart = false;
@@ -352,8 +352,7 @@ String projectObsidianInlineLinkDestinationBackslashesForRendering(
         index > 0 &&
         source.codeUnitAt(index - 1) == 0x21 &&
         !isIanvsMarkdownEscapedAt(source, index - 1);
-    if (inlineCodeLength == 0 &&
-        character == 0x5b &&
+    if (character == 0x5b &&
         !imageLabel &&
         !isIanvsMarkdownEscapedAt(source, index)) {
       final labelEnd = findIanvsMarkdownLinkLabelEnd(source, index);
@@ -388,7 +387,6 @@ String projectObsidianInlineLinkDestinationBackslashesForRendering(
     }
 
     lineStart = character == 0x0a;
-    if (lineStart) inlineCodeLength = 0;
     index += 1;
   }
 
@@ -831,6 +829,46 @@ Map<String, int> collectObsidianStandardFootnoteOrdinals(String source) {
   return Map<String, int>.unmodifiable(collector.standardOrdinals);
 }
 
+/// One footnote reference projected as a compact ordinal in inactive Live
+/// Preview while the exact Markdown remains owned by the editor controller.
+@immutable
+final class IanvsMarkdownLivePreviewFootnoteReference {
+  const IanvsMarkdownLivePreviewFootnoteReference({
+    required this.sourceRange,
+    required this.ordinal,
+    required this.occurrence,
+  });
+
+  final TextRange sourceRange;
+  final int ordinal;
+  final int occurrence;
+
+  /// Obsidian labels the first occurrence `[N]`, then `[N-1]`, `[N-2]`.
+  String get label =>
+      occurrence == 1 ? '[$ordinal]' : '[$ordinal-${occurrence - 1}]';
+}
+
+/// Collects the source ranges and shared ordinals shown by inactive Live
+/// Preview for standard and inline footnotes.
+///
+/// Undefined standard references remain literal and do not consume an
+/// ordinal. Comments and code retain their higher parsing priority. Nested
+/// inline footnotes still consume shared ordinals, but only the outer source
+/// range is projected in the document body.
+List<IanvsMarkdownLivePreviewFootnoteReference>
+ianvsMarkdownLivePreviewFootnoteReferences(String source) {
+  if (!source.contains('^')) {
+    return const <IanvsMarkdownLivePreviewFootnoteReference>[];
+  }
+  final content = _maskObsidianComments(source);
+  final collector = _ObsidianFootnoteOrdinalCollector(
+    _collectStandardFootnoteDefinitionLabels(content),
+  )..scan(content, collectPresentations: true);
+  return List<IanvsMarkdownLivePreviewFootnoteReference>.unmodifiable(
+    collector.presentations,
+  );
+}
+
 Set<String> _collectStandardFootnoteDefinitionLabels(String source) {
   return _standardFootnoteDefinitions(
     source,
@@ -949,17 +987,24 @@ final class _ObsidianFootnoteOrdinalCollector {
 
   final Set<String> definedLabels;
   final Map<String, int> standardOrdinals = <String, int>{};
+  final Map<String, int> _standardOccurrences = <String, int>{};
+  final List<IanvsMarkdownLivePreviewFootnoteReference> presentations =
+      <IanvsMarkdownLivePreviewFootnoteReference>[];
   int _nextOrdinal = 1;
 
-  void scan(String source, {bool allowFences = true}) {
+  void scan(
+    String source, {
+    bool allowFences = true,
+    int sourceOffset = 0,
+    bool collectPresentations = false,
+  }) {
     var index = 0;
     var fenceCharacter = 0;
     var fenceLength = 0;
-    var inlineCodeLength = 0;
     var lineStart = true;
 
     while (index < source.length) {
-      if (allowFences && lineStart && inlineCodeLength == 0) {
+      if (allowFences && lineStart) {
         final lineEnd = source.indexOf('\n', index);
         final end = lineEnd < 0 ? source.length : lineEnd;
         final line = source.substring(index, end);
@@ -988,31 +1033,47 @@ final class _ObsidianFootnoteOrdinalCollector {
       }
       if (character == 0x60) {
         final runLength = _characterRunLength(source, index, 0x60);
-        if (inlineCodeLength == 0) {
-          inlineCodeLength = runLength;
-        } else if (inlineCodeLength == runLength) {
-          inlineCodeLength = 0;
+        final codeEnd = _ianvsMarkdownInlineCodeSpanEnd(source, index);
+        if (codeEnd != null) {
+          index = codeEnd;
+          lineStart = false;
+          continue;
         }
         index += runLength;
         lineStart = false;
         continue;
       }
-      if (inlineCodeLength == 0 &&
-          character == 0x5e &&
+      if (character == 0x5e &&
           index + 1 < source.length &&
           source.codeUnitAt(index + 1) == 0x5b &&
           !isIanvsMarkdownEscapedAt(source, index)) {
         final close = findIanvsMarkdownInlineFootnoteEnd(source, index + 2);
         if (close >= 0) {
+          final ordinal = _nextOrdinal;
           _nextOrdinal += 1;
-          scan(source.substring(index + 2, close), allowFences: false);
+          if (collectPresentations) {
+            presentations.add(
+              IanvsMarkdownLivePreviewFootnoteReference(
+                sourceRange: TextRange(
+                  start: sourceOffset + index,
+                  end: sourceOffset + close + 1,
+                ),
+                ordinal: ordinal,
+                occurrence: 1,
+              ),
+            );
+          }
+          scan(
+            source.substring(index + 2, close),
+            allowFences: false,
+            sourceOffset: sourceOffset + index + 2,
+          );
           index = close + 1;
           lineStart = false;
           continue;
         }
       }
-      if (inlineCodeLength == 0 &&
-          character == 0x5b &&
+      if (character == 0x5b &&
           index + 2 < source.length &&
           source.codeUnitAt(index + 1) == 0x5e &&
           !isIanvsMarkdownEscapedAt(source, index)) {
@@ -1025,7 +1086,24 @@ final class _ObsidianFootnoteOrdinalCollector {
           if (label.isNotEmpty &&
               !label.contains(RegExp(r'[ \t]')) &&
               definedLabels.contains(label)) {
-            standardOrdinals.putIfAbsent(label, () => _nextOrdinal++);
+            final ordinal = standardOrdinals.putIfAbsent(
+              label,
+              () => _nextOrdinal++,
+            );
+            final occurrence = (_standardOccurrences[label] ?? 0) + 1;
+            _standardOccurrences[label] = occurrence;
+            if (collectPresentations) {
+              presentations.add(
+                IanvsMarkdownLivePreviewFootnoteReference(
+                  sourceRange: TextRange(
+                    start: sourceOffset + index,
+                    end: sourceOffset + close + 1,
+                  ),
+                  ordinal: ordinal,
+                  occurrence: occurrence,
+                ),
+              );
+            }
             index = close + 1;
             lineStart = false;
             continue;
@@ -1033,7 +1111,6 @@ final class _ObsidianFootnoteOrdinalCollector {
         }
       }
       lineStart = character == 0x0a;
-      if (lineStart) inlineCodeLength = 0;
       index += 1;
     }
   }
@@ -1046,6 +1123,23 @@ String _stripObsidianComments(String source) {
     output.write(source.substring(cursor, range.start));
     for (var index = range.start; index < range.end; index += 1) {
       if (source.codeUnitAt(index) == 0x0a) output.write('\n');
+    }
+    cursor = range.end;
+  }
+  output.write(source.substring(cursor));
+  return output.toString();
+}
+
+String _maskObsidianComments(String source) {
+  final output = StringBuffer();
+  var cursor = 0;
+  for (final range in ianvsMarkdownCommentRanges(source)) {
+    output.write(source.substring(cursor, range.start));
+    for (var index = range.start; index < range.end; index += 1) {
+      final character = source.codeUnitAt(index);
+      output.writeCharCode(
+        character == 0x0a || character == 0x0d ? character : 0x20,
+      );
     }
     cursor = range.end;
   }
@@ -1100,11 +1194,10 @@ final class _InlineFootnoteExpansion {
     var index = 0;
     var fenceCharacter = 0;
     var fenceLength = 0;
-    var inlineCodeLength = 0;
     var lineStart = true;
 
     while (index < source.length) {
-      if (allowFences && lineStart && inlineCodeLength == 0) {
+      if (allowFences && lineStart) {
         final lineEnd = source.indexOf('\n', index);
         final end = lineEnd < 0 ? source.length : lineEnd;
         final line = source.substring(index, end);
@@ -1137,10 +1230,12 @@ final class _InlineFootnoteExpansion {
 
       if (character == 0x60) {
         final runLength = _characterRunLength(source, index, 0x60);
-        if (inlineCodeLength == 0) {
-          inlineCodeLength = runLength;
-        } else if (runLength == inlineCodeLength) {
-          inlineCodeLength = 0;
+        final codeEnd = _ianvsMarkdownInlineCodeSpanEnd(source, index);
+        if (codeEnd != null) {
+          output.write(source.substring(index, codeEnd));
+          index = codeEnd;
+          lineStart = false;
+          continue;
         }
         output.write(source.substring(index, index + runLength));
         index += runLength;
@@ -1149,7 +1244,6 @@ final class _InlineFootnoteExpansion {
       }
 
       final canStartFootnote =
-          inlineCodeLength == 0 &&
           character == 0x5e &&
           index + 1 < source.length &&
           source.codeUnitAt(index + 1) == 0x5b &&
@@ -1171,7 +1265,6 @@ final class _InlineFootnoteExpansion {
 
       output.writeCharCode(character);
       lineStart = character == 0x0a;
-      if (lineStart) inlineCodeLength = 0;
       index += 1;
     }
 
@@ -1196,4 +1289,25 @@ int _characterRunLength(String source, int start, int character) {
     end += 1;
   }
   return end - start;
+}
+
+int? _ianvsMarkdownInlineCodeSpanEnd(String source, int openingStart) {
+  if (openingStart < 0 ||
+      openingStart >= source.length ||
+      source.codeUnitAt(openingStart) != 0x60 ||
+      (openingStart > 0 && source.codeUnitAt(openingStart - 1) == 0x60)) {
+    return null;
+  }
+  final openingLength = _characterRunLength(source, openingStart, 0x60);
+  var search = openingStart + openingLength;
+  while (search < source.length) {
+    final candidate = source.indexOf('`', search);
+    if (candidate < 0) return null;
+    final candidateLength = _characterRunLength(source, candidate, 0x60);
+    if (candidateLength == openingLength) {
+      return candidate + candidateLength;
+    }
+    search = candidate + candidateLength;
+  }
+  return null;
 }

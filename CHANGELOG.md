@@ -1,5 +1,10 @@
 ## Unreleased
 
+- Render defined standard and inline footnotes as shared `[N]` / `[N-k]`
+  ordinals in inactive Live Preview, while undefined references remain literal,
+  definition blocks keep document-wide numbering, and activation restores the
+  exact Markdown source; single- and multi-line code spans retain literal
+  footnote-shaped text in Reading and Live Preview.
 - Keep an isolated `==before / blank line / after==` attempt fully literal in
   Reading and inactive Live Preview instead of projecting both sides as
   independent unclosed highlights; exact source and higher-priority literal

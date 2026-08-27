@@ -136,6 +136,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   late ScrollController _scrollController;
   late List<IanvsMarkdownBlock> _blocks;
   late List<TextRange> _crossParagraphHighlightLiteralRuns;
+  late List<IanvsMarkdownLivePreviewFootnoteReference>
+  _livePreviewFootnoteReferences;
   late IanvsMarkdownHeadingFoldModel _headingFoldModel;
   late MarkdownLinkReferenceContext _linkReferences;
   late String _lastText;
@@ -347,6 +349,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         ianvsMarkdownCrossParagraphHighlightLiteralRuns(source);
     _blockController.documentHighlightLiteralRuns =
         _crossParagraphHighlightLiteralRuns;
+    _livePreviewFootnoteReferences = ianvsMarkdownLivePreviewFootnoteReferences(
+      source,
+    );
     _blocks = parseMarkdownBlocks(source, splitListItems: true);
     _headingFoldModel = IanvsMarkdownHeadingFoldModel.fromBlocks(
       source,
@@ -3582,11 +3587,42 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   }
 
   String _renderedBlockSource(IanvsMarkdownBlock block) {
-    final projectedBlock = projectObsidianCrossParagraphHighlightsForRendering(
-      block.source,
-      literalRuns: _crossParagraphHighlightLiteralRuns,
-      sourceOffset: block.start,
-    );
+    final footnoteReferences = _livePreviewFootnoteReferences
+        .where(
+          (reference) =>
+              reference.sourceRange.start >= block.start &&
+              reference.sourceRange.end <= block.end,
+        )
+        .toList(growable: false);
+    final edits = <_LivePreviewRenderingEdit>[
+      for (final reference in footnoteReferences)
+        _LivePreviewRenderingEdit(
+          start: reference.sourceRange.start - block.start,
+          end: reference.sourceRange.end - block.start,
+          replacement: '<sup>${reference.label}</sup>',
+        ),
+      for (final range in _crossParagraphHighlightLiteralRuns)
+        if (range.start >= block.start &&
+            range.end <= block.end &&
+            !footnoteReferences.any(
+              (reference) =>
+                  range.start >= reference.sourceRange.start &&
+                  range.start < reference.sourceRange.end,
+            ))
+          _LivePreviewRenderingEdit(
+            start: range.start - block.start,
+            end: range.start - block.start,
+            replacement: r'\',
+          ),
+    ]..sort((left, right) => right.start.compareTo(left.start));
+    var projectedBlock = block.source;
+    for (final edit in edits) {
+      projectedBlock = projectedBlock.replaceRange(
+        edit.start,
+        edit.end,
+        edit.replacement,
+      );
+    }
     final footnoteDefinition = prepareObsidianFootnoteDefinitionForEditing(
       projectedBlock,
       document: widget.controller.text,
@@ -6470,6 +6506,18 @@ class _ActiveQuoteRailsPainter extends CustomPainter {
         oldDelegate.textScaler != textScaler ||
         oldDelegate.color != color;
   }
+}
+
+final class _LivePreviewRenderingEdit {
+  const _LivePreviewRenderingEdit({
+    required this.start,
+    required this.end,
+    required this.replacement,
+  });
+
+  final int start;
+  final int end;
+  final String replacement;
 }
 
 class _BlockEditingController extends TextEditingController {
