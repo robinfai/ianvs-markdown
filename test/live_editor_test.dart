@@ -4897,6 +4897,116 @@ second
   );
 
   testWidgets(
+    'property Command+S commits pending input before saving',
+    (tester) async {
+      const source = '''
+---
+title: Alpha
+---
+# Body
+''';
+      const expected = '''
+---
+title: Beta
+---
+# Body
+''';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      final saved = <String>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 1000,
+              height: 720,
+              child: IanvsMarkdownLiveEditor(
+                controller: controller,
+                onSaveRequested: saved.add,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final input = find.byKey(
+        const ValueKey('ianvs-markdown-front-matter-input-title'),
+      );
+      await tester.tap(input);
+      await tester.enterText(input, 'Beta');
+      expect(controller.text, source);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+
+      expect(controller.text, expected);
+      expect(saved, <String>[expected]);
+      expect(controller.isDirty, isFalse);
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
+    'date property Command+S commits pending input before saving',
+    (tester) async {
+      const source = '''
+---
+due: 2026-08-28
+---
+# Body
+''';
+      const expected = '''
+---
+due: 2026-08-27
+---
+# Body
+''';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      final saved = <String>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 1000,
+              height: 720,
+              child: IanvsMarkdownLiveEditor(
+                controller: controller,
+                onSaveRequested: saved.add,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final day = find.byKey(
+        const ValueKey('ianvs-markdown-front-matter-date-day-due'),
+      );
+      await tester.tap(day);
+      await tester.enterText(day, '27');
+      expect(controller.text, source);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+
+      expect(controller.text, expected);
+      expect(saved, <String>[expected]);
+      expect(controller.isDirty, isFalse);
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
     'property Tab traversal never indents a stale document selection',
     (tester) async {
       const source = '''

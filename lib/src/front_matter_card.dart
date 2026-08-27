@@ -38,6 +38,15 @@ bool _isOuterMarkdownDeleteLineShortcut(KeyEvent event) {
       !keyboard.isMetaPressed;
 }
 
+bool _isOuterMarkdownSaveShortcut(KeyEvent event) {
+  if (event is! KeyDownEvent && event is! KeyRepeatEvent) return false;
+  if (event.logicalKey != LogicalKeyboardKey.keyS) return false;
+  final keyboard = HardwareKeyboard.instance;
+  return !keyboard.isAltPressed &&
+      !keyboard.isShiftPressed &&
+      keyboard.isMetaPressed != keyboard.isControlPressed;
+}
+
 enum _PropertyHistoryCommand { undo, redo }
 
 _PropertyHistoryCommand? _propertyHistoryCommand(KeyEvent event) {
@@ -594,6 +603,10 @@ class _ObsidianEditableKeyState extends State<_ObsidianEditableKey> {
     if (_isOuterMarkdownFormattingShortcut(event)) {
       return KeyEventResult.handled;
     }
+    if (_isOuterMarkdownSaveShortcut(event)) {
+      _commit();
+      return KeyEventResult.ignored;
+    }
     if (_isPropertyTraversalShortcut(event)) {
       _traversePropertyFocus(context);
       return KeyEventResult.handled;
@@ -970,6 +983,10 @@ class _ObsidianEditableListValueState
     if (_isOuterMarkdownFormattingShortcut(event)) {
       return KeyEventResult.handled;
     }
+    if (_isOuterMarkdownSaveShortcut(event)) {
+      _commitInput();
+      return KeyEventResult.ignored;
+    }
     if (_isPropertyTraversalShortcut(event)) {
       _commitInput();
       _traversePropertyFocus(context);
@@ -1196,6 +1213,10 @@ class _ObsidianEditableDateValueState
     }
     if (_isOuterMarkdownFormattingShortcut(event)) {
       return KeyEventResult.handled;
+    }
+    if (_isOuterMarkdownSaveShortcut(event)) {
+      _commit();
+      return KeyEventResult.ignored;
     }
     if (_isPropertyTraversalShortcut(event)) {
       _traversePropertyFocus(context);
@@ -1446,6 +1467,10 @@ class _ObsidianEditableNumberValueState
     if (_isOuterMarkdownFormattingShortcut(event)) {
       return KeyEventResult.handled;
     }
+    if (_isOuterMarkdownSaveShortcut(event)) {
+      _commit();
+      return KeyEventResult.ignored;
+    }
     if (_isPropertyTraversalShortcut(event)) {
       _traversePropertyFocus(context);
       return KeyEventResult.handled;
@@ -1588,6 +1613,10 @@ class _ObsidianEditableTextValueState
     }
     if (_isOuterMarkdownFormattingShortcut(event)) {
       return KeyEventResult.handled;
+    }
+    if (_isOuterMarkdownSaveShortcut(event)) {
+      _commit();
+      return KeyEventResult.ignored;
     }
     if (_isPropertyTraversalShortcut(event)) {
       _traversePropertyFocus(context);
