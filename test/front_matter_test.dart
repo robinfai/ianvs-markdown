@@ -333,6 +333,64 @@ $longKey: long key
     expect(document.entries[2].keyEditable, isFalse);
   });
 
+  test(
+    'date values commit exact calendar dates and canonicalize flow lists',
+    () {
+      const source = '''
+---
+title: Alpha
+due: 2026-08-28
+tags: [one, two]
+---
+Body
+''';
+      final document = parseMarkdownFrontMatter(source);
+      final due = document.entries.firstWhere((entry) => entry.key == 'due');
+
+      final updated = replaceMarkdownFrontMatterDateValue(
+        source,
+        due,
+        '2026-08-27',
+      );
+      expect(updated, '''
+---
+title: Alpha
+due: 2026-08-27
+tags:
+  - one
+  - two
+---
+Body
+''');
+      final updatedDocument = parseMarkdownFrontMatter(updated);
+      expect(updatedDocument.entries.map((entry) => entry.key), const <String>[
+        'title',
+        'due',
+        'tags',
+      ]);
+      expect(updatedDocument.entries[1].type, MarkdownMetadataValueType.date);
+
+      for (final invalid in <String>[
+        '2026-02-30',
+        '2026-2-03',
+        '2026-02-3',
+        '0000-01-01',
+        'abc',
+        '',
+      ]) {
+        expect(
+          replaceMarkdownFrontMatterDateValue(source, due, invalid),
+          source,
+        );
+      }
+      final shifted = source.replaceFirst('title:', 'draft: true\ntitle:');
+      expect(
+        replaceMarkdownFrontMatterDateValue(shifted, due, '2026-08-27'),
+        shifted,
+      );
+    },
+  );
+
   test('safe string-list properties rewrite as typed block scalars', () {
     const source = '''
 ---

@@ -4528,6 +4528,74 @@ tags:
     );
   });
 
+  testWidgets('date properties commit on Return while Tab keeps pending', (
+    tester,
+  ) async {
+    const source = '''
+---
+title: Alpha
+due: 2026-08-28
+tags: [one, two]
+---
+# Body
+''';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final dayInput = find.byKey(
+      const ValueKey('ianvs-markdown-front-matter-date-day-due'),
+    );
+    final pickerButton = find.byKey(
+      const ValueKey('ianvs-markdown-front-matter-date-picker-due'),
+    );
+    expect(dayInput, findsOneWidget);
+    expect(pickerButton, findsOneWidget);
+
+    await tester.tap(pickerButton);
+    await tester.pumpAndSettle();
+    expect(find.byType(DatePickerDialog), findsOneWidget);
+    expect(controller.text, source);
+    await tester.tapAt(const Offset(1, 1));
+    await tester.pumpAndSettle();
+    expect(find.byType(DatePickerDialog), findsNothing);
+
+    await tester.tap(dayInput);
+    await tester.enterText(dayInput, '27');
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+
+    expect(controller.text, source);
+    expect(tester.widget<TextField>(dayInput).controller?.text, '27');
+
+    await tester.tap(dayInput);
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    expect(controller.text, '''
+---
+title: Alpha
+due: 2026-08-27
+tags:
+  - one
+  - two
+---
+# Body
+''');
+    final due = parseMarkdownFrontMatter(
+      controller.text,
+    ).entries.firstWhere((entry) => entry.key == 'due');
+    expect(due.type, MarkdownMetadataValueType.date);
+
+    controller.undo();
+    await tester.pumpAndSettle();
+    expect(controller.text, source);
+    controller.redo();
+    await tester.pumpAndSettle();
+    expect(controller.text, contains('due: 2026-08-27'));
+  });
+
   testWidgets('number properties commit finite values and stay numeric', (
     tester,
   ) async {

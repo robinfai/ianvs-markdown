@@ -14,6 +14,8 @@ typedef IanvsMarkdownMetadataBooleanChanged =
     void Function(MarkdownMetadataEntry entry, bool value);
 typedef IanvsMarkdownMetadataNumberChanged =
     void Function(MarkdownMetadataEntry entry, num value);
+typedef IanvsMarkdownMetadataDateChanged =
+    void Function(MarkdownMetadataEntry entry, String value);
 typedef IanvsMarkdownMetadataListChanged =
     void Function(MarkdownMetadataEntry entry, List<String> values);
 typedef IanvsMarkdownMetadataKeyChanged =
@@ -34,6 +36,7 @@ class IanvsMarkdownFrontMatterCard extends StatefulWidget {
     this.onTextChanged,
     this.onBooleanChanged,
     this.onNumberChanged,
+    this.onDateChanged,
     this.onListChanged,
     this.onKeyChanged,
   });
@@ -50,6 +53,7 @@ class IanvsMarkdownFrontMatterCard extends StatefulWidget {
   final IanvsMarkdownMetadataTextChanged? onTextChanged;
   final IanvsMarkdownMetadataBooleanChanged? onBooleanChanged;
   final IanvsMarkdownMetadataNumberChanged? onNumberChanged;
+  final IanvsMarkdownMetadataDateChanged? onDateChanged;
   final IanvsMarkdownMetadataListChanged? onListChanged;
   final IanvsMarkdownMetadataKeyChanged? onKeyChanged;
 
@@ -274,6 +278,7 @@ class _IanvsMarkdownFrontMatterCardState
                           onTextChanged: widget.onTextChanged,
                           onBooleanChanged: widget.onBooleanChanged,
                           onNumberChanged: widget.onNumberChanged,
+                          onDateChanged: widget.onDateChanged,
                           onListChanged: widget.onListChanged,
                           onKeyChanged: widget.onKeyChanged,
                           existingKeys: existingKeys,
@@ -320,6 +325,7 @@ class _ObsidianMetadataRow extends StatelessWidget {
     required this.onTextChanged,
     required this.onBooleanChanged,
     required this.onNumberChanged,
+    required this.onDateChanged,
     required this.onListChanged,
     required this.onKeyChanged,
     required this.existingKeys,
@@ -331,6 +337,7 @@ class _ObsidianMetadataRow extends StatelessWidget {
   final IanvsMarkdownMetadataTextChanged? onTextChanged;
   final IanvsMarkdownMetadataBooleanChanged? onBooleanChanged;
   final IanvsMarkdownMetadataNumberChanged? onNumberChanged;
+  final IanvsMarkdownMetadataDateChanged? onDateChanged;
   final IanvsMarkdownMetadataListChanged? onListChanged;
   final IanvsMarkdownMetadataKeyChanged? onKeyChanged;
   final Set<String> existingKeys;
@@ -396,6 +403,7 @@ class _ObsidianMetadataRow extends StatelessWidget {
               onTextChanged: onTextChanged,
               onBooleanChanged: onBooleanChanged,
               onNumberChanged: onNumberChanged,
+              onDateChanged: onDateChanged,
               onListChanged: onListChanged,
             ),
           ),
@@ -597,6 +605,7 @@ class _ObsidianMetadataValue extends StatelessWidget {
     required this.onTextChanged,
     required this.onBooleanChanged,
     required this.onNumberChanged,
+    required this.onDateChanged,
     required this.onListChanged,
   });
 
@@ -608,6 +617,7 @@ class _ObsidianMetadataValue extends StatelessWidget {
   final IanvsMarkdownMetadataTextChanged? onTextChanged;
   final IanvsMarkdownMetadataBooleanChanged? onBooleanChanged;
   final IanvsMarkdownMetadataNumberChanged? onNumberChanged;
+  final IanvsMarkdownMetadataDateChanged? onDateChanged;
   final IanvsMarkdownMetadataListChanged? onListChanged;
 
   @override
@@ -649,6 +659,14 @@ class _ObsidianMetadataValue extends StatelessWidget {
         entry: entry,
         colors: colors,
         onChanged: onNumberChanged!,
+      );
+    }
+    if (entry.type == MarkdownMetadataValueType.date && onDateChanged != null) {
+      return _ObsidianEditableDateValue(
+        key: ValueKey('ianvs-markdown-front-matter-date-editor-${entry.key}'),
+        entry: entry,
+        colors: colors,
+        onChanged: onDateChanged!,
       );
     }
     if (entry.type == MarkdownMetadataValueType.date) {
@@ -911,6 +929,249 @@ class _ObsidianEditableListValueState
               ),
             ),
           ),
+      ],
+    );
+  }
+}
+
+class _ObsidianEditableDateValue extends StatefulWidget {
+  const _ObsidianEditableDateValue({
+    super.key,
+    required this.entry,
+    required this.colors,
+    required this.onChanged,
+  });
+
+  final MarkdownMetadataEntry entry;
+  final IanvsMarkdownThemeData colors;
+  final IanvsMarkdownMetadataDateChanged onChanged;
+
+  @override
+  State<_ObsidianEditableDateValue> createState() =>
+      _ObsidianEditableDateValueState();
+}
+
+class _ObsidianEditableDateValueState
+    extends State<_ObsidianEditableDateValue> {
+  late final TextEditingController _yearController;
+  late final TextEditingController _monthController;
+  late final TextEditingController _dayController;
+  late final FocusNode _yearFocusNode;
+  late final FocusNode _monthFocusNode;
+  late final FocusNode _dayFocusNode;
+  late String _committedValue;
+
+  @override
+  void initState() {
+    super.initState();
+    _committedValue = widget.entry.value;
+    _yearController = TextEditingController();
+    _monthController = TextEditingController();
+    _dayController = TextEditingController();
+    _yearFocusNode = FocusNode();
+    _monthFocusNode = FocusNode();
+    _dayFocusNode = FocusNode();
+    _setControllerDate(_committedValue);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ObsidianEditableDateValue oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.entry.value != widget.entry.value) {
+      _committedValue = widget.entry.value;
+      _setControllerDate(_committedValue);
+    }
+  }
+
+  void _setControllerValue(TextEditingController controller, String value) {
+    controller.value = TextEditingValue(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
+    );
+  }
+
+  void _setControllerDate(String value) {
+    final parts = value.split('-');
+    if (parts.length != 3) return;
+    _setControllerValue(_yearController, parts[0]);
+    _setControllerValue(_monthController, parts[1]);
+    _setControllerValue(_dayController, parts[2]);
+  }
+
+  DateTime? _pendingDate() {
+    final yearText = _yearController.text;
+    final monthText = _monthController.text;
+    final dayText = _dayController.text;
+    if (yearText.length != 4 || monthText.length != 2 || dayText.length != 2) {
+      return null;
+    }
+    final year = int.tryParse(yearText);
+    final month = int.tryParse(monthText);
+    final day = int.tryParse(dayText);
+    if (year == null ||
+        month == null ||
+        day == null ||
+        year < 1 ||
+        year > 9999 ||
+        month < 1 ||
+        month > 12 ||
+        day < 1) {
+      return null;
+    }
+    final date = DateTime.utc(year, month, day);
+    return date.year == year && date.month == month && date.day == day
+        ? date
+        : null;
+  }
+
+  String _serializeDate(DateTime value) =>
+      '${value.year.toString().padLeft(4, '0')}-'
+      '${value.month.toString().padLeft(2, '0')}-'
+      '${value.day.toString().padLeft(2, '0')}';
+
+  void _commit() {
+    final date = _pendingDate();
+    if (date == null) return;
+    final value = _serializeDate(date);
+    if (value == _committedValue) return;
+    _committedValue = value;
+    widget.onChanged(widget.entry, value);
+  }
+
+  void _submit() {
+    _commit();
+    _yearFocusNode.unfocus();
+    _monthFocusNode.unfocus();
+    _dayFocusNode.unfocus();
+  }
+
+  Future<void> _showDatePicker() async {
+    final committed = DateTime.tryParse(_committedValue);
+    final initial = _pendingDate() ?? committed ?? DateTime.now();
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(1),
+      lastDate: DateTime(9999, 12, 31),
+    );
+    if (!mounted || selected == null) return;
+    _setControllerDate(_serializeDate(selected));
+    _dayFocusNode.requestFocus();
+  }
+
+  @override
+  void dispose() {
+    _yearController.dispose();
+    _monthController.dispose();
+    _dayController.dispose();
+    _yearFocusNode.dispose();
+    _monthFocusNode.dispose();
+    _dayFocusNode.dispose();
+    super.dispose();
+  }
+
+  Widget _segment({
+    required String label,
+    required String keySuffix,
+    required double width,
+    required int maximumLength,
+    required TextEditingController controller,
+    required FocusNode focusNode,
+  }) {
+    return Semantics(
+      label: '${widget.entry.key} $label',
+      child: SizedBox(
+        width: width,
+        child: TextField(
+          key: ValueKey(
+            'ianvs-markdown-front-matter-date-$keySuffix-${widget.entry.key}',
+          ),
+          controller: controller,
+          focusNode: focusNode,
+          maxLines: 1,
+          maxLength: maximumLength,
+          keyboardType: TextInputType.number,
+          textInputAction: TextInputAction.done,
+          textAlign: TextAlign.center,
+          smartDashesType: SmartDashesType.disabled,
+          smartQuotesType: SmartQuotesType.disabled,
+          autocorrect: false,
+          enableSuggestions: false,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          onSubmitted: (_) => _submit(),
+          style: TextStyle(
+            color: widget.colors.textPrimary,
+            fontSize: 11.5,
+            height: 1.35,
+          ),
+          cursorColor: widget.colors.accent,
+          decoration: InputDecoration(
+            isDense: true,
+            counterText: '',
+            contentPadding: const EdgeInsets.symmetric(vertical: 2),
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: widget.colors.accentSoft),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final separatorStyle = TextStyle(
+      color: widget.colors.textTertiary,
+      fontSize: 11.5,
+      height: 1.35,
+    );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          key: ValueKey(
+            'ianvs-markdown-front-matter-date-picker-${widget.entry.key}',
+          ),
+          onPressed: _showDatePicker,
+          tooltip: '选择日期',
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints.tightFor(width: 20, height: 20),
+          icon: Icon(
+            Icons.calendar_today_outlined,
+            size: 11.5,
+            color: widget.colors.textTertiary,
+          ),
+        ),
+        const SizedBox(width: 3),
+        _segment(
+          label: '年',
+          keySuffix: 'year',
+          width: 34,
+          maximumLength: 4,
+          controller: _yearController,
+          focusNode: _yearFocusNode,
+        ),
+        Text(' / ', style: separatorStyle),
+        _segment(
+          label: '月',
+          keySuffix: 'month',
+          width: 20,
+          maximumLength: 2,
+          controller: _monthController,
+          focusNode: _monthFocusNode,
+        ),
+        Text(' / ', style: separatorStyle),
+        _segment(
+          label: '日',
+          keySuffix: 'day',
+          width: 20,
+          maximumLength: 2,
+          controller: _dayController,
+          focusNode: _dayFocusNode,
+        ),
       ],
     );
   }

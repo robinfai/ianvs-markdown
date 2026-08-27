@@ -248,6 +248,28 @@ String replaceMarkdownFrontMatterNumberValue(
   );
 }
 
+/// Replaces one top-level front-matter property with an exact calendar date.
+///
+/// Obsidian commits a date field on Return and canonicalizes unrelated
+/// top-level flow lists at the same time. Incomplete and impossible dates are
+/// rejected so the property cannot silently change from YAML date to text.
+String replaceMarkdownFrontMatterDateValue(
+  String source,
+  MarkdownMetadataEntry entry,
+  String value,
+) {
+  final date = _normalizedMarkdownDate(value);
+  if (entry.type != MarkdownMetadataValueType.date || date == null) {
+    return source;
+  }
+  return _replaceMarkdownFrontMatterEntrySource(
+    source,
+    entry,
+    date,
+    canonicalizeFlowLists: true,
+  );
+}
+
 /// Replaces one top-level front-matter property name.
 ///
 /// Empty, lossy, or duplicate keys are rejected. A successful rename keeps
@@ -500,6 +522,21 @@ bool _editableMetadataKey(String value) {
 }
 
 String _metadataKeyIdentity(String value) => value.toLowerCase();
+
+String? _normalizedMarkdownDate(String value) {
+  final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(value);
+  if (match == null) return null;
+  final year = int.parse(match.group(1)!);
+  final month = int.parse(match.group(2)!);
+  final day = int.parse(match.group(3)!);
+  if (year < 1 || year > 9999 || month < 1 || month > 12 || day < 1) {
+    return null;
+  }
+  final parsed = DateTime.utc(year, month, day);
+  return parsed.year == year && parsed.month == month && parsed.day == day
+      ? value
+      : null;
+}
 
 bool _metadataKeyUsesStringList(String key) {
   final normalized = key.toLowerCase().replaceAll('-', '_');

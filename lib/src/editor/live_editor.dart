@@ -3402,6 +3402,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
                   _setFrontMatterBoolean(block, entry, value),
               onNumberChanged: (entry, value) =>
                   _setFrontMatterNumber(block, entry, value),
+              onDateChanged: (entry, value) =>
+                  _setFrontMatterDate(block, entry, value),
               onListChanged: (entry, values) =>
                   _setFrontMatterList(block, entry, values),
               onKeyChanged: (entry, key) =>
@@ -3694,6 +3696,20 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     num value,
   ) {
     final replacement = replaceMarkdownFrontMatterNumberValue(
+      block.source,
+      entry,
+      value,
+    );
+    if (replacement == block.source) return;
+    _replaceBlockSource(block, replacement);
+  }
+
+  void _setFrontMatterDate(
+    IanvsMarkdownBlock block,
+    MarkdownMetadataEntry entry,
+    String value,
+  ) {
+    final replacement = replaceMarkdownFrontMatterDateValue(
       block.source,
       entry,
       value,

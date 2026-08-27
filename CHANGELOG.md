@@ -15,6 +15,9 @@
   Escape cancellation, exact source-order and value-type preservation, YAML
   quoting for ambiguous names, and empty/case-insensitive duplicate/lossy-key
   rejection, including Obsidian's refusal of case-only renames.
+- Add a segmented year/month/day property editor with a date-picker surface.
+  Return commits an exact valid date as one undoable edit and canonicalizes
+  top-level flow lists; Tab moves focus while retaining the pending UI value.
 - Match Obsidian properties for source-order keys, an ordinary `title` row,
   default-expanded panels, triple-dash-only closing markers, distinct aliases,
   tags, and `cssclasses`, linked Wiki/URL scalar values, and invisible empty
