@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:ianvs_markdown/src/code_surface.dart';
 import 'package:ianvs_markdown/src/list_guide.dart';
+import 'package:markdown/markdown.dart' as md;
 
 void main() {
   Widget app(Widget child, {ThemeData? theme}) {
@@ -3409,6 +3410,65 @@ fenced ^fence-id
       '[^ianvs-inline-footnote-3]\n'
       '[^ianvs-inline-footnote-3]: inner',
     );
+  });
+
+  test(
+    'reading uses the last case-insensitive standard footnote definition',
+    () {
+      const source = '''
+Alpha[^a], repeat[^A], and third[^a]. Undefined[^ianvs-shadowed-footnote-1].
+
+[^a]: First definition.
+
+```text
+[^A]: Fenced literal.
+```
+
+[^A]: Last definition.
+''';
+
+      final rendered = prepareObsidianMarkdownForRendering(source);
+      expect(rendered, contains('[^ianvs-shadowed-footnote-2]: First'));
+      expect(rendered, contains('[^A]: Last definition.'));
+      expect(rendered, contains('[^A]: Fenced literal.'));
+      expect(
+        prepareObsidianMarkdownForRendering(
+          source,
+          mode: IanvsMarkdownObsidianMetadataMode.editing,
+        ),
+        source,
+      );
+
+      final html = md.markdownToHtml(
+        rendered,
+        extensionSet: md.ExtensionSet.gitHubFlavored,
+      );
+      expect(html, contains('Last definition.'));
+      expect(html, isNot(contains('First definition.')));
+      expect(html, contains('[^A]: Fenced literal.'));
+      expect(RegExp('class="footnote-backref"').allMatches(html), hasLength(3));
+    },
+  );
+
+  testWidgets('reading renders the last case-insensitive footnote definition', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(
+          data: '''
+Alpha[^a], repeat[^A], and third[^a].
+
+[^a]: First definition.
+[^A]: Last definition.
+''',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Last definition.'), findsOneWidget);
+    expect(find.textContaining('First definition.'), findsNothing);
   });
 
   test('collects standard footnote order outside comments and code', () {

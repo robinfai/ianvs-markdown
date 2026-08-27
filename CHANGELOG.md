@@ -64,6 +64,9 @@
 - Match Obsidian comment pairing, backslash escape parity, adjacent-percent
   residue, literal unclosed delimiters, code precedence, and standalone
   comments that remain one editable Live Preview block across blank lines.
+- Match Obsidian case-insensitive standard-footnote definitions by making the
+  last duplicate authoritative in Reading while preserving exact Live Preview
+  and source bytes, shared first-reference numbering, and every backlink.
 - Match Obsidian's Live Preview inline-source boundaries: reveal delimiters at
   their opening edge, hide them immediately after the closing edge, select the
   complete formatted source on double click, edit ordinary links without

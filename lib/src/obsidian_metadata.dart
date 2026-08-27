@@ -267,7 +267,9 @@ String prepareObsidianMarkdownForRendering(
 
   final withoutComments = _stripObsidianComments(source);
   final withoutBlockIds = _stripBlockIdentifiers(withoutComments);
-  return _expandInlineFootnotes(withoutBlockIds);
+  final withObsidianFootnoteDefinitions =
+      _applyObsidianFootnoteDefinitionPrecedence(withoutBlockIds);
+  return _expandInlineFootnotes(withObsidianFootnoteDefinitions);
 }
 
 /// Parses editing-only inline metadata into a styled renderer element while
@@ -491,13 +493,83 @@ Map<String, int> collectObsidianStandardFootnoteOrdinals(String source) {
 }
 
 Set<String> _collectStandardFootnoteDefinitionLabels(String source) {
-  final labels = <String>{};
-  var fenceCharacter = 0;
-  var fenceLength = 0;
+  return _standardFootnoteDefinitions(
+    source,
+  ).map((definition) => definition.normalizedLabel).toSet();
+}
+
+final class _ObsidianStandardFootnoteDefinition {
+  const _ObsidianStandardFootnoteDefinition({
+    required this.labelStart,
+    required this.labelEnd,
+    required this.normalizedLabel,
+  });
+
+  final int labelStart;
+  final int labelEnd;
+  final String normalizedLabel;
+}
+
+/// Makes the last case-insensitive standard-footnote definition authoritative.
+///
+/// The underlying Markdown parser already resolves references without case,
+/// but retains the first matching definition. Obsidian 1.13.7 instead uses the
+/// last definition. Earlier definitions are therefore assigned collision-free
+/// unreferenced labels in the Reading-only copy; Live Preview and source mode
+/// keep every original byte.
+String _applyObsidianFootnoteDefinitionPrecedence(String source) {
+  final definitions = _standardFootnoteDefinitions(source);
+  if (definitions.length < 2) return source;
+
+  final lastByLabel = <String, int>{};
+  for (var index = 0; index < definitions.length; index += 1) {
+    lastByLabel[definitions[index].normalizedLabel] = index;
+  }
+  if (lastByLabel.length == definitions.length) return source;
+
+  final reservedLabels = RegExp(
+    r'\[\^([^\] \r\n\x00\t]+)\]',
+  ).allMatches(source).map((match) => match.group(1)!.toLowerCase()).toSet();
+  var nextShadowOrdinal = 1;
+  String allocateShadowLabel() {
+    var label = 'ianvs-shadowed-footnote-$nextShadowOrdinal';
+    while (reservedLabels.contains(label)) {
+      nextShadowOrdinal += 1;
+      label = 'ianvs-shadowed-footnote-$nextShadowOrdinal';
+    }
+    nextShadowOrdinal += 1;
+    reservedLabels.add(label);
+    return label;
+  }
+
+  final output = StringBuffer();
+  var cursor = 0;
+  for (var index = 0; index < definitions.length; index += 1) {
+    final definition = definitions[index];
+    if (lastByLabel[definition.normalizedLabel] == index) continue;
+    output
+      ..write(source.substring(cursor, definition.labelStart))
+      ..write(allocateShadowLabel());
+    cursor = definition.labelEnd;
+  }
+  output.write(source.substring(cursor));
+  return output.toString();
+}
+
+List<_ObsidianStandardFootnoteDefinition> _standardFootnoteDefinitions(
+  String source,
+) {
+  final definitions = <_ObsidianStandardFootnoteDefinition>[];
   final definitionPattern = RegExp(
     r'^[ ]{0,3}\[\^([^\] \r\n\x00\t]+)\]:[ \t]*',
   );
-  for (final line in source.split('\n')) {
+  var fenceCharacter = 0;
+  var fenceLength = 0;
+  var lineStart = 0;
+  while (lineStart <= source.length) {
+    final newline = source.indexOf('\n', lineStart);
+    final lineEnd = newline < 0 ? source.length : newline;
+    final line = source.substring(lineStart, lineEnd);
     final fence = RegExp(r'^ {0,3}(`{3,}|~{3,})').firstMatch(line);
     if (fence != null) {
       final marker = fence.group(1)!;
@@ -509,13 +581,28 @@ Set<String> _collectStandardFootnoteDefinitionLabels(String source) {
         fenceCharacter = 0;
         fenceLength = 0;
       }
-      continue;
+    } else if (fenceLength == 0) {
+      final definition = definitionPattern.firstMatch(line);
+      if (definition != null) {
+        final label = definition.group(1)!;
+        final labelStart =
+            lineStart +
+            definition.start +
+            definition.group(0)!.indexOf('[^') +
+            2;
+        definitions.add(
+          _ObsidianStandardFootnoteDefinition(
+            labelStart: labelStart,
+            labelEnd: labelStart + label.length,
+            normalizedLabel: label.toLowerCase(),
+          ),
+        );
+      }
     }
-    if (fenceLength > 0) continue;
-    final definition = definitionPattern.firstMatch(line);
-    if (definition != null) labels.add(definition.group(1)!.toLowerCase());
+    if (newline < 0) break;
+    lineStart = newline + 1;
   }
-  return labels;
+  return definitions;
 }
 
 final class _ObsidianFootnoteOrdinalCollector {
