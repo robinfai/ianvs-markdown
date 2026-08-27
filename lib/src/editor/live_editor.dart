@@ -3382,33 +3382,36 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     Widget rendered;
     if (block.type == IanvsMarkdownBlockType.frontMatter) {
       final document = parseMarkdownFrontMatter(block.source);
-      rendered = document.entries.isEmpty
-          ? IanvsMarkdown(
-              data: block.source,
-              softLineBreak: widget.softLineBreak,
-              renderBudget: widget.renderBudget,
-              theme: colors,
-            )
-          : IanvsMarkdownFrontMatterCard(
-              entries: document.entries,
-              theme: colors,
-              compact: widget.compactFrontMatter,
-              initiallyExpanded: true,
-              showDocumentTitle: widget.showDocumentTitle,
-              onTapLink: widget.onTapLink,
-              onTextChanged: (entry, value) =>
-                  _setFrontMatterText(block, entry, value),
-              onBooleanChanged: (entry, value) =>
-                  _setFrontMatterBoolean(block, entry, value),
-              onNumberChanged: (entry, value) =>
-                  _setFrontMatterNumber(block, entry, value),
-              onDateChanged: (entry, value) =>
-                  _setFrontMatterDate(block, entry, value),
-              onListChanged: (entry, values) =>
-                  _setFrontMatterList(block, entry, values),
-              onKeyChanged: (entry, key) =>
-                  _setFrontMatterKey(block, entry, key),
-            );
+      if (!document.hasFrontMatter) {
+        rendered = IanvsMarkdown(
+          data: block.source,
+          softLineBreak: widget.softLineBreak,
+          renderBudget: widget.renderBudget,
+          theme: colors,
+        );
+      } else if (document.entries.isEmpty) {
+        rendered = const SizedBox.shrink();
+      } else {
+        rendered = IanvsMarkdownFrontMatterCard(
+          entries: document.entries,
+          theme: colors,
+          compact: widget.compactFrontMatter,
+          initiallyExpanded: true,
+          showDocumentTitle: widget.showDocumentTitle,
+          onTapLink: widget.onTapLink,
+          onTextChanged: (entry, value) =>
+              _setFrontMatterText(block, entry, value),
+          onBooleanChanged: (entry, value) =>
+              _setFrontMatterBoolean(block, entry, value),
+          onNumberChanged: (entry, value) =>
+              _setFrontMatterNumber(block, entry, value),
+          onDateChanged: (entry, value) =>
+              _setFrontMatterDate(block, entry, value),
+          onListChanged: (entry, values) =>
+              _setFrontMatterList(block, entry, values),
+          onKeyChanged: (entry, key) => _setFrontMatterKey(block, entry, key),
+        );
+      }
     } else if (block.type == IanvsMarkdownBlockType.indentedCode) {
       rendered = _LivePreviewIndentedCode(
         source: block.source,

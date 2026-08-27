@@ -4402,6 +4402,51 @@ Omega body.
   });
 
   testWidgets(
+    'empty front matter stays invisible without changing exact source',
+    (tester) async {
+      const source = '---\n---\nBody';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+
+      bool isHorizontalRule(Widget widget) {
+        if (widget is! Container) return false;
+        final decoration = widget.decoration;
+        if (decoration is! BoxDecoration) return false;
+        final border = decoration.border;
+        return border is Border &&
+            border.top.width == 2 &&
+            border.top.color == IanvsMarkdownThemeData.light.borderSoft;
+      }
+
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      final frontMatterBlock = find.byKey(
+        const ValueKey('ianvs-markdown-block-0-frontMatter'),
+      );
+      expect(frontMatterBlock, findsOneWidget);
+      expect(find.text('Body'), findsOneWidget);
+      expect(find.text('笔记属性'), findsNothing);
+      expect(
+        find.descendant(
+          of: frontMatterBlock,
+          matching: find.byWidgetPredicate(isHorizontalRule),
+        ),
+        findsNothing,
+      );
+      expect(controller.text, source);
+
+      controller.mode = IanvsMarkdownEditorMode.preview;
+      await tester.pumpAndSettle();
+
+      expect(find.text('Body'), findsOneWidget);
+      expect(find.text('笔记属性'), findsNothing);
+      expect(find.byWidgetPredicate(isHorizontalRule), findsNothing);
+      expect(controller.text, source);
+    },
+  );
+
+  testWidgets(
     'compact properties default expanded and activate exact YAML source',
     (tester) async {
       const source = '''
