@@ -477,6 +477,31 @@ void main() {
     expect(controller.text, source);
   });
 
+  testWidgets('live preview activates exact angle autolink source', (
+    tester,
+  ) async {
+    const source =
+        'Angle <https://example.com/path?q=1#f> and <user@example.com>.';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    expect(find.text('https://example.com/path?q=1#f'), findsOneWidget);
+    expect(find.text('user@example.com'), findsOneWidget);
+    expect(controller.text, source);
+
+    await tester.tap(find.text('https://example.com/path?q=1#f'));
+    await tester.pumpAndSettle();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, source);
+    expect(controller.text, source);
+  });
+
   testWidgets('ordinary active rail follows only the caret line', (
     tester,
   ) async {

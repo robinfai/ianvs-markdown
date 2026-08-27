@@ -110,7 +110,7 @@ IanvsMarkdown(
 
 `IanvsMarkdownController` 是编辑状态的唯一数据源，管理文本、选区、模式、dirty 状态和撤销历史。`IanvsMarkdownLiveEditor` 会把当前块显示为原始 Markdown，其余块继续使用渲染组件：
 
-行内源码边界遵循 Obsidian Live Preview：光标到达起始定界符前即揭示完整范围，越过闭合定界符后立即重新隐藏；双击格式化内容会连同定界符选中完整源码。普通 Markdown 链接支持空目标、`<…>` 目标、平衡或转义括号、双引号/单引号/括号 title，以及 title 前的 soft break；destination 中奇数反斜线 run 的最后一条继续转义括号，前面的每一对会在链接目标中保留为 `%5C`，Live Preview 激活后仍恢复精确源码。`<www.example.com>` 采用 Obsidian 的非标准回退：前导 `<` 保持字面值，`www.example.com>` 成为 bare-link label，尾随 `>` 在回调目标中编码为 `%3E`；普通 `www` 链接不变。只有 Reading parser 确认识别的完整语法才会在非活动状态隐藏，未闭合 title 与多余尾随字符保持源码并允许合法 shortcut reference 回退。full、collapsed 和 shortcut reference 共享文档定义映射，label 大小写不敏感；实测 `[Whitespace   Ref][  Ref   A  ]` 这类同时含周围空白与内部连续空白的 secondary label 会保持字面值。首个重复定义优先级和 block-local definition 注入保持一致。普通 Markdown 链接单击进入源码编辑而不导航，Wiki 链接单击交给宿主的 `onTapLink` 打开目标。
+行内源码边界遵循 Obsidian Live Preview：光标到达起始定界符前即揭示完整范围，越过闭合定界符后立即重新隐藏；双击格式化内容会连同定界符选中完整源码。普通 Markdown 链接支持空目标、`<…>` 目标、平衡或转义括号、双引号/单引号/括号 title，以及 title 前的 soft break；destination 中奇数反斜线 run 的最后一条继续转义括号，前面的每一对会在链接目标中保留为 `%5C`，Live Preview 激活后仍恢复精确源码。角括号内的 `http`、`https`、email、`mailto`、`ftp` 与 `obsidian` scheme 会先于安全 raw-HTML fallback 解析，并在 Live Preview 激活后恢复完整角括号源码。`<www.example.com>` 采用 Obsidian 的非标准回退：前导 `<` 保持字面值，`www.example.com>` 成为 bare-link label，尾随 `>` 在回调目标中编码为 `%3E`；普通 `www` 链接不变。只有 Reading parser 确认识别的完整语法才会在非活动状态隐藏，未闭合 title 与多余尾随字符保持源码并允许合法 shortcut reference 回退。full、collapsed 和 shortcut reference 共享文档定义映射，label 大小写不敏感；实测 `[Whitespace   Ref][  Ref   A  ]` 这类同时含周围空白与内部连续空白的 secondary label 会保持字面值。首个重复定义优先级和 block-local definition 注入保持一致。普通 Markdown 链接单击进入源码编辑而不导航，Wiki 链接单击交给宿主的 `onTapLink` 打开目标。
 
 注释只配对未被奇数反斜线转义的 `%%`；未闭合 delimiter 保持字面源码，`%%%%` 为空注释，连续 `%` 的余留字符保持可见。独立注释可跨空行作为一个 Live Preview 编辑块，行内代码和围栏代码始终优先于注释解析。
 

@@ -1003,6 +1003,44 @@ Unclosed <https://open.example/path tail.
     ));
   });
 
+  testWidgets('renders Obsidian angle scheme and email autolinks', (
+    tester,
+  ) async {
+    final taps = <(String, String?)>[];
+    await tester.pumpWidget(
+      app(
+        IanvsMarkdown(
+          data:
+              '<https://example.com/path?q=1#f> '
+              '<user@example.com> '
+              '<mailto:mail@example.com> '
+              '<obsidian://open?vault=x&file=y> '
+              '<ftp://example.com/archive>',
+          onTapLink: (text, href, title) => taps.add((text, href)),
+        ),
+      ),
+    );
+
+    for (final label in <String>[
+      'https://example.com/path?q=1#f',
+      'user@example.com',
+      'mailto:mail@example.com',
+      'obsidian://open?vault=x&file=y',
+      'ftp://example.com/archive',
+    ]) {
+      expect(find.text(label), findsOneWidget, reason: label);
+      await tester.tap(find.text(label));
+      await tester.pump();
+    }
+    expect(taps, <(String, String?)>[
+      ('https://example.com/path?q=1#f', 'https://example.com/path?q=1#f'),
+      ('user@example.com', 'mailto:user@example.com'),
+      ('mailto:mail@example.com', 'mailto:mail@example.com'),
+      ('obsidian://open?vault=x&file=y', 'obsidian://open?vault=x&file=y'),
+      ('ftp://example.com/archive', 'ftp://example.com/archive'),
+    ]);
+  });
+
   testWidgets('angle www falls back to an Obsidian bare link through >', (
     tester,
   ) async {

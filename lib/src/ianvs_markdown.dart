@@ -285,8 +285,11 @@ class IanvsMarkdown extends StatelessWidget {
       ),
       if (obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing)
         IanvsMarkdownEditingHardBreakSyntax(),
-      ...ianvsMarkdownInlineHtmlSyntaxes(obsidianMetadataMode),
+      // Angle autolinks are syntactically more specific than raw HTML.
+      // Giving them first refusal keeps `<https:…>`, `<user@example.com>`,
+      // and custom schemes from being consumed by the safe HTML fallback.
       IanvsMarkdownAutolinkSyntax(),
+      ...ianvsMarkdownInlineHtmlSyntaxes(obsidianMetadataMode),
       if (obsidianMetadataMode ==
           IanvsMarkdownObsidianMetadataMode.editing) ...[
         IanvsMarkdownEditingMetadataInlineSyntax.comment(),
