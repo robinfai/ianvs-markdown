@@ -17,7 +17,11 @@ bool _isOuterMarkdownFormattingShortcut(KeyEvent event) {
   }
   final keyboard = HardwareKeyboard.instance;
   if (keyboard.isAltPressed || keyboard.isShiftPressed) return false;
-  return keyboard.isMetaPressed != keyboard.isControlPressed;
+  if (keyboard.isMetaPressed == keyboard.isControlPressed) return false;
+  if (keyboard.isMetaPressed) return true;
+  if (event.logicalKey == LogicalKeyboardKey.keyI) return true;
+  return defaultTargetPlatform != TargetPlatform.macOS &&
+      defaultTargetPlatform != TargetPlatform.iOS;
 }
 
 bool _isPropertyTraversalShortcut(KeyEvent event) {

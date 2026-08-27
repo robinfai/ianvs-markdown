@@ -4769,6 +4769,40 @@ title: Alpha
   );
 
   testWidgets(
+    'macOS Control+B keeps native property-field navigation',
+    (tester) async {
+      const source = '''
+---
+title: Alpha
+---
+# Body
+''';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      final input = find.byKey(
+        const ValueKey('ianvs-markdown-front-matter-input-title'),
+      );
+      await tester.tap(input);
+      final field = tester.widget<TextField>(input);
+      field.controller?.selection = const TextSelection.collapsed(offset: 3);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyB);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pump();
+
+      expect(field.controller?.selection.extentOffset, 2);
+      expect(controller.text, source);
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
     'property Tab traversal never indents a stale document selection',
     (tester) async {
       const source = '''
