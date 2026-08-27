@@ -5157,6 +5157,18 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
       }
       return KeyEventResult.handled;
     }
+    final directionalKey =
+        key == LogicalKeyboardKey.arrowUp ||
+        key == LogicalKeyboardKey.arrowDown ||
+        key == LogicalKeyboardKey.arrowLeft ||
+        key == LogicalKeyboardKey.arrowRight;
+    if (directionalKey &&
+        (HardwareKeyboard.instance.isAltPressed ||
+            HardwareKeyboard.instance.isControlPressed ||
+            HardwareKeyboard.instance.isMetaPressed ||
+            HardwareKeyboard.instance.isShiftPressed)) {
+      return KeyEventResult.ignored;
+    }
     if (key == LogicalKeyboardKey.arrowUp) {
       return _moveVertical(cell, -1);
     }

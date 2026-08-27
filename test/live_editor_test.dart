@@ -10661,6 +10661,38 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
   });
 
   testWidgets(
+    'table Option+Right stays in the focused cell at its boundary',
+    (tester) async {
+      const source = '| A | B |\n| --- | --- |\n| alpha | beta |';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+      final first = find.byKey(const ValueKey('ianvs-markdown-table-1-0'));
+      final second = find.byKey(const ValueKey('ianvs-markdown-table-1-1'));
+      await tester.tap(first);
+      tester.widget<TextField>(first).controller?.selection =
+          const TextSelection.collapsed(offset: 'alpha'.length);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+      await tester.pumpAndSettle();
+
+      expect(tester.widget<TextField>(first).focusNode?.hasFocus, isTrue);
+      expect(tester.widget<TextField>(second).focusNode?.hasFocus, isFalse);
+      expect(
+        tester.widget<TextField>(first).controller?.selection,
+        const TextSelection.collapsed(offset: 'alpha'.length),
+      );
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
     'table Command+A selects and replaces the entire Markdown document',
     (tester) async {
       const source =
