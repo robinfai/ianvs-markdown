@@ -2552,6 +2552,7 @@ List<_SyntaxToken> _markdownSyntaxTokens(
     <TextRange>[...excludedRanges, ...inlineStructuralRanges],
   );
   final metadataExcludedRanges = <TextRange>[...excludedRanges, ...codeRanges];
+  final footnoteRanges = <TextRange>[];
   for (final range in ianvsMarkdownBlockIdRanges(text)) {
     if (_overlapsAnyRange(range.start, range.end, metadataExcludedRanges)) {
       continue;
@@ -2564,7 +2565,9 @@ List<_SyntaxToken> _markdownSyntaxTokens(
     if (_overlapsAnyRange(match.start, match.end, metadataExcludedRanges)) {
       continue;
     }
-    inlineStructuralRanges.add(TextRange(start: match.start, end: match.end));
+    final range = TextRange(start: match.start, end: match.end);
+    inlineStructuralRanges.add(range);
+    footnoteRanges.add(range);
     tokens.add(_SyntaxToken(match.start, match.end, theme.comment));
   }
   var inlineFootnoteStart = text.indexOf('^[');
@@ -2581,9 +2584,9 @@ List<_SyntaxToken> _markdownSyntaxTokens(
       );
       if (close >= 0) {
         final end = close + 1;
-        inlineStructuralRanges.add(
-          TextRange(start: inlineFootnoteStart, end: end),
-        );
+        final range = TextRange(start: inlineFootnoteStart, end: end);
+        inlineStructuralRanges.add(range);
+        footnoteRanges.add(range);
         tokens.add(_SyntaxToken(inlineFootnoteStart, end, theme.comment));
         inlineFootnoteStart = text.indexOf('^[', end);
         continue;
@@ -2624,6 +2627,7 @@ List<_SyntaxToken> _markdownSyntaxTokens(
       ...mathRanges,
       ...wikiLinkLiteralRanges,
     ],
+    nestedLabelRanges: footnoteRanges,
   );
   final referenceLinkLiteralRanges = _addReferenceLinkSyntaxTokens(
     tokens,
@@ -2642,6 +2646,7 @@ List<_SyntaxToken> _markdownSyntaxTokens(
       ...wikiLinkLiteralRanges,
       ...inlineLinkLiteralRanges,
     ],
+    nestedLabelRanges: footnoteRanges,
   );
   final explicitLinkLiteralRanges = <TextRange>[
     ...mathRanges,
@@ -3320,6 +3325,7 @@ List<TextRange> _addLinkSyntaxTokens(
   IanvsMarkdownSyntaxTheme theme,
   List<TextRange> excludedRanges, {
   List<TextRange> openingExcludedRanges = const <TextRange>[],
+  List<TextRange> nestedLabelRanges = const <TextRange>[],
 }) {
   final literalRanges = <TextRange>[];
   var index = 0;
@@ -3355,11 +3361,18 @@ List<TextRange> _addLinkSyntaxTokens(
       index = bracketStart + 1;
       continue;
     }
-    if (_overlapsAnyRange(matchStart, matchEnd, excludedRanges)) {
+    final labelStart = bracketStart + 1;
+    if (_hasDisallowedLinkOverlap(
+      matchStart,
+      matchEnd,
+      labelStart,
+      labelEnd,
+      excludedRanges,
+      nestedLabelRanges,
+    )) {
       index = matchEnd;
       continue;
     }
-    final labelStart = bracketStart + 1;
     final revealRange = TextRange(start: matchStart, end: matchEnd);
     literalRanges
       ..add(TextRange(start: matchStart, end: labelStart))
@@ -3395,6 +3408,7 @@ List<TextRange> _addReferenceLinkSyntaxTokens(
   Set<String> definedLabels,
   List<TextRange> excludedRanges, {
   List<TextRange> openingExcludedRanges = const <TextRange>[],
+  List<TextRange> nestedLabelRanges = const <TextRange>[],
 }) {
   if (definedLabels.isEmpty) return const <TextRange>[];
   final literalRanges = <TextRange>[];
@@ -3461,7 +3475,14 @@ List<TextRange> _addReferenceLinkSyntaxTokens(
 
     final normalized = normalizeMarkdownLinkReferenceLabel(referenceLabel);
     if (!definedLabels.contains(normalized) ||
-        _overlapsAnyRange(matchStart, matchEnd, excludedRanges)) {
+        _hasDisallowedLinkOverlap(
+          matchStart,
+          matchEnd,
+          labelStart,
+          labelEnd,
+          excludedRanges,
+          nestedLabelRanges,
+        )) {
       index = matchEnd;
       continue;
     }
@@ -3491,6 +3512,28 @@ List<TextRange> _addReferenceLinkSyntaxTokens(
     index = matchEnd;
   }
   return literalRanges;
+}
+
+bool _hasDisallowedLinkOverlap(
+  int matchStart,
+  int matchEnd,
+  int labelStart,
+  int labelEnd,
+  List<TextRange> excludedRanges,
+  List<TextRange> nestedLabelRanges,
+) {
+  for (final excluded in excludedRanges) {
+    if (excluded.end <= matchStart || excluded.start >= matchEnd) continue;
+    final nestable = nestedLabelRanges.any(
+      (range) =>
+          range.start == excluded.start &&
+          range.end == excluded.end &&
+          ((range.start >= labelStart && range.end <= labelEnd) ||
+              (matchStart >= range.start && matchEnd <= range.end)),
+    );
+    if (!nestable) return true;
+  }
+  return false;
 }
 
 bool _isTaskCheckboxCandidate(String text, int start, int end) {

@@ -2576,6 +2576,67 @@ void main() {
     },
   );
 
+  test('link source ranges contain nested inline footnotes', () {
+    const syntax = IanvsMarkdownSyntaxTheme(
+      heading: TextStyle(),
+      marker: TextStyle(color: Color(0xff777777)),
+      link: TextStyle(decoration: TextDecoration.underline),
+      code: TextStyle(),
+      comment: TextStyle(fontStyle: FontStyle.italic),
+    );
+    const source =
+        'Inline [link ^[note]](https://example.com).\n\n'
+        'Reference [ref ^[other]][target].\n\n'
+        '[target]: https://example.com';
+
+    TextRange? rangeFor(String content) {
+      final start = source.indexOf(content);
+      return ianvsMarkdownInlineSourceRangeAt(
+        source,
+        TextRange(start: start, end: start + content.length),
+      );
+    }
+
+    expect(
+      rangeFor('link')?.textInside(source),
+      '[link ^[note]](https://example.com)',
+    );
+    expect(rangeFor('ref')?.textInside(source), '[ref ^[other]][target]');
+
+    final spans = buildMarkdownSourceTextSpan(
+      const TextEditingValue(
+        text: source,
+        selection: TextSelection.collapsed(offset: 0),
+      ),
+      style: const TextStyle(fontSize: 14),
+      syntaxTheme: syntax,
+      withComposing: false,
+      hideInactiveInlineMarkers: false,
+    ).children!.cast<TextSpan>().toList();
+
+    TextSpan spanAt(int offset) {
+      var cursor = 0;
+      for (final span in spans) {
+        final end = cursor + (span.text?.length ?? 0);
+        if (offset >= cursor && offset < end) return span;
+        cursor = end;
+      }
+      throw StateError('No span at $offset');
+    }
+
+    expect(
+      spanAt(source.indexOf('link')).style?.decoration,
+      TextDecoration.underline,
+    );
+    final inlineFootnote = spanAt(source.indexOf('note'));
+    expect(inlineFootnote.style?.decoration, TextDecoration.underline);
+    expect(inlineFootnote.style?.fontStyle, FontStyle.italic);
+    expect(
+      spanAt(source.indexOf('ref')).style?.decoration,
+      TextDecoration.underline,
+    );
+  });
+
   test('multiline delimited syntax keeps styles and reveals local markers', () {
     const syntax = IanvsMarkdownSyntaxTheme(
       heading: TextStyle(fontWeight: FontWeight.w600),
