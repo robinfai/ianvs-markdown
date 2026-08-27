@@ -728,6 +728,21 @@ final answer = 42;
     expect(find.text('3'), findsOneWidget);
   });
 
+  testWidgets('reading mode leaves mismatched table headers literal', (
+    tester,
+  ) async {
+    const source =
+        '| A | B |\n'
+        '| --- | --- | --- |\n'
+        '| one | two | three |';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Table), findsNothing);
+    expect(_renderedPlainTextContains(tester, '| A | B |'), isTrue);
+    expect(_renderedPlainTextContains(tester, '| one | two | three |'), isTrue);
+  });
+
   testWidgets('table projection ignores fenced source and missing delimiters', (
     tester,
   ) async {

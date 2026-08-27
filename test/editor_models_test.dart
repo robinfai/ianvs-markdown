@@ -197,6 +197,34 @@ $$
     expect(blocks.single.source, source);
   });
 
+  test('requires table headers and delimiters to have equal cell counts', () {
+    const narrowHeader =
+        r'| A \| pipe | B |'
+        '\n| --- | --- | --- |\n'
+        '| one | two | three |';
+    const wideHeader =
+        '| A | B | C |\n'
+        '| --- | --- |\n'
+        '| one | two |';
+
+    for (final source in <String>[narrowHeader, wideHeader]) {
+      final blocks = parseMarkdownBlocks(source);
+      expect(blocks, hasLength(1));
+      expect(blocks.single.type, IanvsMarkdownBlockType.paragraph);
+      expect(blocks.single.source, source);
+    }
+
+    const valid =
+        r'| A \| pipe | B |'
+        '\n| --- | --- |\n'
+        '| one | two |';
+    final validBlocks = parseMarkdownBlocks(valid);
+
+    expect(validBlocks, hasLength(1));
+    expect(validBlocks.single.type, IanvsMarkdownBlockType.table);
+    expect(validBlocks.single.source, valid);
+  });
+
   test('classifies alternate and ordered task states without rewriting', () {
     const source = '- [!] Important\n\n1. [/] In progress\n\n- [k] Unknown';
 

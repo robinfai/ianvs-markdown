@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../markdown_table_syntax.dart';
+
 /// Display modes supported by [IanvsMarkdownLiveEditor].
 enum IanvsMarkdownEditorMode {
   /// The active block is source text and all other blocks are rendered.
@@ -625,11 +627,16 @@ bool _isIndentedCode(String text) =>
     RegExp(r'^(?: {4}| {0,3}\t)').hasMatch(text);
 
 bool _isTableStart(List<_SourceLine> lines, int index) {
-  if (index + 1 >= lines.length || !lines[index].text.contains('|')) {
+  if (index + 1 >= lines.length) {
     return false;
   }
+  final headerCellCount = countMarkdownTableCells(lines[index].text);
+  if (headerCellCount < 2) return false;
   final delimiter = lines[index + 1].text.trim();
-  return RegExp(r'^\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)+\|?$').hasMatch(delimiter);
+  return RegExp(
+        r'^\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)+\|?$',
+      ).hasMatch(delimiter) &&
+      countMarkdownTableCells(delimiter) == headerCellCount;
 }
 
 bool _isHtmlStart(String text) =>

@@ -8911,6 +8911,30 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     expect(controller.selection, const TextSelection.collapsed(offset: 17));
   });
 
+  testWidgets('mismatched table headers remain one editable paragraph', (
+    tester,
+  ) async {
+    const source =
+        '| A | B |\n'
+        '| --- | --- | --- |\n'
+        '| one | two | three |';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    expect(find.bySemanticsLabel('Editable Markdown table'), findsNothing);
+    await tester.tap(find.textContaining('| A | B |'));
+    await tester.pumpAndSettle();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, source);
+  });
+
   testWidgets('table cells edit their source ranges without exposing pipes', (
     tester,
   ) async {

@@ -15,6 +15,7 @@ import 'highlight.dart';
 import 'inline_code.dart';
 import 'inline_link.dart';
 import 'list_guide.dart';
+import 'markdown_table_syntax.dart';
 import 'math.dart';
 import 'markdown_document.dart';
 import 'obsidian_autolink.dart';
@@ -536,10 +537,12 @@ String _projectIrregularObsidianTables(String source) {
   final lines = source.split('\n');
   final codeLines = _projectedCodeLines(source, lines);
   for (var index = 0; index + 1 < lines.length; index += 1) {
+    final headerCellCount = countMarkdownTableCells(lines[index]);
     if (codeLines[index] ||
         codeLines[index + 1] ||
-        _projectedTableCellCount(lines[index]) < 2 ||
-        !_isProjectedTableDelimiter(lines[index + 1])) {
+        headerCellCount < 2 ||
+        !_isProjectedTableDelimiter(lines[index + 1]) ||
+        countMarkdownTableCells(lines[index + 1]) != headerCellCount) {
       continue;
     }
 
@@ -554,12 +557,12 @@ String _projectIrregularObsidianTables(String source) {
     }
     var columnCount = 0;
     for (var row = index; row <= end; row += 1) {
-      final count = _projectedTableCellCount(lines[row]);
+      final count = countMarkdownTableCells(lines[row]);
       if (count > columnCount) columnCount = count;
     }
     for (var row = index; row <= end; row += 1) {
       final separator = row == index + 1;
-      while (_projectedTableCellCount(lines[row]) < columnCount) {
+      while (countMarkdownTableCells(lines[row]) < columnCount) {
         lines[row] = _appendProjectedTableCell(
           lines[row],
           separator: separator,
@@ -595,28 +598,6 @@ bool _isProjectedTableDelimiter(String source) {
   return RegExp(
     r'^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)+\|?\s*$',
   ).hasMatch(source);
-}
-
-int _projectedTableCellCount(String source) {
-  final pipes = <int>[];
-  for (var index = 0; index < source.length; index += 1) {
-    if (source.codeUnitAt(index) != 0x7c) continue;
-    var slashes = 0;
-    for (
-      var cursor = index - 1;
-      cursor >= 0 && source.codeUnitAt(cursor) == 0x5c;
-      cursor -= 1
-    ) {
-      slashes += 1;
-    }
-    if (slashes.isEven) pipes.add(index);
-  }
-  if (pipes.isEmpty) return 1;
-  final trimmedLeft = source.length - source.trimLeft().length;
-  final trimmedRight = source.trimRight().length;
-  final leading = trimmedLeft < source.length && source[trimmedLeft] == '|';
-  final trailing = trimmedRight > 0 && source[trimmedRight - 1] == '|';
-  return pipes.length + 1 - (leading ? 1 : 0) - (trailing ? 1 : 0);
 }
 
 String _appendProjectedTableCell(String source, {required bool separator}) {
