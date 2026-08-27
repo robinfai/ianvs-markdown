@@ -207,6 +207,32 @@ final value = 1;
     expect(completeTagBlocks.last.source, 'After');
   });
 
+  test('adjacent HTML blocks share one exact live-preview range', () {
+    const comments = '<!-- one -->\n<!-- two -->\nAfter';
+    final commentBlocks = parseMarkdownBlocks(comments);
+    expect(commentBlocks.map((block) => block.type), <IanvsMarkdownBlockType>[
+      IanvsMarkdownBlockType.html,
+      IanvsMarkdownBlockType.paragraph,
+    ]);
+    expect(commentBlocks.first.source, '<!-- one -->\n<!-- two -->');
+    expect(commentBlocks.last.source, 'After');
+
+    const raw =
+        '<script>\nfirst\n</script>\n'
+        '<style>\nsecond\n</style>\n'
+        'After';
+    final rawBlocks = parseMarkdownBlocks(raw);
+    expect(rawBlocks.map((block) => block.type), <IanvsMarkdownBlockType>[
+      IanvsMarkdownBlockType.html,
+      IanvsMarkdownBlockType.paragraph,
+    ]);
+    expect(
+      rawBlocks.first.source,
+      '<script>\nfirst\n</script>\n<style>\nsecond\n</style>',
+    );
+    expect(rawBlocks.last.source, 'After');
+  });
+
   test('inline HTML remains inside its surrounding paragraph', () {
     const paired = '<em>inline</em> continuation\nnext';
     final pairedBlocks = parseMarkdownBlocks(paired);

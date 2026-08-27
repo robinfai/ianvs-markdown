@@ -481,23 +481,35 @@ int _tableEnd(List<_SourceLine> lines, int first) {
 }
 
 int _htmlEnd(List<_SourceLine> lines, int first) {
-  final block = _htmlBlockStart(lines[first].text);
-  if (block == null) return first;
-  final endPattern = block.endPattern;
-  if (endPattern != null) {
-    for (var index = first; index < lines.length; index += 1) {
-      if (endPattern.hasMatch(lines[index].text)) return index;
+  var blockFirst = first;
+  while (true) {
+    final block = _htmlBlockStart(lines[blockFirst].text);
+    if (block == null) return blockFirst;
+    final endPattern = block.endPattern;
+    if (endPattern != null) {
+      var last = lines.length - 1;
+      for (var index = blockFirst; index < lines.length; index += 1) {
+        if (endPattern.hasMatch(lines[index].text)) {
+          last = index;
+          break;
+        }
+      }
+      if (last + 1 >= lines.length ||
+          _htmlBlockStart(lines[last + 1].text) == null) {
+        return last;
+      }
+      blockFirst = last + 1;
+      continue;
     }
-    return lines.length - 1;
-  }
 
-  var last = first;
-  for (var index = first + 1; index < lines.length; index += 1) {
-    final text = lines[index].text;
-    if (text.trim().isEmpty) break;
-    last = index;
+    var last = blockFirst;
+    for (var index = blockFirst + 1; index < lines.length; index += 1) {
+      final text = lines[index].text;
+      if (text.trim().isEmpty) break;
+      last = index;
+    }
+    return last;
   }
-  return last;
 }
 
 int _paragraphEnd(List<_SourceLine> lines, int first) {
