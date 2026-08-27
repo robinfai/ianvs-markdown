@@ -343,6 +343,34 @@ $$
     );
   });
 
+  test('partial tabs retain code indentation after container projection', () {
+    for (final indentation in <String>[' \t', '  \t', '   \t']) {
+      expect(
+        parseMarkdownBlocks('${indentation}code').single.type,
+        IanvsMarkdownBlockType.indentedCode,
+      );
+    }
+
+    const source =
+        '  \ttop-level ^[one]\r\n'
+        '\r\n'
+        '-\r\n'
+        '\t\tlisted 😀 ^[two]\r\n'
+        '\r\n'
+        '>\t\tquoted ^[three]';
+
+    final blocks = parseMarkdownBlocks(source);
+    expect(blocks.first.type, IanvsMarkdownBlockType.indentedCode);
+    expect(blocks.first.source, '  \ttop-level ^[one]');
+
+    final ranges = ianvsMarkdownBlockCodeRanges(source);
+    expect(ranges.map((range) => range.textInside(source)), <String>[
+      '  \ttop-level ^[one]',
+      '\t\tlisted 😀 ^[two]',
+      '\tquoted ^[three]',
+    ]);
+  });
+
   test('paired standalone comments keep internal blank lines in one block', () {
     const comment = '%%\nhidden first\n\nhidden second\n%%';
     const source = 'Before.\n\n$comment\n\nAfter.';

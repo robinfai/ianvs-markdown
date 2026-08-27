@@ -1,5 +1,8 @@
 ## Unreleased
 
+- Recognize one to three spaces followed by a Tab as four-column indented
+  code, including after list or quote container projection, so Obsidian
+  comments, footnotes, and block IDs inside remain byte-exact literal text.
 - Keep pipe-less GFM body rows inside tables until a blank line or real block
   opener, including exact Live Preview cell editing and missing-cell writes.
 - Keep irregular-table projection active after fenced code nested in list

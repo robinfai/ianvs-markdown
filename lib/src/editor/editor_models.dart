@@ -518,7 +518,7 @@ bool _isIndentedContinuation(String text) =>
     RegExp(r'^(?: {2,}|\t)\S').hasMatch(text);
 
 bool _isIndentedCode(String text) =>
-    text.startsWith('    ') || text.startsWith('\t');
+    RegExp(r'^(?: {4}| {0,3}\t)').hasMatch(text);
 
 bool _isTableStart(List<_SourceLine> lines, int index) {
   if (index + 1 >= lines.length || !lines[index].text.contains('|')) {

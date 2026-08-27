@@ -2471,14 +2471,14 @@ widget := unknown_token(42)
   testWidgets('reading keeps Obsidian comments literal in indented code', (
     tester,
   ) async {
-    const markdown = '''
-Before.
-
-    code %%inside%% tail
-	more %%tab%% code
-
-After.
-''';
+    const markdown =
+        'Before.\n'
+        '\n'
+        '    code %%inside%% tail\n'
+        '\tmore %%tab%% code\n'
+        '  \tpartial %%partial-tab%% code\n'
+        '\n'
+        'After.\n';
 
     await tester.pumpWidget(
       app(
@@ -2493,7 +2493,12 @@ After.
         matching: find.byType(SelectableText),
       ),
     );
-    expect(rendered.data, 'code %%inside%% tail\nmore %%tab%% code');
+    expect(
+      rendered.data,
+      'code %%inside%% tail\n'
+      'more %%tab%% code\n'
+      'partial %%partial-tab%% code',
+    );
   });
 
   testWidgets('reading ignores comment closers inside inline code', (
@@ -3643,15 +3648,15 @@ unclosed %% stays''';
   });
 
   test('Obsidian comments yield only to true indented code blocks', () {
-    const source = '''
-paired %%gone%%
-
-    code %%inside%% tail
-	more %%tab%% code
-
-paragraph
-    continuation %%also gone%%
-''';
+    const source =
+        'paired %%gone%%\n'
+        '\n'
+        '    code %%inside%% tail\n'
+        '\tmore %%tab%% code\n'
+        '  \tpartial %%partial-tab%% code\n'
+        '\n'
+        'paragraph\n'
+        '    continuation %%also gone%%\n';
 
     final comments = ianvsMarkdownCommentRanges(
       source,
@@ -3661,6 +3666,7 @@ paragraph
     expect(comments, <String>['%%gone%%', '%%also gone%%']);
     expect(rendered, contains('    code %%inside%% tail'));
     expect(rendered, contains('\tmore %%tab%% code'));
+    expect(rendered, contains('  \tpartial %%partial-tab%% code'));
     expect(rendered, isNot(contains('%%gone%%')));
     expect(rendered, isNot(contains('%%also gone%%')));
   });
@@ -4326,6 +4332,8 @@ code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
 - quote
   >     quoted ^[quoted] and [^inside] %%quoted%% ^quoted-id
 -\t\tTabbed ^[tabbed] and [^inside] %%tabbed%% ^tabbed-id
+-
+\t\tpartial ^[partial] and [^inside] %%partial%% ^partial-id
 - ```md
   fenced ^[fenced] and [^inside] %%fenced%% ^fenced-id
   ```
@@ -4370,6 +4378,7 @@ Outside ^[outside] and [^outside] %%outside%% ^outside-id
       '%%nested%% ^nested-id',
       '%%quoted%% ^quoted-id',
       '%%tabbed%% ^tabbed-id',
+      '%%partial%% ^partial-id',
       '%%fenced%% ^fenced-id',
     ]) {
       expect(prepared, contains(inside));
