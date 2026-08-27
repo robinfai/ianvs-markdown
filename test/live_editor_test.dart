@@ -187,7 +187,7 @@ void main() {
   testWidgets('live preview renders tag pills and reveals their exact source', (
     tester,
   ) async {
-    const block = 'Before #中文/子项 and #one#two after.';
+    const block = 'Before #中文/子项 and #one#two, then ：#after-colon.';
     const source = '$block\n\nTail.';
     final controller = IanvsMarkdownController(text: source);
     addTearDown(controller.dispose);
@@ -195,8 +195,8 @@ void main() {
     await tester.pumpWidget(app(controller));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('ianvs-markdown-tag')), findsNWidgets(3));
-    for (final tag in <String>['#中文/子项', '#one', '#two']) {
+    expect(find.byKey(const ValueKey('ianvs-markdown-tag')), findsNWidgets(4));
+    for (final tag in <String>['#中文/子项', '#one', '#two', '#after-colon']) {
       expect(find.text(tag), findsOneWidget);
     }
 

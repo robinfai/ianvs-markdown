@@ -114,7 +114,7 @@ IanvsMarkdown(
 
 注释只配对未被奇数反斜线转义的 `%%`；未闭合 delimiter 保持字面源码，`%%%%` 为空注释，连续 `%` 的余留字符保持可见。独立注释可跨空行作为一个 Live Preview 编辑块，行内代码和围栏代码始终优先于注释解析。
 
-标签词法与 Obsidian 对齐：标签通常从文首或空白后开始，也允许 `#one#two` 这样的相邻标签；内容支持 Unicode、emoji 和 `/` 路径，但不能只有 ASCII 数字。ASCII 标点及 Obsidian 排除的两个 Unicode 标点区会结束标签，全角标点等范围外字符仍可成为标签的一部分；奇数个反斜线转义 `#`，偶数个则恢复解析。阅读态和非活动 Live Preview 显示标签胶囊，活动块恢复精确 Markdown 源码，点击标签仍通过 `onTapLink` 交给宿主。
+标签词法与 Obsidian 对齐：标签通常从文首或空白后开始，也接受实测的全角冒号起始边界，并允许 `#one#two` 这样的相邻标签；内容支持 Unicode、emoji 和 `/` 路径，但不能只有 ASCII 数字。ASCII 标点及 Obsidian 排除的两个 Unicode 标点区会结束标签，全角标点等范围外字符仍可成为标签的一部分；奇数个反斜线转义 `#`，偶数个则恢复解析。阅读态和非活动 Live Preview 显示标签胶囊，活动块恢复精确 Markdown 源码，点击标签仍通过 `onTapLink` 交给宿主。
 
 `==高亮==` 同样使用 Obsidian 1.13.7 的边界：inner 首尾为空格或 Tab、空内容和纯空白内容都保持字面值；合法闭合高亮可以跨一个 soft break，但不能跨空行，未闭合 opening 只着色到当前物理行末。Reading 每侧只隐藏成对的两个 `=` 并保留 surplus，非活动 Live Preview 会隐藏参与语法的完整等号 run，活动块恢复精确源码；`==one====two==` 仍是两个相邻高亮。奇偶反斜线、行内/围栏代码和注释优先级在渲染与源码着色中一致，普通链接和 Wiki alias 内也能叠加高亮，双击正文会选中完整 delimiter 范围。
 

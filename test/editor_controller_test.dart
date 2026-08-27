@@ -1941,7 +1941,7 @@ void main() {
     );
     const source =
         '#café #123 #123tag (#paren) #nested/sub; '
-        'word#tight https://example.com/#fragment '
+        'word#tight https://example.com/#fragment ：#after-colon '
         r'\#escaped \\#double #one#two '
         '#fullwidth。tail `text #code`';
 
@@ -1963,6 +1963,7 @@ void main() {
         '#café',
         '#123tag',
         '#nested/sub',
+        '#after-colon',
         '#double',
         '#one',
         '#two',

@@ -2320,7 +2320,7 @@ widget := unknown_token(42)
     const source =
         '#tag #123 #123tag #under_score #hyphen-tag #nested/sub '
         '#中文 #café #тег #🚀 #123/ #/ #/start #end/ #a//b '
-        '(#paren) word#tight https://example.com/#fragment '
+        '(#paren) word#tight https://example.com/#fragment ：#after-colon '
         '#tag.dot #tag:colon #first#second '
         r'\#escaped \\#double-escaped '
         '#fullwidth。tail';
@@ -2344,6 +2344,7 @@ widget := unknown_token(42)
         '#/start',
         '#end/',
         '#a//b',
+        '#after-colon',
         '#tag',
         '#tag',
         '#first',
@@ -2363,7 +2364,7 @@ widget := unknown_token(42)
         IanvsMarkdown(
           data:
               '#tag #123 #123tag #nested/sub #中文 #café #тег #🚀 '
-              '#one#two #fullwidth。tail\n\n'
+              '#one#two #fullwidth。tail ：#after-colon\n\n'
               r'(#paren) word#tight https://example.com/#fragment '
               r'\#escaped \\#double-escaped `text #code`'
               '\n\n%%hidden #comment%%\n\n'
@@ -2373,7 +2374,7 @@ widget := unknown_token(42)
       ),
     );
 
-    expect(find.byKey(const ValueKey('ianvs-markdown-tag')), findsNWidgets(11));
+    expect(find.byKey(const ValueKey('ianvs-markdown-tag')), findsNWidgets(12));
     for (final tag in <String>[
       '#tag',
       '#123tag',
@@ -2385,6 +2386,7 @@ widget := unknown_token(42)
       '#one',
       '#two',
       '#fullwidth。tail',
+      '#after-colon',
       '#double-escaped',
     ]) {
       expect(find.text(tag), findsOneWidget);

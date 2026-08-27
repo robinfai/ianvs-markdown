@@ -155,11 +155,13 @@ final RegExp _obsidianTagPattern = RegExp(
 );
 final RegExp _obsidianNumericTagPattern = RegExp(r'^#[0-9]+$');
 final RegExp _obsidianTagWhitespacePattern = RegExp(r'\s');
+const int _obsidianTagFullwidthColon = 0xff1a;
 
 /// Finds the lexical ranges that Obsidian treats as inline tags.
 ///
-/// Tags begin at the start of the document or immediately after whitespace,
-/// stop before ASCII punctuation or characters in Obsidian's two excluded
+/// Tags begin at the start of the document, immediately after whitespace, or
+/// after the fullwidth-colon punctuation boundary confirmed in Obsidian 1.13.7.
+/// They stop before ASCII punctuation or characters in Obsidian's two excluded
 /// Unicode punctuation blocks,
 /// and must contain something other than ASCII digits. The allowed remainder
 /// deliberately includes `/`, non-ASCII scripts, emoji, and other symbols.
@@ -205,7 +207,8 @@ bool _isObsidianTagStartBoundary(String source, int start) {
     if (boundary == 0 ||
         _obsidianTagWhitespacePattern.hasMatch(
           source.substring(boundary - 1, boundary),
-        )) {
+        ) ||
+        source.codeUnitAt(boundary - 1) == _obsidianTagFullwidthColon) {
       return true;
     }
     final previousHash = source.lastIndexOf('#', boundary - 1);

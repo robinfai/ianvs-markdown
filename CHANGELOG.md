@@ -54,9 +54,9 @@
   scope, nested links, Reading/Live Preview presentation, and source-range
   selection.
 - Match Obsidian tag tokenization for Unicode and emoji, numeric rejection,
-  slash paths, adjacent tags, punctuation boundaries, and backslash parity
-  with code, comment, and link precedence across Reading, Live Preview, and
-  source styling.
+  slash paths, adjacent tags, punctuation boundaries including a confirmed
+  fullwidth-colon start, and backslash parity with code, comment, and link
+  precedence across Reading, Live Preview, and source styling.
 - Match Obsidian block-ID boundaries for standalone markers, underscores,
   table cells, ASCII spaces after valid IDs, multiple candidates, escape
   parity, blank-separated ownership by the preceding supported block, and code
