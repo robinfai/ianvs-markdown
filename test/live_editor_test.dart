@@ -8935,6 +8935,47 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     expect(field.controller?.text, source);
   });
 
+  testWidgets('single-column tables expose editable cells', (tester) async {
+    const source = '| A |\n| --- |\n| one |';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final fields = find.descendant(
+      of: find.bySemanticsLabel('Editable Markdown table'),
+      matching: find.byType(TextField),
+    );
+    expect(fields, findsNWidgets(2));
+    expect(tester.widget<TextField>(fields.first).controller?.text, 'A');
+    expect(tester.widget<TextField>(fields.last).controller?.text, 'one');
+  });
+
+  testWidgets('code-indented table delimiters stay in one source paragraph', (
+    tester,
+  ) async {
+    const source =
+        '| A | B |\n'
+        '    | --- | --- |\n'
+        '| one | two |';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    expect(find.bySemanticsLabel('Editable Markdown table'), findsNothing);
+    await tester.tap(find.textContaining('| A | B |'));
+    await tester.pumpAndSettle();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, source);
+  });
+
   testWidgets('table cells edit their source ranges without exposing pipes', (
     tester,
   ) async {

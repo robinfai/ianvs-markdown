@@ -631,11 +631,8 @@ bool _isTableStart(List<_SourceLine> lines, int index) {
     return false;
   }
   final headerCellCount = countMarkdownTableCells(lines[index].text);
-  if (headerCellCount < 2) return false;
-  final delimiter = lines[index + 1].text.trim();
-  return RegExp(
-        r'^\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)+\|?$',
-      ).hasMatch(delimiter) &&
+  final delimiter = lines[index + 1].text;
+  return isMarkdownTableDelimiterRow(delimiter) &&
       countMarkdownTableCells(delimiter) == headerCellCount;
 }
 

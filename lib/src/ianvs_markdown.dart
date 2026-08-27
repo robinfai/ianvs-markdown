@@ -540,8 +540,7 @@ String _projectIrregularObsidianTables(String source) {
     final headerCellCount = countMarkdownTableCells(lines[index]);
     if (codeLines[index] ||
         codeLines[index + 1] ||
-        headerCellCount < 2 ||
-        !_isProjectedTableDelimiter(lines[index + 1]) ||
+        !isMarkdownTableDelimiterRow(lines[index + 1]) ||
         countMarkdownTableCells(lines[index + 1]) != headerCellCount) {
       continue;
     }
@@ -592,12 +591,6 @@ List<bool> _projectedCodeLines(String source, List<String> lines) {
     lineStart = lineEnd + 1;
   }
   return result;
-}
-
-bool _isProjectedTableDelimiter(String source) {
-  return RegExp(
-    r'^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)+\|?\s*$',
-  ).hasMatch(source);
 }
 
 String _appendProjectedTableCell(String source, {required bool separator}) {

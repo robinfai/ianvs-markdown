@@ -743,6 +743,36 @@ final answer = 42;
     expect(_renderedPlainTextContains(tester, '| one | two | three |'), isTrue);
   });
 
+  testWidgets('reading mode supports framed single-column tables', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(const IanvsMarkdown(data: '| A |\n| --- |\n| one |')),
+    );
+    await tester.pumpAndSettle();
+
+    final table = tester.widget<Table>(find.byType(Table));
+    expect(table.children, hasLength(2));
+    expect(table.children.map((row) => row.children.length), everyElement(1));
+    expect(find.text('A'), findsOneWidget);
+    expect(find.text('one'), findsOneWidget);
+  });
+
+  testWidgets('reading mode rejects code-indented table delimiters', (
+    tester,
+  ) async {
+    const source =
+        '| A | B |\n'
+        '    | --- | --- |\n'
+        '| one | two |';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Table), findsNothing);
+    expect(_renderedPlainTextContains(tester, '| A | B |'), isTrue);
+    expect(_renderedPlainTextContains(tester, '| one | two |'), isTrue);
+  });
+
   testWidgets('table projection ignores fenced source and missing delimiters', (
     tester,
   ) async {

@@ -225,6 +225,46 @@ $$
     expect(validBlocks.single.source, valid);
   });
 
+  test('recognizes framed single-column tables', () {
+    for (final source in <String>[
+      '| A |\n| --- |\n| one |',
+      '${r'| A \| pipe |'}\n| --- |\n| one |',
+      'A\n| --- |\none',
+    ]) {
+      final blocks = parseMarkdownBlocks(source);
+
+      expect(blocks, hasLength(1));
+      expect(blocks.single.type, IanvsMarkdownBlockType.table);
+      expect(blocks.single.source, source);
+    }
+  });
+
+  test('rejects code-indented table delimiter rows', () {
+    const valid =
+        '| A | B |\n'
+        '   | --- | --- |\n'
+        '| one | two |';
+    const codeIndented =
+        '| A | B |\n'
+        '    | --- | --- |\n'
+        '| one | two |';
+    const tabIndented =
+        '| A | B |\n'
+        '\t| --- | --- |\n'
+        '| one | two |';
+
+    expect(
+      parseMarkdownBlocks(valid).single.type,
+      IanvsMarkdownBlockType.table,
+    );
+    for (final source in <String>[codeIndented, tabIndented]) {
+      final invalidBlocks = parseMarkdownBlocks(source);
+      expect(invalidBlocks, hasLength(1));
+      expect(invalidBlocks.single.type, IanvsMarkdownBlockType.paragraph);
+      expect(invalidBlocks.single.source, source);
+    }
+  });
+
   test('classifies alternate and ordered task states without rewriting', () {
     const source = '- [!] Important\n\n1. [/] In progress\n\n- [k] Unknown';
 
