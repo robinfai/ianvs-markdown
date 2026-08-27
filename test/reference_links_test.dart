@@ -36,4 +36,21 @@ void main() {
     );
     expect(context.appendDefinitionsTo('Plain text.'), 'Plain text.');
   });
+
+  test('isolated blocks preserve parser resolution and inline fallback', () {
+    const source =
+        r'[ref\]part]: docs/escaped.md'
+        '\n[fallback]: docs/fallback.md';
+    final context = MarkdownLinkReferenceContext.parse(source);
+
+    expect(
+      context.appendDefinitionsTo(r'[label][ref\]part]'),
+      r'[label][ref\]part]',
+    );
+    expect(
+      context.appendDefinitionsTo('[fallback](target "unclosed)'),
+      '[fallback](target "unclosed)\n\n'
+      '[fallback]: <docs/fallback.md>',
+    );
+  });
 }

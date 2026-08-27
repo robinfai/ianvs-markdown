@@ -1,5 +1,10 @@
 ## Unreleased
 
+- Match Obsidian ordinary-link source recognition for empty and angle-wrapped
+  destinations, balanced and escaped parentheses, double-, single-, and
+  parenthesis-delimited titles, soft-line title whitespace, malformed-link
+  fallback, nested labels, and parser-compatible full-reference labels; share
+  the same scanner with block-local reference-definition injection.
 - Match Obsidian Callout headers for case-insensitive non-empty types up to
   `]`, Unicode and punctuation fallback cards, strict zero-or-one-space quote
   markers, real-blank block boundaries, exact active source markers, and

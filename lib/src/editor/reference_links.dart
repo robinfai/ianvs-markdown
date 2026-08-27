@@ -1,5 +1,7 @@
 import 'package:markdown/markdown.dart' as md;
 
+import '../markdown_link_source.dart';
+
 /// Document-wide Markdown link references needed by block-based live preview.
 final class MarkdownLinkReferenceContext {
   MarkdownLinkReferenceContext._(this.references);
@@ -25,15 +27,7 @@ final class MarkdownLinkReferenceContext {
   String appendDefinitionsTo(String source) {
     if (source.isEmpty || references.isEmpty) return source;
     final labels = <String>{};
-    final candidates = RegExp(
-      r'!?\[([^\]\r\n]+)\](?:\[([^\]\r\n]*)\])?',
-    ).allMatches(source);
-    for (final candidate in candidates) {
-      final primary = candidate.group(1) ?? '';
-      final secondary = candidate.group(2);
-      final label = secondary == null || secondary.isEmpty
-          ? primary
-          : secondary;
+    for (final label in findIanvsMarkdownReferencedLabels(source)) {
       final normalized = normalizeMarkdownLinkReferenceLabel(label);
       if (references.containsKey(normalized)) labels.add(normalized);
     }

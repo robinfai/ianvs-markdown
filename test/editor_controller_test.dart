@@ -3054,6 +3054,81 @@ void main() {
   });
 
   test(
+    'Markdown link source styling validates titles and soft-line whitespace',
+    () {
+      const syntax = IanvsMarkdownSyntaxTheme(
+        heading: TextStyle(fontWeight: FontWeight.w600),
+        marker: TextStyle(color: Color(0xff777777)),
+        link: TextStyle(decoration: TextDecoration.underline),
+        code: TextStyle(fontFamily: 'monospace'),
+        comment: TextStyle(fontStyle: FontStyle.italic),
+      );
+      const source =
+          'Empty []() tail.\n'
+          'Soft [soft](https://example.com\n"soft title") tail.\n'
+          'Unclosed [unclosed](https://example.com "title) tail.\n'
+          'Trailing [trailing](https://example.com "title" mystery) tail.';
+
+      List<TextSpan> build(int caret) => buildMarkdownSourceTextSpan(
+        TextEditingValue(
+          text: source,
+          selection: TextSelection.collapsed(offset: caret),
+        ),
+        style: const TextStyle(fontSize: 14),
+        syntaxTheme: syntax,
+        withComposing: false,
+        hideInactiveInlineMarkers: true,
+      ).children!.cast<TextSpan>().toList();
+
+      TextSpan spanAt(List<TextSpan> spans, int offset) {
+        var cursor = 0;
+        for (final span in spans) {
+          final end = cursor + (span.text?.length ?? 0);
+          if (offset >= cursor && offset < end) return span;
+          cursor = end;
+        }
+        throw StateError('No span at $offset');
+      }
+
+      final inactive = build(0);
+      final emptyStart = source.indexOf('[]()');
+      expect(spanAt(inactive, emptyStart).style?.fontSize, .01);
+      expect(spanAt(inactive, emptyStart + 3).style?.fontSize, .01);
+
+      final softStart = source.indexOf('[soft]');
+      final softLabel = source.indexOf('soft', softStart);
+      final softEnd = source.indexOf('")', softLabel) + 2;
+      expect(
+        spanAt(inactive, softLabel).style?.decoration,
+        TextDecoration.underline,
+      );
+      expect(spanAt(inactive, softStart).style?.fontSize, .01);
+      expect(spanAt(inactive, softEnd - 1).style?.fontSize, .01);
+      expect(
+        ianvsMarkdownInlineSourceRangeAt(
+          source,
+          TextRange(start: softLabel, end: softLabel + 4),
+        )?.textInside(source),
+        source.substring(softStart, softEnd),
+      );
+
+      expect(
+        spanAt(inactive, source.indexOf('unclosed')).style?.decoration,
+        isNull,
+      );
+      expect(
+        spanAt(inactive, source.indexOf('trailing')).style?.decoration,
+        isNull,
+      );
+
+      final active = build(softLabel + 1);
+      expect(spanAt(active, softStart).style?.fontSize, 14);
+      expect(spanAt(active, softEnd - 1).style?.fontSize, 14);
+      expect(inactive.map((span) => span.text).join(), source);
+    },
+  );
+
+  test(
     'reference links resolve document definitions before hiding markers',
     () {
       const syntax = IanvsMarkdownSyntaxTheme(

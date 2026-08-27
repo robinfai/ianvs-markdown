@@ -8,6 +8,7 @@ import '../code_block.dart';
 import '../emphasis.dart';
 import '../footnote_syntax.dart';
 import '../highlight.dart';
+import '../markdown_link_source.dart';
 import '../obsidian_autolink.dart';
 import '../obsidian_html.dart';
 import '../obsidian_inline.dart';
@@ -3335,60 +3336,46 @@ List<TextRange> _addLinkSyntaxTokens(
       index = bracketStart + 1;
       continue;
     }
-    final labelEnd = _balancedMarkdownDelimiterEnd(
-      text,
-      bracketStart,
-      opening: 0x5b,
-      closing: 0x5d,
-    );
+    final labelEnd = findIanvsMarkdownLinkLabelEnd(text, bracketStart);
     if (labelEnd == null ||
         labelEnd + 1 >= text.length ||
         text.codeUnitAt(labelEnd + 1) != 0x28) {
       index = bracketStart + 1;
       continue;
     }
-    final destinationEnd = _balancedMarkdownDelimiterEnd(
-      text,
-      labelEnd + 1,
-      opening: 0x28,
-      closing: 0x29,
-    );
-    if (destinationEnd == null) {
+    final matchEnd = findIanvsMarkdownInlineLinkEnd(text, labelEnd + 1);
+    if (matchEnd == null) {
       index = bracketStart + 1;
       continue;
     }
-    final matchEnd = destinationEnd + 1;
     if (_overlapsAnyRange(matchStart, matchEnd, excludedRanges)) {
       index = matchEnd;
       continue;
     }
     final labelStart = bracketStart + 1;
-    if (labelStart >= labelEnd) {
-      index = matchEnd;
-      continue;
-    }
     final revealRange = TextRange(start: matchStart, end: matchEnd);
     literalRanges
       ..add(TextRange(start: matchStart, end: labelStart))
       ..add(TextRange(start: labelEnd, end: matchEnd));
-    target
-      ..add(
-        _SyntaxToken(
-          matchStart,
-          labelStart,
-          theme.marker,
-          inlineMarkerRange: revealRange,
-        ),
-      )
-      ..add(_SyntaxToken(labelStart, labelEnd, theme.link))
-      ..add(
-        _SyntaxToken(
-          labelEnd,
-          matchEnd,
-          theme.marker,
-          inlineMarkerRange: revealRange,
-        ),
-      );
+    target.add(
+      _SyntaxToken(
+        matchStart,
+        labelStart,
+        theme.marker,
+        inlineMarkerRange: revealRange,
+      ),
+    );
+    if (labelStart < labelEnd) {
+      target.add(_SyntaxToken(labelStart, labelEnd, theme.link));
+    }
+    target.add(
+      _SyntaxToken(
+        labelEnd,
+        matchEnd,
+        theme.marker,
+        inlineMarkerRange: revealRange,
+      ),
+    );
     index = matchEnd;
   }
   return literalRanges;
@@ -3425,12 +3412,7 @@ List<TextRange> _addReferenceLinkSyntaxTokens(
       index = bracketStart + 1;
       continue;
     }
-    final labelEnd = _balancedMarkdownDelimiterEnd(
-      text,
-      bracketStart,
-      opening: 0x5b,
-      closing: 0x5d,
-    );
+    final labelEnd = findIanvsMarkdownLinkLabelEnd(text, bracketStart);
     if (labelEnd == null) {
       index = bracketStart + 1;
       continue;
@@ -3441,31 +3423,24 @@ List<TextRange> _addReferenceLinkSyntaxTokens(
     var referenceLabel = primaryLabel;
     var matchEnd = labelEnd + 1;
     if (matchEnd < text.length && text.codeUnitAt(matchEnd) == 0x28) {
-      final inlineDestinationEnd = _balancedMarkdownDelimiterEnd(
-        text,
-        matchEnd,
-        opening: 0x28,
-        closing: 0x29,
-      );
-      if (inlineDestinationEnd != null) {
+      final inlineLinkEnd = findIanvsMarkdownInlineLinkEnd(text, matchEnd);
+      if (inlineLinkEnd != null) {
         index = matchEnd;
         continue;
       }
     }
     if (matchEnd < text.length && text.codeUnitAt(matchEnd) == 0x5b) {
-      final referenceEnd = _balancedMarkdownDelimiterEnd(
-        text,
-        matchEnd,
-        opening: 0x5b,
-        closing: 0x5d,
-      );
-      if (referenceEnd == null) {
-        index = matchEnd + 1;
-        continue;
+      if (matchEnd + 1 < text.length && text.codeUnitAt(matchEnd + 1) == 0x5d) {
+        matchEnd += 2;
+      } else {
+        final reference = findIanvsMarkdownReferenceLabel(text, matchEnd);
+        if (reference == null) {
+          index = matchEnd + 1;
+          continue;
+        }
+        referenceLabel = reference.label;
+        matchEnd = reference.end;
       }
-      final secondaryLabel = text.substring(matchEnd + 1, referenceEnd);
-      if (secondaryLabel.isNotEmpty) referenceLabel = secondaryLabel;
-      matchEnd = referenceEnd + 1;
     } else {
       if (matchEnd < text.length && text.codeUnitAt(matchEnd) == 0x3a) {
         index = matchEnd;
@@ -3517,35 +3492,6 @@ bool _isTaskCheckboxCandidate(String text, int start, int end) {
   final lineStart = text.lastIndexOf('\n', start - 1) + 1;
   final prefix = text.substring(lineStart, start);
   return RegExp(r'^ {0,3}(?:[-+*]|\d{1,9}[.)])[ \t]+$').hasMatch(prefix);
-}
-
-int? _balancedMarkdownDelimiterEnd(
-  String text,
-  int start, {
-  required int opening,
-  required int closing,
-}) {
-  if (start < 0 || start >= text.length || text.codeUnitAt(start) != opening) {
-    return null;
-  }
-  var depth = 1;
-  var index = start + 1;
-  while (index < text.length) {
-    final character = text.codeUnitAt(index);
-    if (character == 0x0a || character == 0x0d) return null;
-    if (character == 0x5c && index + 1 < text.length) {
-      index += 2;
-      continue;
-    }
-    if (character == opening) {
-      depth += 1;
-    } else if (character == closing) {
-      depth -= 1;
-      if (depth == 0) return index;
-    }
-    index += 1;
-  }
-  return null;
 }
 
 List<TextRange> _addAutolinkSyntaxTokens(
