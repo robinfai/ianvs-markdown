@@ -1,5 +1,8 @@
 ## Unreleased
 
+- Preserve footnote, comment, and block-ID-shaped text inside code blocks that
+  begin in ordered, unordered, empty, nested, quoted, or tab-separated list
+  items, with container prefixes excluded from exact UTF-16 source ranges.
 - Preserve footnote, comment, and block-ID-shaped text inside fenced or
   indented code nested in one or more block-quote containers, with original
   UTF-16 source ranges shared by Reading, Live Preview, and source styling.

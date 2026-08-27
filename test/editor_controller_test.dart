@@ -3606,6 +3606,78 @@ Outside ^[outside] and [^outside] %%outside%% ^outside-id
     }
   });
 
+  test('live source metadata yields to code inside list items', () {
+    const syntax = IanvsMarkdownSyntaxTheme(
+      heading: TextStyle(),
+      marker: TextStyle(color: Color(0xff777777)),
+      link: TextStyle(),
+      code: TextStyle(fontFamily: 'monospace'),
+      comment: TextStyle(color: Color(0xff555555)),
+    );
+    const source = '''
+1.     ordered ^[ordered] and [^inside] %%ordered%% ^ordered-id
+-
+      empty ^[empty] and [^inside] %%empty%% ^empty-id
+-
+  -
+        nested ^[nested] and [^inside] %%nested%% ^nested-id
+- quote
+  >     quoted ^[quoted] and [^inside] %%quoted%% ^quoted-id
+-\t\tTabbed ^[tabbed] and [^inside] %%tabbed%% ^tabbed-id
+- ```md
+  fenced ^[fenced] and [^inside] %%fenced%% ^fenced-id
+  ```
+
+Outside ^[outside] and [^outside] %%outside%% ^outside-id
+''';
+
+    final spans = buildMarkdownSourceTextSpan(
+      const TextEditingValue(
+        text: source,
+        selection: TextSelection.collapsed(offset: 0),
+      ),
+      style: const TextStyle(fontSize: 14),
+      syntaxTheme: syntax,
+      withComposing: false,
+    ).children!.cast<TextSpan>().toList();
+
+    expect(spans.map((span) => span.text).join(), source);
+    final metadata = spans
+        .where((span) => span.style?.color == const Color(0xff555555))
+        .map((span) => span.text)
+        .join();
+    for (final outside in <String>[
+      '^[outside]',
+      '[^outside]',
+      '%%outside%%',
+      ' ^outside-id',
+    ]) {
+      expect(metadata, contains(outside));
+    }
+    for (final inside in <String>[
+      '^[ordered]',
+      '%%ordered%%',
+      '^ordered-id',
+      '^[empty]',
+      '%%empty%%',
+      '^empty-id',
+      '^[nested]',
+      '%%nested%%',
+      '^nested-id',
+      '^[quoted]',
+      '%%quoted%%',
+      '^quoted-id',
+      '^[tabbed]',
+      '%%tabbed%%',
+      '^tabbed-id',
+      '^[fenced]',
+      '%%fenced%%',
+      '^fenced-id',
+    ]) {
+      expect(metadata, isNot(contains(inside)));
+    }
+  });
+
   test('live source keeps code-shaped closers inside the outer comment', () {
     const syntax = IanvsMarkdownSyntaxTheme(
       heading: TextStyle(),

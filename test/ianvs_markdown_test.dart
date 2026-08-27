@@ -4255,6 +4255,69 @@ code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     );
   });
 
+  test('keeps Obsidian metadata literal inside list-contained code', () {
+    const source = '''
+1.     ordered ^[ordered] and [^inside] %%ordered%% ^ordered-id
+-
+      empty ^[empty] and [^inside] %%empty%% ^empty-id
+-
+  -
+        nested ^[nested] and [^inside] %%nested%% ^nested-id
+- quote
+  >     quoted ^[quoted] and [^inside] %%quoted%% ^quoted-id
+-\t\tTabbed ^[tabbed] and [^inside] %%tabbed%% ^tabbed-id
+- ```md
+  fenced ^[fenced] and [^inside] %%fenced%% ^fenced-id
+  ```
+
+Outside ^[outside] and [^outside] %%outside%% ^outside-id
+
+[^inside]: Inside.
+[^outside]: Outside.
+''';
+
+    expect(collectObsidianStandardFootnoteOrdinals(source), <String, int>{
+      'outside': 2,
+    });
+    final presentations = ianvsMarkdownLivePreviewFootnoteReferences(source);
+    expect(presentations.map((reference) => reference.label), <String>[
+      '[1]',
+      '[2]',
+    ]);
+    expect(
+      presentations.map(
+        (reference) => reference.sourceRange.textInside(source),
+      ),
+      <String>['^[outside]', '[^outside]'],
+    );
+    expect(
+      ianvsMarkdownCommentRanges(
+        source,
+      ).map((range) => range.textInside(source)),
+      <String>['%%outside%%'],
+    );
+    expect(
+      ianvsMarkdownBlockIdRanges(
+        source,
+      ).map((range) => range.textInside(source)),
+      <String>[' ^outside-id'],
+    );
+
+    final prepared = prepareObsidianMarkdownForRendering(source);
+    for (final inside in <String>[
+      '%%ordered%% ^ordered-id',
+      '%%empty%% ^empty-id',
+      '%%nested%% ^nested-id',
+      '%%quoted%% ^quoted-id',
+      '%%tabbed%% ^tabbed-id',
+      '%%fenced%% ^fenced-id',
+    ]) {
+      expect(prepared, contains(inside));
+    }
+    expect(prepared, isNot(contains('%%outside%%')));
+    expect(prepared, isNot(contains('^outside-id')));
+  });
+
   testWidgets('reading keeps multiline-code footnotes literal', (tester) async {
     const source = '''
 `code

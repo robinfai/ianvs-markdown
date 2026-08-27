@@ -265,6 +265,46 @@ $$
     );
   });
 
+  test('code ranges project list item containers and preserve prefixes', () {
+    const source =
+        'Before 😀.\r\n'
+        '\r\n'
+        '1.     ordered 😀 ^[one]\r\n'
+        '-\r\n'
+        '      empty ^[two]\r\n'
+        '-\r\n'
+        '  -\r\n'
+        '        nested ^[three]\r\n'
+        '- quote\r\n'
+        '  >     quoted ^[four]\r\n'
+        '-\t\tTabbed ^[five]\r\n'
+        '- ```md\r\n'
+        '  fenced ^[six]\r\n'
+        '  ```\r\n'
+        'After.';
+
+    final ranges = ianvsMarkdownBlockCodeRanges(source);
+
+    expect(ranges, hasLength(8));
+    expect(ranges.map((range) => range.textInside(source)), <String>[
+      '    ordered 😀 ^[one]',
+      '    empty ^[two]',
+      '    nested ^[three]',
+      '    quoted ^[four]',
+      '\tTabbed ^[five]',
+      '```md\r\n',
+      'fenced ^[six]\r\n',
+      '```',
+    ]);
+    expect(
+      ianvsMarkdownBlockCodeRanges(
+        '- paragraph\n  continuation ^[outside]\n'
+        '- item\n      indented continuation ^[outside]',
+      ),
+      isEmpty,
+    );
+  });
+
   test('paired standalone comments keep internal blank lines in one block', () {
     const comment = '%%\nhidden first\n\nhidden second\n%%';
     const source = 'Before.\n\n$comment\n\nAfter.';

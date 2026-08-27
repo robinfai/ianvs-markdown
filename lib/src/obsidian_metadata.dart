@@ -249,9 +249,6 @@ int _rangeEndContainingOffset(List<TextRange> ranges, int offset) {
   return -1;
 }
 
-final RegExp _obsidianBlockIdFencePattern = RegExp(
-  r'^ {0,3}(`{3,}|~{3,})(.*)$',
-);
 final RegExp _obsidianTrailingBlockIdPattern = RegExp(r'\^[A-Za-z0-9_-]+ *$');
 final RegExp _obsidianTableBlockIdPattern = RegExp(
   r'\|([ \t]*)(\\*)\^([A-Za-z0-9_-]+)([ \t]*)(?=\|)',
@@ -271,32 +268,8 @@ List<TextRange> ianvsMarkdownBlockIdRanges(String source) {
   final blocks = parseMarkdownBlocks(source);
   final lines = source.split('\n');
   var offset = 0;
-  var fenceCharacter = 0;
-  var fenceLength = 0;
 
   for (final line in lines) {
-    final fence = _obsidianBlockIdFencePattern.firstMatch(line);
-    if (fenceLength > 0) {
-      if (fence != null) {
-        final marker = fence.group(1)!;
-        if (marker.codeUnitAt(0) == fenceCharacter &&
-            marker.length >= fenceLength &&
-            fence.group(2)!.trim().isEmpty) {
-          fenceCharacter = 0;
-          fenceLength = 0;
-        }
-      }
-      offset += line.length + 1;
-      continue;
-    }
-    if (fence != null) {
-      final marker = fence.group(1)!;
-      fenceCharacter = marker.codeUnitAt(0);
-      fenceLength = marker.length;
-      offset += line.length + 1;
-      continue;
-    }
-
     for (final match in _obsidianTableBlockIdPattern.allMatches(line)) {
       final slashes = match.group(2)!;
       if (slashes.length.isOdd) continue;
@@ -1060,44 +1033,35 @@ List<_ObsidianStandardFootnoteDefinition> _standardFootnoteDefinitions(
   String source,
 ) {
   final definitions = <_ObsidianStandardFootnoteDefinition>[];
+  final blockCodeRanges = ianvsMarkdownBlockCodeRanges(source);
   final definitionPattern = RegExp(
     r'^[ ]{0,3}\[\^([^\] \r\n\x00\t]+)\]:[ \t]*',
   );
-  var fenceCharacter = 0;
-  var fenceLength = 0;
   var lineStart = 0;
   while (lineStart <= source.length) {
     final newline = source.indexOf('\n', lineStart);
     final lineEnd = newline < 0 ? source.length : newline;
     final line = source.substring(lineStart, lineEnd);
-    final fence = RegExp(r'^ {0,3}(`{3,}|~{3,})').firstMatch(line);
-    if (fence != null) {
-      final marker = fence.group(1)!;
-      if (fenceLength == 0) {
-        fenceCharacter = marker.codeUnitAt(0);
-        fenceLength = marker.length;
-      } else if (marker.codeUnitAt(0) == fenceCharacter &&
-          marker.length >= fenceLength) {
-        fenceCharacter = 0;
-        fenceLength = 0;
-      }
-    } else if (fenceLength == 0) {
-      final definition = definitionPattern.firstMatch(line);
-      if (definition != null) {
-        final label = definition.group(1)!;
-        final labelStart =
-            lineStart +
-            definition.start +
-            definition.group(0)!.indexOf('[^') +
-            2;
-        definitions.add(
-          _ObsidianStandardFootnoteDefinition(
-            labelStart: labelStart,
-            labelEnd: labelStart + label.length,
-            normalizedLabel: label.toLowerCase(),
-          ),
-        );
-      }
+    final definition = definitionPattern.firstMatch(line);
+    final sourceRange = definition == null
+        ? null
+        : TextRange(
+            start: lineStart + definition.start,
+            end: lineStart + definition.end,
+          );
+    if (definition != null &&
+        sourceRange != null &&
+        !_overlapsMetadataRange(sourceRange, blockCodeRanges)) {
+      final label = definition.group(1)!;
+      final labelStart =
+          lineStart + definition.start + definition.group(0)!.indexOf('[^') + 2;
+      definitions.add(
+        _ObsidianStandardFootnoteDefinition(
+          labelStart: labelStart,
+          labelEnd: labelStart + label.length,
+          normalizedLabel: label.toLowerCase(),
+        ),
+      );
     }
     if (newline < 0) break;
     lineStart = newline + 1;
