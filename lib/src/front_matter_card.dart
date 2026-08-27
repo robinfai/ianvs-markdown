@@ -20,6 +20,25 @@ bool _isOuterMarkdownFormattingShortcut(KeyEvent event) {
   return keyboard.isMetaPressed != keyboard.isControlPressed;
 }
 
+bool _isPropertyTraversalShortcut(KeyEvent event) {
+  if (event is! KeyDownEvent || event.logicalKey != LogicalKeyboardKey.tab) {
+    return false;
+  }
+  final keyboard = HardwareKeyboard.instance;
+  return !keyboard.isAltPressed &&
+      !keyboard.isControlPressed &&
+      !keyboard.isMetaPressed;
+}
+
+void _traversePropertyFocus(BuildContext context) {
+  final focusScope = FocusScope.of(context);
+  if (HardwareKeyboard.instance.isShiftPressed) {
+    focusScope.previousFocus();
+  } else {
+    focusScope.nextFocus();
+  }
+}
+
 typedef IanvsMarkdownMetadataTextChanged =
     void Function(MarkdownMetadataEntry entry, String value);
 typedef IanvsMarkdownMetadataBooleanChanged =
@@ -513,6 +532,10 @@ class _ObsidianEditableKeyState extends State<_ObsidianEditableKey> {
     if (_isOuterMarkdownFormattingShortcut(event)) {
       return KeyEventResult.handled;
     }
+    if (_isPropertyTraversalShortcut(event)) {
+      _traversePropertyFocus(context);
+      return KeyEventResult.handled;
+    }
     if (event is! KeyDownEvent ||
         event.logicalKey != LogicalKeyboardKey.escape) {
       return KeyEventResult.ignored;
@@ -877,6 +900,11 @@ class _ObsidianEditableListValueState
     if (_isOuterMarkdownFormattingShortcut(event)) {
       return KeyEventResult.handled;
     }
+    if (_isPropertyTraversalShortcut(event)) {
+      _commitInput();
+      _traversePropertyFocus(context);
+      return KeyEventResult.handled;
+    }
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
     if (event.logicalKey == LogicalKeyboardKey.escape) {
       if (widget.tag) {
@@ -886,9 +914,6 @@ class _ObsidianEditableListValueState
       }
       node.unfocus();
       return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.tab) {
-      _commitInput();
     }
     return KeyEventResult.ignored;
   }
@@ -1082,6 +1107,17 @@ class _ObsidianEditableDateValueState
     _dayFocusNode.unfocus();
   }
 
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (_isOuterMarkdownFormattingShortcut(event)) {
+      return KeyEventResult.handled;
+    }
+    if (_isPropertyTraversalShortcut(event)) {
+      _traversePropertyFocus(context);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
   Future<void> _showDatePicker() async {
     final committed = DateTime.tryParse(_committedValue);
     final initial = _pendingDate() ?? committed ?? DateTime.now();
@@ -1119,37 +1155,40 @@ class _ObsidianEditableDateValueState
       label: '${widget.entry.key} $label',
       child: SizedBox(
         width: width,
-        child: TextField(
-          key: ValueKey(
-            'ianvs-markdown-front-matter-date-$keySuffix-${widget.entry.key}',
-          ),
-          controller: controller,
-          focusNode: focusNode,
-          maxLines: 1,
-          maxLength: maximumLength,
-          keyboardType: TextInputType.number,
-          textInputAction: TextInputAction.done,
-          textAlign: TextAlign.center,
-          smartDashesType: SmartDashesType.disabled,
-          smartQuotesType: SmartQuotesType.disabled,
-          autocorrect: false,
-          enableSuggestions: false,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          onSubmitted: (_) => _submit(),
-          style: TextStyle(
-            color: widget.colors.textPrimary,
-            fontSize: 11.5,
-            height: 1.35,
-          ),
-          cursorColor: widget.colors.accent,
-          decoration: InputDecoration(
-            isDense: true,
-            counterText: '',
-            contentPadding: const EdgeInsets.symmetric(vertical: 2),
-            border: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: widget.colors.accentSoft),
+        child: Focus(
+          onKeyEvent: _handleKeyEvent,
+          child: TextField(
+            key: ValueKey(
+              'ianvs-markdown-front-matter-date-$keySuffix-${widget.entry.key}',
+            ),
+            controller: controller,
+            focusNode: focusNode,
+            maxLines: 1,
+            maxLength: maximumLength,
+            keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.done,
+            textAlign: TextAlign.center,
+            smartDashesType: SmartDashesType.disabled,
+            smartQuotesType: SmartQuotesType.disabled,
+            autocorrect: false,
+            enableSuggestions: false,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onSubmitted: (_) => _submit(),
+            style: TextStyle(
+              color: widget.colors.textPrimary,
+              fontSize: 11.5,
+              height: 1.35,
+            ),
+            cursorColor: widget.colors.accent,
+            decoration: InputDecoration(
+              isDense: true,
+              counterText: '',
+              contentPadding: const EdgeInsets.symmetric(vertical: 2),
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: widget.colors.accentSoft),
+              ),
             ),
           ),
         ),
@@ -1306,6 +1345,10 @@ class _ObsidianEditableNumberValueState
     if (_isOuterMarkdownFormattingShortcut(event)) {
       return KeyEventResult.handled;
     }
+    if (_isPropertyTraversalShortcut(event)) {
+      _traversePropertyFocus(context);
+      return KeyEventResult.handled;
+    }
     if (event is! KeyDownEvent ||
         event.logicalKey != LogicalKeyboardKey.escape) {
       return KeyEventResult.ignored;
@@ -1435,6 +1478,10 @@ class _ObsidianEditableTextValueState
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (_isOuterMarkdownFormattingShortcut(event)) {
+      return KeyEventResult.handled;
+    }
+    if (_isPropertyTraversalShortcut(event)) {
+      _traversePropertyFocus(context);
       return KeyEventResult.handled;
     }
     if (event is! KeyDownEvent ||

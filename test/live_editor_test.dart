@@ -4768,6 +4768,85 @@ title: Alpha
     }),
   );
 
+  testWidgets(
+    'property Tab traversal never indents a stale document selection',
+    (tester) async {
+      const source = '''
+---
+title: Alpha
+---
+- one
+    - two
+''';
+      const expected = '''
+---
+title: Beta
+---
+- one
+    - two
+''';
+
+      for (final backwards in <bool>[false, true]) {
+        final controller = IanvsMarkdownController(text: source);
+        addTearDown(controller.dispose);
+        await tester.pumpWidget(app(controller));
+        await tester.pumpAndSettle();
+
+        final input = find.byKey(
+          const ValueKey('ianvs-markdown-front-matter-input-title'),
+        );
+        await tester.tap(input);
+        await tester.enterText(input, 'Beta');
+        controller.selection = TextSelection.collapsed(
+          offset: source.indexOf('two') + 1,
+        );
+
+        if (backwards) {
+          await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+        }
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        if (backwards) {
+          await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+        }
+        await tester.pumpAndSettle();
+
+        expect(controller.text, expected, reason: 'backwards: $backwards');
+        expect(controller.text, isNot(contains('        - two')));
+        expect(controller.text, isNot(contains('\n- two')));
+      }
+    },
+  );
+
+  testWidgets('date property Tab stays local to its segmented input', (
+    tester,
+  ) async {
+    const source = '''
+---
+due: 2026-08-28
+---
+- one
+    - two
+''';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final dayInput = find.byKey(
+      const ValueKey('ianvs-markdown-front-matter-date-day-due'),
+    );
+    await tester.tap(dayInput);
+    await tester.enterText(dayInput, '27');
+    controller.selection = TextSelection.collapsed(
+      offset: source.indexOf('two') + 1,
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+
+    expect(controller.text, source);
+    expect(tester.widget<TextField>(dayInput).controller?.text, '27');
+  });
+
   testWidgets('property keys rename in place and reject empty or duplicate', (
     tester,
   ) async {
