@@ -284,8 +284,12 @@ IanvsMarkdownBlockType _classifyBlock(List<_SourceLine> lines, int index) {
   if (_isThematicBreak(text)) return IanvsMarkdownBlockType.thematicBreak;
   if (_isBlockquote(text)) return IanvsMarkdownBlockType.blockquote;
   if (_isTaskList(text)) return IanvsMarkdownBlockType.taskList;
-  if (_isUnorderedList(text)) return IanvsMarkdownBlockType.unorderedList;
-  if (_isOrderedList(text)) return IanvsMarkdownBlockType.orderedList;
+  final listMarker = _blockListMarker(text);
+  if (listMarker != null) {
+    return listMarker.ordered
+        ? IanvsMarkdownBlockType.orderedList
+        : IanvsMarkdownBlockType.unorderedList;
+  }
   if (_isTableStart(lines, index)) return IanvsMarkdownBlockType.table;
   if (_isHtmlStart(text)) return IanvsMarkdownBlockType.html;
   if (index + 1 < lines.length && _isSetextUnderline(lines[index + 1].text)) {
@@ -363,13 +367,33 @@ int _blockquoteEnd(List<_SourceLine> lines, int first) {
 }
 
 int _listEnd(List<_SourceLine> lines, int first) {
-  final ordered = _isOrderedList(lines[first].text);
+  final openingMarker = _blockListMarker(lines[first].text);
+  if (openingMarker == null) return first;
+  var marker = openingMarker;
   var last = first;
+  var pendingBlank = false;
   for (var index = first + 1; index < lines.length; index += 1) {
     final text = lines[index].text;
-    if (text.trim().isEmpty) break;
-    if (_isIndentedContinuation(text) ||
-        (ordered ? _isOrderedList(text) : _isUnorderedList(text))) {
+    if (text.trim().isEmpty) {
+      pendingBlank = true;
+      continue;
+    }
+
+    final candidate = _blockListMarker(text);
+    if (candidate != null && candidate.leadingColumns < marker.contentIndent) {
+      if (candidate.ordered != marker.ordered) break;
+      marker = candidate;
+      last = index;
+      pendingBlank = false;
+      continue;
+    }
+    if (pendingBlank && marker.blank) break;
+    if (_isIndentedContinuation(text, minimumColumns: marker.contentIndent)) {
+      last = index;
+      pendingBlank = false;
+      continue;
+    }
+    if (!pendingBlank && !_startsNewBlock(lines, index)) {
       last = index;
       continue;
     }
@@ -379,13 +403,26 @@ int _listEnd(List<_SourceLine> lines, int first) {
 }
 
 int _listItemEnd(List<_SourceLine> lines, int first) {
+  final marker = _blockListMarker(lines[first].text);
+  if (marker == null) return first;
   var last = first;
+  var pendingBlank = false;
   for (var index = first + 1; index < lines.length; index += 1) {
     final text = lines[index].text;
-    if (text.trim().isEmpty || _listItemTypeAtAnyIndent(text) != null) {
+    if (text.trim().isEmpty) {
+      pendingBlank = true;
+      continue;
+    }
+    if (_listItemTypeAtAnyIndent(text) != null) {
       break;
     }
-    if (_isIndentedContinuation(text)) {
+    if (pendingBlank && marker.blank) break;
+    if (_isIndentedContinuation(text, minimumColumns: marker.contentIndent)) {
+      last = index;
+      pendingBlank = false;
+      continue;
+    }
+    if (!pendingBlank && !_startsNewBlock(lines, index)) {
       last = index;
       continue;
     }
@@ -399,24 +436,30 @@ IanvsMarkdownBlockType? _nestedListItemType(
   int index,
   List<IanvsMarkdownBlock> blocks,
 ) {
-  if (index <= 0 ||
-      blocks.isEmpty ||
-      blocks.last.lastLine != index - 1 ||
-      lines[index - 1].text.trim().isEmpty) {
+  if (index <= 0 || blocks.isEmpty) {
     return null;
   }
-  final previousType = blocks.last.type;
+  final previous = blocks.last;
+  final separatedByBlank = previous.lastLine + 1 < index;
+  for (var cursor = previous.lastLine + 1; cursor < index; cursor += 1) {
+    if (lines[cursor].text.trim().isNotEmpty) return null;
+  }
+  final previousType = previous.type;
   if (previousType != IanvsMarkdownBlockType.unorderedList &&
       previousType != IanvsMarkdownBlockType.orderedList &&
       previousType != IanvsMarkdownBlockType.taskList) {
     return null;
+  }
+  if (separatedByBlank) {
+    final previousFirstLine = previous.source.split('\n').first;
+    if (_blockListMarker(previousFirstLine)?.blank ?? false) return null;
   }
   return _listItemTypeAtAnyIndent(lines[index].text);
 }
 
 IanvsMarkdownBlockType? _listItemTypeAtAnyIndent(String text) {
   final marker = RegExp(
-    r'^[ \t]*(?:([-+*])|(\d{1,9})[.)])[ \t]+(\[[^\r\n]\](?:[ \t]+|$))?',
+    r'^[ \t]*(?:([-+*])|(\d{1,9})[.)])(?:(?:[ \t]+)(\[[^\r\n]\](?:[ \t]+|$))?|[ \t]*$)',
   ).firstMatch(text);
   if (marker == null) return null;
   if (marker.group(3) != null) return IanvsMarkdownBlockType.taskList;
@@ -505,8 +548,9 @@ bool _isThematicBreak(String text) => RegExp(
 
 bool _isBlockquote(String text) => RegExp(r'^ {0,3}>').hasMatch(text);
 
-bool _isTaskList(String text) =>
-    RegExp(r'^\s{0,3}(?:[-+*]|\d{1,9}[.)])\s+\[[^\r\n]\]\s+').hasMatch(text);
+bool _isTaskList(String text) => RegExp(
+  r'^\s{0,3}(?:[-+*]|\d{1,9}[.)])\s+\[[^\r\n]\](?:[ \t]+|$)',
+).hasMatch(text);
 
 bool _isUnorderedList(String text) =>
     RegExp(r'^\s{0,3}[-+*]\s+').hasMatch(text);
@@ -514,8 +558,62 @@ bool _isUnorderedList(String text) =>
 bool _isOrderedList(String text) =>
     RegExp(r'^\s{0,3}\d{1,9}[.)]\s+').hasMatch(text);
 
-bool _isIndentedContinuation(String text) =>
-    RegExp(r'^(?: {2,}|\t)\S').hasMatch(text);
+bool _isIndentedContinuation(String text, {required int minimumColumns}) =>
+    text.trim().isNotEmpty && _leadingIndentColumns(text) >= minimumColumns;
+
+int _leadingIndentColumns(String text) {
+  var columns = 0;
+  for (final character in text.codeUnits) {
+    if (character == 0x20) {
+      columns += 1;
+    } else if (character == 0x09) {
+      columns += 4 - (columns % 4);
+    } else {
+      break;
+    }
+  }
+  return columns;
+}
+
+_BlockListMarker? _blockListMarker(String text) {
+  final match = RegExp(r'^( {0,3})(?:(\d{1,9})[.)]|([*+-]))').firstMatch(text);
+  if (match == null) return null;
+  final markerEnd = match.end;
+  if (markerEnd < text.length) {
+    final character = text.codeUnitAt(markerEnd);
+    if (character != 0x20 && character != 0x09) return null;
+  }
+
+  final leadingColumns = match.group(1)!.length;
+  final digits = match.group(2);
+  final markerWidth = digits == null ? 1 : digits.length + 1;
+  final precedingWhitespace = leadingColumns + markerWidth + 1;
+  if (markerEnd == text.length) {
+    return _BlockListMarker(
+      ordered: digits != null,
+      leadingColumns: leadingColumns,
+      contentIndent: precedingWhitespace,
+      blank: true,
+    );
+  }
+
+  final contentStart = markerEnd + 1;
+  var content = contentStart;
+  while (content < text.length) {
+    final character = text.codeUnitAt(content);
+    if (character != 0x20 && character != 0x09) break;
+    content += 1;
+  }
+  final extraWhitespace = content - contentStart;
+  return _BlockListMarker(
+    ordered: digits != null,
+    leadingColumns: leadingColumns,
+    contentIndent: content == text.length || extraWhitespace >= 4
+        ? precedingWhitespace
+        : precedingWhitespace + extraWhitespace,
+    blank: content == text.length,
+  );
+}
 
 bool _isIndentedCode(String text) =>
     RegExp(r'^(?: {4}| {0,3}\t)').hasMatch(text);
@@ -582,6 +680,20 @@ final class _SourceLine {
   final int end;
   final String text;
   final int number;
+}
+
+final class _BlockListMarker {
+  const _BlockListMarker({
+    required this.ordered,
+    required this.leadingColumns,
+    required this.contentIndent,
+    required this.blank,
+  });
+
+  final bool ordered;
+  final int leadingColumns;
+  final int contentIndent;
+  final bool blank;
 }
 
 final class _Fence {

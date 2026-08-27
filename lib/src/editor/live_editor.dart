@@ -2900,7 +2900,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
                 previousListBlock,
                 block,
               ) >
-              1) {
+              1 &&
+          _isMarkerOnlyListSource(previousListBlock.source)) {
         indentationStack.clear();
       }
       final indentation = _liveListIndentationColumns(block.source);
@@ -4603,7 +4604,7 @@ class _LiveHeadingFoldFrameState extends State<_LiveHeadingFoldFrame> {
 
 int _liveListIndentationColumns(String source) {
   final marker = RegExp(
-    r'^([ \t]*)(?:[-+*]|\d{1,9}[.)])[ \t]+',
+    r'^([ \t]*)(?:[-+*]|\d{1,9}[.)])(?:[ \t]+|$)',
   ).firstMatch(source);
   if (marker == null) return 0;
   var columns = 0;
@@ -4612,6 +4613,9 @@ int _liveListIndentationColumns(String source) {
   }
   return columns;
 }
+
+bool _isMarkerOnlyListSource(String source) =>
+    RegExp(r'^[ \t]*(?:[-+*]|\d{1,9}[.)])[ \t]*$').hasMatch(source);
 
 class _EditableMarkdownTable extends StatefulWidget {
   const _EditableMarkdownTable({

@@ -566,4 +566,75 @@ visible''';
       IanvsMarkdownBlockType.orderedList,
     ]);
   });
+
+  test('loose lists retain blank-separated items and child blocks', () {
+    const source =
+        '- one\n'
+        '\n'
+        '- two\n'
+        '\n'
+        '  continuation\n'
+        '\n'
+        'After.';
+
+    final grouped = parseMarkdownBlocks(source);
+    expect(grouped, hasLength(2));
+    expect(grouped.first.type, IanvsMarkdownBlockType.unorderedList);
+    expect(grouped.first.source, '- one\n\n- two\n\n  continuation');
+    expect(grouped.last.source, 'After.');
+
+    final split = parseMarkdownBlocks(source, splitListItems: true);
+    expect(split.map((block) => block.type), <IanvsMarkdownBlockType>[
+      IanvsMarkdownBlockType.unorderedList,
+      IanvsMarkdownBlockType.unorderedList,
+      IanvsMarkdownBlockType.paragraph,
+    ]);
+    expect(split.map((block) => block.source), <String>[
+      '- one',
+      '- two\n\n  continuation',
+      'After.',
+    ]);
+  });
+
+  test('marker-only lists retain visual-column Tab continuations', () {
+    const source =
+        '-\n'
+        ' \tcontinued\n'
+        '- parent\n'
+        '\n'
+        '  - child';
+
+    final grouped = parseMarkdownBlocks(source);
+    expect(grouped, hasLength(1));
+    expect(grouped.single.type, IanvsMarkdownBlockType.unorderedList);
+    expect(grouped.single.source, source);
+
+    final split = parseMarkdownBlocks(source, splitListItems: true);
+    expect(
+      split.map((block) => block.type),
+      everyElement(IanvsMarkdownBlockType.unorderedList),
+    );
+    expect(split.map((block) => block.source), <String>[
+      '-\n \tcontinued',
+      '- parent',
+      '  - child',
+    ]);
+
+    final ordered = parseMarkdownBlocks('1.\n \tcontinued');
+    expect(ordered, hasLength(1));
+    expect(ordered.single.type, IanvsMarkdownBlockType.orderedList);
+
+    final emptyTask = parseMarkdownBlocks('- [ ]');
+    expect(emptyTask.single.type, IanvsMarkdownBlockType.taskList);
+
+    final emptyThenBlank = parseMarkdownBlocks('-\n\n  outside');
+    expect(emptyThenBlank.map((block) => block.type), <IanvsMarkdownBlockType>[
+      IanvsMarkdownBlockType.unorderedList,
+      IanvsMarkdownBlockType.paragraph,
+    ]);
+    expect(emptyThenBlank.map((block) => block.source), <String>[
+      '-',
+      '  outside',
+    ]);
+  });
 }

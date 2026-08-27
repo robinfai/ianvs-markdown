@@ -5221,6 +5221,46 @@ url: https://example.com/path
     expect(find.text('Nested'), findsOneWidget);
   });
 
+  testWidgets('loose list child blocks stay inside their editable item', (
+    tester,
+  ) async {
+    final controller = IanvsMarkdownController(
+      text: '- Parent\n\n  continuation\n\n- Sibling',
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('continuation'));
+    await tester.pump();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final field = find.descendant(of: active, matching: find.byType(TextField));
+    expect(
+      tester.widget<TextField>(field).controller?.text,
+      '- Parent\n\n  continuation',
+    );
+    expect(find.text('Sibling'), findsOneWidget);
+  });
+
+  testWidgets('blank-separated nested list items retain their depth', (
+    tester,
+  ) async {
+    final controller = IanvsMarkdownController(
+      text: '- [ ] Parent\n\n  - [ ] Child',
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final checkboxes = find.byType(IanvsMarkdownTaskCheckbox);
+    expect(checkboxes, findsNWidgets(2));
+    final parent = tester.getCenter(checkboxes.at(0));
+    final child = tester.getCenter(checkboxes.at(1));
+    expect(child.dx - parent.dx, closeTo(28, .01));
+  });
+
   testWidgets(
     'nested Live Preview lists keep 28px steps and connected guides',
     (tester) async {

@@ -1,5 +1,8 @@
 ## Unreleased
 
+- Keep loose lists structurally continuous across blank-separated siblings and
+  indented child blocks, including marker-only items, visual-column Tab
+  continuations, per-item Live Preview editing, and nested guide depth.
 - Recognize one to three spaces followed by a Tab as four-column indented
   code, including after list or quote container projection, so Obsidian
   comments, footnotes, and block IDs inside remain byte-exact literal text.
