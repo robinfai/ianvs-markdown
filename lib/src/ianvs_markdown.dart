@@ -6,6 +6,7 @@ import 'blocked_image.dart';
 import 'callout.dart';
 import 'code_block.dart';
 import 'code_surface.dart';
+import 'editor/markdown_code_ranges.dart';
 import 'emphasis.dart';
 import 'front_matter_card.dart';
 import 'heading_folding.dart';
@@ -532,24 +533,10 @@ class IanvsMarkdown extends StatelessWidget {
 
 String _projectIrregularObsidianTables(String source) {
   final lines = source.split('\n');
-  String? fenceCharacter;
-  var fenceLength = 0;
+  final codeLines = _projectedCodeLines(source, lines);
   for (var index = 0; index + 1 < lines.length; index += 1) {
-    final fence = RegExp(r'^ {0,3}(`{3,}|~{3,})').firstMatch(lines[index]);
-    if (fence != null) {
-      final marker = fence.group(1)!;
-      if (fenceCharacter == null) {
-        fenceCharacter = marker[0];
-        fenceLength = marker.length;
-      } else if (marker[0] == fenceCharacter &&
-          marker.length >= fenceLength &&
-          lines[index].substring(fence.end).trim().isEmpty) {
-        fenceCharacter = null;
-        fenceLength = 0;
-      }
-      continue;
-    }
-    if (fenceCharacter != null ||
+    if (codeLines[index] ||
+        codeLines[index + 1] ||
         _projectedTableCellCount(lines[index]) < 2 ||
         !_isProjectedTableDelimiter(lines[index + 1])) {
       continue;
@@ -557,6 +544,7 @@ String _projectIrregularObsidianTables(String source) {
 
     var end = index + 1;
     while (end + 1 < lines.length &&
+        !codeLines[end + 1] &&
         lines[end + 1].trim().isNotEmpty &&
         _hasProjectedTablePipe(lines[end + 1])) {
       end += 1;
@@ -578,6 +566,26 @@ String _projectIrregularObsidianTables(String source) {
     index = end;
   }
   return lines.join('\n');
+}
+
+List<bool> _projectedCodeLines(String source, List<String> lines) {
+  final codeRanges = ianvsMarkdownBlockCodeRanges(source);
+  final result = List<bool>.filled(lines.length, false);
+  var lineStart = 0;
+  var rangeIndex = 0;
+  for (var lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+    final lineEnd = lineStart + lines[lineIndex].length;
+    while (rangeIndex < codeRanges.length &&
+        codeRanges[rangeIndex].end <= lineStart) {
+      rangeIndex += 1;
+    }
+    if (rangeIndex < codeRanges.length) {
+      final range = codeRanges[rangeIndex];
+      result[lineIndex] = range.start < lineEnd && range.end > lineStart;
+    }
+    lineStart = lineEnd + 1;
+  }
+  return result;
 }
 
 bool _isProjectedTableDelimiter(String source) {

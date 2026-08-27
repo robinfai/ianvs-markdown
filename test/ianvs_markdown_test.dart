@@ -726,6 +726,40 @@ final answer = 42;
     expect(find.textContaining('| Plain | text |'), findsOneWidget);
   });
 
+  testWidgets('table projection resumes after list-contained fences', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(
+          data:
+              '- ```text\n'
+              '  | code | row |\n'
+              '  | --- | --- |\n'
+              '  | only |\n'
+              '  ```\n\n'
+              '| A | B | C |\n'
+              '| --- | --- | --- |\n'
+              '| one |\n'
+              '| x | y | z | extra |',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(IanvsMarkdownCodeBlock), findsOneWidget);
+    expect(
+      tester
+          .widget<IanvsMarkdownCodeBlock>(find.byType(IanvsMarkdownCodeBlock))
+          .source,
+      '| code | row |\n| --- | --- |\n| only |',
+    );
+    final table = tester.widget<Table>(find.byType(Table));
+    expect(table.children, hasLength(3));
+    expect(table.children.map((row) => row.children.length), everyElement(4));
+    expect(find.text('extra'), findsOneWidget);
+  });
+
   testWidgets('renders local links as Obsidian-style text by default', (
     tester,
   ) async {

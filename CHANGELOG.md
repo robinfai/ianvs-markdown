@@ -1,5 +1,7 @@
 ## Unreleased
 
+- Keep irregular-table projection active after fenced code nested in list
+  containers, while leaving table-shaped lines inside that code byte-exact.
 - Preserve footnote, comment, and block-ID-shaped text inside code blocks that
   begin in ordered, unordered, empty, nested, quoted, or tab-separated list
   items, with container prefixes excluded from exact UTF-16 source ranges.
