@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
+import '../callout.dart';
 import '../code_block.dart';
 import '../code_surface.dart';
 import '../front_matter.dart';
@@ -2995,7 +2996,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     final quoteLines = quoteMarker == null
         ? const <_QuoteLineLayout>[]
         : _quoteLineLayouts(block.source);
-    final callout = quoteMarker != null && _isCalloutSource(block.source);
+    final callout =
+        quoteMarker != null &&
+        parseIanvsMarkdownCalloutHeader(block.source) != null;
     final headingLevel = block.type == IanvsMarkdownBlockType.heading
         ? _activeHeadingLevelForSource(block.source)
         : null;
@@ -6184,13 +6187,16 @@ List<_QuoteLineLayout> _quoteLineLayouts(String source) {
   var inheritedDepth = 1;
   for (final text in source.split('\n')) {
     var cursor = 0;
-    while (cursor < text.length && cursor < 3 && text[cursor] == ' ') {
-      cursor += 1;
-    }
-    final leadingStart = 0;
     final markers = <TextRange>[];
-    while (cursor < text.length && text[cursor] == '>') {
-      final markerStart = markers.isEmpty ? leadingStart : cursor;
+    while (true) {
+      final indentationStart = cursor;
+      var indentation = 0;
+      while (cursor < text.length && indentation < 3 && text[cursor] == ' ') {
+        cursor += 1;
+        indentation += 1;
+      }
+      if (cursor >= text.length || text[cursor] != '>') break;
+      final markerStart = markers.isEmpty ? 0 : indentationStart;
       cursor += 1;
       if (cursor < text.length &&
           (text[cursor] == ' ' || text[cursor] == '\t')) {
@@ -6235,12 +6241,6 @@ List<_HiddenMarkerSpan> _hiddenQuoteMarkerRanges(
     );
   }
   return List<_HiddenMarkerSpan>.unmodifiable(hidden);
-}
-
-bool _isCalloutSource(String source) {
-  return RegExp(
-    r'^ {0,3}>[ \t]?\[![A-Za-z0-9_-]+\](?:[+-])?(?:[ \t]+|$)',
-  ).hasMatch(source);
 }
 
 class _ActiveQuoteBlock extends StatelessWidget {

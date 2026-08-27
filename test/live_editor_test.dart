@@ -4735,6 +4735,48 @@ empty:
     },
   );
 
+  testWidgets(
+    'spaced nested quote markers stay hidden away from the active line',
+    (tester) async {
+      const source = '> Outer\n>   > Nested\n> Outer tail';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+      final renderedQuote = find.bySemanticsLabel('Edit Markdown block');
+      final quoteRect = tester.getRect(renderedQuote);
+      await tester.tapAt(Offset(quoteRect.center.dx, quoteRect.bottom - 15));
+      await tester.pump();
+
+      final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+      final fieldFinder = find.descendant(
+        of: active,
+        matching: find.byType(TextField),
+      );
+      final field = tester.widget<TextField>(fieldFinder);
+      final span = field.controller!.buildTextSpan(
+        context: tester.element(fieldFinder),
+        style: field.style,
+        withComposing: false,
+      );
+      final visibleMarkerCharacters = _textSpanLeaves(span)
+          .where(
+            (child) => child.style?.fontSize != 0 && child.style?.color?.a != 0,
+          )
+          .fold<int>(
+            0,
+            (count, child) => count + '>'.allMatches(child.text ?? '').length,
+          );
+
+      expect(
+        controller.selection.extentOffset,
+        greaterThan(source.lastIndexOf('> Outer tail')),
+      );
+      expect(visibleMarkerCharacters, 1);
+    },
+  );
+
   testWidgets('quote activation follows the rendered horizontal tap', (
     tester,
   ) async {
@@ -4971,6 +5013,46 @@ empty:
         )
         .toList();
     expect(visibleMarkers, hasLength(2));
+  });
+
+  testWidgets('Unicode callout types keep every marker visible when active', (
+    tester,
+  ) async {
+    const source = '> [!注意] Unicode callout\n> Exact body';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-callout-注意')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.textContaining('Exact body'));
+    await tester.pump();
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final fieldFinder = find.descendant(
+      of: active,
+      matching: find.byType(TextField),
+    );
+    final field = tester.widget<TextField>(fieldFinder);
+    final span = field.controller!.buildTextSpan(
+      context: tester.element(fieldFinder),
+      style: field.style,
+      withComposing: false,
+    );
+    final visibleMarkerCharacters = _textSpanLeaves(span)
+        .where(
+          (child) => child.style?.fontSize != 0 && child.style?.color?.a != 0,
+        )
+        .fold<int>(
+          0,
+          (count, child) => count + '>'.allMatches(child.text ?? '').length,
+        );
+
+    expect(field.controller?.text, source);
+    expect(visibleMarkerCharacters, 2);
   });
 
   testWidgets(

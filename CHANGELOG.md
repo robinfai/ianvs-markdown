@@ -1,5 +1,9 @@
 ## Unreleased
 
+- Match Obsidian Callout headers for case-insensitive non-empty types up to
+  `]`, Unicode and punctuation fallback cards, strict zero-or-one-space quote
+  markers, real-blank block boundaries, exact active source markers, and
+  spaced nested block-quote rails.
 - Match Obsidian emphasis and strong delimiter stacks for flanking, asymmetric
   and long runs, Reading/Live Preview-specific surplus presentation, intraword
   asterisks, literal intraword underscores, escapes, nesting, and source-range

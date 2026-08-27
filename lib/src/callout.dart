@@ -9,13 +9,57 @@ typedef IanvsMarkdownCalloutBodyBuilder =
 typedef IanvsMarkdownCalloutTitleBuilder =
     Widget Function(BuildContext context, String source, Color accent);
 
+/// Metadata parsed from an Obsidian Callout header.
+@immutable
+final class IanvsMarkdownCalloutHeader {
+  const IanvsMarkdownCalloutHeader({
+    required this.type,
+    required this.fold,
+    required this.explicitTitle,
+  });
+
+  /// Lowercase type used for Obsidian's case-insensitive style lookup.
+  final String type;
+
+  /// Tight `+` or `-` folding marker, or the empty string.
+  final String fold;
+
+  /// Trimmed custom title, or the empty string when the default is used.
+  final String explicitTitle;
+
+  String get title =>
+      explicitTitle.isEmpty ? _defaultTitle(type) : explicitTitle;
+}
+
+final RegExp _ianvsMarkdownCalloutHeaderPattern = RegExp(
+  r'^ {0,3}> ?\[!([^\]\r\n]+)\]([+-])?(?:[ \t]+(.*))?[ \t]*$',
+);
+
+/// Parses the first physical line of an Obsidian Callout.
+///
+/// Obsidian 1.13.7 accepts either no character or one literal space after
+/// `>`. The type is any non-empty text before `]`; type matching is
+/// case-insensitive, while two spaces or a Tab after `>` leave the marker as
+/// an ordinary block quote.
+IanvsMarkdownCalloutHeader? parseIanvsMarkdownCalloutHeader(String source) {
+  final firstBreak = source.indexOf('\n');
+  var firstLine = firstBreak < 0 ? source : source.substring(0, firstBreak);
+  if (firstLine.endsWith('\r')) {
+    firstLine = firstLine.substring(0, firstLine.length - 1);
+  }
+  final match = _ianvsMarkdownCalloutHeaderPattern.firstMatch(firstLine);
+  if (match == null) return null;
+  return IanvsMarkdownCalloutHeader(
+    type: match.group(1)!.toLowerCase(),
+    fold: match.group(2) ?? '',
+    explicitTitle: match.group(3)?.trim() ?? '',
+  );
+}
+
 /// Parses Obsidian callouts such as `> [!note] Title`.
 class IanvsMarkdownCalloutSyntax extends md.BlockSyntax {
   const IanvsMarkdownCalloutSyntax();
 
-  static final RegExp _header = RegExp(
-    r'^ {0,3}>[ \t]?\[!([A-Za-z0-9_-]+)\]([+-])?(?:[ \t]+(.*))?[ \t]*$',
-  );
   static final RegExp _quoteLine = RegExp(r'^ {0,3}>[ \t]?(.*)$');
   static final RegExp _unquotedBlockOpener = RegExp(
     r'^ {0,3}(?:#{1,6}(?:[ \t]+|$)|`{3,}|~{3,}|\$\$[ \t]*$|'
@@ -23,14 +67,11 @@ class IanvsMarkdownCalloutSyntax extends md.BlockSyntax {
   );
 
   @override
-  RegExp get pattern => _header;
+  RegExp get pattern => _ianvsMarkdownCalloutHeaderPattern;
 
   @override
   md.Node parse(md.BlockParser parser) {
-    final header = _header.firstMatch(parser.current.content)!;
-    final type = header.group(1)!.toLowerCase();
-    final fold = header.group(2) ?? '';
-    final explicitTitle = header.group(3)?.trim() ?? '';
+    final header = parseIanvsMarkdownCalloutHeader(parser.current.content)!;
     parser.advance();
 
     final bodyLines = <String>[];
@@ -50,11 +91,9 @@ class IanvsMarkdownCalloutSyntax extends md.BlockSyntax {
     }
 
     return md.Element('ianvs-callout', const <md.Node>[])
-      ..attributes['data-type'] = type
-      ..attributes['data-title'] = explicitTitle.isEmpty
-          ? _defaultTitle(type)
-          : explicitTitle
-      ..attributes['data-fold'] = fold
+      ..attributes['data-type'] = header.type
+      ..attributes['data-title'] = header.title
+      ..attributes['data-fold'] = header.fold
       ..attributes['data-body'] = bodyLines.join('\n');
   }
 

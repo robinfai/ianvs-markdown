@@ -2804,6 +2804,118 @@ $$
     },
   );
 
+  test('parses Obsidian callout headers with exact type and spacing rules', () {
+    for (final source in <String>[
+      '>[!NOTE]',
+      '> [!note]',
+      '> [!.]',
+      '> [!/]',
+      '> [!注意]',
+      '> [! ]',
+    ]) {
+      expect(
+        parseIanvsMarkdownCalloutHeader(source),
+        isNotNull,
+        reason: source,
+      );
+    }
+    for (final source in <String>[
+      '> [!]',
+      '>  [!NOTE]',
+      '>   [!NOTE]',
+      '>\t[!NOTE]',
+      '> [!NOTE]NoSpaceTitle',
+    ]) {
+      expect(parseIanvsMarkdownCalloutHeader(source), isNull, reason: source);
+    }
+
+    final tight = parseIanvsMarkdownCalloutHeader(
+      '> [!NoTe]- **Custom title**  ',
+    )!;
+    expect(tight.type, 'note');
+    expect(tight.fold, '-');
+    expect(tight.explicitTitle, '**Custom title**');
+    expect(tight.title, '**Custom title**');
+
+    final spaced = parseIanvsMarkdownCalloutHeader('> [!note] + Title')!;
+    expect(spaced.fold, isEmpty);
+    expect(spaced.explicitTitle, '+ Title');
+    expect(
+      parseIanvsMarkdownCalloutHeader(
+        '> [!注意] Unicode title\n> body line',
+      )?.type,
+      '注意',
+    );
+  });
+
+  testWidgets('renders broad Obsidian callout types but strict markers', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const SingleChildScrollView(
+          child: IanvsMarkdown(
+            data:
+                '> [!NoTe] Mixed case\n'
+                '> note body\n\n'
+                '> [!CUSTOM] Unknown\n'
+                '> custom body\n\n'
+                '> [!.] Dot\n'
+                '> dot body\n\n'
+                '> [!/] Slash\n'
+                '> slash body\n\n'
+                '> [!注意] Unicode\n'
+                '> unicode body\n\n'
+                '> [! ] Space type\n'
+                '> space body\n\n'
+                '>  [!NOTE] Two spaces stay literal\n'
+                '> ordinary quote\n\n'
+                '>\t[!NOTE] Tab stays literal\n'
+                '>\ttab quote',
+          ),
+        ),
+      ),
+    );
+
+    for (final type in <String>['note', 'custom', '.', '/', '注意', ' ']) {
+      expect(
+        find.byKey(ValueKey<String>('ianvs-markdown-callout-$type')),
+        findsOneWidget,
+        reason: type,
+      );
+    }
+    expect(find.textContaining('[!NOTE] Two spaces'), findsOneWidget);
+    expect(find.textContaining('[!NOTE] Tab'), findsOneWidget);
+  });
+
+  testWidgets('keeps adjacent callout headers in the first quote body', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(
+          data:
+              '> [!NOTE] First\n'
+              '> first body\n'
+              '> [!TIP] Adjacent remains body text\n'
+              '> adjacent body\n\n'
+              '> [!TIP] Separated\n'
+              '> separated body',
+        ),
+      ),
+    );
+
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-callout-note')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-callout-tip')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('[!TIP] Adjacent'), findsOneWidget);
+  });
+
   testWidgets('renders Obsidian highlights and collapsible callouts', (
     tester,
   ) async {
