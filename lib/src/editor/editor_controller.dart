@@ -3618,6 +3618,9 @@ List<TextRange> _addWikiLinkSyntaxTokens(
     literalRanges
       ..add(TextRange(start: match.start, end: labelStart))
       ..add(TextRange(start: labelEnd, end: match.end));
+    if (separator == null) {
+      literalRanges.add(TextRange(start: labelStart, end: labelEnd));
+    }
     target
       ..add(
         _SyntaxToken(

@@ -2576,6 +2576,64 @@ void main() {
     },
   );
 
+  test('Wiki targets stay literal while aliases compose inline styles', () {
+    const syntax = IanvsMarkdownSyntaxTheme(
+      heading: TextStyle(),
+      marker: TextStyle(color: Color(0xff777777)),
+      link: TextStyle(),
+      code: TextStyle(),
+      comment: TextStyle(),
+      wikiLink: TextStyle(fontWeight: FontWeight.w600),
+      highlight: TextStyle(backgroundColor: Color(0xffffe184)),
+    );
+    const source = '[[L==before==]] [[Target|==alias==]]';
+    final spans = buildMarkdownSourceTextSpan(
+      const TextEditingValue(
+        text: source,
+        selection: TextSelection.collapsed(offset: 0),
+      ),
+      style: const TextStyle(fontSize: 14),
+      syntaxTheme: syntax,
+      withComposing: false,
+      hideInactiveInlineMarkers: true,
+    ).children!.cast<TextSpan>().toList();
+
+    TextSpan spanAt(int offset) {
+      var cursor = 0;
+      for (final span in spans) {
+        final end = cursor + (span.text?.length ?? 0);
+        if (offset >= cursor && offset < end) return span;
+        cursor = end;
+      }
+      throw StateError('No span at $offset');
+    }
+
+    final targetContent = source.indexOf('before');
+    final targetEquals = source.indexOf('==');
+    final aliasContent = source.indexOf('alias');
+    expect(spanAt(targetContent).style?.backgroundColor, isNull);
+    expect(spanAt(targetContent).style?.fontWeight, FontWeight.w600);
+    expect(spanAt(targetEquals).style?.fontSize, 14);
+    expect(
+      spanAt(aliasContent).style?.backgroundColor,
+      const Color(0xffffe184),
+    );
+    expect(
+      ianvsMarkdownInlineSourceRangeAt(
+        source,
+        TextRange(start: targetContent, end: targetContent + 1),
+      )?.textInside(source),
+      '[[L==before==]]',
+    );
+    expect(
+      ianvsMarkdownInlineSourceRangeAt(
+        source,
+        TextRange(start: aliasContent, end: aliasContent + 1),
+      )?.textInside(source),
+      '==alias==',
+    );
+  });
+
   test('link source ranges contain nested inline footnotes', () {
     const syntax = IanvsMarkdownSyntaxTheme(
       heading: TextStyle(),
