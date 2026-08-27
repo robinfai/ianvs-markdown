@@ -184,6 +184,33 @@ void main() {
     expect(openedHref, 'https://example.com/path');
   });
 
+  testWidgets('live preview renders tag pills and reveals their exact source', (
+    tester,
+  ) async {
+    const block = 'Before #中文/子项 and #one#two after.';
+    const source = '$block\n\nTail.';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('ianvs-markdown-tag')), findsNWidgets(3));
+    for (final tag in <String>['#中文/子项', '#one', '#two']) {
+      expect(find.text(tag), findsOneWidget);
+    }
+
+    await tester.tap(find.textContaining('Before'));
+    await tester.pumpAndSettle();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, block);
+    expect(controller.text, source);
+  });
+
   testWidgets('live Wiki links navigate through the host callback', (
     tester,
   ) async {

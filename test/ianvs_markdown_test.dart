@@ -1908,6 +1908,85 @@ widget := unknown_token(42)
     },
   );
 
+  test('tag ranges match Obsidian Unicode, numeric, and start boundaries', () {
+    const source =
+        '#tag #123 #123tag #under_score #hyphen-tag #nested/sub '
+        '#中文 #café #тег #🚀 #123/ #/ #/start #end/ #a//b '
+        '(#paren) word#tight https://example.com/#fragment '
+        '#tag.dot #tag:colon #first#second '
+        r'\#escaped \\#double-escaped '
+        '#fullwidth。tail';
+
+    expect(
+      ianvsMarkdownTagRanges(
+        source,
+      ).map((range) => range.textInside(source)).toList(),
+      <String>[
+        '#tag',
+        '#123tag',
+        '#under_score',
+        '#hyphen-tag',
+        '#nested/sub',
+        '#中文',
+        '#café',
+        '#тег',
+        '#🚀',
+        '#123/',
+        '#/',
+        '#/start',
+        '#end/',
+        '#a//b',
+        '#tag',
+        '#tag',
+        '#first',
+        '#second',
+        '#double-escaped',
+        '#fullwidth。tail',
+      ],
+    );
+  });
+
+  testWidgets('reading follows Obsidian tag character and context rules', (
+    tester,
+  ) async {
+    final taps = <(String, String?)>[];
+    await tester.pumpWidget(
+      app(
+        IanvsMarkdown(
+          data:
+              '#tag #123 #123tag #nested/sub #中文 #café #тег #🚀 '
+              '#one#two #fullwidth。tail\n\n'
+              r'(#paren) word#tight https://example.com/#fragment '
+              r'\#escaped \\#double-escaped `text #code`'
+              '\n\n%%hidden #comment%%\n\n'
+              '```text\n#fenced\n```',
+          onTapLink: (text, href, title) => taps.add((text, href)),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const ValueKey('ianvs-markdown-tag')), findsNWidgets(11));
+    for (final tag in <String>[
+      '#tag',
+      '#123tag',
+      '#nested/sub',
+      '#中文',
+      '#café',
+      '#тег',
+      '#🚀',
+      '#one',
+      '#two',
+      '#fullwidth。tail',
+      '#double-escaped',
+    ]) {
+      expect(find.text(tag), findsOneWidget);
+    }
+    await tester.tap(find.text('#café'));
+    await tester.pump();
+    expect(taps, <(String, String?)>[('#café', 'tag:#café')]);
+    expect(find.text('#fenced'), findsOneWidget);
+  });
+
   testWidgets('renders Obsidian Wiki links, aliases, and tag chips', (
     tester,
   ) async {

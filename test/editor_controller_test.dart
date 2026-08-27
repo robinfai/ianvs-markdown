@@ -1899,6 +1899,52 @@ void main() {
     );
   });
 
+  test('source tag styling shares Obsidian lexical boundaries', () {
+    const tagColor = Color(0xff123456);
+    const syntax = IanvsMarkdownSyntaxTheme(
+      heading: TextStyle(),
+      marker: TextStyle(),
+      link: TextStyle(),
+      code: TextStyle(fontFamily: 'monospace'),
+      comment: TextStyle(),
+      tag: TextStyle(color: tagColor),
+    );
+    const source =
+        '#café #123 #123tag (#paren) #nested/sub; '
+        'word#tight https://example.com/#fragment '
+        r'\#escaped \\#double #one#two '
+        '#fullwidth。tail `text #code`';
+
+    final spans = buildMarkdownSourceTextSpan(
+      const TextEditingValue(
+        text: source,
+        selection: TextSelection.collapsed(offset: 0),
+      ),
+      style: const TextStyle(fontSize: 14),
+      syntaxTheme: syntax,
+      withComposing: false,
+    ).children!.cast<TextSpan>().toList();
+
+    expect(
+      spans
+          .where((span) => span.style?.color == tagColor)
+          .map((span) => span.text),
+      <String>[
+        '#café',
+        '#123tag',
+        '#nested/sub',
+        '#double',
+        '#one',
+        '#two',
+        '#fullwidth。tail',
+      ],
+    );
+    expect(
+      spans.singleWhere((span) => span.text == 'text #code').style?.fontFamily,
+      'monospace',
+    );
+  });
+
   test(
     'leading-pipe Wiki links keep the pipe visible outside their markers',
     () {

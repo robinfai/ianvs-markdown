@@ -1,5 +1,9 @@
 ## Unreleased
 
+- Match Obsidian tag tokenization for Unicode and emoji, numeric rejection,
+  slash paths, adjacent tags, punctuation boundaries, and backslash parity
+  with code, comment, and link precedence across Reading, Live Preview, and
+  source styling.
 - Match Obsidian block-ID boundaries for standalone markers, underscores,
   table cells, strict line endings, multiple candidates, escape parity, and
   code precedence across Reading, Live Preview, and source styling.

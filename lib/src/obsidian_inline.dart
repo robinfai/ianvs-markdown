@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/services.dart' show TextRange;
 import 'package:html/parser.dart' as html_parser;
 import 'package:markdown/markdown.dart' as md;
 
@@ -167,26 +168,103 @@ String _wikiLinkLabel(
       : target;
 }
 
-/// Parses Obsidian-style tags, including nested tags such as `#work/project`.
+final RegExp _obsidianTagPattern = RegExp(
+  r'''#[^\u2000-\u206F\u2E00-\u2E7F'!"#$%&()*+,.:;<=>?@^`{|}~\[\]\\\s]+''',
+);
+final RegExp _obsidianNumericTagPattern = RegExp(r'^#[0-9]+$');
+final RegExp _obsidianTagWhitespacePattern = RegExp(r'\s');
+
+/// Finds the lexical ranges that Obsidian treats as inline tags.
+///
+/// Tags begin at the start of the document or immediately after whitespace,
+/// stop before ASCII punctuation or characters in Obsidian's two excluded
+/// Unicode punctuation blocks,
+/// and must contain something other than ASCII digits. The allowed remainder
+/// deliberately includes `/`, non-ASCII scripts, emoji, and other symbols.
+/// An even backslash run preserves the slashes and restores tag parsing, while
+/// an odd run escapes the hash. A valid tag can be followed immediately by
+/// another tag, as in `#one#two`.
+List<TextRange> ianvsMarkdownTagRanges(String source) {
+  final ranges = <TextRange>[];
+  var start = source.indexOf('#');
+  while (start >= 0) {
+    final range = _ianvsMarkdownTagRangeAt(source, start);
+    if (range != null) ranges.add(range);
+    start = source.indexOf('#', range?.end ?? start + 1);
+  }
+  return List<TextRange>.unmodifiable(ranges);
+}
+
+TextRange? _ianvsMarkdownTagRangeAt(String source, int start) {
+  final range = _unboundedObsidianTagRangeAt(source, start);
+  if (range == null) return null;
+  final boundary = _obsidianTagEscapeBoundary(source, start);
+  if ((start - boundary).isOdd ||
+      !_isObsidianTagStartBoundary(source, boundary)) {
+    return null;
+  }
+  return range;
+}
+
+TextRange? _unboundedObsidianTagRangeAt(String source, int start) {
+  if (start < 0 || start >= source.length || source.codeUnitAt(start) != 0x23) {
+    return null;
+  }
+  final match = _obsidianTagPattern.matchAsPrefix(source, start);
+  if (match == null || _obsidianNumericTagPattern.hasMatch(match.group(0)!)) {
+    return null;
+  }
+  return TextRange(start: start, end: match.end);
+}
+
+bool _isObsidianTagStartBoundary(String source, int start) {
+  var boundary = start;
+  while (true) {
+    if (boundary == 0 ||
+        _obsidianTagWhitespacePattern.hasMatch(
+          source.substring(boundary - 1, boundary),
+        )) {
+      return true;
+    }
+    final previousHash = source.lastIndexOf('#', boundary - 1);
+    if (previousHash < 0) return false;
+    final previousTag = _unboundedObsidianTagRangeAt(source, previousHash);
+    if (previousTag == null || previousTag.end != boundary) return false;
+    final previousBoundary = _obsidianTagEscapeBoundary(source, previousHash);
+    if ((previousHash - previousBoundary).isOdd) return false;
+    boundary = previousBoundary;
+  }
+}
+
+int _obsidianTagEscapeBoundary(String source, int start) {
+  var boundary = start;
+  while (boundary > 0 && source.codeUnitAt(boundary - 1) == 0x5c) {
+    boundary -= 1;
+  }
+  return boundary;
+}
+
+/// Parses Obsidian-style tags, including nested and Unicode tags.
 class IanvsMarkdownTagSyntax extends md.InlineSyntax {
-  IanvsMarkdownTagSyntax()
-    : super(r'#([A-Za-z0-9_\-/\u3400-\u9fff]+)', startCharacter: 0x23);
+  IanvsMarkdownTagSyntax() : super(r'#', startCharacter: 0x23);
 
   @override
-  bool onMatch(md.InlineParser parser, Match match) {
-    if (match.start > 0) {
-      final previous = parser.source.substring(match.start - 1, match.start);
-      if (RegExp(r'[A-Za-z0-9_/]').hasMatch(previous)) {
-        parser.advanceBy(1);
-        return false;
-      }
-    }
-
-    final label = match.group(0)!;
+  bool tryMatch(md.InlineParser parser, [int? startMatchPos]) {
+    final start = startMatchPos ?? parser.pos;
+    if (start != parser.pos) return false;
+    final range = _ianvsMarkdownTagRangeAt(parser.source, start);
+    if (range == null) return false;
+    parser.writeText();
+    final label = parser.source.substring(range.start, range.end);
     final anchor = md.Element.text('a', label)
       ..attributes['href'] = 'tag:$label'
       ..attributes['data-ianvs-tag'] = 'true';
-    parser.addNode(anchor);
+    parser
+      ..addNode(anchor)
+      ..consume(range.end - range.start);
     return true;
   }
+
+  @override
+  bool onMatch(md.InlineParser parser, Match match) => false;
 }

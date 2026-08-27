@@ -8,6 +8,7 @@ import '../code_block.dart';
 import '../footnote_syntax.dart';
 import '../obsidian_autolink.dart';
 import '../obsidian_html.dart';
+import '../obsidian_inline.dart';
 import '../obsidian_metadata.dart';
 import '../wiki_link_reference.dart';
 import 'editor_models.dart';
@@ -3609,13 +3610,9 @@ void _addTagSyntaxTokens(
   IanvsMarkdownSyntaxTheme theme,
   List<TextRange> excludedRanges,
 ) {
-  final pattern = RegExp(r'(?<![A-Za-z0-9_/])#[A-Za-z0-9_\-/\u3400-\u9fff]+');
-  for (final match in pattern.allMatches(text)) {
-    if (_overlapsAnyRange(match.start, match.end, excludedRanges) ||
-        _isEscapedAt(text, match.start)) {
-      continue;
-    }
-    target.add(_SyntaxToken(match.start, match.end, theme.tag));
+  for (final range in ianvsMarkdownTagRanges(text)) {
+    if (_overlapsAnyRange(range.start, range.end, excludedRanges)) continue;
+    target.add(_SyntaxToken(range.start, range.end, theme.tag));
   }
 }
 
