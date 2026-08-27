@@ -10078,6 +10078,52 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
   });
 
   testWidgets(
+    'table formatting shortcuts target the focused cell and undo cleanly',
+    (tester) async {
+      const source =
+          'pre\n\n'
+          '| H | I |\n'
+          '| --- | --- |\n'
+          '| alpha | beta |\n\n'
+          'post';
+      final controller = IanvsMarkdownController(text: source)
+        ..selection = const TextSelection.collapsed(offset: 0);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+      final cell = find.byKey(const ValueKey('ianvs-markdown-table-1-0'));
+      await tester.tap(cell);
+      await tester.pump();
+
+      Future<void> format(LogicalKeyboardKey key, String expectedCell) async {
+        tester.widget<TextField>(cell).controller?.selection =
+            const TextSelection(baseOffset: 0, extentOffset: 5);
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+        await tester.sendKeyEvent(key);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+        await tester.pumpAndSettle();
+
+        expect(controller.text, contains('| $expectedCell | beta |'));
+        expect(controller.text, startsWith('pre\n\n'));
+        expect(tester.widget<TextField>(cell).controller?.text, expectedCell);
+
+        controller.undo();
+        await tester.pumpAndSettle();
+        expect(controller.text, source);
+        expect(tester.widget<TextField>(cell).controller?.text, 'alpha');
+      }
+
+      await format(LogicalKeyboardKey.keyB, '**alpha**');
+      await format(LogicalKeyboardKey.keyI, '*alpha*');
+      await format(LogicalKeyboardKey.keyK, '[alpha]()');
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
     'table Command+D deletes the focused physical row',
     (tester) async {
       const source =

@@ -3387,6 +3387,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           colors: colors,
           linkReferenceLabels: _linkReferences.labels,
           onCellChanged: _replaceTableCell,
+          onCellFormatted: _replaceFormattedTableCell,
           onDeleteLine: _deleteTableLine,
           onAddRow: () => _appendTableRow(block),
           onAddRowAbove: () => _prependTableRow(block),
@@ -3834,6 +3835,31 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       text: current.text.replaceRange(editStart, editEnd, sourceReplacement),
       selection: selection,
       composing: TextRange.empty,
+    );
+  }
+
+  void _replaceFormattedTableCell(
+    _EditableTableCell cell,
+    TextEditingValue replacement,
+  ) {
+    _replaceTableCell(cell, replacement.text);
+    final selection = replacement.selection;
+    if (!selection.isValid) return;
+    final source = widget.controller.text;
+    if (cell.lineStart < 0 || cell.lineStart > source.length) return;
+    final newline = source.indexOf('\n', cell.lineStart);
+    final lineEnd = newline < 0 ? source.length : newline;
+    final line = source.substring(cell.lineStart, lineEnd);
+    final ranges = _tableLineCellRanges(_EditableTableLine(line, 0));
+    if (cell.column >= ranges.length) return;
+    final range = ranges[cell.column];
+    final cellStart = cell.lineStart + range.$1;
+    final cellLength = range.$2 - range.$1;
+    widget.controller.selection = TextSelection(
+      baseOffset: cellStart + selection.baseOffset.clamp(0, cellLength),
+      extentOffset: cellStart + selection.extentOffset.clamp(0, cellLength),
+      affinity: selection.affinity,
+      isDirectional: selection.isDirectional,
     );
   }
 
@@ -4634,6 +4660,7 @@ class _EditableMarkdownTable extends StatefulWidget {
     required this.colors,
     required this.linkReferenceLabels,
     required this.onCellChanged,
+    required this.onCellFormatted,
     required this.onDeleteLine,
     required this.onAddRow,
     required this.onAddRowAbove,
@@ -4646,6 +4673,8 @@ class _EditableMarkdownTable extends StatefulWidget {
   final IanvsMarkdownThemeData colors;
   final Set<String> linkReferenceLabels;
   final void Function(_EditableTableCell cell, String value) onCellChanged;
+  final void Function(_EditableTableCell cell, TextEditingValue value)
+  onCellFormatted;
   final ValueChanged<_EditableTableCell> onDeleteLine;
   final VoidCallback onAddRow;
   final VoidCallback onAddRowAbove;
@@ -4701,7 +4730,7 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
         .map((cell) => cell.key)
         .toSet();
     for (final cell in _model.rows.expand((row) => row)) {
-      final focusNode = _focusNodes.putIfAbsent(cell.key, () {
+      _focusNodes.putIfAbsent(cell.key, () {
         final node = FocusNode();
         node.addListener(_handleCellFocusChanged);
         return node;
@@ -4710,7 +4739,7 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
         cell.key,
         () => _TableCellEditingController(text: cell.text),
       );
-      if (!focusNode.hasFocus && controller.text != cell.text) {
+      if (controller.text != cell.text) {
         controller.value = TextEditingValue(
           text: cell.text,
           selection: TextSelection.collapsed(
@@ -4944,6 +4973,11 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
       return KeyEventResult.ignored;
     }
     final key = event.logicalKey;
+    final inlineCommand = _tableInlineCommandForKey(key);
+    if (inlineCommand != null && _hasTableInlineCommandModifier(key)) {
+      _applyTableInlineCommand(cell, inlineCommand);
+      return KeyEventResult.handled;
+    }
     final usesCommandModifier =
         defaultTargetPlatform == TargetPlatform.macOS ||
         defaultTargetPlatform == TargetPlatform.iOS;
@@ -4998,6 +5032,45 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
       return _moveHorizontalAtBoundary(cell, 1);
     }
     return KeyEventResult.ignored;
+  }
+
+  bool _hasTableInlineCommandModifier(LogicalKeyboardKey key) {
+    final keyboard = HardwareKeyboard.instance;
+    if (keyboard.isAltPressed || keyboard.isShiftPressed) return false;
+    final usesCommandModifier =
+        defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.iOS;
+    if (usesCommandModifier && key == LogicalKeyboardKey.keyI) {
+      return keyboard.isMetaPressed != keyboard.isControlPressed;
+    }
+    return usesCommandModifier
+        ? keyboard.isMetaPressed && !keyboard.isControlPressed
+        : keyboard.isControlPressed && !keyboard.isMetaPressed;
+  }
+
+  void _applyTableInlineCommand(
+    _EditableTableCell cell,
+    _TableInlineCommand command,
+  ) {
+    final cellController = _controllers[cell.key];
+    if (cellController == null) return;
+    final commandController = IanvsMarkdownController(text: cellController.text)
+      ..value = cellController.value.copyWith(composing: TextRange.empty);
+    switch (command) {
+      case _TableInlineCommand.bold:
+        commandController.toggleInline('**');
+        break;
+      case _TableInlineCommand.italic:
+        commandController.toggleInline('*');
+        break;
+      case _TableInlineCommand.link:
+        commandController.insertLink();
+        break;
+    }
+    final replacement = commandController.value;
+    commandController.dispose();
+    cellController.value = replacement;
+    widget.onCellFormatted(cell, replacement);
   }
 
   void _moveTab(_EditableTableCell cell, {required bool backwards}) {
@@ -5489,6 +5562,15 @@ IanvsMarkdownSyntaxTheme _tableCellSyntaxTheme(
 }
 
 enum _TableFocusPlacement { selectAll, start, end, preserve }
+
+enum _TableInlineCommand { bold, italic, link }
+
+_TableInlineCommand? _tableInlineCommandForKey(LogicalKeyboardKey key) {
+  if (key == LogicalKeyboardKey.keyB) return _TableInlineCommand.bold;
+  if (key == LogicalKeyboardKey.keyI) return _TableInlineCommand.italic;
+  if (key == LogicalKeyboardKey.keyK) return _TableInlineCommand.link;
+  return null;
+}
 
 enum _TableDragAxis { row, column }
 
