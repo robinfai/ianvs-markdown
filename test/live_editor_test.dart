@@ -4437,6 +4437,68 @@ title: Alpha
     expect(controller.text, contains('title: Committed'));
   });
 
+  testWidgets('number properties commit finite values and stay numeric', (
+    tester,
+  ) async {
+    const source = '''
+---
+count: 42
+tags: [one, two]
+---
+# Body
+''';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final input = find.byKey(
+      const ValueKey('ianvs-markdown-front-matter-number-input-count'),
+    );
+    expect(input, findsOneWidget);
+    await tester.tap(input);
+    await tester.enterText(input, '43');
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+
+    expect(controller.text, '''
+---
+count: 43
+tags:
+  - one
+  - two
+---
+# Body
+''');
+    expect(
+      parseMarkdownFrontMatter(
+        controller.text,
+      ).entries.firstWhere((entry) => entry.key == 'count').type,
+      MarkdownMetadataValueType.number,
+    );
+
+    controller.undo();
+    await tester.pumpAndSettle();
+    expect(controller.text, source);
+    controller.redo();
+    await tester.pumpAndSettle();
+    expect(controller.text, contains('count: 43'));
+
+    await tester.tap(input);
+    await tester.enterText(input, 'not-a-number');
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+    expect(controller.text, contains('count: 43'));
+    expect(tester.widget<TextField>(input).controller?.text, '43');
+
+    await tester.tap(input);
+    await tester.enterText(input, '99');
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(controller.text, contains('count: 43'));
+    expect(tester.widget<TextField>(input).controller?.text, '43');
+  });
+
   testWidgets('editable properties retain Wiki and URL link callbacks', (
     tester,
   ) async {

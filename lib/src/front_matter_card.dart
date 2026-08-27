@@ -11,6 +11,8 @@ typedef IanvsMarkdownMetadataTextChanged =
     void Function(MarkdownMetadataEntry entry, String value);
 typedef IanvsMarkdownMetadataBooleanChanged =
     void Function(MarkdownMetadataEntry entry, bool value);
+typedef IanvsMarkdownMetadataNumberChanged =
+    void Function(MarkdownMetadataEntry entry, num value);
 
 class IanvsMarkdownFrontMatterCard extends StatefulWidget {
   const IanvsMarkdownFrontMatterCard({
@@ -26,6 +28,7 @@ class IanvsMarkdownFrontMatterCard extends StatefulWidget {
     this.onTapLink,
     this.onTextChanged,
     this.onBooleanChanged,
+    this.onNumberChanged,
   });
 
   final List<MarkdownMetadataEntry> entries;
@@ -39,6 +42,7 @@ class IanvsMarkdownFrontMatterCard extends StatefulWidget {
   final MarkdownTapLinkCallback? onTapLink;
   final IanvsMarkdownMetadataTextChanged? onTextChanged;
   final IanvsMarkdownMetadataBooleanChanged? onBooleanChanged;
+  final IanvsMarkdownMetadataNumberChanged? onNumberChanged;
 
   @override
   State<IanvsMarkdownFrontMatterCard> createState() =>
@@ -259,6 +263,7 @@ class _IanvsMarkdownFrontMatterCardState
                           onTapLink: widget.onTapLink,
                           onTextChanged: widget.onTextChanged,
                           onBooleanChanged: widget.onBooleanChanged,
+                          onNumberChanged: widget.onNumberChanged,
                         ),
                       Padding(
                         padding: const EdgeInsets.fromLTRB(7, 4, 7, 2),
@@ -301,6 +306,7 @@ class _ObsidianMetadataRow extends StatelessWidget {
     required this.onTapLink,
     required this.onTextChanged,
     required this.onBooleanChanged,
+    required this.onNumberChanged,
   });
 
   final MarkdownMetadataEntry entry;
@@ -308,6 +314,7 @@ class _ObsidianMetadataRow extends StatelessWidget {
   final MarkdownTapLinkCallback? onTapLink;
   final IanvsMarkdownMetadataTextChanged? onTextChanged;
   final IanvsMarkdownMetadataBooleanChanged? onBooleanChanged;
+  final IanvsMarkdownMetadataNumberChanged? onNumberChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -359,6 +366,7 @@ class _ObsidianMetadataRow extends StatelessWidget {
               onTapLink: onTapLink,
               onTextChanged: onTextChanged,
               onBooleanChanged: onBooleanChanged,
+              onNumberChanged: onNumberChanged,
             ),
           ),
         ],
@@ -412,6 +420,7 @@ class _ObsidianMetadataValue extends StatelessWidget {
     required this.onTapLink,
     required this.onTextChanged,
     required this.onBooleanChanged,
+    required this.onNumberChanged,
   });
 
   final MarkdownMetadataEntry entry;
@@ -421,6 +430,7 @@ class _ObsidianMetadataValue extends StatelessWidget {
   final MarkdownTapLinkCallback? onTapLink;
   final IanvsMarkdownMetadataTextChanged? onTextChanged;
   final IanvsMarkdownMetadataBooleanChanged? onBooleanChanged;
+  final IanvsMarkdownMetadataNumberChanged? onNumberChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -452,6 +462,15 @@ class _ObsidianMetadataValue extends StatelessWidget {
             ),
           ),
         ),
+      );
+    }
+    if (entry.type == MarkdownMetadataValueType.number &&
+        onNumberChanged != null) {
+      return _ObsidianEditableNumberValue(
+        key: ValueKey('ianvs-markdown-front-matter-number-editor-${entry.key}'),
+        entry: entry,
+        colors: colors,
+        onChanged: onNumberChanged!,
       );
     }
     if (entry.type == MarkdownMetadataValueType.date) {
@@ -550,6 +569,159 @@ class _ObsidianMetadataValue extends StatelessWidget {
         fontSize: object ? 10.5 : 11.5,
         height: 1.35,
         fontStyle: empty ? FontStyle.italic : FontStyle.normal,
+      ),
+    );
+  }
+}
+
+class _ObsidianEditableNumberValue extends StatefulWidget {
+  const _ObsidianEditableNumberValue({
+    super.key,
+    required this.entry,
+    required this.colors,
+    required this.onChanged,
+  });
+
+  final MarkdownMetadataEntry entry;
+  final IanvsMarkdownThemeData colors;
+  final IanvsMarkdownMetadataNumberChanged onChanged;
+
+  @override
+  State<_ObsidianEditableNumberValue> createState() =>
+      _ObsidianEditableNumberValueState();
+}
+
+class _ObsidianEditableNumberValueState
+    extends State<_ObsidianEditableNumberValue> {
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+  late String _committedValue;
+  var _cancelled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _committedValue = widget.entry.value;
+    _controller = TextEditingController(text: _committedValue);
+    _focusNode = FocusNode()..addListener(_handleFocusChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ObsidianEditableNumberValue oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.entry.value != widget.entry.value) {
+      _committedValue = widget.entry.value;
+      _setControllerText(_committedValue);
+    }
+  }
+
+  void _handleFocusChanged() {
+    if (_focusNode.hasFocus) {
+      _cancelled = false;
+      return;
+    }
+    if (_cancelled) {
+      _cancelled = false;
+      return;
+    }
+    _commit();
+  }
+
+  num? _finiteNumber(String source) {
+    final value = num.tryParse(source.trim());
+    return value != null && value.isFinite ? value : null;
+  }
+
+  void _setControllerText(String value) {
+    _controller.value = TextEditingValue(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
+    );
+  }
+
+  void _restore() => _setControllerText(_committedValue);
+
+  void _commit() {
+    final value = _finiteNumber(_controller.text);
+    if (value == null) {
+      _restore();
+      return;
+    }
+    _commitValue(value);
+  }
+
+  void _commitValue(num value) {
+    if (!value.isFinite) {
+      _restore();
+      return;
+    }
+    final serialized = '$value';
+    _setControllerText(serialized);
+    if (serialized == _committedValue) return;
+    _committedValue = serialized;
+    widget.onChanged(widget.entry, value);
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent ||
+        event.logicalKey != LogicalKeyboardKey.escape) {
+      return KeyEventResult.ignored;
+    }
+    _cancelled = true;
+    _restore();
+    node.unfocus();
+    return KeyEventResult.handled;
+  }
+
+  @override
+  void dispose() {
+    _focusNode
+      ..removeListener(_handleFocusChanged)
+      ..dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      onKeyEvent: _handleKeyEvent,
+      child: TextField(
+        key: ValueKey(
+          'ianvs-markdown-front-matter-number-input-${widget.entry.key}',
+        ),
+        controller: _controller,
+        focusNode: _focusNode,
+        maxLines: 1,
+        keyboardType: const TextInputType.numberWithOptions(
+          decimal: true,
+          signed: true,
+        ),
+        textInputAction: TextInputAction.done,
+        smartDashesType: SmartDashesType.disabled,
+        smartQuotesType: SmartQuotesType.disabled,
+        autocorrect: false,
+        enableSuggestions: false,
+        onSubmitted: (_) {
+          _commit();
+          _focusNode.unfocus();
+        },
+        onTapOutside: (_) => _focusNode.unfocus(),
+        style: TextStyle(
+          color: widget.colors.textPrimary,
+          fontSize: 11.5,
+          height: 1.35,
+        ),
+        cursorColor: widget.colors.accent,
+        decoration: InputDecoration(
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(vertical: 2),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: UnderlineInputBorder(
+            borderSide: BorderSide(color: widget.colors.accentSoft),
+          ),
+        ),
       ),
     );
   }

@@ -198,6 +198,59 @@ Body
     );
   });
 
+  test('number property rewrites canonicalize lists and reject non-finite', () {
+    const source = '''
+---
+count: 42
+ratio: 3.5
+tags: [one, two]
+---
+Body
+''';
+    final document = parseMarkdownFrontMatter(source);
+    MarkdownMetadataEntry entry(String key) =>
+        document.entries.firstWhere((item) => item.key == key);
+
+    expect(
+      replaceMarkdownFrontMatterNumberValue(source, entry('count'), 43),
+      '''
+---
+count: 43
+ratio: 3.5
+tags:
+  - one
+  - two
+---
+Body
+''',
+    );
+    expect(
+      replaceMarkdownFrontMatterNumberValue(source, entry('ratio'), 4.5),
+      '''
+---
+count: 42
+ratio: 4.5
+tags:
+  - one
+  - two
+---
+Body
+''',
+    );
+    expect(
+      replaceMarkdownFrontMatterNumberValue(source, entry('count'), double.nan),
+      source,
+    );
+    expect(
+      replaceMarkdownFrontMatterNumberValue(
+        source,
+        entry('count'),
+        double.infinity,
+      ),
+      source,
+    );
+  });
+
   test(
     'property rewrites preserve CRLF and avoid stale or commented spans',
     () {

@@ -4,6 +4,9 @@
   controls: Enter or focus loss commits one undoable source edit, Escape
   cancels pending text, and a committed text field canonicalizes top-level
   inline scalar lists to the block-list form emitted by Obsidian Properties.
+- Add finite numeric property input with focus-loss submission, invalid-input
+  recovery, numeric YAML type preservation, and the same observed top-level
+  flow-list canonicalization as an Obsidian number-field commit.
 - Match Obsidian properties for source-order keys, an ordinary `title` row,
   default-expanded panels, triple-dash-only closing markers, distinct aliases,
   tags, and `cssclasses`, linked Wiki/URL scalar values, and invisible empty

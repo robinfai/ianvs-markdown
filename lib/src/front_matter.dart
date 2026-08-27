@@ -207,6 +207,24 @@ String replaceMarkdownFrontMatterBooleanValue(
   canonicalizeFlowLists: false,
 );
 
+/// Replaces one top-level front-matter property with a finite number scalar.
+///
+/// Like a text-property commit, Obsidian also canonicalizes unrelated
+/// top-level flow lists when a number field is committed.
+String replaceMarkdownFrontMatterNumberValue(
+  String source,
+  MarkdownMetadataEntry entry,
+  num value,
+) {
+  if (!value.isFinite) return source;
+  return _replaceMarkdownFrontMatterValue(
+    source,
+    entry,
+    '$value',
+    canonicalizeFlowLists: true,
+  );
+}
+
 String _replaceMarkdownFrontMatterValue(
   String source,
   MarkdownMetadataEntry entry,
