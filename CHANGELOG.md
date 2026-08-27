@@ -1,5 +1,7 @@
 ## Unreleased
 
+- Resolve empty ordinary-link destinations to Obsidian's current-note URI in
+  link callbacks, including both `()` and `(<>)` source forms.
 - Render defined standard and inline footnotes as shared `[N]` / `[N-k]`
   ordinals in inactive Live Preview, while undefined references remain literal,
   definition blocks keep document-wide numbering, and activation restores the

@@ -7,6 +7,8 @@ import 'theme.dart';
 
 typedef IanvsMarkdownWikiLinkExists = bool Function(String target);
 
+const _obsidianCurrentNoteHref = 'app://obsidian.md/index.html';
+
 class IanvsMarkdownInlineLinkBuilder extends MarkdownElementBuilder {
   IanvsMarkdownInlineLinkBuilder({
     required this.onTapLink,
@@ -28,8 +30,14 @@ class IanvsMarkdownInlineLinkBuilder extends MarkdownElementBuilder {
     TextStyle? parentStyle,
   ) {
     final label = element.textContent.trim();
-    final href = element.attributes['href'];
+    final sourceHref = element.attributes['href'];
     final wikiLink = element.attributes['data-ianvs-wiki-link'] == 'true';
+    final tagLink = element.attributes['data-ianvs-tag'] == 'true';
+    // Obsidian resolves both `()` and `(<>)` to the current note instead of
+    // exposing an empty destination to link interaction callbacks.
+    final href = !wikiLink && !tagLink && sourceHref?.isEmpty == true
+        ? _obsidianCurrentNoteHref
+        : sourceHref;
     final labelSegments = _markdownLinkLabelSegments(element);
     var effectivePreferredStyle = _mergeMarkdownLinkStyles(
       parentStyle,
@@ -57,7 +65,7 @@ class IanvsMarkdownInlineLinkBuilder extends MarkdownElementBuilder {
       wikiLinkResolved: wikiLink && href != null
           ? wikiLinkExists?.call(href)
           : null,
-      tagLink: element.attributes['data-ianvs-tag'] == 'true',
+      tagLink: tagLink,
       preferredStyle: effectivePreferredStyle,
       onTapLink: onTapLink,
       enableFileLinkChips: enableFileLinkChips,

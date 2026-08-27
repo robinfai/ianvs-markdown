@@ -810,6 +810,7 @@ final answer = 42;
         IanvsMarkdown(
           data:
               '[]() [Label]() '
+              '[AngleEmpty](<>) '
               '[Angle](<https://example.com/a b>) '
               '[Titled](https://example.com "Title help")',
           onTapLink: (text, href, title) => taps.add((text, href, title)),
@@ -821,17 +822,32 @@ final answer = 42;
         .widgetList<Semantics>(find.byType(Semantics))
         .where((widget) => widget.properties.link == true)
         .toList();
-    expect(linkSemantics, hasLength(4));
+    expect(linkSemantics, hasLength(5));
     expect(
       linkSemantics.any((widget) => widget.properties.label?.isEmpty ?? true),
       isTrue,
     );
     expect(find.byTooltip('Title help'), findsOneWidget);
 
+    final ordinaryLinks = find.byKey(
+      const ValueKey('ianvs-markdown-ordinary-link'),
+    );
+    await tester.tap(ordinaryLinks.at(0));
+    await tester.pump();
+    expect(taps.single, ('', 'app://obsidian.md/index.html', ''));
+
+    await tester.tap(find.text('Label'));
+    await tester.pump();
+    expect(taps.last, ('Label', 'app://obsidian.md/index.html', ''));
+
+    await tester.tap(find.text('AngleEmpty'));
+    await tester.pump();
+    expect(taps.last, ('AngleEmpty', 'app://obsidian.md/index.html', ''));
+
     await tester.tap(find.text('Angle'));
     await tester.pump();
-    expect(taps.single.$1, 'Angle');
-    expect(taps.single.$2, 'https://example.com/a%20b');
+    expect(taps.last.$1, 'Angle');
+    expect(taps.last.$2, 'https://example.com/a%20b');
 
     await tester.tap(find.text('Titled'));
     await tester.pump();
