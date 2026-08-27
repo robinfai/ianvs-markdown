@@ -20,19 +20,37 @@ final RegExp _obsidianCommentFencePattern = RegExp(
   r'^ {0,3}(`{3,}|~{3,})(.*)$',
 );
 
-/// Finds paired Obsidian `%%...%%` comments outside code spans and fences.
+/// Finds paired Obsidian `%%...%%` comments outside code spans and blocks.
 ///
 /// Delimiters are paired from left to right. An odd run of preceding
 /// backslashes escapes a delimiter, and an opening delimiter without a later
 /// unescaped close remains ordinary source text.
 List<TextRange> ianvsMarkdownCommentRanges(String source) {
   final ranges = <TextRange>[];
+  final indentedCodeRanges = parseMarkdownBlocks(source)
+      .where((block) => block.type == IanvsMarkdownBlockType.indentedCode)
+      .map((block) => TextRange(start: block.start, end: block.end))
+      .toList(growable: false);
   var index = 0;
+  var indentedCodeIndex = 0;
   var lineStart = true;
   var fenceCharacter = 0;
   var fenceLength = 0;
 
   while (index < source.length) {
+    while (indentedCodeIndex < indentedCodeRanges.length &&
+        index >= indentedCodeRanges[indentedCodeIndex].end) {
+      indentedCodeIndex += 1;
+    }
+    if (indentedCodeIndex < indentedCodeRanges.length) {
+      final range = indentedCodeRanges[indentedCodeIndex];
+      if (index >= range.start && index < range.end) {
+        index = range.end;
+        lineStart = false;
+        continue;
+      }
+    }
+
     if (lineStart) {
       final lineEnd = source.indexOf('\n', index);
       final end = lineEnd < 0 ? source.length : lineEnd;

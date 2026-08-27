@@ -2408,6 +2408,34 @@ widget := unknown_token(42)
     expect(rendered.data, code);
   });
 
+  testWidgets('reading keeps Obsidian comments literal in indented code', (
+    tester,
+  ) async {
+    const markdown = '''
+Before.
+
+    code %%inside%% tail
+	more %%tab%% code
+
+After.
+''';
+
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(data: markdown),
+        theme: ThemeData(platform: TargetPlatform.android),
+      ),
+    );
+
+    final rendered = tester.widget<SelectableText>(
+      find.descendant(
+        of: find.byType(IanvsMarkdownIndentedCodeBlock),
+        matching: find.byType(SelectableText),
+      ),
+    );
+    expect(rendered.data, 'code %%inside%% tail\nmore %%tab%% code');
+  });
+
   testWidgets('long code blocks stay fully expanded like Obsidian by default', (
     tester,
   ) async {
@@ -3541,6 +3569,29 @@ unclosed %% stays''';
       '```\n'
       'unclosed %% stays',
     );
+  });
+
+  test('Obsidian comments yield only to true indented code blocks', () {
+    const source = '''
+paired %%gone%%
+
+    code %%inside%% tail
+	more %%tab%% code
+
+paragraph
+    continuation %%also gone%%
+''';
+
+    final comments = ianvsMarkdownCommentRanges(
+      source,
+    ).map((range) => source.substring(range.start, range.end));
+    final rendered = prepareObsidianMarkdownForRendering(source);
+
+    expect(comments, <String>['%%gone%%', '%%also gone%%']);
+    expect(rendered, contains('    code %%inside%% tail'));
+    expect(rendered, contains('\tmore %%tab%% code'));
+    expect(rendered, isNot(contains('%%gone%%')));
+    expect(rendered, isNot(contains('%%also gone%%')));
   });
 
   testWidgets('editing comments keep escaped and unclosed source literal', (

@@ -1,5 +1,8 @@
 ## Unreleased
 
+- Preserve literal `%%comment-shaped%%` text inside true four-space or tab
+  indented code blocks in Reading and source styling, without treating an
+  indented paragraph continuation as code.
 - Keep a line-ending `^block-id` candidate literal when a soft line below
   continues the same Markdown block; only a true block-ending marker is
   consumed or styled as Obsidian metadata, while table-cell IDs stay intact.
