@@ -1,5 +1,9 @@
 ## Unreleased
 
+- Keep ordinary full-reference labels case-insensitive while matching
+  Obsidian's measured non-normalizing whitespace boundary: a secondary label
+  combining surrounding whitespace with a repeated internal run remains
+  literal in Reading and block-local Live Preview instead of resolving.
 - Add Obsidian-style Live Preview property editing for text fields and boolean
   controls: Enter or focus loss commits one undoable source edit, Escape
   cancels pending text, and a committed text field canonicalizes top-level

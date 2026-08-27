@@ -1,5 +1,53 @@
 import 'package:markdown/markdown.dart' as md;
 
+import 'footnote_syntax.dart';
+import 'markdown_link_source.dart';
+
+/// Keeps full-reference labels with Obsidian-non-normalizing whitespace
+/// literal, instead of letting CommonMark collapse them onto a definition.
+final class IanvsMarkdownLiteralReferenceWhitespaceSyntax
+    extends md.InlineSyntax {
+  IanvsMarkdownLiteralReferenceWhitespaceSyntax()
+    : super(r'\[', startCharacter: 0x5b);
+
+  @override
+  bool tryMatch(md.InlineParser parser, [int? startMatchPos]) {
+    final start = startMatchPos ?? parser.pos;
+    final source = parser.source;
+    if (start != parser.pos ||
+        start >= source.length ||
+        source.codeUnitAt(start) != 0x5b ||
+        isIanvsMarkdownEscapedAt(source, start)) {
+      return false;
+    }
+    final primaryEnd = findIanvsMarkdownLinkLabelEnd(source, start);
+    if (primaryEnd == null ||
+        primaryEnd + 1 >= source.length ||
+        source.codeUnitAt(primaryEnd + 1) != 0x5b) {
+      return false;
+    }
+    final secondaryStart = primaryEnd + 1;
+    final secondary = findIanvsMarkdownReferenceLabel(source, secondaryStart);
+    if (secondary == null) return false;
+    final rawSecondary = source.substring(
+      secondaryStart + 1,
+      secondary.end - 1,
+    );
+    if (!hasIanvsMarkdownLiteralReferenceWhitespace(rawSecondary)) {
+      return false;
+    }
+
+    parser.writeText();
+    parser
+      ..addNode(md.Text(source.substring(start, secondary.end)))
+      ..consume(secondary.end - start);
+    return true;
+  }
+
+  @override
+  bool onMatch(md.InlineParser parser, Match match) => false;
+}
+
 /// A source-preserving autolink match shared by rendering and live editing.
 final class IanvsMarkdownAutolinkMatch {
   const IanvsMarkdownAutolinkMatch({

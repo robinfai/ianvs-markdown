@@ -628,6 +628,37 @@ final answer = 42;
     expect(tappedHref, 'docs/guide.md');
   });
 
+  testWidgets('keeps Obsidian reference labels with extra whitespace literal', (
+    tester,
+  ) async {
+    String? tappedHref;
+    await tester.pumpWidget(
+      app(
+        IanvsMarkdown(
+          data:
+              '[Exact][Ref A]. [Case][ref a]. '
+              '[Whitespace   Ref][  Ref   A  ].\n\n'
+              '[Ref A]: docs/ref.md "Reference title"',
+          onTapLink: (text, href, title) => tappedHref = href,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-ordinary-link')),
+      findsNWidgets(2),
+    );
+    expect(
+      _renderedPlainTextContains(tester, '[Whitespace   Ref][  Ref   A  ]'),
+      isTrue,
+    );
+
+    await tester.tap(find.text('Case'));
+    await tester.pump();
+    expect(tappedHref, 'docs/ref.md');
+  });
+
   testWidgets('reading tables retain extra cells and pad missing cells', (
     tester,
   ) async {

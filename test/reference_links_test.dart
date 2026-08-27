@@ -37,6 +37,19 @@ void main() {
     expect(context.appendDefinitionsTo('Plain text.'), 'Plain text.');
   });
 
+  test('isolated blocks do not inject normalized whitespace references', () {
+    final context = MarkdownLinkReferenceContext.parse('[Ref A]: docs/ref.md');
+
+    expect(
+      context.appendDefinitionsTo('[Case][ref a]'),
+      '[Case][ref a]\n\n[ref a]: <docs/ref.md>',
+    );
+    expect(
+      context.appendDefinitionsTo('[Whitespace   Ref][  Ref   A  ]'),
+      '[Whitespace   Ref][  Ref   A  ]',
+    );
+  });
+
   test('isolated blocks preserve parser resolution and inline fallback', () {
     const source =
         r'[ref\]part]: docs/escaped.md'

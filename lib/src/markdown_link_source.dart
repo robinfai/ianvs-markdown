@@ -83,6 +83,30 @@ final class IanvsMarkdownReferenceLabelMatch {
   final String label;
 }
 
+/// Whether a full-reference secondary label matches the whitespace shape that
+/// Obsidian 1.13.7 keeps literal instead of CommonMark-normalizing.
+///
+/// The measured boundary combines surrounding horizontal whitespace with a
+/// repeated internal run, as in `[label][  Ref   A  ]`. Less constrained
+/// whitespace forms remain parser-owned until separately measured.
+bool hasIanvsMarkdownLiteralReferenceWhitespace(String label) {
+  if (label.isEmpty) return false;
+  var start = 0;
+  while (start < label.length) {
+    final character = label.codeUnitAt(start);
+    if (character != 0x20 && character != 0x09) break;
+    start += 1;
+  }
+  var end = label.length;
+  while (end > start) {
+    final character = label.codeUnitAt(end - 1);
+    if (character != 0x20 && character != 0x09) break;
+    end -= 1;
+  }
+  if (start == 0 && end == label.length) return false;
+  return RegExp(r'[ \t]{2,}').hasMatch(label.substring(start, end));
+}
+
 /// Parses the secondary label in a full reference link.
 ///
 /// Unlike link text, a reference label cannot contain an unescaped `[`, and
@@ -172,7 +196,13 @@ Iterable<String> findIanvsMarkdownReferencedLabels(String source) sync* {
       }
       final secondary = findIanvsMarkdownReferenceLabel(source, suffixStart);
       if (secondary != null) {
-        yield secondary.label;
+        final rawSecondary = source.substring(
+          suffixStart + 1,
+          secondary.end - 1,
+        );
+        if (!hasIanvsMarkdownLiteralReferenceWhitespace(rawSecondary)) {
+          yield secondary.label;
+        }
         index = secondary.end;
         continue;
       }

@@ -294,6 +294,7 @@ class IanvsMarkdown extends StatelessWidget {
         IanvsMarkdownEditingMetadataInlineSyntax.standardFootnote(),
         IanvsMarkdownEditingMetadataInlineSyntax.inlineFootnote(),
       ],
+      IanvsMarkdownLiteralReferenceWhitespaceSyntax(),
       // Metadata syntaxes such as block IDs include their leading space, so
       // they must get first refusal before rendered whitespace is collapsed.
       IanvsMarkdownRenderedWhitespaceSyntax(),

@@ -82,7 +82,8 @@ void main() {
       'collects references without mistaking inline links or definitions',
       () {
         const source =
-            '[inline](target) [full][ref] [collapsed][] [shortcut]\n'
+            '[inline](target) [full][ref] [literal][  ref   name  ] '
+            '[collapsed][] [shortcut]\n'
             r'[escaped][ref\]part]'
             '\n'
             '- [x] task\n'
@@ -96,5 +97,18 @@ void main() {
         ]);
       },
     );
+
+    test('identifies Obsidian-literal reference whitespace', () {
+      expect(hasIanvsMarkdownLiteralReferenceWhitespace('Ref A'), isFalse);
+      expect(hasIanvsMarkdownLiteralReferenceWhitespace('ref a'), isFalse);
+      expect(hasIanvsMarkdownLiteralReferenceWhitespace(' Ref A'), isFalse);
+      expect(hasIanvsMarkdownLiteralReferenceWhitespace('Ref A '), isFalse);
+      expect(hasIanvsMarkdownLiteralReferenceWhitespace('Ref   A'), isFalse);
+      expect(hasIanvsMarkdownLiteralReferenceWhitespace('  Ref   A  '), isTrue);
+      expect(
+        hasIanvsMarkdownLiteralReferenceWhitespace('\tRef\t\tA\t'),
+        isTrue,
+      );
+    });
   });
 }

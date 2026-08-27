@@ -386,6 +386,41 @@ void main() {
     expect(openedHref, 'docs/guide.md');
   });
 
+  testWidgets('live preview keeps extra-whitespace reference labels literal', (
+    tester,
+  ) async {
+    const source =
+        'Literal [Whitespace   Ref][  Ref   A  ].\n\n'
+        '[Ref A]: docs/ref.md';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1000,
+            height: 720,
+            child: IanvsMarkdownLiveEditor(controller: controller),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-ordinary-link')),
+      findsNothing,
+    );
+    expect(
+      find.textContaining(
+        '[Whitespace   Ref][  Ref   A  ]',
+        findRichText: true,
+      ),
+      findsOneWidget,
+    );
+    expect(controller.text, source);
+  });
+
   testWidgets('ordinary active rail follows only the caret line', (
     tester,
   ) async {
