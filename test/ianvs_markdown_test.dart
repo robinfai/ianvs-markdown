@@ -1170,6 +1170,220 @@ Literal:A``Z
     expect(_renderedTextHasBackground(tester, 'mark two'), isTrue);
   });
 
+  test('strikethrough scan matches Obsidian runs and escape parity', () {
+    const source =
+        'L~single~R\n\n'
+        'L~~basic~~R\n\n'
+        'L~~~triple~~~R\n\n'
+        'L~~~~quad~~~~R\n\n'
+        'L~~~~alpha~~R\n\n'
+        'L~~bravo~~~~R\n\n'
+        'L~~one~~~~two~~R\n\n'
+        'L~~ leading~~R\n\n'
+        'L~~trailing ~~R\n\n'
+        'L~~~~R\n\n'
+        'L~~closed-soft\nnext~~R\n\n'
+        'L~~open-soft\nnextR\n\n'
+        r'L\~~odd~~R'
+        '\n\n'
+        r'L\\~~even~~R';
+
+    final scan = ianvsMarkdownStrikethroughScan(source);
+    expect(
+      scan.matches.map((match) => match.content.textInside(source)).toList(),
+      <String>[
+        'basic',
+        'triple',
+        'quad',
+        'alpha',
+        'bravo',
+        'one',
+        'two',
+        '',
+        'closed-soft\nnext',
+        'open-soft',
+        'even',
+      ],
+    );
+
+    final triple = scan.matches.singleWhere(
+      (match) => match.content.textInside(source) == 'triple',
+    );
+    expect(triple.openingVisiblePrefixLength, 1);
+    expect(triple.pairedLength, 2);
+    expect(triple.closingRun!.end - triple.closingRun!.start, 3);
+
+    final quad = scan.matches.singleWhere(
+      (match) => match.content.textInside(source) == 'quad',
+    );
+    expect(quad.pairedLength, 4);
+    expect(quad.deferredOpeningSurplusLength, 0);
+
+    final alpha = scan.matches.singleWhere(
+      (match) => match.content.textInside(source) == 'alpha',
+    );
+    expect(alpha.pairedLength, 2);
+    expect(alpha.deferredOpeningSurplusLength, 2);
+    final bravo = scan.matches.singleWhere(
+      (match) => match.content.textInside(source) == 'bravo',
+    );
+    expect(bravo.closingRun!.end - bravo.closingRun!.start, 4);
+    expect(bravo.closingDelimiter!.end - bravo.closingDelimiter!.start, 2);
+
+    final one = scan.matches.singleWhere(
+      (match) => match.content.textInside(source) == 'one',
+    );
+    final two = scan.matches.singleWhere(
+      (match) => match.content.textInside(source) == 'two',
+    );
+    expect(two.openingRun.start, one.closingDelimiter!.end);
+    expect(
+      scan.matches
+          .singleWhere(
+            (match) => match.content.textInside(source) == 'open-soft',
+          )
+          .isClosed,
+      isFalse,
+    );
+  });
+
+  testWidgets('reading follows Obsidian strikethrough run presentation', (
+    tester,
+  ) async {
+    const source =
+        'A~single~Z\n\n'
+        'B~~~triple~~~Z\n\n'
+        'C~~~~quad~~~~Z\n\n'
+        'D~~~~alpha~~Z\n\n'
+        'E~~bravo~~~~Z\n\n'
+        'F~~~~Z\n\n'
+        'G~~openZ\n\n'
+        'H~~closed\nnext~~Z\n\n'
+        'I~~ leading~~Z\n\n'
+        r'J\~~odd~~Z';
+
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    for (final visible in <String>[
+      'A~single~Z',
+      'B~triple~Z',
+      'CquadZ',
+      'Dalpha~~Z',
+      'Ebravo~~Z',
+      'FZ',
+      'GopenZ',
+      'I~~ leading~~Z',
+      'J~~oddZ',
+    ]) {
+      expect(
+        _renderedPlainTextContains(tester, visible),
+        isTrue,
+        reason: visible,
+      );
+    }
+    expect(
+      _renderedTextHasDecoration(tester, 'single', TextDecoration.lineThrough),
+      isFalse,
+    );
+    for (final struck in <String>[
+      'triple',
+      'quad',
+      'alpha',
+      'bravo',
+      'openZ',
+      'closed',
+      'next',
+    ]) {
+      expect(
+        _renderedTextHasDecoration(tester, struck, TextDecoration.lineThrough),
+        isTrue,
+        reason: struck,
+      );
+    }
+    expect(
+      _renderedTextHasDecoration(tester, 'leading', TextDecoration.lineThrough),
+      isFalse,
+    );
+  });
+
+  testWidgets('strikethrough nesting preserves links and code priority', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(
+          data:
+              '~~**strong**~~ ~~[link](https://example.com)~~ '
+              '[[Wiki|~~alias~~]] `~~code~~`',
+        ),
+      ),
+    );
+
+    expect(_renderedTextIsBold(tester, 'strong'), isTrue);
+    for (final struck in <String>['strong', 'link', 'alias']) {
+      expect(
+        _renderedTextHasDecoration(tester, struck, TextDecoration.lineThrough),
+        isTrue,
+        reason: struck,
+      );
+    }
+    expect(
+      _renderedTextUsesInlineCodeStyle(
+        tester,
+        '~~code~~',
+        IanvsMarkdownThemeData.light,
+      ),
+      isTrue,
+    );
+  });
+
+  testWidgets('editing strikethrough hides complete participating runs', (
+    tester,
+  ) async {
+    const source =
+        'A~single~Z\n\n'
+        'B~~~~alpha~~Z\n\n'
+        'C~~bravo~~~~Z\n\n'
+        'D~~ echo~~Z\n\n'
+        'E~~foxtrot ~~Z';
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(
+          data: source,
+          obsidianMetadataMode: IanvsMarkdownObsidianMetadataMode.editing,
+        ),
+      ),
+    );
+
+    for (final visible in <String>[
+      'A~single~Z',
+      'BalphaZ',
+      'CbravoZ',
+      'D~~ echoZ',
+      'Efoxtrot Z',
+    ]) {
+      expect(
+        _renderedPlainTextContains(tester, visible),
+        isTrue,
+        reason: visible,
+      );
+    }
+    for (final struck in <String>['alpha', 'bravo']) {
+      expect(
+        _renderedTextHasDecoration(tester, struck, TextDecoration.lineThrough),
+        isTrue,
+        reason: struck,
+      );
+    }
+    for (final literal in <String>['echo', 'foxtrot']) {
+      expect(
+        _renderedTextHasDecoration(tester, literal, TextDecoration.lineThrough),
+        isFalse,
+        reason: literal,
+      );
+    }
+  });
+
   testWidgets(
     'editing code spans preserve source breaks while reading normalizes them',
     (tester) async {
@@ -3540,7 +3754,8 @@ bool _renderedTextHasDecoration(
   bool hasDecoration(InlineSpan span, [TextDecoration? inheritedDecoration]) {
     if (span is! TextSpan) return false;
     final current = span.style?.decoration ?? inheritedDecoration;
-    if ((span.text?.contains(text) ?? false) && current == decoration) {
+    if ((span.text?.contains(text) ?? false) &&
+        (current?.contains(decoration) ?? false)) {
       return true;
     }
     return (span.children ?? const <InlineSpan>[]).any(

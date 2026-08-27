@@ -1,5 +1,9 @@
 ## Unreleased
 
+- Match Obsidian strikethrough parsing for double-tilde-only syntax, odd and
+  even delimiter runs, asymmetric and adjacent surplus, whitespace and escape
+  boundaries, soft-line and unclosed scopes, nested links/Wiki aliases, code
+  priority, inactive marker hiding, and source-range selection.
 - Match Obsidian highlight parsing for whitespace boundaries, surplus and
   adjacent `=` runs, escape parity, closed soft-line spans, unclosed line
   scope, nested links, Reading/Live Preview presentation, and source-range

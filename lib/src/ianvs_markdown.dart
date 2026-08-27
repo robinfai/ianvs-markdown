@@ -20,6 +20,7 @@ import 'obsidian_inline.dart';
 import 'obsidian_metadata.dart';
 import 'obsidian_image.dart';
 import 'render_budget.dart';
+import 'strikethrough.dart';
 import 'task_checkbox.dart';
 import 'task_syntax.dart';
 import 'theme.dart';
@@ -294,6 +295,12 @@ class IanvsMarkdown extends StatelessWidget {
             obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing
             ? IanvsMarkdownHighlightPresentation.editing
             : IanvsMarkdownHighlightPresentation.reading,
+      ),
+      IanvsMarkdownStrikethroughSyntax(
+        presentation:
+            obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing
+            ? IanvsMarkdownStrikethroughPresentation.editing
+            : IanvsMarkdownStrikethroughPresentation.reading,
       ),
       IanvsMarkdownWikiLinkSyntax(
         presentation:

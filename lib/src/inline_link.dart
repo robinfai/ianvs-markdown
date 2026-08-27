@@ -30,9 +30,27 @@ class IanvsMarkdownInlineLinkBuilder extends MarkdownElementBuilder {
     final label = element.textContent.trim();
     final href = element.attributes['href'];
     final wikiLink = element.attributes['data-ianvs-wiki-link'] == 'true';
+    final labelSegments = _markdownLinkLabelSegments(element);
+    var effectivePreferredStyle = _mergeMarkdownLinkStyles(
+      parentStyle,
+      preferredStyle,
+    );
+    final fullyStruckLabel =
+        labelSegments.isNotEmpty &&
+        labelSegments.every((segment) => segment.strikethrough);
+    if (element.attributes['data-ianvs-outer-strikethrough'] == 'true' ||
+        fullyStruckLabel) {
+      effectivePreferredStyle = (effectivePreferredStyle ?? const TextStyle())
+          .copyWith(
+            decoration: _combineMarkdownLinkDecorations(
+              effectivePreferredStyle?.decoration,
+              TextDecoration.lineThrough,
+            ),
+          );
+    }
     final link = _MarkdownInlineLink(
       label: label,
-      labelSegments: _markdownLinkLabelSegments(element),
+      labelSegments: labelSegments,
       href: href,
       title: element.attributes['title'] ?? '',
       wikiLink: wikiLink,
@@ -40,7 +58,7 @@ class IanvsMarkdownInlineLinkBuilder extends MarkdownElementBuilder {
           ? wikiLinkExists?.call(href)
           : null,
       tagLink: element.attributes['data-ianvs-tag'] == 'true',
-      preferredStyle: preferredStyle,
+      preferredStyle: effectivePreferredStyle,
       onTapLink: onTapLink,
       enableFileLinkChips: enableFileLinkChips,
       theme: theme,
@@ -184,7 +202,9 @@ class _MarkdownInlineLinkState extends State<_MarkdownInlineLink> {
               style: widget.preferredStyle?.copyWith(
                 color: colors.textPrimary,
                 backgroundColor: Colors.transparent,
-                decoration: TextDecoration.none,
+                decoration: _markdownLinkStrikethroughOnly(
+                  widget.preferredStyle?.decoration,
+                ),
                 fontSize: 12.5,
                 height: 1.25,
                 fontWeight: FontWeight.w600,
@@ -203,7 +223,10 @@ class _MarkdownInlineLinkState extends State<_MarkdownInlineLink> {
     final style = (widget.preferredStyle ?? const TextStyle()).copyWith(
       color: colors.accentDark,
       backgroundColor: Colors.transparent,
-      decoration: TextDecoration.underline,
+      decoration: _combineMarkdownLinkDecorations(
+        _markdownLinkStrikethroughOnly(widget.preferredStyle?.decoration),
+        TextDecoration.underline,
+      ),
       decorationColor: colors.accentDark,
       decorationThickness: 1,
     );
@@ -324,8 +347,15 @@ class _MarkdownInlineLinkState extends State<_MarkdownInlineLink> {
           color: color,
           backgroundColor: Colors.transparent,
           decoration: unresolved
-              ? TextDecoration.none
-              : TextDecoration.underline,
+              ? _markdownLinkStrikethroughOnly(
+                  widget.preferredStyle?.decoration,
+                )
+              : _combineMarkdownLinkDecorations(
+                  _markdownLinkStrikethroughOnly(
+                    widget.preferredStyle?.decoration,
+                  ),
+                  TextDecoration.underline,
+                ),
           decorationColor: color,
           decorationThickness: 1,
           fontWeight: unresolved ? FontWeight.w500 : FontWeight.w600,
@@ -349,7 +379,9 @@ class _MarkdownInlineLinkState extends State<_MarkdownInlineLink> {
         style: widget.preferredStyle?.copyWith(
           color: colors.accentDark,
           backgroundColor: Colors.transparent,
-          decoration: TextDecoration.none,
+          decoration: _markdownLinkStrikethroughOnly(
+            widget.preferredStyle?.decoration,
+          ),
           fontSize: 12.5,
           height: 1.25,
           fontWeight: FontWeight.w600,
@@ -358,6 +390,41 @@ class _MarkdownInlineLinkState extends State<_MarkdownInlineLink> {
     );
   }
 }
+
+TextStyle? _mergeMarkdownLinkStyles(
+  TextStyle? parentStyle,
+  TextStyle? preferredStyle,
+) {
+  if (parentStyle == null) return preferredStyle;
+  if (preferredStyle == null) return parentStyle;
+  return parentStyle
+      .merge(preferredStyle)
+      .copyWith(
+        decoration: _combineMarkdownLinkDecorations(
+          parentStyle.decoration,
+          preferredStyle.decoration,
+        ),
+      );
+}
+
+TextDecoration? _combineMarkdownLinkDecorations(
+  TextDecoration? inherited,
+  TextDecoration? overlay,
+) {
+  if (inherited != null && inherited == overlay) return inherited;
+  final decorations = <TextDecoration>[
+    if (inherited != null && inherited != TextDecoration.none) inherited,
+    if (overlay != null && overlay != TextDecoration.none) overlay,
+  ];
+  if (decorations.isEmpty) return null;
+  if (decorations.length == 1) return decorations.single;
+  return TextDecoration.combine(decorations);
+}
+
+TextDecoration _markdownLinkStrikethroughOnly(TextDecoration? decoration) =>
+    decoration?.contains(TextDecoration.lineThrough) == true
+    ? TextDecoration.lineThrough
+    : TextDecoration.none;
 
 class _MarkdownLinkLabelSegment {
   const _MarkdownLinkLabelSegment({

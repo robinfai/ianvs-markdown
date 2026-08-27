@@ -496,6 +496,29 @@ void main() {
     expect(controller.text, source);
   });
 
+  testWidgets('double click selects complete Obsidian strikethrough source', (
+    tester,
+  ) async {
+    const source = 'Left ~~strikeword~~ right';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final renderedRect = tester.getRect(find.textContaining('Left'));
+    final target = Offset(
+      renderedRect.left + 90,
+      renderedRect.top + renderedRect.height / 2,
+    );
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(controller.selection.textInside(controller.text), '~~strikeword~~');
+    expect(controller.text, source);
+  });
+
   testWidgets('direct triple click selects the complete source line', (
     tester,
   ) async {

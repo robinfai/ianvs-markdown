@@ -11,6 +11,7 @@ import '../obsidian_autolink.dart';
 import '../obsidian_html.dart';
 import '../obsidian_inline.dart';
 import '../obsidian_metadata.dart';
+import '../strikethrough.dart';
 import '../wiki_link_reference.dart';
 import 'editor_models.dart';
 import 'markdown_paste.dart';
@@ -2704,12 +2705,10 @@ List<_SyntaxToken> _markdownSyntaxTokens(
     theme.strong,
     inlineSyntaxExcludedRanges,
   );
-  _addDelimitedSyntaxTokens(
+  _addStrikethroughSyntaxTokens(
     tokens,
     text,
-    RegExp(r'(~~)(\S(?:(?:(?!\n[ \t]*\n)[\s\S])*?\S)?)~~'),
-    theme.strikethrough,
-    theme.marker,
+    theme,
     inlineSyntaxExcludedRanges,
   );
   _addDelimitedSyntaxTokens(
@@ -3115,6 +3114,73 @@ List<TextRange> _addDelimitedSyntaxTokens(
       );
   }
   return ranges;
+}
+
+void _addStrikethroughSyntaxTokens(
+  List<_SyntaxToken> target,
+  String text,
+  IanvsMarkdownSyntaxTheme theme,
+  List<TextRange> excludedRanges,
+) {
+  final scan = ianvsMarkdownStrikethroughScan(
+    text,
+    excludedRanges: excludedRanges,
+  );
+  for (final match in scan.matches) {
+    final revealRange = match.sourceRange;
+    final openingLineEnd = text.indexOf('\n', match.content.start);
+    final multiline =
+        match.isClosed &&
+        openingLineEnd >= 0 &&
+        openingLineEnd < match.content.end;
+    final closingLineStart = multiline
+        ? text.lastIndexOf('\n', match.content.end - 1) + 1
+        : match.openingRun.start;
+    final openingRevealRange = multiline
+        ? TextRange(start: match.openingRun.start, end: openingLineEnd)
+        : revealRange;
+    final closingRevealRange = multiline
+        ? TextRange(start: closingLineStart, end: match.closingRun!.end)
+        : revealRange;
+    target.add(
+      _SyntaxToken(
+        match.openingRun.start,
+        match.openingRun.end,
+        theme.marker,
+        inlineMarkerRange: openingRevealRange,
+      ),
+    );
+    if (!match.content.isCollapsed) {
+      target.add(
+        _SyntaxToken(
+          match.content.start,
+          match.content.end,
+          theme.strikethrough,
+        ),
+      );
+    }
+    final closing = match.closingRun;
+    if (closing != null) {
+      target.add(
+        _SyntaxToken(
+          closing.start,
+          closing.end,
+          theme.marker,
+          inlineMarkerRange: closingRevealRange,
+        ),
+      );
+    }
+  }
+  for (final range in scan.editingOnlyHiddenRanges) {
+    target.add(
+      _SyntaxToken(
+        range.start,
+        range.end,
+        theme.marker,
+        inlineMarkerRange: range,
+      ),
+    );
+  }
 }
 
 void _addHighlightSyntaxTokens(

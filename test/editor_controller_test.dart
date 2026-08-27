@@ -2027,6 +2027,129 @@ void main() {
   );
 
   test(
+    'source strikethrough shares Obsidian runs and invalid marker hiding',
+    () {
+      const syntax = IanvsMarkdownSyntaxTheme(
+        heading: TextStyle(),
+        marker: TextStyle(color: Color(0xff777777)),
+        link: TextStyle(),
+        code: TextStyle(fontFamily: 'monospace'),
+        comment: TextStyle(),
+        strikethrough: TextStyle(decoration: TextDecoration.lineThrough),
+      );
+      const source =
+          'A~single~Z\n\n'
+          'B~~~~alpha~~Z\n\n'
+          'C~~bravo~~~~Z\n\n'
+          'D~~openZ\nnextZ\n\n'
+          'E~~ echo~~Z\n\n'
+          'F~~foxtrot ~~Z';
+
+      List<TextSpan> build(int caret) => buildMarkdownSourceTextSpan(
+        TextEditingValue(
+          text: source,
+          selection: TextSelection.collapsed(offset: caret),
+        ),
+        style: const TextStyle(fontSize: 14),
+        syntaxTheme: syntax,
+        withComposing: false,
+        hideInactiveInlineMarkers: true,
+      ).children!.cast<TextSpan>().toList();
+
+      TextSpan spanAt(List<TextSpan> spans, int offset) {
+        var cursor = 0;
+        for (final span in spans) {
+          final end = cursor + (span.text?.length ?? 0);
+          if (offset >= cursor && offset < end) return span;
+          cursor = end;
+        }
+        throw StateError('No span at $offset');
+      }
+
+      final inactive = build(source.indexOf('nextZ'));
+      expect(spanAt(inactive, source.indexOf('~single')).style?.fontSize, 14);
+
+      final alpha = source.indexOf('alpha');
+      expect(spanAt(inactive, alpha - 4).style?.fontSize, .01);
+      expect(spanAt(inactive, alpha + 'alpha'.length).style?.fontSize, .01);
+      expect(
+        spanAt(
+          inactive,
+          alpha,
+        ).style?.decoration?.contains(TextDecoration.lineThrough),
+        isTrue,
+      );
+
+      final bravo = source.indexOf('bravo');
+      expect(spanAt(inactive, bravo - 2).style?.fontSize, .01);
+      expect(spanAt(inactive, bravo + 'bravo'.length).style?.fontSize, .01);
+      expect(
+        spanAt(
+          inactive,
+          bravo,
+        ).style?.decoration?.contains(TextDecoration.lineThrough),
+        isTrue,
+      );
+
+      final open = source.indexOf('openZ');
+      expect(
+        spanAt(
+          inactive,
+          open,
+        ).style?.decoration?.contains(TextDecoration.lineThrough),
+        isTrue,
+      );
+      expect(
+        spanAt(
+          inactive,
+          source.indexOf('nextZ'),
+        ).style?.decoration?.contains(TextDecoration.lineThrough),
+        isNot(true),
+      );
+
+      final echo = source.indexOf('echo');
+      expect(spanAt(inactive, echo - 3).style?.fontSize, 14);
+      expect(
+        spanAt(inactive, source.indexOf('~~Z', echo)).style?.fontSize,
+        .01,
+      );
+      expect(
+        spanAt(
+          inactive,
+          echo,
+        ).style?.decoration?.contains(TextDecoration.lineThrough),
+        isNot(true),
+      );
+
+      final foxtrot = source.indexOf('foxtrot');
+      expect(spanAt(inactive, foxtrot - 2).style?.fontSize, .01);
+      expect(
+        spanAt(inactive, source.indexOf('~~Z', foxtrot)).style?.fontSize,
+        .01,
+      );
+      expect(
+        spanAt(
+          inactive,
+          foxtrot,
+        ).style?.decoration?.contains(TextDecoration.lineThrough),
+        isNot(true),
+      );
+
+      final active = build(alpha);
+      expect(spanAt(active, alpha - 4).style?.fontSize, 14);
+      expect(spanAt(active, alpha + 'alpha'.length).style?.fontSize, 14);
+      expect(
+        ianvsMarkdownInlineSourceRangeAt(
+          source,
+          TextRange(start: alpha, end: alpha + 'alpha'.length),
+        )?.textInside(source),
+        '~~~~alpha~~',
+      );
+      expect(inactive.map((span) => span.text).join(), source);
+    },
+  );
+
+  test(
     'leading-pipe Wiki links keep the pipe visible outside their markers',
     () {
       const source = 'A [[|Alias]] B [[ ]] C [[]]';
