@@ -4658,9 +4658,14 @@ bool _isMarkerOnlyListSource(String source) =>
     RegExp(r'^[ \t]*(?:[-+*]|\d{1,9}[.)])[ \t]*$').hasMatch(source);
 
 class _TablePasteAction extends ContextAction<PasteTextIntent> {
-  _TablePasteAction({required this.controller, required this.onChanged});
+  _TablePasteAction({
+    required this.controller,
+    required this.isCurrent,
+    required this.onChanged,
+  });
 
   final TextEditingController controller;
+  final bool Function() isCurrent;
   final ValueChanged<TextEditingValue> onChanged;
 
   @override
@@ -4679,6 +4684,7 @@ class _TablePasteAction extends ContextAction<PasteTextIntent> {
     Action<PasteTextIntent>? defaultAction,
   ) async {
     final data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (!isCurrent()) return;
     final pastedText = data?.text;
     final replacement = pastedText == null
         ? null
@@ -4906,6 +4912,26 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
 
   void _handleCellFocusChanged() {
     if (mounted) setState(() {});
+  }
+
+  _EditableTableCell? _cellForKey(String key) {
+    for (final row in _model.rows) {
+      for (final cell in row) {
+        if (cell.key == key) return cell;
+      }
+    }
+    return null;
+  }
+
+  void _handleFormattedCellAction(
+    String key,
+    TextEditingController expectedController,
+    TextEditingValue value,
+  ) {
+    if (!mounted || !identical(_controllers[key], expectedController)) return;
+    final cell = _cellForKey(key);
+    if (cell == null) return;
+    widget.onCellFormatted(cell, value);
   }
 
   void _addRow({int column = 0}) {
@@ -5424,14 +5450,28 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                                   actions: <Type, Action<Intent>>{
                                     PasteTextIntent: _TablePasteAction(
                                       controller: controller,
+                                      isCurrent: () =>
+                                          mounted &&
+                                          identical(
+                                            _controllers[cell.key],
+                                            controller,
+                                          ),
                                       onChanged: (value) =>
-                                          widget.onCellFormatted(cell, value),
+                                          _handleFormattedCellAction(
+                                            cell.key,
+                                            controller,
+                                            value,
+                                          ),
                                     ),
                                     DeleteToNextWordBoundaryIntent:
                                         _TableWordDeletionAction(
                                           controller: controller,
-                                          onChanged: (value) => widget
-                                              .onCellFormatted(cell, value),
+                                          onChanged: (value) =>
+                                              _handleFormattedCellAction(
+                                                cell.key,
+                                                controller,
+                                                value,
+                                              ),
                                         ),
                                     ExtendSelectionToNextWordBoundaryIntent:
                                         _TableWordMovementAction(controller),

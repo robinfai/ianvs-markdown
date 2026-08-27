@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -10843,6 +10845,65 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
       await tester.pumpAndSettle();
       expect(controller.text, source);
       expect(tester.widget<TextField>(cell).controller?.text, 'alpha');
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
+    'table smart paste resolves the cell after awaiting the clipboard',
+    (tester) async {
+      const url = 'https://example.com';
+      const source =
+          '| H | I |\n'
+          '| --- | --- |\n'
+          '| alpha | beta |';
+      const expected =
+          '| H | I |\n'
+          '| --- | --- |\n'
+          '| LONGalpha | [beta](https://example.com) |';
+      final clipboard = Completer<Map<String, dynamic>?>();
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (methodCall) {
+          if (methodCall.method == 'Clipboard.getData') {
+            return clipboard.future;
+          }
+          return Future<Object?>.value();
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+      final first = find.byKey(const ValueKey('ianvs-markdown-table-1-0'));
+      final second = find.byKey(const ValueKey('ianvs-markdown-table-1-1'));
+      await tester.tap(second);
+      tester.widget<TextField>(second).controller?.selection =
+          const TextSelection(baseOffset: 0, extentOffset: 4);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyV);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.tap(first);
+      await tester.pump();
+      await tester.enterText(first, 'LONGalpha');
+      await tester.pump();
+      expect(controller.text, contains('| LONGalpha | beta |'));
+
+      clipboard.complete(const <String, dynamic>{'text': url});
+      await tester.pumpAndSettle();
+
+      expect(controller.text, expected);
+      expect(tester.widget<TextField>(second).controller?.text, '[beta]($url)');
     },
     variant: const TargetPlatformVariant(<TargetPlatform>{
       TargetPlatform.macOS,
