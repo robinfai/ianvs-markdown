@@ -1,5 +1,9 @@
 ## Unreleased
 
+- Lock Obsidian list editing semantics for multi-level empty-item exits,
+  quote-contained soft continuations, four-space and tab-indented list-like
+  lines, standalone comment wrappers, and tab-separated dash markers that
+  render as lists while retaining native newline input behavior.
 - Match Obsidian ordinary-link source recognition for empty and angle-wrapped
   destinations, balanced and escaped parentheses, double-, single-, and
   parenthesis-delimited titles, soft-line title whitespace, malformed-link

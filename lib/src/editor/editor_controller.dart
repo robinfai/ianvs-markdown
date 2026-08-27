@@ -1667,6 +1667,9 @@ _MarkdownContinuationLine? _parseMarkdownContinuationLine(String line) {
       continue;
     }
 
+    // Obsidian renders dash markers followed by U+0009 as lists, but Enter and
+    // Shift+Enter keep native newline behavior instead of synthesizing a new
+    // marker. Continuations therefore intentionally require an ASCII space.
     final unordered = RegExp(r'^([-+*] )(\[[^\r\n]\] )?').firstMatch(remaining);
     if (unordered != null) {
       final marker = unordered.group(1)!;

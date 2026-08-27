@@ -324,4 +324,16 @@ final value = 1;
       IanvsMarkdownBlockType.unorderedList,
     ]);
   });
+
+  test('tab-separated markers remain list blocks for rendering', () {
+    const source = '-\tone\n\n1.\ttwo';
+
+    final blocks = parseMarkdownBlocks(source, splitListItems: true);
+
+    expect(blocks.map((block) => block.source), <String>['-\tone', '1.\ttwo']);
+    expect(blocks.map((block) => block.type), <IanvsMarkdownBlockType>[
+      IanvsMarkdownBlockType.unorderedList,
+      IanvsMarkdownBlockType.orderedList,
+    ]);
+  });
 }

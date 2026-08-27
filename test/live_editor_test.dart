@@ -6978,6 +6978,40 @@ Inline ^[first], missing[^missing], standard[^a], repeated[^a], empty ^[], and s
     expect(controller.selection, const TextSelection.collapsed(offset: 12));
   });
 
+  testWidgets(
+    'source editor keeps native newline after a tab-separated list marker',
+    (tester) async {
+      final controller = IanvsMarkdownController(
+        text: '-\tone',
+        mode: IanvsMarkdownEditorMode.source,
+      )..selection = const TextSelection.collapsed(offset: 5);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: IanvsMarkdownEditor(
+              controller: controller,
+              autofocus: true,
+              showToolbar: false,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      tester.testTextInput.updateEditingValue(
+        const TextEditingValue(
+          text: '-\tone\n',
+          selection: TextSelection.collapsed(offset: 6),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(controller.text, '-\tone\n');
+      expect(controller.selection, const TextSelection.collapsed(offset: 6));
+    },
+  );
+
   testWidgets('source Tab renumbers an ordered item inside a quote', (
     tester,
   ) async {
@@ -7610,6 +7644,37 @@ Inline ^[first], missing[^missing], standard[^a], repeated[^a], empty ^[], and s
     expect(controller.text, '>     - item\n>     - ');
     expect(controller.selection, const TextSelection.collapsed(offset: 21));
   });
+
+  testWidgets(
+    'tab-separated rendered list keeps native newline editing semantics',
+    (tester) async {
+      final controller = IanvsMarkdownController(text: '-\tone')
+        ..selection = const TextSelection.collapsed(offset: 5);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: IanvsMarkdownLiveEditor(
+              controller: controller,
+              autofocus: true,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      tester.testTextInput.updateEditingValue(
+        const TextEditingValue(
+          text: '-\tone\n',
+          selection: TextSelection.collapsed(offset: 6),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(controller.text, '-\tone\n');
+      expect(controller.selection, const TextSelection.collapsed(offset: 6));
+    },
+  );
 
   testWidgets('live preview exits an empty EOF list without an extra gap', (
     tester,

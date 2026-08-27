@@ -1454,6 +1454,28 @@ void main() {
       );
     });
 
+    test('matches Obsidian list exits and literal-tab boundaries', () {
+      final firstExit = _pressEnter(formatter, '- first\n        - ');
+      expect(firstExit.text, '- first\n    - ');
+      final secondExit = _pressEnterAt(
+        formatter,
+        firstExit.text,
+        firstExit.selection.extentOffset,
+      );
+      expect(secondExit.text, '- first\n- ');
+
+      expect(_pressEnter(formatter, '    - code').text, '    - code\n    - ');
+      expect(_pressEnter(formatter, '\t- code').text, '\t- code\n\t- ');
+
+      const comment = '%%\n- item\n%%';
+      expect(
+        _pressEnterAt(formatter, comment, comment.indexOf('\n%%')).text,
+        '%%\n- item\n- \n%%',
+      );
+
+      expect(_pressEnter(formatter, '-\tone').text, '-\tone\n');
+    });
+
     testWidgets('Shift+Enter aligns soft continuations under markers', (
       tester,
     ) async {
@@ -1473,12 +1495,18 @@ void main() {
         expect((await shiftEnter('> quote')).text, '> quote\n> ');
         expect((await shiftEnter('>quote')).text, '>quote\n> ');
         expect((await shiftEnter('> - item')).text, '> - item\n>   ');
+        expect((await shiftEnter('> 9. item')).text, '> 9. item\n>    ');
+        expect(
+          (await shiftEnter('> - [x] done')).text,
+          '> - [x] done\n>       ',
+        );
         expect(
           (await shiftEnter('>     - item')).text,
           '>     - item\n>       ',
         );
         expect((await shiftEnter('> > quote')).text, '> > quote\n> > ');
         expect((await shiftEnter('    - nested')).text, '    - nested\n      ');
+        expect((await shiftEnter('-\tone')).text, '-\tone\n');
       } finally {
         await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
       }
