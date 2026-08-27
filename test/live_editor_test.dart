@@ -5171,6 +5171,108 @@ Label
   );
 
   testWidgets(
+    'property Option+Backspace cannot delete stale Markdown punctuation',
+    (tester) async {
+      const source = '''
+---
+title: Alpha
+---
+**bold**''';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 1000,
+              height: 720,
+              child: IanvsMarkdownLiveEditor(controller: controller),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final input = find.byKey(
+        const ValueKey('ianvs-markdown-front-matter-input-title'),
+      );
+      controller.selection = const TextSelection.collapsed(
+        offset: source.length,
+      );
+      await tester.tap(input);
+      final field = tester.widget<TextField>(input);
+      field.controller!.selection = const TextSelection.collapsed(
+        offset: 'Alpha'.length,
+      );
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+      await tester.pumpAndSettle();
+
+      expect(controller.text, source);
+      expect(field.controller!.text, isEmpty);
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
+    'property Option+Left cannot move a stale document selection',
+    (tester) async {
+      const source = '''
+---
+title: Alpha
+---
+**bold**''';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 1000,
+              height: 720,
+              child: IanvsMarkdownLiveEditor(controller: controller),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final input = find.byKey(
+        const ValueKey('ianvs-markdown-front-matter-input-title'),
+      );
+      controller.selection = const TextSelection.collapsed(
+        offset: source.length,
+      );
+      await tester.tap(input);
+      final field = tester.widget<TextField>(input);
+      field.controller!.selection = const TextSelection.collapsed(
+        offset: 'Alpha'.length,
+      );
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+      await tester.pumpAndSettle();
+
+      expect(
+        controller.selection,
+        const TextSelection.collapsed(offset: source.length),
+      );
+      expect(
+        field.controller!.selection,
+        const TextSelection.collapsed(offset: 0),
+      );
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
     'property Tab traversal never indents a stale document selection',
     (tester) async {
       const source = '''

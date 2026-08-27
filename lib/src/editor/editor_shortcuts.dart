@@ -10,6 +10,10 @@ import 'editor_models.dart';
 import 'editor_toolbar.dart';
 import 'markdown_paste.dart';
 
+bool _isInsideFrontMatterCard(BuildContext? context) =>
+    context?.findAncestorWidgetOfExactType<IanvsMarkdownFrontMatterCard>() !=
+    null;
+
 class IanvsMarkdownEditorShortcuts extends StatelessWidget {
   const IanvsMarkdownEditorShortcuts({
     super.key,
@@ -219,9 +223,7 @@ class _MarkdownPasteAction extends ContextAction<PasteTextIntent> {
   @override
   Object? invoke(PasteTextIntent intent, [BuildContext? context]) {
     final defaultAction = callingAction;
-    if (context
-            ?.findAncestorWidgetOfExactType<IanvsMarkdownFrontMatterCard>() !=
-        null) {
+    if (_isInsideFrontMatterCard(context)) {
       return defaultAction?.invoke(intent);
     }
     final selection = controller.selection;
@@ -337,13 +339,19 @@ class _OutdentIntent extends Intent {
 }
 
 class _MarkdownWordDeletionAction
-    extends Action<DeleteToNextWordBoundaryIntent> {
+    extends ContextAction<DeleteToNextWordBoundaryIntent> {
   _MarkdownWordDeletionAction(this.controller);
 
   final IanvsMarkdownController controller;
 
   @override
-  Object? invoke(DeleteToNextWordBoundaryIntent intent) {
+  Object? invoke(
+    DeleteToNextWordBoundaryIntent intent, [
+    BuildContext? context,
+  ]) {
+    if (_isInsideFrontMatterCard(context)) {
+      return callingAction?.invoke(intent);
+    }
     if (controller.deleteMarkdownPunctuationSegment(forward: intent.forward)) {
       return null;
     }
@@ -352,13 +360,19 @@ class _MarkdownWordDeletionAction
 }
 
 class _MarkdownWordMovementAction
-    extends Action<ExtendSelectionToNextWordBoundaryIntent> {
+    extends ContextAction<ExtendSelectionToNextWordBoundaryIntent> {
   _MarkdownWordMovementAction(this.controller);
 
   final IanvsMarkdownController controller;
 
   @override
-  Object? invoke(ExtendSelectionToNextWordBoundaryIntent intent) {
+  Object? invoke(
+    ExtendSelectionToNextWordBoundaryIntent intent, [
+    BuildContext? context,
+  ]) {
+    if (_isInsideFrontMatterCard(context)) {
+      return callingAction?.invoke(intent);
+    }
     if (controller.moveAcrossMarkdownPunctuation(
       forward: intent.forward,
       extendSelection: !intent.collapseSelection,
@@ -370,15 +384,20 @@ class _MarkdownWordMovementAction
 }
 
 class _MarkdownWordSelectionAction
-    extends Action<ExtendSelectionToNextWordBoundaryOrCaretLocationIntent> {
+    extends
+        ContextAction<ExtendSelectionToNextWordBoundaryOrCaretLocationIntent> {
   _MarkdownWordSelectionAction(this.controller);
 
   final IanvsMarkdownController controller;
 
   @override
   Object? invoke(
-    ExtendSelectionToNextWordBoundaryOrCaretLocationIntent intent,
-  ) {
+    ExtendSelectionToNextWordBoundaryOrCaretLocationIntent intent, [
+    BuildContext? context,
+  ]) {
+    if (_isInsideFrontMatterCard(context)) {
+      return callingAction?.invoke(intent);
+    }
     if (controller.moveAcrossMarkdownPunctuation(
       forward: intent.forward,
       extendSelection: true,
