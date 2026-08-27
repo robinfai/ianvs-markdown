@@ -4389,6 +4389,41 @@ code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     );
   });
 
+  test('escaped opening backticks do not hide following footnotes', () {
+    const source = r'''\`^[note]` and [^std]
+
+[^std]: Definition.''';
+
+    final presentations = ianvsMarkdownLivePreviewFootnoteReferences(source);
+    expect(
+      presentations.map(
+        (reference) => reference.sourceRange.textInside(source),
+      ),
+      <String>['^[note]', '[^std]'],
+    );
+    expect(presentations.map((reference) => reference.label), <String>[
+      '[1]',
+      '[2]',
+    ]);
+    expect(collectObsidianStandardFootnoteOrdinals(source), <String, int>{
+      'std': 2,
+    });
+    final rendered = prepareObsidianMarkdownForRendering(source);
+    expect(rendered, contains(r'\`[^ianvs-inline-footnote-1]` and [^std]'));
+    expect(rendered, endsWith('[^ianvs-inline-footnote-1]: note'));
+
+    const evenParity = r'''\\`^[code]` and ^[visible]''';
+    final evenPresentations = ianvsMarkdownLivePreviewFootnoteReferences(
+      evenParity,
+    );
+    expect(
+      evenPresentations.map(
+        (reference) => reference.sourceRange.textInside(evenParity),
+      ),
+      <String>['^[visible]'],
+    );
+  });
+
   test('keeps Obsidian metadata literal inside list-contained code', () {
     const source = '''
 1.     ordered ^[ordered] and [^inside] %%ordered%% ^ordered-id

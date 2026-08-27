@@ -1417,6 +1417,7 @@ int? _ianvsMarkdownInlineCodeSpanEnd(String source, int openingStart) {
   if (openingStart < 0 ||
       openingStart >= source.length ||
       source.codeUnitAt(openingStart) != 0x60 ||
+      isIanvsMarkdownEscapedAt(source, openingStart) ||
       (openingStart > 0 && source.codeUnitAt(openingStart - 1) == 0x60)) {
     return null;
   }
