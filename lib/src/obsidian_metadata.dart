@@ -3,6 +3,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import 'footnote_syntax.dart';
+import 'markdown_link_source.dart';
 import 'theme.dart';
 
 /// Determines whether Obsidian editing metadata is shown or consumed.
@@ -270,6 +271,212 @@ String prepareObsidianMarkdownForRendering(
   final withObsidianFootnoteDefinitions =
       _applyObsidianFootnoteDefinitionPrecedence(withoutBlockIds);
   return _expandInlineFootnotes(withObsidianFootnoteDefinitions);
+}
+
+/// Projects literal backslashes in Obsidian inline-link destinations without
+/// changing the document source exposed by Live Preview or source mode.
+///
+/// CommonMark consumes the final backslash in a run as punctuation escaping,
+/// while each preceding pair represents one literal backslash. The Markdown
+/// package currently drops those literal pairs for parenthesis destinations;
+/// percent-encoding them in the rendering-only copy preserves the target.
+/// Code spans, fenced code, comments, images, malformed links, and titles are
+/// deliberately left byte-for-byte unchanged.
+String projectObsidianInlineLinkDestinationBackslashesForRendering(
+  String source,
+) {
+  if (source.isEmpty || !source.contains(r'\\\')) return source;
+
+  final comments = ianvsMarkdownCommentRanges(source);
+  final output = StringBuffer();
+  var cursor = 0;
+  var index = 0;
+  var commentIndex = 0;
+  var fenceCharacter = 0;
+  var fenceLength = 0;
+  var inlineCodeLength = 0;
+  var lineStart = true;
+
+  while (index < source.length) {
+    while (commentIndex < comments.length &&
+        comments[commentIndex].end <= index) {
+      commentIndex += 1;
+    }
+    if (commentIndex < comments.length &&
+        comments[commentIndex].start == index) {
+      index = comments[commentIndex].end;
+      lineStart = index == 0 || source.codeUnitAt(index - 1) == 0x0a;
+      continue;
+    }
+
+    if (lineStart && inlineCodeLength == 0) {
+      final lineEnd = source.indexOf('\n', index);
+      final end = lineEnd < 0 ? source.length : lineEnd;
+      final line = source.substring(index, end);
+      final fence = RegExp(r'^ {0,3}(`{3,}|~{3,})').firstMatch(line);
+      if (fence != null) {
+        final marker = fence.group(1)!;
+        if (fenceLength == 0) {
+          fenceCharacter = marker.codeUnitAt(0);
+          fenceLength = marker.length;
+        } else if (marker.codeUnitAt(0) == fenceCharacter &&
+            marker.length >= fenceLength) {
+          fenceCharacter = 0;
+          fenceLength = 0;
+        }
+        index = lineEnd < 0 ? source.length : lineEnd + 1;
+        lineStart = true;
+        continue;
+      }
+    }
+
+    final character = source.codeUnitAt(index);
+    if (fenceLength > 0) {
+      lineStart = character == 0x0a;
+      index += 1;
+      continue;
+    }
+    if (character == 0x60) {
+      final runLength = _characterRunLength(source, index, 0x60);
+      if (inlineCodeLength == 0) {
+        inlineCodeLength = runLength;
+      } else if (inlineCodeLength == runLength) {
+        inlineCodeLength = 0;
+      }
+      index += runLength;
+      lineStart = false;
+      continue;
+    }
+
+    final imageLabel =
+        index > 0 &&
+        source.codeUnitAt(index - 1) == 0x21 &&
+        !isIanvsMarkdownEscapedAt(source, index - 1);
+    if (inlineCodeLength == 0 &&
+        character == 0x5b &&
+        !imageLabel &&
+        !isIanvsMarkdownEscapedAt(source, index)) {
+      final labelEnd = findIanvsMarkdownLinkLabelEnd(source, index);
+      final suffixStart = labelEnd == null ? -1 : labelEnd + 1;
+      if (suffixStart >= 0 &&
+          suffixStart < source.length &&
+          source.codeUnitAt(suffixStart) == 0x28) {
+        final linkEnd = findIanvsMarkdownInlineLinkEnd(source, suffixStart);
+        if (linkEnd != null) {
+          final destination = _bareInlineLinkDestinationRange(
+            source,
+            suffixStart,
+            linkEnd,
+          );
+          if (destination != null) {
+            final original = destination.textInside(source);
+            final projected = _projectInlineLinkDestinationBackslashes(
+              original,
+            );
+            if (projected != original) {
+              output
+                ..write(source.substring(cursor, destination.start))
+                ..write(projected);
+              cursor = destination.end;
+            }
+          }
+          index = linkEnd;
+          lineStart = false;
+          continue;
+        }
+      }
+    }
+
+    lineStart = character == 0x0a;
+    if (lineStart) inlineCodeLength = 0;
+    index += 1;
+  }
+
+  if (cursor == 0) return source;
+  output.write(source.substring(cursor));
+  return output.toString();
+}
+
+TextRange? _bareInlineLinkDestinationRange(
+  String source,
+  int openingParenthesis,
+  int linkEnd,
+) {
+  var index = openingParenthesis + 1;
+  while (index < linkEnd &&
+      _isIanvsMarkdownLinkWhitespace(source.codeUnitAt(index))) {
+    index += 1;
+  }
+  if (index >= linkEnd || source.codeUnitAt(index) == 0x3c) return null;
+
+  final start = index;
+  var depth = 1;
+  while (index < linkEnd) {
+    final character = source.codeUnitAt(index);
+    if (character == 0x5c && index + 1 < linkEnd) {
+      index += 2;
+      continue;
+    }
+    if (_isIanvsMarkdownLinkDestinationSeparator(character)) {
+      return depth == 1 ? TextRange(start: start, end: index) : null;
+    }
+    if (character == 0x28) {
+      depth += 1;
+    } else if (character == 0x29) {
+      depth -= 1;
+      if (depth == 0) return TextRange(start: start, end: index);
+    }
+    index += 1;
+  }
+  return null;
+}
+
+bool _isIanvsMarkdownLinkWhitespace(int character) =>
+    character == 0x20 ||
+    character == 0x09 ||
+    character == 0x0a ||
+    character == 0x0b ||
+    character == 0x0c ||
+    character == 0x0d;
+
+bool _isIanvsMarkdownLinkDestinationSeparator(int character) =>
+    character == 0x20 ||
+    character == 0x0a ||
+    character == 0x0c ||
+    character == 0x0d;
+
+String _projectInlineLinkDestinationBackslashes(String destination) {
+  final output = StringBuffer();
+  var cursor = 0;
+  var index = 0;
+  while (index < destination.length) {
+    if (destination.codeUnitAt(index) != 0x5c) {
+      index += 1;
+      continue;
+    }
+    final runStart = index;
+    while (index < destination.length &&
+        destination.codeUnitAt(index) == 0x5c) {
+      index += 1;
+    }
+    final runLength = index - runStart;
+    final following = index < destination.length
+        ? destination.codeUnitAt(index)
+        : -1;
+    if (runLength < 3 ||
+        runLength.isEven ||
+        (following != 0x28 && following != 0x29)) {
+      continue;
+    }
+    output
+      ..write(destination.substring(cursor, runStart))
+      ..write('%5C' * (runLength ~/ 2))
+      ..write(r'\');
+    cursor = index;
+  }
+  if (cursor == 0) return destination;
+  output.write(destination.substring(cursor));
+  return output.toString();
 }
 
 /// Parses editing-only inline metadata into a styled renderer element while

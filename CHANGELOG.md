@@ -1,5 +1,10 @@
 ## Unreleased
 
+- Preserve Obsidian inline-link destination backslash parity: odd runs that
+  escape a parenthesis now retain one encoded literal backslash per preceding
+  pair in Reading and inactive Live Preview, while exact source, code,
+  comments, images, angle destinations, titles, and malformed links stay
+  unchanged.
 - Keep ordinary full-reference labels case-insensitive while matching
   Obsidian's measured non-normalizing whitespace boundary: a secondary label
   combining surrounding whitespace with a repeated internal run remains

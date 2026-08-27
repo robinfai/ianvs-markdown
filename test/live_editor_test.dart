@@ -421,6 +421,38 @@ void main() {
     expect(controller.text, source);
   });
 
+  testWidgets(
+    'live preview projects odd link targets but activates exact source',
+    (tester) async {
+      const source = r'Odd [Odd](https://example.com/a\\\(b\)) tail.';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 1000,
+              height: 720,
+              child: IanvsMarkdownLiveEditor(controller: controller),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip(r'https://example.com/a%5C(b)'), findsOneWidget);
+      await tester.tap(find.text('Odd'));
+      await tester.pumpAndSettle();
+
+      final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+      final field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      expect(field.controller?.text, source);
+      expect(controller.text, source);
+    },
+  );
+
   testWidgets('ordinary active rail follows only the caret line', (
     tester,
   ) async {

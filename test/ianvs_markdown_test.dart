@@ -838,6 +838,69 @@ final answer = 42;
     expect(taps.last, ('Titled', 'https://example.com', 'Title help'));
   });
 
+  testWidgets('links preserve Obsidian destination backslash parity', (
+    tester,
+  ) async {
+    final taps = <(String, String?)>[];
+    await tester.pumpWidget(
+      app(
+        IanvsMarkdown(
+          data: r'''
+[Even](https://example.com/a\(b\))
+[Odd](https://example.com/a\\\(b\))
+[Close](https://example.com/a\)tail)
+''',
+          onTapLink: (text, href, title) => taps.add((text, href)),
+        ),
+      ),
+    );
+
+    for (final label in <String>['Even', 'Odd', 'Close']) {
+      await tester.tap(find.text(label));
+      await tester.pump();
+    }
+    expect(taps, <(String, String?)>[
+      ('Even', 'https://example.com/a(b)'),
+      ('Odd', r'https://example.com/a%5C(b)'),
+      ('Close', 'https://example.com/a)tail'),
+    ]);
+  });
+
+  test('link destination projection skips literal and non-link contexts', () {
+    const source = r'''
+[Odd](https://example.com/a\\\(b\))
+[Even](https://example.com/a\(b\))
+[Close](https://example.com/a\)tail)
+[Title](https://example.com "title \\\( text")
+[Angle](<https://example.com/a\\\(b\)>)
+[Malformed](https://example.com/a\\\(b\)
+`[Code](https://example.com/a\\\(b\))`
+%%[Comment](https://example.com/a\\\(b\))%%
+![Image](https://example.com/a\\\(b\))
+```text
+[Fence](https://example.com/a\\\(b\))
+```
+''';
+
+    expect(
+      projectObsidianInlineLinkDestinationBackslashesForRendering(source),
+      r'''
+[Odd](https://example.com/a%5C\(b\))
+[Even](https://example.com/a\(b\))
+[Close](https://example.com/a\)tail)
+[Title](https://example.com "title \\\( text")
+[Angle](<https://example.com/a\\\(b\)>)
+[Malformed](https://example.com/a\\\(b\)
+`[Code](https://example.com/a\\\(b\))`
+%%[Comment](https://example.com/a\\\(b\))%%
+![Image](https://example.com/a\\\(b\))
+```text
+[Fence](https://example.com/a\\\(b\))
+```
+''',
+    );
+  });
+
   testWidgets('renders a safe Obsidian inline HTML subset', (tester) async {
     String? tappedHref;
     await tester.pumpWidget(
