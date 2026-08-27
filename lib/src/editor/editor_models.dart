@@ -230,7 +230,7 @@ bool ianvsMarkdownTableBodyContinues(String text, {String? nextLine}) {
       _isThematicBreak(text) ||
       _isBlockquote(text) ||
       RegExp(r'^(?: {4}| {0,3}\t)').hasMatch(text) ||
-      _isHtmlStart(text) ||
+      _isInterruptingHtmlBlockStart(text) ||
       RegExp(r'^ {0,3}\[[^\]\r\n]+\]:').hasMatch(text)) {
     return false;
   }
@@ -638,6 +638,29 @@ bool _isTableStart(List<_SourceLine> lines, int index) {
 
 bool _isHtmlStart(String text) =>
     RegExp(r'^ {0,3}</?[A-Za-z][^>]*>').hasMatch(text);
+
+final RegExp _interruptingHtmlBlockStartPattern = RegExp(
+  r'^ {0,3}(?:'
+  r'<(?:pre|script|style|textarea)(?:[ \t]|>|$)'
+  r'|<!--'
+  r'|<\?'
+  r'|<![A-Za-z]'
+  r'|<!\[CDATA\['
+  r'|</?(?:address|article|aside|base|basefont|blockquote|body|caption|center|'
+  r'col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|'
+  r'footer|form|frame|frameset|h1|h2|h3|h4|h5|h6|head|header|hr|html|iframe|'
+  r'legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|'
+  r'section|source|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)'
+  r'(?:[ \t]|>|/>|$))',
+  caseSensitive: false,
+);
+
+/// HTML block starts that can interrupt an already-open leaf block.
+///
+/// CommonMark's generic complete-tag condition cannot interrupt a paragraph
+/// or table, so inline HTML such as `<em>cell</em>` remains valid cell text.
+bool _isInterruptingHtmlBlockStart(String text) =>
+    _interruptingHtmlBlockStartPattern.hasMatch(text);
 
 _Fence? _fence(String text) {
   final match = RegExp(r'^ {0,3}(`{3,}|~{3,})(.*)$').firstMatch(text);

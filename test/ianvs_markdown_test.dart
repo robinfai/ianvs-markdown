@@ -773,6 +773,29 @@ final answer = 42;
     expect(_renderedPlainTextContains(tester, '| one | two |'), isTrue);
   });
 
+  testWidgets('table projection stops before interrupting HTML comments', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(
+          data:
+              '| A | B |\n'
+              '| --- | --- |\n'
+              '| one | two |\n'
+              '<!-- stop -->\n'
+              'After',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final table = tester.widget<Table>(find.byType(Table));
+    expect(table.children, hasLength(2));
+    expect(_renderedPlainTextContains(tester, 'After'), isTrue);
+    expect(_renderedPlainTextContains(tester, 'After |'), isFalse);
+  });
+
   testWidgets('table projection ignores fenced source and missing delimiters', (
     tester,
   ) async {

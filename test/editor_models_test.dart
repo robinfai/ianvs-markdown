@@ -118,6 +118,33 @@ final value = 1;
     expect(interruptedBlocks.last.source, '> quote');
   });
 
+  test('table HTML rows stop only for interrupting HTML blocks', () {
+    const inlineHtml =
+        '| A | B |\n'
+        '| --- | --- |\n'
+        '<em>one</em> | two';
+    final inlineBlocks = parseMarkdownBlocks(inlineHtml);
+
+    expect(inlineBlocks, hasLength(1));
+    expect(inlineBlocks.single.type, IanvsMarkdownBlockType.table);
+    expect(inlineBlocks.single.source, inlineHtml);
+
+    const interrupted =
+        '| A | B |\n'
+        '| --- | --- |\n'
+        '| one | two |\n'
+        '<!-- stop -->\n'
+        'After';
+    final interruptedBlocks = parseMarkdownBlocks(interrupted);
+
+    expect(interruptedBlocks.first.type, IanvsMarkdownBlockType.table);
+    expect(
+      interruptedBlocks.first.source,
+      '| A | B |\n| --- | --- |\n| one | two |',
+    );
+    expect(interruptedBlocks.last.source, '<!-- stop -->\nAfter');
+  });
+
   test('standalone block IDs extend supported blocks across blank lines', () {
     const source =
         '# Heading\n\n^heading-id\n\n'

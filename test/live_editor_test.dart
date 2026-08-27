@@ -8976,6 +8976,49 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     expect(field.controller?.text, source);
   });
 
+  testWidgets('inline HTML stays in table rows but HTML comments interrupt', (
+    tester,
+  ) async {
+    final inlineController = IanvsMarkdownController(
+      text:
+          '| A | B |\n'
+          '| --- | --- |\n'
+          '<em>one</em> | two',
+    );
+    addTearDown(inlineController.dispose);
+    await tester.pumpWidget(app(inlineController));
+    await tester.pumpAndSettle();
+
+    var fields = find.descendant(
+      of: find.bySemanticsLabel('Editable Markdown table'),
+      matching: find.byType(TextField),
+    );
+    expect(fields, findsNWidgets(4));
+    expect(
+      tester.widget<TextField>(fields.at(2)).controller?.text,
+      '<em>one</em>',
+    );
+
+    final commentController = IanvsMarkdownController(
+      text:
+          '| A | B |\n'
+          '| --- | --- |\n'
+          '| one | two |\n'
+          '<!-- stop -->\n'
+          'After',
+    );
+    addTearDown(commentController.dispose);
+    await tester.pumpWidget(app(commentController));
+    await tester.pumpAndSettle();
+
+    fields = find.descendant(
+      of: find.bySemanticsLabel('Editable Markdown table'),
+      matching: find.byType(TextField),
+    );
+    expect(fields, findsNWidgets(4));
+    expect(find.text('After'), findsOneWidget);
+  });
+
   testWidgets('table cells edit their source ranges without exposing pipes', (
     tester,
   ) async {
