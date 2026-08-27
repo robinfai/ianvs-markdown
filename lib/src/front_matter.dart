@@ -39,6 +39,7 @@ final class MarkdownMetadataEntry {
     this.sourceKeyEnd,
     this.sourceValueStart,
     this.sourceValueEnd,
+    this.listValuesEditable = false,
   });
 
   final String key;
@@ -56,6 +57,12 @@ final class MarkdownMetadataEntry {
   final int? sourceKeyEnd;
   final int? sourceValueStart;
   final int? sourceValueEnd;
+
+  /// Whether [items] contains the complete, safely editable string sequence.
+  ///
+  /// Long, nested, typed, or otherwise lossy YAML sequences remain visible
+  /// but must be edited through their full source instead of the property UI.
+  final bool listValuesEditable;
 
   bool get isLong => value.length > 72 || value.contains('\n');
 }
@@ -146,8 +153,11 @@ void _collectMetadata(
     if (key.isEmpty) continue;
     final value = valueNode.value;
     final type = _metadataValueType(value);
-    final items = value is Iterable<Object?>
-        ? value
+    final sequence = value is Iterable<Object?>
+        ? value.toList(growable: false)
+        : null;
+    final items = sequence != null
+        ? sequence
               .take(16)
               .map((item) => _metadataItemText(item, 160))
               .where((item) => item.isNotEmpty)
@@ -173,6 +183,12 @@ void _collectMetadata(
         sourceKeyEnd: sourceOffset + keyNode.span.end.offset,
         sourceValueStart: sourceOffset + valueNode.span.start.offset,
         sourceValueEnd: sourceOffset + valueNode.span.end.offset,
+        listValuesEditable:
+            (type == MarkdownMetadataValueType.list &&
+                sequence != null &&
+                sequence.length <= 16 &&
+                sequence.every(_editableMetadataListItem)) ||
+            (value == null && _metadataKeyUsesStringList(key)),
       ),
     );
   }
@@ -225,11 +241,77 @@ String replaceMarkdownFrontMatterNumberValue(
   );
 }
 
+/// Replaces one complete, safely editable top-level string sequence.
+///
+/// Obsidian writes multi-value properties as block lists. Removing the last
+/// item keeps the property as an empty scalar (`tags:`), while every non-empty
+/// value is serialized as a YAML text scalar so strings such as `true`, `42`,
+/// or `#tag` do not change type.
+String replaceMarkdownFrontMatterListValue(
+  String source,
+  MarkdownMetadataEntry entry,
+  List<String> values,
+) {
+  if (!entry.listValuesEditable ||
+      values.length > 16 ||
+      !values.every(_editableMetadataListItem)) {
+    return source;
+  }
+  final keyStart = entry.sourceKeyStart;
+  final keyEnd = entry.sourceKeyEnd;
+  final valueStart = entry.sourceValueStart;
+  final valueEnd = entry.sourceValueEnd;
+  if (keyStart == null ||
+      keyEnd == null ||
+      valueStart == null ||
+      valueEnd == null ||
+      keyStart < 0 ||
+      keyEnd < keyStart ||
+      valueStart < keyEnd ||
+      valueEnd < valueStart ||
+      valueStart > source.length ||
+      valueEnd > source.length) {
+    return source;
+  }
+  final separator = source.indexOf(':', keyEnd);
+  if (separator < keyEnd || separator > valueStart) return source;
+  final emptyScalarAtSeparator =
+      entry.type == MarkdownMetadataValueType.empty &&
+      valueEnd == valueStart &&
+      separator == valueStart;
+  final lineStart = keyStart == 0
+      ? 0
+      : source.lastIndexOf('\n', keyStart - 1) + 1;
+  final indentation = source.substring(lineStart, keyStart);
+  final lineBreak = source.contains('\r\n') ? '\r\n' : '\n';
+  final sourceRetainsLineBreak =
+      source.startsWith('\n', valueEnd) || source.startsWith('\r\n', valueEnd);
+  final replacement = values.isEmpty
+      ? emptyScalarAtSeparator || sourceRetainsLineBreak
+            ? ''
+            : lineBreak
+      : values
+            .map(
+              (value) => '$lineBreak$indentation  - ${_yamlTextScalar(value)}',
+            )
+            .join();
+  return _replaceMarkdownFrontMatterValue(
+    source,
+    entry,
+    replacement,
+    canonicalizeFlowLists: true,
+    editStart: separator + 1,
+    editEnd: emptyScalarAtSeparator ? separator + 1 : null,
+  );
+}
+
 String _replaceMarkdownFrontMatterValue(
   String source,
   MarkdownMetadataEntry entry,
   String replacement, {
   required bool canonicalizeFlowLists,
+  int? editStart,
+  int? editEnd,
 }) {
   final valueStart = entry.sourceValueStart;
   final valueEnd = entry.sourceValueEnd;
@@ -238,6 +320,20 @@ String _replaceMarkdownFrontMatterValue(
       valueStart < 0 ||
       valueEnd < valueStart ||
       valueEnd > source.length) {
+    return source;
+  }
+  final replacementStart = editStart ?? valueStart;
+  final replacementEnd = editEnd ?? valueEnd;
+  final insertsAfterEmptyScalar =
+      valueStart == valueEnd &&
+      replacementStart == valueStart + 1 &&
+      replacementEnd == replacementStart &&
+      valueStart < source.length &&
+      source.codeUnitAt(valueStart) == 0x3a;
+  if (replacementStart < (entry.sourceKeyEnd ?? 0) ||
+      replacementEnd < replacementStart ||
+      replacementEnd > source.length ||
+      (replacementStart > valueStart && !insertsAfterEmptyScalar)) {
     return source;
   }
 
@@ -270,8 +366,8 @@ String _replaceMarkdownFrontMatterValue(
 
   final edits = <_FrontMatterSourceEdit>[
     _FrontMatterSourceEdit(
-      start: valueStart,
-      end: valueEnd,
+      start: replacementStart,
+      end: replacementEnd,
       replacement: replacement,
     ),
   ];
@@ -324,6 +420,26 @@ String _replaceMarkdownFrontMatterValue(
     updated = updated.replaceRange(edit.start, edit.end, edit.replacement);
   }
   return updated;
+}
+
+bool _editableMetadataListItem(Object? value) {
+  if (value is! String ||
+      value.isEmpty ||
+      value.length > 160 ||
+      value.trim() != value ||
+      value.contains('\n') ||
+      value.contains('\r')) {
+    return false;
+  }
+  return !value.codeUnits.any((unit) => unit < 0x20);
+}
+
+bool _metadataKeyUsesStringList(String key) {
+  final normalized = key.toLowerCase().replaceAll('-', '_');
+  return normalized == 'tags' ||
+      normalized == 'tag' ||
+      normalized == 'aliases' ||
+      normalized == 'alias';
 }
 
 int? _frontMatterClosingStart(String source, int lineStart) {

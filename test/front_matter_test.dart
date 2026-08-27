@@ -251,6 +251,147 @@ Body
     );
   });
 
+  test('safe string-list properties rewrite as typed block scalars', () {
+    const source = '''
+---
+tags: [one, two]
+aliases: [Alias One]
+typed: [one, 2]
+---
+Body
+''';
+    final document = parseMarkdownFrontMatter(source);
+    MarkdownMetadataEntry entry(String key) =>
+        document.entries.firstWhere((item) => item.key == key);
+
+    expect(entry('tags').listValuesEditable, isTrue);
+    expect(entry('aliases').listValuesEditable, isTrue);
+    expect(entry('typed').listValuesEditable, isFalse);
+    expect(
+      replaceMarkdownFrontMatterListValue(source, entry('tags'), <String>[
+        'one',
+        'three',
+        'true',
+        '42',
+        '#hash',
+      ]),
+      '''
+---
+tags:
+  - one
+  - three
+  - "true"
+  - "42"
+  - "#hash"
+aliases:
+  - Alias One
+typed:
+  - one
+  - 2
+---
+Body
+''',
+    );
+    expect(
+      replaceMarkdownFrontMatterListValue(
+        source,
+        entry('tags'),
+        const <String>[],
+      ),
+      '''
+---
+tags:
+aliases:
+  - Alias One
+typed:
+  - one
+  - 2
+---
+Body
+''',
+    );
+
+    final stale = source.replaceFirst('tags:', 'draft: true\ntags:');
+    expect(
+      replaceMarkdownFrontMatterListValue(stale, entry('tags'), const ['one']),
+      stale,
+    );
+    expect(
+      replaceMarkdownFrontMatterListValue(source, entry('typed'), const [
+        'one',
+      ]),
+      source,
+    );
+
+    final longList = parseMarkdownFrontMatter(
+      '---\ntags: [${List<String>.generate(17, (index) => 'tag$index').join(', ')}]\n---\n',
+    ).entries.single;
+    expect(longList.listValuesEditable, isFalse);
+  });
+
+  test('empty known list properties can accept a new block-list value', () {
+    const source = '''
+---
+title: Alpha
+tags:
+empty:
+---
+Body
+''';
+    final document = parseMarkdownFrontMatter(source);
+    final tags = document.entries.firstWhere((entry) => entry.key == 'tags');
+    final empty = document.entries.firstWhere((entry) => entry.key == 'empty');
+
+    expect(tags.type, MarkdownMetadataValueType.empty);
+    expect(tags.listValuesEditable, isTrue);
+    expect(empty.listValuesEditable, isFalse);
+    expect(
+      replaceMarkdownFrontMatterListValue(source, tags, const ['three']),
+      '''
+---
+title: Alpha
+tags:
+  - three
+empty:
+---
+Body
+''',
+    );
+  });
+
+  test('list property rewrites preserve CRLF around empty values', () {
+    const source =
+        '---\r\n'
+        'tags:\r\n'
+        '  - one\r\n'
+        '---\r\n'
+        'Body';
+    final tags = parseMarkdownFrontMatter(source).entries.single;
+
+    expect(
+      replaceMarkdownFrontMatterListValue(source, tags, const <String>[]),
+      '---\r\n'
+      'tags:\r\n'
+      '---\r\n'
+      'Body',
+    );
+    final emptyTags = parseMarkdownFrontMatter(
+      '---\r\ntags:\r\n---\r\nBody',
+    ).entries.single;
+    expect(
+      replaceMarkdownFrontMatterListValue(
+        '---\r\ntags:\r\n---\r\nBody',
+        emptyTags,
+        const ['two'],
+      ),
+      '---\r\n'
+      'tags:\r\n'
+      '  - two\r\n'
+      '---\r\n'
+      'Body',
+    );
+  });
+
   test(
     'property rewrites preserve CRLF and avoid stale or commented spans',
     () {

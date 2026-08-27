@@ -7,6 +7,10 @@
 - Add finite numeric property input with focus-loss submission, invalid-input
   recovery, numeric YAML type preservation, and the same observed top-level
   flow-list canonicalization as an Obsidian number-field commit.
+- Add safe in-place tag editing for complete string lists: chip removal writes
+  immediately, removing the last item preserves an empty `tags:` property,
+  and Tab/Enter adds a block-list value from either populated or empty state.
+  Typed, nested, truncated, or oversized lists remain source-only.
 - Match Obsidian properties for source-order keys, an ordinary `title` row,
   default-expanded panels, triple-dash-only closing markers, distinct aliases,
   tags, and `cssclasses`, linked Wiki/URL scalar values, and invisible empty

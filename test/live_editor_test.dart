@@ -4499,6 +4499,108 @@ tags:
     expect(tester.widget<TextField>(input).controller?.text, '43');
   });
 
+  testWidgets('tag properties remove to an empty key and add from empty', (
+    tester,
+  ) async {
+    const source = '''
+---
+tags: [one, two]
+aliases: [Alias One]
+---
+# Body
+''';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(
+        const ValueKey('ianvs-markdown-front-matter-chip-remove-tags-1'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.text, '''
+---
+tags:
+  - one
+aliases:
+  - Alias One
+---
+# Body
+''');
+
+    controller.undo();
+    await tester.pumpAndSettle();
+    expect(controller.text, source);
+    controller.redo();
+    await tester.pumpAndSettle();
+    expect(controller.text, contains('  - one'));
+
+    await tester.tap(
+      find.byKey(
+        const ValueKey('ianvs-markdown-front-matter-chip-remove-tags-0'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.text, '''
+---
+tags:
+aliases:
+  - Alias One
+---
+# Body
+''');
+
+    final input = find.byKey(
+      const ValueKey('ianvs-markdown-front-matter-list-input-tags'),
+    );
+    expect(input, findsOneWidget);
+    await tester.tap(input);
+    await tester.enterText(input, 'three');
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+    expect(controller.text, '''
+---
+tags:
+  - three
+aliases:
+  - Alias One
+---
+# Body
+''');
+
+    await tester.tap(input);
+    await tester.enterText(input, 'pending');
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(controller.text, contains('  - three'));
+    expect(tester.widget<TextField>(input).controller?.text, isEmpty);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('lossy typed tag lists remain presentation-only', (tester) async {
+    const source = '''
+---
+tags: [one, 2]
+---
+# Body
+''';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-front-matter-list-input-tags')),
+      findsNothing,
+    );
+    expect(controller.text, source);
+  });
+
   testWidgets('editable properties retain Wiki and URL link callbacks', (
     tester,
   ) async {
