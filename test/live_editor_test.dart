@@ -6475,6 +6475,31 @@ Standard[^note] and inline ^[inline body].
     expect(controller.text, source);
   });
 
+  testWidgets('live preview keeps a soft-line block ID candidate literal', (
+    tester,
+  ) async {
+    const paragraph = 'Soft first ^soft-id\ncontinuation.';
+    const source = '$paragraph\n\nFinal ^final-id';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('^soft-id'), findsOneWidget);
+    expect(find.text(' ^final-id'), findsOneWidget);
+
+    await tester.tap(find.textContaining('^soft-id'));
+    await tester.pump();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, paragraph);
+    expect(controller.text, source);
+  });
+
   testWidgets('live preview shares mixed footnote numbering', (tester) async {
     const source = '''
 Inline ^[first], missing[^missing], standard[^a], repeated[^a], empty ^[], and second[^b].

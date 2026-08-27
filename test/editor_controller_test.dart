@@ -3390,6 +3390,7 @@ void main() {
     );
     const source = '''
 Visible %%secret%% text. ^block-id
+
 Reference[^1], inline ^[footnote body], empty ^[], and nested ^[outer ^[inner]].
 %%
 Hidden **source** block.
@@ -3469,15 +3470,44 @@ Hidden **source** block.
       code: TextStyle(fontFamily: 'monospace'),
       comment: TextStyle(color: Color(0xff555555)),
     );
+    List<TextSpan> spansFor(String source) => buildMarkdownSourceTextSpan(
+      TextEditingValue(
+        text: source,
+        selection: const TextSelection.collapsed(offset: 0),
+      ),
+      style: const TextStyle(fontSize: 14),
+      syntaxTheme: syntax,
+      withComposing: false,
+    ).children!.cast<TextSpan>().toList();
+
+    Iterable<String?> metadataFor(String source) => spansFor(source)
+        .where((span) => span.style?.color == const Color(0xff555555))
+        .map((span) => span.text);
+
+    expect(metadataFor('valid ^under_score'), <String>[' ^under_score']);
+    expect(metadataFor('^standalone-id'), <String>['^standalone-id']);
+    expect(metadataFor(r'escaped \^literal-id'), isEmpty);
+    expect(metadataFor(r'double \\^double-id'), <String>['^double-id']);
+    expect(metadataFor('trailing ^space-id   '), <String>[' ^space-id   ']);
+
+    final inlineCode = spansFor(
+      r'`inline ^code-id`',
+    ).singleWhere((span) => span.text?.contains('^code-id') ?? false);
+    expect(inlineCode.style?.fontFamily, 'monospace');
+  });
+
+  test('live source only styles block IDs at Markdown block ends', () {
+    const syntax = IanvsMarkdownSyntaxTheme(
+      heading: TextStyle(),
+      marker: TextStyle(),
+      link: TextStyle(),
+      code: TextStyle(fontFamily: 'monospace'),
+      comment: TextStyle(color: Color(0xff555555)),
+    );
     const source =
-        'valid ^under_score\n'
-        '^standalone-id\n'
-        r'escaped \^literal-id'
-        '\n'
-        r'double \\^double-id'
-        '\n'
-        'trailing ^space-id   \n'
-        '`inline ^code-id`';
+        'Soft first ^soft-id\n'
+        'continuation.\n\n'
+        'Final ^final-id';
 
     final spans = buildMarkdownSourceTextSpan(
       const TextEditingValue(
@@ -3493,17 +3523,9 @@ Hidden **source** block.
       spans
           .where((span) => span.style?.color == const Color(0xff555555))
           .map((span) => span.text),
-      <String>[
-        ' ^under_score',
-        '^standalone-id',
-        '^double-id',
-        ' ^space-id   ',
-      ],
+      <String>[' ^final-id'],
     );
-    final inlineCode = spans.singleWhere(
-      (span) => span.text?.contains('^code-id') ?? false,
-    );
-    expect(inlineCode.style?.fontFamily, 'monospace');
+    expect(spans.map((span) => span.text).join(), source);
   });
 
   test('full source keeps language highlighting inside fenced code', () {

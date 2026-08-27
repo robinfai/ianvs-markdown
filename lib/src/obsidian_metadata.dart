@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
+import 'editor/editor_models.dart';
 import 'footnote_syntax.dart';
 import 'markdown_link_source.dart';
 import 'theme.dart';
@@ -151,14 +152,15 @@ final RegExp _obsidianTableBlockIdPattern = RegExp(
 
 /// Finds Obsidian block identifiers outside comments and fenced code.
 ///
-/// A normal identifier ends a source line, may be followed by ASCII spaces,
-/// and is either standalone or separated from preceding content by whitespace.
-/// An even backslash run may appear before the caret; it remains literal while
-/// the identifier is consumed. A table cell containing only an identifier is
-/// handled as the equivalent standalone form.
+/// A normal identifier ends its Markdown block, may be followed by ASCII
+/// spaces, and is either standalone or separated from preceding content by
+/// whitespace. An even backslash run may appear before the caret; it remains
+/// literal while the identifier is consumed. A table cell containing only an
+/// identifier is handled as the equivalent standalone form.
 List<TextRange> ianvsMarkdownBlockIdRanges(String source) {
   final ranges = <TextRange>[];
   final commentRanges = ianvsMarkdownCommentRanges(source);
+  final blocks = parseMarkdownBlocks(source);
   final lines = source.split('\n');
   var offset = 0;
   var fenceCharacter = 0;
@@ -207,7 +209,8 @@ List<TextRange> ianvsMarkdownBlockIdRanges(String source) {
           end: offset + trailing.end,
         );
         if (!_overlapsMetadataRange(range, commentRanges) &&
-            !_overlapsMetadataRange(range, ranges)) {
+            !_overlapsMetadataRange(range, ranges) &&
+            _endsMarkdownBlock(range.end, blocks)) {
           ranges.add(range);
         }
       }
@@ -217,6 +220,14 @@ List<TextRange> ianvsMarkdownBlockIdRanges(String source) {
 
   ranges.sort((a, b) => a.start.compareTo(b.start));
   return List<TextRange>.unmodifiable(ranges);
+}
+
+bool _endsMarkdownBlock(int offset, List<IanvsMarkdownBlock> blocks) {
+  for (final block in blocks) {
+    if (offset < block.start) return false;
+    if (offset <= block.end) return offset == block.end;
+  }
+  return false;
 }
 
 int? _blockIdRangeStart(String line, int caret) {

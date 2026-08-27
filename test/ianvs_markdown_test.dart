@@ -3593,53 +3593,113 @@ unclosed %% stays''';
   });
 
   test('block IDs match standalone, underscore, table, and escape rules', () {
-    const source =
-        r'''paragraph ^alpha
-underscore ^a_b
-no-space^beta
-dot ^a.b
-trailing spaces ^space-id'''
-        '   \n'
-        r'''multiple ^first-id ^second-id
-^standalone-id
-> ^quote-id
-- list item
-  ^list-id
+    expect(
+      prepareObsidianMarkdownForRendering('paragraph ^alpha'),
+      'paragraph',
+    );
+    expect(
+      prepareObsidianMarkdownForRendering('underscore ^a_b'),
+      'underscore',
+    );
+    expect(
+      prepareObsidianMarkdownForRendering('no-space^beta'),
+      'no-space^beta',
+    );
+    expect(prepareObsidianMarkdownForRendering('dot ^a.b'), 'dot ^a.b');
+    expect(
+      prepareObsidianMarkdownForRendering('trailing spaces ^space-id   '),
+      'trailing spaces',
+    );
+    expect(
+      prepareObsidianMarkdownForRendering('multiple ^first-id ^second-id'),
+      'multiple ^first-id',
+    );
+    expect(prepareObsidianMarkdownForRendering('^standalone-id'), '');
+    expect(prepareObsidianMarkdownForRendering('> ^quote-id'), '>');
+    expect(
+      prepareObsidianMarkdownForRendering('- list item\n  ^list-id'),
+      '- list item\n',
+    );
+    expect(
+      prepareObsidianMarkdownForRendering(
+        '''
 | key | value |
 | --- | --- |
-| row | ^table-id |
-escaped \^single-escape
-double \\^double-escape
-`inline ^code-id`
+| row | ^table-id |'''
+            .trim(),
+      ),
+      '''
+| key | value |
+| --- | --- |
+| row |  |'''
+          .trim(),
+    );
+    expect(
+      prepareObsidianMarkdownForRendering(r'escaped \^single-escape'),
+      r'escaped \^single-escape',
+    );
+    expect(
+      prepareObsidianMarkdownForRendering(r'double \\^double-escape'),
+      r'double \\',
+    );
+    expect(
+      prepareObsidianMarkdownForRendering(r'`inline ^code-id`'),
+      r'`inline ^code-id`',
+    );
+    expect(
+      prepareObsidianMarkdownForRendering(
+        '''
 ```
 fenced ^fence-id
-```''';
+```'''
+            .trim(),
+      ),
+      '''
+```
+fenced ^fence-id
+```'''
+          .trim(),
+    );
+  });
 
-    final rendered = prepareObsidianMarkdownForRendering(source);
+  test('block IDs only consume a Markdown block-ending marker', () {
+    const source =
+        'Soft first ^soft-id\n'
+        'continuation.\n\n'
+        'Paragraph end ^paragraph-id\n'
+        '# Heading end ^heading-id';
+
+    final ranges = ianvsMarkdownBlockIdRanges(source);
 
     expect(
-      rendered,
-      r'''paragraph
-underscore
-no-space^beta
-dot ^a.b
-trailing spaces'''
-      '\n'
-      r'''multiple ^first-id
-
->
-- list item
-
-| key | value |
-| --- | --- |
-| row |  |
-escaped \^single-escape
-double \\
-`inline ^code-id`
-```
-fenced ^fence-id
-```''',
+      ranges.map((range) => source.substring(range.start, range.end)),
+      <String>[' ^paragraph-id', ' ^heading-id'],
     );
+    expect(
+      prepareObsidianMarkdownForRendering(source),
+      'Soft first ^soft-id\n'
+      'continuation.\n\n'
+      'Paragraph end\n'
+      '# Heading end',
+    );
+  });
+
+  testWidgets('reading keeps a soft-line block ID candidate literal', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(
+          data:
+              'Soft first ^soft-id\n'
+              'continuation.\n\n'
+              'Final ^final-id',
+        ),
+      ),
+    );
+
+    expect(find.textContaining('^soft-id'), findsOneWidget);
+    expect(find.textContaining('^final-id'), findsNothing);
   });
 
   testWidgets('reading hides standalone and trailing-space block IDs', (
@@ -3649,7 +3709,8 @@ fenced ^fence-id
       app(
         const IanvsMarkdown(
           data:
-              'Paragraph ^under_score\n'
+              'Paragraph ^under_score\n\n'
+              '# Heading\n'
               '^standalone-id\n\n'
               'Valid trailing ^space-id   ',
         ),
@@ -3666,8 +3727,9 @@ fenced ^fence-id
       app(
         const IanvsMarkdown(
           data:
-              'Paragraph ^under_score\n'
-              'Trailing ^space-id   \n'
+              'Paragraph ^under_score\n\n'
+              'Trailing ^space-id   \n\n'
+              '# Standalone heading\n'
               '^standalone-id',
           obsidianMetadataMode: IanvsMarkdownObsidianMetadataMode.editing,
         ),
@@ -3675,7 +3737,7 @@ fenced ^fence-id
     );
 
     expect(find.text(' ^under_score'), findsOneWidget);
-    expect(find.text(' ^space-id   '), findsOneWidget);
+    expect(find.text(' ^space-id'), findsOneWidget);
     expect(find.text('^standalone-id'), findsOneWidget);
   });
 
