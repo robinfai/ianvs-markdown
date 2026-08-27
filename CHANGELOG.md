@@ -13,7 +13,8 @@
   Typed, nested, truncated, or oversized lists remain source-only.
 - Add in-place property-key renaming with Tab, Enter, and focus-loss commits,
   Escape cancellation, exact source-order and value-type preservation, YAML
-  quoting for ambiguous names, and empty/duplicate/lossy-key rejection.
+  quoting for ambiguous names, and empty/case-insensitive duplicate/lossy-key
+  rejection, including Obsidian's refusal of case-only renames.
 - Match Obsidian properties for source-order keys, an ordinary `title` row,
   default-expanded panels, triple-dash-only closing markers, distinct aliases,
   tags, and `cssclasses`, linked Wiki/URL scalar values, and invisible empty

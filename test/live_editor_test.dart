@@ -4508,6 +4508,20 @@ tags:
     await tester.pumpAndSettle();
     expect(controller.text, contains('weight: 42'));
     expect(tester.widget<TextField>(weightInput).controller?.text, 'weight');
+
+    await tester.tap(weightInput);
+    await tester.enterText(weightInput, 'Weight');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(controller.text, contains('weight: 42'));
+    expect(tester.widget<TextField>(weightInput).controller?.text, 'weight');
+
+    await tester.tap(weightInput);
+    await tester.enterText(weightInput, 'TITLE');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(controller.text, contains('weight: 42'));
+    expect(tester.widget<TextField>(weightInput).controller?.text, 'weight');
     expect(
       find.byKey(const ValueKey('ianvs-markdown-active-block')),
       findsNothing,

@@ -453,7 +453,10 @@ class _ObsidianEditableKeyState extends State<_ObsidianEditableKey> {
         !value.contains('\n') &&
         !value.contains('\r') &&
         !value.codeUnits.any((unit) => unit < 0x20) &&
-        (value == _committedKey || !widget.existingKeys.contains(value));
+        (value == _committedKey ||
+            !widget.existingKeys.any(
+              (key) => key.toLowerCase() == value.toLowerCase(),
+            ));
   }
 
   void _restore() {

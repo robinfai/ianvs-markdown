@@ -288,6 +288,8 @@ Body
       expect(renamedDocument.entries[1].type, MarkdownMetadataValueType.number);
 
       expect(replaceMarkdownFrontMatterKey(source, count, 'title'), source);
+      expect(replaceMarkdownFrontMatterKey(source, count, 'TITLE'), source);
+      expect(replaceMarkdownFrontMatterKey(source, count, 'Count'), source);
       expect(replaceMarkdownFrontMatterKey(source, count, ''), source);
       expect(replaceMarkdownFrontMatterKey(source, count, 'bad\nkey'), source);
       expect(

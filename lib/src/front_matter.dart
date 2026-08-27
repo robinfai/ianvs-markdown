@@ -258,15 +258,18 @@ String replaceMarkdownFrontMatterKey(
   MarkdownMetadataEntry entry,
   String key,
 ) {
-  if (!entry.keyEditable || !_editableMetadataKey(key) || key == entry.key) {
+  if (!entry.keyEditable ||
+      !_editableMetadataKey(key) ||
+      _metadataKeyIdentity(key) == _metadataKeyIdentity(entry.key)) {
     return source;
   }
+  final keyIdentity = _metadataKeyIdentity(key);
   final document = parseMarkdownFrontMatter(source);
   if (!document.hasFrontMatter ||
       document.entries.any(
         (candidate) =>
             candidate.sourceKeyStart != entry.sourceKeyStart &&
-            candidate.key == key,
+            _metadataKeyIdentity(candidate.key) == keyIdentity,
       )) {
     return source;
   }
@@ -495,6 +498,8 @@ bool _editableMetadataKey(String value) {
   }
   return !value.codeUnits.any((unit) => unit < 0x20);
 }
+
+String _metadataKeyIdentity(String value) => value.toLowerCase();
 
 bool _metadataKeyUsesStringList(String key) {
   final normalized = key.toLowerCase().replaceAll('-', '_');
