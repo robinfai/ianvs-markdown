@@ -49,6 +49,23 @@ settings:
     expect(document.entries.last.key, 'key39');
   });
 
+  test('front matter accepts exactly 64 KiB of raw YAML', () {
+    final exactValue = 'a' * (markdownFrontMatterByteLimit - 6);
+    final exactSource = '---\nkey: $exactValue\n---\nBody';
+    final exact = parseMarkdownFrontMatter(exactSource);
+
+    expect(exact.hasFrontMatter, isTrue);
+    expect(exact.body, 'Body');
+    expect(exact.entries.single.key, 'key');
+
+    final oversizedValue = 'a' * (markdownFrontMatterByteLimit - 5);
+    final oversizedSource = '---\nkey: $oversizedValue\n---\nBody';
+    final oversized = parseMarkdownFrontMatter(oversizedSource);
+
+    expect(oversized.hasFrontMatter, isFalse);
+    expect(oversized.body, oversizedSource);
+  });
+
   test('preserves YAML value types for Obsidian property presentation', () {
     final document = parseMarkdownFrontMatter('''
 ---

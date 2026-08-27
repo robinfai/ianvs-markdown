@@ -85,7 +85,7 @@ MarkdownFrontMatterDocument parseMarkdownFrontMatter(String source) {
 
   var lineStart = openingEnd + 1;
   while (lineStart <= source.length &&
-      lineStart - openingEnd <= markdownFrontMatterByteLimit) {
+      lineStart - (openingEnd + 1) <= markdownFrontMatterByteLimit) {
     final newline = source.indexOf('\n', lineStart);
     final lineEnd = newline < 0 ? source.length : newline;
     final line = _frontMatterMarkerLine(source.substring(lineStart, lineEnd));
