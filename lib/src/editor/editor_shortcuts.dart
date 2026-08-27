@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
+import '../front_matter_card.dart';
 import 'editor_controller.dart';
 import 'editor_models.dart';
 import 'editor_toolbar.dart';
@@ -218,6 +219,11 @@ class _MarkdownPasteAction extends ContextAction<PasteTextIntent> {
   @override
   Object? invoke(PasteTextIntent intent, [BuildContext? context]) {
     final defaultAction = callingAction;
+    if (context
+            ?.findAncestorWidgetOfExactType<IanvsMarkdownFrontMatterCard>() !=
+        null) {
+      return defaultAction?.invoke(intent);
+    }
     final selection = controller.selection;
     if (!selection.isValid || selection.isCollapsed) {
       return defaultAction?.invoke(intent);

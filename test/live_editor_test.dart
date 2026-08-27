@@ -5107,6 +5107,70 @@ due: 2026-08-27
   );
 
   testWidgets(
+    'property paste cannot replace a stale document selection',
+    (tester) async {
+      const url = 'https://example.com';
+      const source = '''
+---
+title: Alpha
+---
+Label
+''';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (methodCall) async => methodCall.method == 'Clipboard.getData'
+            ? const <String, dynamic>{'text': url}
+            : null,
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 1000,
+              height: 720,
+              child: IanvsMarkdownLiveEditor(controller: controller),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final input = find.byKey(
+        const ValueKey('ianvs-markdown-front-matter-input-title'),
+      );
+      controller.selection = TextSelection(
+        baseOffset: source.indexOf('Label'),
+        extentOffset: source.indexOf('Label') + 'Label'.length,
+      );
+      await tester.tap(input);
+      final field = tester.widget<TextField>(input);
+      field.controller!.selection = const TextSelection(
+        baseOffset: 0,
+        extentOffset: 'Alpha'.length,
+      );
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyV);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+
+      expect(controller.text, source);
+      expect(field.controller!.text, url);
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
     'property Tab traversal never indents a stale document selection',
     (tester) async {
       const source = '''
