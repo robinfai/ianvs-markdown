@@ -41,6 +41,8 @@ score: 42
 ratio: 3.5
 due: 2026-08-24
 moment: 2026-08-24T18:05:00
+zoned: 2026-08-27T10:20:30+08:00
+quoted_number: "42"
 items: [alpha, beta]
 settings:
   owner: Codex
@@ -59,6 +61,11 @@ Body
     expect(entry('due').type, MarkdownMetadataValueType.date);
     expect(entry('due').value, '2026-08-24');
     expect(entry('moment').type, MarkdownMetadataValueType.text);
+    expect(entry('moment').value, '2026-08-24T18:05:00');
+    expect(entry('zoned').type, MarkdownMetadataValueType.text);
+    expect(entry('zoned').value, '2026-08-27T10:20:30+08:00');
+    expect(entry('quoted_number').type, MarkdownMetadataValueType.text);
+    expect(entry('quoted_number').value, '42');
     expect(entry('items').type, MarkdownMetadataValueType.list);
     expect(entry('items').items, <String>['alpha', 'beta']);
     expect(entry('settings').type, MarkdownMetadataValueType.object);
@@ -91,6 +98,45 @@ Body
       document.entries.map((entry) => (entry.key, entry.value)),
       <(String, String)>[('empty', ''), ('blank', ''), ('status', 'ready')],
     );
+  });
+
+  test('preserves source key order instead of promoting title or author', () {
+    final document = parseMarkdownFrontMatter('''
+---
+status: draft
+author: Robin
+title: Later title
+tags: [one]
+---
+Body
+''');
+
+    expect(document.entries.map((entry) => entry.key), <String>[
+      'status',
+      'author',
+      'title',
+      'tags',
+    ]);
+  });
+
+  test('accepts only the Obsidian triple-dash closing marker', () {
+    const invalidSources = <String>[
+      '---\ntitle: Ellipsis\n...\nBody',
+      ' ---\ntitle: Opening prefix\n---\nBody',
+      '--- \ntitle: Opening suffix\n---\nBody',
+      '---\ntitle: Closing prefix\n ---\nBody',
+      '---\ntitle: Closing suffix\n--- \nBody',
+      '\ufeff---\ntitle: BOM\n---\nBody',
+    ];
+
+    for (final source in invalidSources) {
+      expect(
+        parseMarkdownFrontMatter(source).hasFrontMatter,
+        isFalse,
+        reason: source,
+      );
+      expect(parseMarkdownFrontMatter(source).body, source, reason: source);
+    }
   });
 
   test(

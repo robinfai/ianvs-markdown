@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import 'front_matter.dart';
 import 'theme.dart';
@@ -16,6 +17,7 @@ class IanvsMarkdownFrontMatterCard extends StatefulWidget {
     this.compact = false,
     this.initiallyExpanded = true,
     this.showDocumentTitle = false,
+    this.onTapLink,
   });
 
   final List<MarkdownMetadataEntry> entries;
@@ -26,6 +28,7 @@ class IanvsMarkdownFrontMatterCard extends StatefulWidget {
   final bool compact;
   final bool initiallyExpanded;
   final bool showDocumentTitle;
+  final MarkdownTapLinkCallback? onTapLink;
 
   @override
   State<IanvsMarkdownFrontMatterCard> createState() =>
@@ -240,7 +243,11 @@ class _IanvsMarkdownFrontMatterCardState
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       for (final entry in detailEntries)
-                        _ObsidianMetadataRow(entry: entry, colors: colors),
+                        _ObsidianMetadataRow(
+                          entry: entry,
+                          colors: colors,
+                          onTapLink: widget.onTapLink,
+                        ),
                       Padding(
                         padding: const EdgeInsets.fromLTRB(7, 4, 7, 2),
                         child: Row(
@@ -276,10 +283,15 @@ class _IanvsMarkdownFrontMatterCardState
 }
 
 class _ObsidianMetadataRow extends StatelessWidget {
-  const _ObsidianMetadataRow({required this.entry, required this.colors});
+  const _ObsidianMetadataRow({
+    required this.entry,
+    required this.colors,
+    required this.onTapLink,
+  });
 
   final MarkdownMetadataEntry entry;
   final IanvsMarkdownThemeData colors;
+  final MarkdownTapLinkCallback? onTapLink;
 
   @override
   Widget build(BuildContext context) {
@@ -328,6 +340,7 @@ class _ObsidianMetadataRow extends StatelessWidget {
               normalizedKey: normalizedKey,
               items: items,
               colors: colors,
+              onTapLink: onTapLink,
             ),
           ),
         ],
@@ -378,12 +391,14 @@ class _ObsidianMetadataValue extends StatelessWidget {
     required this.normalizedKey,
     required this.items,
     required this.colors,
+    required this.onTapLink,
   });
 
   final MarkdownMetadataEntry entry;
   final String normalizedKey;
   final List<String> items;
   final IanvsMarkdownThemeData colors;
+  final MarkdownTapLinkCallback? onTapLink;
 
   @override
   Widget build(BuildContext context) {
@@ -430,8 +445,31 @@ class _ObsidianMetadataValue extends StatelessWidget {
         ],
       );
     }
+    final propertyLink = _propertyLink(entry.value);
+    if (entry.type == MarkdownMetadataValueType.text && propertyLink != null) {
+      return _ObsidianMetadataLink(
+        key: valueKey,
+        link: propertyLink,
+        colors: colors,
+        onTapLink: onTapLink,
+      );
+    }
     if (items.isNotEmpty) {
       final tags = normalizedKey == 'tags' || normalizedKey == 'tag';
+      final aliases = normalizedKey == 'aliases' || normalizedKey == 'alias';
+      final cssClasses =
+          normalizedKey == 'cssclasses' || normalizedKey == 'cssclass';
+      if (cssClasses) {
+        return Text(
+          items.join(', '),
+          key: valueKey,
+          style: TextStyle(
+            color: colors.textPrimary,
+            fontSize: 11.5,
+            height: 1.35,
+          ),
+        );
+      }
       return Wrap(
         key: valueKey,
         spacing: 5,
@@ -444,7 +482,9 @@ class _ObsidianMetadataValue extends StatelessWidget {
               ),
               value: items[index],
               tag: tags,
+              linksEnabled: !tags && !aliases,
               colors: colors,
+              onTapLink: onTapLink,
             ),
         ],
       );
@@ -476,49 +516,105 @@ class _ObsidianMetadataChip extends StatelessWidget {
     super.key,
     required this.value,
     required this.tag,
+    required this.linksEnabled,
     required this.colors,
+    required this.onTapLink,
   });
 
   final String value;
   final bool tag;
+  final bool linksEnabled;
   final IanvsMarkdownThemeData colors;
+  final MarkdownTapLinkCallback? onTapLink;
 
   @override
   Widget build(BuildContext context) {
-    final wikiLabel = _propertyWikiLabel(value);
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: tag ? 7 : 0, vertical: 2),
-      decoration: BoxDecoration(
-        color: tag ? colors.accentMist : Colors.transparent,
+    final link = linksEnabled ? _propertyLink(value) : null;
+    final label = link?.label ?? value;
+    final linked = link != null;
+    return Semantics(
+      link: linked,
+      enabled: linked ? onTapLink != null : null,
+      label: label,
+      child: InkWell(
+        onTap: linked && onTapLink != null
+            ? () => onTapLink!(link.label, link.href, '')
+            : null,
         borderRadius: BorderRadius.circular(5),
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: tag ? 7 : 0, vertical: 2),
+          decoration: BoxDecoration(
+            color: tag ? colors.accentMist : Colors.transparent,
+            borderRadius: BorderRadius.circular(5),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: tag || linked ? colors.accentDark : colors.textPrimary,
+                  fontSize: 10.5,
+                  height: 1.25,
+                  fontWeight: FontWeight.w500,
+                  decoration: linked
+                      ? TextDecoration.underline
+                      : TextDecoration.none,
+                  decorationColor: colors.accentDark,
+                ),
+              ),
+              Text(
+                ' ×',
+                style: TextStyle(
+                  color: colors.textTertiary,
+                  fontSize: 9.5,
+                  height: 1.25,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            wikiLabel ?? value,
+    );
+  }
+}
+
+class _ObsidianMetadataLink extends StatelessWidget {
+  const _ObsidianMetadataLink({
+    super.key,
+    required this.link,
+    required this.colors,
+    required this.onTapLink,
+  });
+
+  final _PropertyLink link;
+  final IanvsMarkdownThemeData colors;
+  final MarkdownTapLinkCallback? onTapLink;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Semantics(
+        link: true,
+        enabled: onTapLink != null,
+        label: link.label,
+        child: InkWell(
+          onTap: onTapLink == null
+              ? null
+              : () => onTapLink!(link.label, link.href, ''),
+          borderRadius: BorderRadius.circular(3),
+          child: Text(
+            link.label,
             style: TextStyle(
-              color: tag || wikiLabel != null
-                  ? colors.accentDark
-                  : colors.textPrimary,
-              fontSize: 10.5,
-              height: 1.25,
-              fontWeight: FontWeight.w500,
-              decoration: wikiLabel == null
-                  ? TextDecoration.none
-                  : TextDecoration.underline,
+              color: colors.accentDark,
+              fontSize: 11.5,
+              height: 1.35,
+              decoration: TextDecoration.underline,
               decorationColor: colors.accentDark,
             ),
           ),
-          Text(
-            ' ×',
-            style: TextStyle(
-              color: colors.textTertiary,
-              fontSize: 9.5,
-              height: 1.25,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -544,22 +640,46 @@ String _displayMetadataDate(String value) {
   return '${match.group(1)} / ${match.group(2)} / ${match.group(3)}';
 }
 
-String? _propertyWikiLabel(String value) {
+final class _PropertyLink {
+  const _PropertyLink({required this.label, required this.href});
+
+  final String label;
+  final String href;
+}
+
+_PropertyLink? _propertyLink(String value) {
+  final wiki = _propertyWikiLink(value);
+  if (wiki != null) return wiki;
+  final uri = Uri.tryParse(value);
+  if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
+    return null;
+  }
+  return _PropertyLink(label: value, href: value);
+}
+
+_PropertyLink? _propertyWikiLink(String value) {
   if (!value.startsWith('[[') || !value.endsWith(']]')) return null;
   final source = value.substring(2, value.length - 2);
   final separator = source.indexOf('|');
   final target = (separator < 0 ? source : source.substring(0, separator))
       .trim();
   if (target.isEmpty) return null;
+  String label;
   if (separator >= 0) {
     final alias = source.substring(separator + 1).trim();
-    if (alias.isNotEmpty) return alias;
+    if (alias.isNotEmpty) {
+      label = alias;
+      return _PropertyLink(label: label, href: target);
+    }
   }
   final hash = target.indexOf('#');
-  if (hash < 0 || hash == target.length - 1) return target;
+  if (hash < 0 || hash == target.length - 1) {
+    return _PropertyLink(label: target, href: target);
+  }
   final note = target.substring(0, hash).trim();
   final subpath = target.substring(hash + 1).trim();
-  return note.isEmpty ? subpath : '$note > $subpath';
+  label = note.isEmpty ? subpath : '$note > $subpath';
+  return _PropertyLink(label: label, href: target);
 }
 
 class _MetadataEntryTile extends StatelessWidget {

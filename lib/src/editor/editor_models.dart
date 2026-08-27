@@ -229,8 +229,8 @@ int _frontMatterEnd(List<_SourceLine> lines, int first) {
     index < lines.length && index <= first + 256;
     index += 1
   ) {
-    final text = lines[index].text.trim();
-    if (text == '---' || text == '...') return index;
+    final text = lines[index].text;
+    if (text == '---') return index;
   }
   return first;
 }
@@ -406,7 +406,7 @@ bool _startsNewBlock(List<_SourceLine> lines, int index) {
       _isTableStart(lines, index);
 }
 
-bool _isFrontMatterOpening(String text) => text.trim() == '---';
+bool _isFrontMatterOpening(String text) => text == '---';
 
 bool _isDisplayMathFence(String text) =>
     RegExp(r'^ {0,3}\$\$[ \t]*$').hasMatch(text);

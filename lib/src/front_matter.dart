@@ -51,11 +51,9 @@ final class MarkdownMetadataEntry {
 /// Invalid, oversized, or non-map front matter is left in the document body.
 /// Values are flattened and bounded before they are exposed to the UI.
 MarkdownFrontMatterDocument parseMarkdownFrontMatter(String source) {
-  final start = source.startsWith('\ufeff') ? 1 : 0;
-  final openingEnd = source.indexOf('\n', start);
+  final openingEnd = source.indexOf('\n');
   if (openingEnd < 0 ||
-      source.substring(start, openingEnd).replaceFirst('\r', '').trim() !=
-          '---') {
+      _frontMatterMarkerLine(source.substring(0, openingEnd)) != '---') {
     return _withoutFrontMatter(source);
   }
 
@@ -66,8 +64,8 @@ MarkdownFrontMatterDocument parseMarkdownFrontMatter(String source) {
       lineStart - openingEnd <= markdownFrontMatterByteLimit) {
     final newline = source.indexOf('\n', lineStart);
     final lineEnd = newline < 0 ? source.length : newline;
-    final line = source.substring(lineStart, lineEnd).trim();
-    if (line == '---' || line == '...') {
+    final line = _frontMatterMarkerLine(source.substring(lineStart, lineEnd));
+    if (line == '---') {
       final raw = source.substring(openingEnd + 1, lineStart);
       if (utf8.encode(raw).length > markdownFrontMatterByteLimit) {
         return _withoutFrontMatter(source);
@@ -87,6 +85,9 @@ MarkdownFrontMatterDocument parseMarkdownFrontMatter(String source) {
   }
   return _withoutFrontMatter(source);
 }
+
+String _frontMatterMarkerLine(String line) =>
+    line.endsWith('\r') ? line.substring(0, line.length - 1) : line;
 
 MarkdownFrontMatterDocument _withoutFrontMatter(String source) {
   return MarkdownFrontMatterDocument(
@@ -108,28 +109,9 @@ List<MarkdownMetadataEntry>? _parseMetadata(String raw) {
 
   final result = <MarkdownMetadataEntry>[];
   _collectMetadata(value, result: result);
-  return List<MarkdownMetadataEntry>.unmodifiable(
-    _prioritizePrimaryMetadata(result),
-  );
-}
-
-List<MarkdownMetadataEntry> _prioritizePrimaryMetadata(
-  List<MarkdownMetadataEntry> entries,
-) {
-  final titles = <MarkdownMetadataEntry>[];
-  final authors = <MarkdownMetadataEntry>[];
-  final remaining = <MarkdownMetadataEntry>[];
-  for (final entry in entries) {
-    final key = entry.key.toLowerCase().replaceAll('-', '_');
-    if (key == 'title') {
-      titles.add(entry);
-    } else if (key == 'author' || key == 'authors') {
-      authors.add(entry);
-    } else {
-      remaining.add(entry);
-    }
-  }
-  return <MarkdownMetadataEntry>[...titles, ...authors, ...remaining];
+  // Obsidian's properties panel follows YAML source order. Reordering common
+  // keys such as title/author makes the structured view disagree with Source.
+  return List<MarkdownMetadataEntry>.unmodifiable(result);
 }
 
 void _collectMetadata(

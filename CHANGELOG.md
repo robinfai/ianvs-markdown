@@ -1,5 +1,9 @@
 ## Unreleased
 
+- Match Obsidian properties for source-order keys, an ordinary `title` row,
+  default-expanded panels, triple-dash-only closing markers, distinct aliases,
+  tags, and `cssclasses`, linked Wiki/URL scalar values, and invisible empty
+  mappings across Reading and Live Preview.
 - Lock Obsidian list editing semantics for multi-level empty-item exits,
   quote-contained soft continuations, four-space and tab-indented list-like
   lines, standalone comment wrappers, and tab-separated dash markers that

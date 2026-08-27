@@ -57,7 +57,7 @@ class IanvsMarkdownLiveEditor extends StatefulWidget {
     this.navigationWidth = 292,
     this.contentMaxWidth = 840,
     this.compactFrontMatter = true,
-    this.showDocumentTitle = true,
+    this.showDocumentTitle = false,
     this.enableHeadingFolding = true,
     this.padding = const EdgeInsets.fromLTRB(28, 20, 32, 44),
     this.onChanged,
@@ -3393,8 +3393,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
               entries: document.entries,
               theme: colors,
               compact: widget.compactFrontMatter,
-              initiallyExpanded: false,
+              initiallyExpanded: true,
               showDocumentTitle: widget.showDocumentTitle,
+              onTapLink: widget.onTapLink,
             );
     } else if (block.type == IanvsMarkdownBlockType.indentedCode) {
       rendered = _LivePreviewIndentedCode(

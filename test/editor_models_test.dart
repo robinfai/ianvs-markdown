@@ -207,6 +207,26 @@ final value = 1;
     ]);
   });
 
+  test('front matter block boundaries require exact triple dashes', () {
+    const sources = <String>[
+      '---\ntitle: Ellipsis\n...\nBody',
+      ' ---\ntitle: Opening prefix\n---\nBody',
+      '--- \ntitle: Opening suffix\n---\nBody',
+      '---\ntitle: Closing prefix\n ---\nBody',
+      '---\ntitle: Closing suffix\n--- \nBody',
+      '\ufeff---\ntitle: BOM\n---\nBody',
+    ];
+
+    for (final source in sources) {
+      final blocks = parseMarkdownBlocks(source);
+      expect(
+        blocks.map((block) => block.type),
+        isNot(contains(IanvsMarkdownBlockType.frontMatter)),
+        reason: source,
+      );
+    }
+  });
+
   test('Setext dashes win after text while thematic variants stay rules', () {
     const source =
         'Setext level two\n'

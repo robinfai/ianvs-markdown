@@ -3540,6 +3540,11 @@ Done.
 
     expect(find.byType(IanvsMarkdownFrontMatterCard), findsOneWidget);
     expect(find.text('Extracted renderer'), findsOneWidget);
+    expect(find.text('笔记属性'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-front-matter-row-title')),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey('ianvs-markdown-outline')),
       findsOneWidget,
@@ -3874,6 +3879,69 @@ Done.
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'compact properties distinguish aliases, cssclasses, and link values',
+    (tester) async {
+      final taps = <(String, String?)>[];
+      const entries = <MarkdownMetadataEntry>[
+        MarkdownMetadataEntry(
+          key: 'aliases',
+          label: 'aliases',
+          value: '[[Alias Note]]',
+          items: <String>['[[Alias Note]]'],
+          type: MarkdownMetadataValueType.list,
+        ),
+        MarkdownMetadataEntry(
+          key: 'cssclasses',
+          label: 'cssclasses',
+          value: 'wide',
+          items: <String>['wide'],
+          type: MarkdownMetadataValueType.list,
+        ),
+        MarkdownMetadataEntry(
+          key: 'wiki_link',
+          label: 'wiki_link',
+          value: '[[Target Note]]',
+        ),
+        MarkdownMetadataEntry(
+          key: 'url',
+          label: 'url',
+          value: 'https://example.com/a?q=1',
+        ),
+      ];
+      await tester.pumpWidget(
+        app(
+          IanvsMarkdownFrontMatterCard(
+            entries: entries,
+            compact: true,
+            onTapLink: (text, href, title) => taps.add((text, href)),
+          ),
+        ),
+      );
+
+      expect(find.text('[[Alias Note]]'), findsOneWidget);
+      expect(find.text('wide'), findsOneWidget);
+      expect(
+        find.byKey(
+          const ValueKey('ianvs-markdown-front-matter-chip-cssclasses-0'),
+        ),
+        findsNothing,
+      );
+      expect(find.text('Target Note'), findsOneWidget);
+      expect(find.text('https://example.com/a?q=1'), findsOneWidget);
+
+      await tester.tap(find.text('Target Note'));
+      await tester.pump();
+      await tester.tap(find.text('https://example.com/a?q=1'));
+      await tester.pump();
+
+      expect(taps, <(String, String?)>[
+        ('Target Note', 'Target Note'),
+        ('https://example.com/a?q=1', 'https://example.com/a?q=1'),
+      ]);
+    },
+  );
 
   testWidgets('uses distinct Obsidian markers for nested unordered lists', (
     tester,

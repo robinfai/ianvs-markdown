@@ -4285,10 +4285,10 @@ Omega body.
     expect(scrollable.position.pixels, greaterThan(0));
   });
 
-  testWidgets('compact properties expand and activate exact YAML source', (
-    tester,
-  ) async {
-    const source = '''
+  testWidgets(
+    'compact properties default expanded and activate exact YAML source',
+    (tester) async {
+      const source = '''
 ---
 title: Properties probe
 status: draft
@@ -4297,37 +4297,47 @@ empty:
 ---
 # Body
 ''';
-    final controller = IanvsMarkdownController(text: source);
-    addTearDown(controller.dispose);
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
 
-    await tester.pumpWidget(app(controller));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Properties probe'), findsOneWidget);
-    expect(find.text('笔记属性'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('ianvs-markdown-front-matter-row-status')),
-      findsNothing,
-    );
+      expect(find.text('Properties probe'), findsOneWidget);
+      expect(find.text('笔记属性'), findsOneWidget);
+      expect(find.text('title'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('ianvs-markdown-front-matter-row-status')),
+        findsOneWidget,
+      );
+      expect(find.text('没有值'), findsOneWidget);
 
-    await tester.tap(
-      find.byKey(const ValueKey('ianvs-markdown-front-matter-toggle')),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('status'), findsOneWidget);
-    expect(find.text('没有值'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('ianvs-markdown-front-matter-toggle')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('status'), findsNothing);
 
-    await tester.tap(
-      find.byKey(const ValueKey('ianvs-markdown-front-matter-row-status')),
-    );
-    await tester.pump();
+      await tester.tap(
+        find.byKey(const ValueKey('ianvs-markdown-front-matter-toggle')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('status'), findsOneWidget);
 
-    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
-    expect(active, findsOneWidget);
-    final field = find.descendant(of: active, matching: find.byType(TextField));
-    expect(
-      tester.widget<TextField>(field).controller?.text,
-      '''
+      await tester.tap(
+        find.byKey(const ValueKey('ianvs-markdown-front-matter-row-status')),
+      );
+      await tester.pump();
+
+      final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+      expect(active, findsOneWidget);
+      final field = find.descendant(
+        of: active,
+        matching: find.byType(TextField),
+      );
+      expect(
+        tester.widget<TextField>(field).controller?.text,
+        '''
 ---
 title: Properties probe
 status: draft
@@ -4335,9 +4345,10 @@ tags: [probe, properties]
 empty:
 ---
 '''
-          .trim(),
-    );
-  });
+            .trim(),
+      );
+    },
+  );
 
   testWidgets('live preview edits one list item without flattening neighbors', (
     tester,
