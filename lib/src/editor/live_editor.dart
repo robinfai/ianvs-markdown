@@ -1704,6 +1704,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           return KeyEventResult.handled;
         }
         if (right != bridge.forward) {
+          if (bridge.forward && !selection.isCollapsed) {
+            return null;
+          }
           if (!bridge.forward) {
             _foldedSelectionBridge = null;
             return KeyEventResult.handled;

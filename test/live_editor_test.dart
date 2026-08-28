@@ -1514,6 +1514,52 @@ void main() {
     },
   );
 
+  testWidgets(
+    'Shift Left first shrinks native selection after a folded bridge',
+    (tester) async {
+      const source = '# Heading\nBody one two\n# Tail';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('折叠标题内容'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Heading'));
+      await tester.pump();
+
+      final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+      final fieldFinder = find.descendant(
+        of: active,
+        matching: find.byType(TextField),
+      );
+      var field = tester.widget<TextField>(fieldFinder);
+      field.controller?.selection = TextSelection.collapsed(
+        offset: field.controller!.text.length,
+      );
+
+      Future<void> shift(LogicalKeyboardKey key) async {
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+        await tester.sendKeyEvent(key);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+        await tester.pumpAndSettle();
+      }
+
+      await shift(LogicalKeyboardKey.arrowRight);
+      await shift(LogicalKeyboardKey.arrowRight);
+      await shift(LogicalKeyboardKey.arrowLeft);
+
+      field = tester.widget<TextField>(fieldFinder);
+      expect(field.controller?.text, '# Tail');
+      expect(
+        field.controller?.selection,
+        const TextSelection.collapsed(offset: 0),
+      );
+      expect(controller.selection, const TextSelection.collapsed(offset: 23));
+      expect(field.focusNode?.hasFocus, isTrue);
+    },
+  );
+
   testWidgets('reverse Shift Option selects the folded source range', (
     tester,
   ) async {
