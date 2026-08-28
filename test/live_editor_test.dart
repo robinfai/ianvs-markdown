@@ -478,6 +478,97 @@ void main() {
     expect(openedHref, 'docs/guide.md');
   });
 
+  testWidgets('live preview projects reference definition controls', (
+    tester,
+  ) async {
+    const url = 'https://example.com/path';
+    const definition = '[target]: $url "Reference title"';
+    const source =
+        'Before\n\n'
+        'Alpha [bravo][target] omega\n\n'
+        '$definition\n\n'
+        'After';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-reference-definitions')),
+      findsOneWidget,
+    );
+    Finder definitionText() => find.byWidgetPredicate((widget) {
+      if (widget is! SelectableText) return false;
+      final text = widget.data ?? widget.textSpan?.toPlainText() ?? '';
+      return text.startsWith('target') && text.endsWith('Reference title');
+    });
+
+    expect(definitionText(), findsOneWidget);
+    expect(find.text(url), findsOneWidget);
+    expect(find.text(definition), findsNothing);
+
+    var definitionEditable = editableWithin(tester, definitionText());
+    var definitionTarget = definitionEditable.localToGlobal(
+      definitionEditable
+          .getLocalRectForCaret(const TextPosition(offset: 2))
+          .center,
+    );
+    await tester.tapAt(definitionTarget);
+    await tester.pumpAndSettle();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    expect(active, findsOneWidget);
+    expect(
+      find.descendant(of: active, matching: find.byType(TextField)),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: active,
+        matching: find.byKey(
+          const ValueKey('ianvs-markdown-reference-definitions'),
+        ),
+      ),
+      findsOneWidget,
+    );
+
+    definitionEditable = editableWithin(tester, definitionText());
+    for (final offset in <int>[2, 20]) {
+      definitionTarget = definitionEditable.localToGlobal(
+        definitionEditable
+            .getLocalRectForCaret(TextPosition(offset: offset))
+            .center,
+      );
+      await tester.tapAt(definitionTarget);
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyQ);
+      await tester.pump();
+      expect(controller.text, source);
+    }
+
+    await tester.tap(find.text(url));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyQ);
+    await tester.pump();
+    expect(controller.text, source);
+
+    await tester.tap(find.text('After'));
+    await tester.pumpAndSettle();
+
+    expect(find.text(url), findsOneWidget);
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+
+    controller.mode = IanvsMarkdownEditorMode.preview;
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-reference-definitions')),
+      findsNothing,
+    );
+    expect(find.text(url), findsNothing);
+  });
+
   testWidgets('live preview keeps extra-whitespace reference labels literal', (
     tester,
   ) async {
@@ -501,8 +592,14 @@ void main() {
 
     expect(
       find.byKey(const ValueKey('ianvs-markdown-ordinary-link')),
-      findsNothing,
+      findsOneWidget,
     );
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-reference-definitions')),
+      findsOneWidget,
+    );
+    expect(find.text('docs/ref.md'), findsOneWidget);
+    expect(find.textContaining('[Ref A]:'), findsNothing);
     expect(
       find.textContaining(
         '[Whitespace   Ref][  Ref   A  ]',

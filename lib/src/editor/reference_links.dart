@@ -2,6 +2,70 @@ import 'package:markdown/markdown.dart' as md;
 
 import '../markdown_link_source.dart';
 
+final class MarkdownLinkReferenceDefinition {
+  const MarkdownLinkReferenceDefinition({
+    required this.label,
+    required this.destination,
+    required this.title,
+  });
+
+  final String label;
+  final String destination;
+  final String? title;
+}
+
+/// Returns parsed definitions only when [source] contains no visible Markdown
+/// nodes. Live Preview uses this to project otherwise parser-hidden definition
+/// blocks without treating mixed paragraphs as metadata.
+List<MarkdownLinkReferenceDefinition> parseMarkdownLinkReferenceDefinitions(
+  String source,
+) {
+  if (source.isEmpty) return const <MarkdownLinkReferenceDefinition>[];
+  final document = md.Document(extensionSet: md.ExtensionSet.gitHubFlavored);
+  final nodes = document.parseLines(source.split('\n'));
+  if (nodes.isNotEmpty || document.linkReferences.isEmpty) {
+    return const <MarkdownLinkReferenceDefinition>[];
+  }
+  final rawLabels = _rawMarkdownLinkReferenceLabels(source);
+  return <MarkdownLinkReferenceDefinition>[
+    for (final entry in document.linkReferences.entries)
+      MarkdownLinkReferenceDefinition(
+        label: rawLabels[entry.key] ?? entry.value.label,
+        destination: entry.value.destination,
+        title: entry.value.title,
+      ),
+  ];
+}
+
+Map<String, String> _rawMarkdownLinkReferenceLabels(String source) {
+  final labels = <String, String>{};
+  var lineStart = 0;
+  while (lineStart < source.length) {
+    final lineEnd = source.indexOf('\n', lineStart);
+    final end = lineEnd < 0 ? source.length : lineEnd;
+    var opening = lineStart;
+    while (opening < end &&
+        opening - lineStart < 3 &&
+        source.codeUnitAt(opening) == 0x20) {
+      opening += 1;
+    }
+    if (opening < end && source.codeUnitAt(opening) == 0x5b) {
+      final match = findIanvsMarkdownReferenceLabel(source, opening);
+      if (match != null &&
+          match.end < end &&
+          source.codeUnitAt(match.end) == 0x3a) {
+        labels.putIfAbsent(
+          normalizeMarkdownLinkReferenceLabel(match.label),
+          () => match.label,
+        );
+      }
+    }
+    if (lineEnd < 0) break;
+    lineStart = lineEnd + 1;
+  }
+  return labels;
+}
+
 /// Document-wide Markdown link references needed by block-based live preview.
 final class MarkdownLinkReferenceContext {
   MarkdownLinkReferenceContext._(this.references);

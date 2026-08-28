@@ -41,6 +41,33 @@ import 'source_editor.dart';
 
 enum _RenderedTapSelection { caret, word, line }
 
+String _referenceDefinitionProjectionSource(
+  MarkdownLinkReferenceDefinition definition,
+) {
+  final title = definition.title?.trim();
+  final projection = StringBuffer()
+    ..write(_escapeReferenceDefinitionText(definition.label))
+    ..write(' [')
+    ..write(_escapeReferenceDefinitionText(definition.destination))
+    ..write('](<')
+    ..write(_escapeReferenceDefinitionDestination(definition.destination))
+    ..write('>)');
+  if (title != null && title.isNotEmpty) {
+    projection
+      ..write(' ')
+      ..write(_escapeReferenceDefinitionText(title));
+  }
+  return projection.toString();
+}
+
+String _escapeReferenceDefinitionText(String source) => source.replaceAllMapped(
+  RegExp(r'([\\`*_\[\]{}()<>#+\-.!|~=])'),
+  (match) => '\\${match.group(1)}',
+);
+
+String _escapeReferenceDefinitionDestination(String source) =>
+    source.replaceAll(r'\', r'\\').replaceAll('>', r'\>');
+
 class _FoldedSelectionBridge {
   const _FoldedSelectionBridge({
     required this.originBlockStart,
@@ -3571,6 +3598,20 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     required int listNestingLevel,
     IanvsMarkdownHeadingSection? headingSection,
   }) {
+    final referenceDefinitions = parseMarkdownLinkReferenceDefinitions(
+      block.source,
+    );
+    if (referenceDefinitions.isNotEmpty) {
+      return Container(
+        key: const ValueKey('ianvs-markdown-active-block'),
+        constraints: const BoxConstraints(minHeight: 36),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+        child: _buildReferenceDefinitionProjection(
+          referenceDefinitions,
+          colors,
+        ),
+      );
+    }
     final styleSheet =
         widget.styleSheet ?? ianvsMarkdownStyleSheet(context, colors);
     final fencedCode = block.type == IanvsMarkdownBlockType.fencedCode;
@@ -4039,10 +4080,20 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       );
     }
     final sourceTasks = projectObsidianTaskMarkers(block.source).tasks;
+    final referenceDefinitions = parseMarkdownLinkReferenceDefinitions(
+      block.source,
+    );
     var renderedTaskIndex = 0;
     Widget rendered;
     if (block.source.trim().isEmpty) {
       rendered = const SizedBox.shrink();
+    } else if (referenceDefinitions.isNotEmpty) {
+      rendered = _buildReferenceDefinitionProjection(
+        referenceDefinitions,
+        colors,
+        onTapText: () =>
+            _activateRenderedBlock(block, tapCount: _pointerTapCount),
+      );
     } else if (block.type == IanvsMarkdownBlockType.frontMatter) {
       final document = parseMarkdownFrontMatter(block.source);
       if (!document.hasFrontMatter) {
@@ -4189,6 +4240,36 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildReferenceDefinitionProjection(
+    List<MarkdownLinkReferenceDefinition> definitions,
+    IanvsMarkdownThemeData colors, {
+    VoidCallback? onTapText,
+  }) {
+    final styleSheet =
+        widget.styleSheet ?? ianvsMarkdownStyleSheet(context, colors);
+    return Column(
+      key: const ValueKey('ianvs-markdown-reference-definitions'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        for (final definition in definitions)
+          IanvsMarkdown(
+            data: _referenceDefinitionProjectionSource(definition),
+            selectable: true,
+            styleSheet: styleSheet.copyWith(
+              blockSpacing: 0,
+              pPadding: EdgeInsets.zero,
+            ),
+            fitContent: true,
+            onTapText: onTapText,
+            showListIndentationGuides: false,
+            softLineBreak: widget.softLineBreak,
+            obsidianMetadataMode: IanvsMarkdownObsidianMetadataMode.editing,
+            theme: colors,
+          ),
+      ],
     );
   }
 
