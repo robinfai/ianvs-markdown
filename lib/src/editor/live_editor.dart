@@ -1518,9 +1518,15 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       final boundary = _editingEnd.clamp(0, source.length);
       if (boundary == source.length) return KeyEventResult.ignored;
       final targetOffset = boundary + 1;
-      final next = activeIndex + 1 < _blocks.length
-          ? _blocks[activeIndex + 1]
-          : null;
+      final nextIndex = _adjacentVisibleBlockIndex(activeIndex, forward: true);
+      if (nextIndex != null && nextIndex > activeIndex + 1) {
+        _activateBlockHorizontally(_blocks[nextIndex], localOffset: 0);
+        return KeyEventResult.handled;
+      }
+      if (nextIndex == null && activeIndex + 1 < _blocks.length) {
+        return KeyEventResult.handled;
+      }
+      final next = nextIndex == null ? null : _blocks[nextIndex];
       if (next != null && targetOffset >= next.start) {
         _activateBlockHorizontally(
           next,
@@ -1544,7 +1550,17 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       return KeyEventResult.ignored;
     }
     final targetOffset = boundary - 1;
-    final previous = _blocks[activeIndex - 1];
+    final previousIndex = _adjacentVisibleBlockIndex(
+      activeIndex,
+      forward: false,
+    );
+    if (previousIndex != null && previousIndex < activeIndex - 1) {
+      final previous = _blocks[previousIndex];
+      _activateBlockHorizontally(previous, localOffset: previous.source.length);
+      return KeyEventResult.handled;
+    }
+    if (previousIndex == null) return KeyEventResult.handled;
+    final previous = _blocks[previousIndex];
     if (targetOffset <= previous.end) {
       _activateBlockHorizontally(
         previous,

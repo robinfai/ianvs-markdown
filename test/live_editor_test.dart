@@ -3270,6 +3270,53 @@ void main() {
     expect(field.focusNode?.hasFocus, isTrue);
   });
 
+  testWidgets('horizontal arrows skip descendants of a collapsed heading', (
+    tester,
+  ) async {
+    const source = '# Heading\nBody\n# Tail';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('折叠标题内容'));
+    await tester.pumpAndSettle();
+    expect(find.text('Body'), findsNothing);
+
+    await tester.tap(find.text('Heading'));
+    await tester.pump();
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    var field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    field.controller?.selection = TextSelection.collapsed(
+      offset: field.controller!.text.length,
+    );
+    await tester.pump();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+
+    expect(active, findsOneWidget);
+    field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, '# Tail');
+    expect(field.controller?.selection.extentOffset, 0);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+
+    field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, '# Heading');
+    expect(field.controller?.selection.extentOffset, '# Heading'.length);
+    expect(field.focusNode?.hasFocus, isTrue);
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('shift horizontal arrows select and replace block separators', (
     tester,
   ) async {
