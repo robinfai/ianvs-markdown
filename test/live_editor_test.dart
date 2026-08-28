@@ -176,10 +176,15 @@ void main() {
     expect(field.controller?.text, source);
   });
 
-  testWidgets('live ordinary links enter source without navigating', (
+  testWidgets('live explicit links stay rendered until reading mode', (
     tester,
   ) async {
-    const source = 'Before [Label](https://example.com/path) after.';
+    const label = 'bravo charlie';
+    const href = 'https://example.com/path?x=1#frag';
+    const source =
+        'Before\n\n'
+        'Alpha [$label]($href "Link title") omega\n\n'
+        'After';
     final controller = IanvsMarkdownController(text: source);
     String? openedHref;
     addTearDown(controller.dispose);
@@ -199,42 +204,34 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Label'));
-    await tester.pumpAndSettle();
-    expect(openedHref, isNull);
-    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
-    final field = tester.widget<TextField>(
-      find.descendant(of: active, matching: find.byType(TextField)),
-    );
-    expect(field.controller?.text, source);
-    final spans = field.controller!
-        .buildTextSpan(
-          context: tester.element(
-            find.descendant(of: active, matching: find.byType(TextField)),
-          ),
-          style: field.style,
-          withComposing: false,
-        )
-        .children!
-        .cast<TextSpan>();
-    expect(
-      spans.singleWhere((span) => span.text == '[').style?.fontSize,
-      greaterThan(1),
-    );
-    expect(
-      spans
-          .singleWhere((span) => span.text == '](https://example.com/path)')
-          .style
-          ?.fontSize,
-      greaterThan(1),
-    );
+    final link = find.text(label);
+    expect(link, findsOneWidget);
+    expect(find.text(href), findsNothing);
+    expect(find.text('Link title'), findsNothing);
+
+    for (var tapCount = 1; tapCount <= 3; tapCount += 1) {
+      await tester.tap(link);
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(
+        find.byKey(const ValueKey('ianvs-markdown-active-block')),
+        findsNothing,
+        reason: 'tap $tapCount',
+      );
+      expect(openedHref, isNull);
+    }
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyQ);
+    await tester.pump();
+
     expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
 
     controller.mode = IanvsMarkdownEditorMode.preview;
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Label'));
+    await tester.tap(find.text(label));
     await tester.pump();
-    expect(openedHref, 'https://example.com/path');
+    expect(openedHref, href);
   });
 
   testWidgets('live preview renders tag pills and reveals their exact source', (
@@ -455,38 +452,24 @@ void main() {
     expect(find.text('shortcut'), findsOneWidget);
     expect(find.textContaining('[guide-ref]:'), findsNothing);
 
-    await tester.tap(find.text('Reference label'));
-    await tester.pumpAndSettle();
-    expect(openedHref, isNull);
-    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
-    final fieldFinder = find.descendant(
-      of: active,
-      matching: find.byType(TextField),
-    );
-    final field = tester.widget<TextField>(fieldFinder);
-    expect(field.controller?.text, 'Full [Reference label][guide-ref] tail.');
-    expect(controller.text, source);
+    final link = find.text('Reference label');
+    for (var tapCount = 1; tapCount <= 3; tapCount += 1) {
+      await tester.tap(link);
+      await tester.pump(const Duration(milliseconds: 100));
 
-    TextSpan markerSpan() {
-      final spans = field.controller!
-          .buildTextSpan(
-            context: tester.element(fieldFinder),
-            style: field.style,
-            withComposing: false,
-          )
-          .children!
-          .cast<TextSpan>();
-      return spans.firstWhere((span) => span.text == '[');
+      expect(
+        find.byKey(const ValueKey('ianvs-markdown-active-block')),
+        findsNothing,
+        reason: 'tap $tapCount',
+      );
+      expect(openedHref, isNull);
     }
 
-    field.controller!.selection = TextSelection.collapsed(
-      offset: field.controller!.text.length,
-    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyQ);
     await tester.pump();
-    expect(markerSpan().style?.fontSize, .01);
-    field.controller!.selection = const TextSelection.collapsed(offset: 8);
-    await tester.pump();
-    expect(markerSpan().style?.fontSize, greaterThan(1));
+
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
 
     controller.mode = IanvsMarkdownEditorMode.preview;
     await tester.pumpAndSettle();
@@ -530,37 +513,36 @@ void main() {
     expect(controller.text, source);
   });
 
-  testWidgets(
-    'live preview projects odd link targets but activates exact source',
-    (tester) async {
-      const source = r'Odd [Odd](https://example.com/a\\\(b\)) tail.';
-      final controller = IanvsMarkdownController(text: source);
-      addTearDown(controller.dispose);
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: SizedBox(
-              width: 1000,
-              height: 720,
-              child: IanvsMarkdownLiveEditor(controller: controller),
-            ),
+  testWidgets('live preview keeps odd link targets as rendered controls', (
+    tester,
+  ) async {
+    const source = r'Odd [Odd](https://example.com/a\\\(b\)) tail.';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1000,
+            height: 720,
+            child: IanvsMarkdownLiveEditor(controller: controller),
           ),
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.byTooltip(r'https://example.com/a%5C(b)'), findsOneWidget);
-      await tester.tap(find.text('Odd'));
-      await tester.pumpAndSettle();
+    expect(find.byTooltip(r'https://example.com/a%5C(b)'), findsOneWidget);
+    await tester.tap(find.text('Odd'));
+    await tester.pumpAndSettle();
 
-      final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
-      final field = tester.widget<TextField>(
-        find.descendant(of: active, matching: find.byType(TextField)),
-      );
-      expect(field.controller?.text, source);
-      expect(controller.text, source);
-    },
-  );
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
 
   testWidgets('live preview preserves exact angle www fallback source', (
     tester,

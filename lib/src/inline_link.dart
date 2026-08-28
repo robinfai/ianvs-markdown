@@ -12,15 +12,15 @@ const _obsidianCurrentNoteHref = 'app://obsidian.md/index.html';
 class IanvsMarkdownInlineLinkBuilder extends MarkdownElementBuilder {
   IanvsMarkdownInlineLinkBuilder({
     required this.onTapLink,
-    this.onTapAutolink,
     required this.enableFileLinkChips,
+    this.editing = false,
     this.wikiLinkExists,
     this.theme,
   });
 
   final MarkdownTapLinkCallback? onTapLink;
-  final MarkdownTapLinkCallback? onTapAutolink;
   final bool enableFileLinkChips;
+  final bool editing;
   final IanvsMarkdownWikiLinkExists? wikiLinkExists;
   final IanvsMarkdownThemeData? theme;
 
@@ -43,6 +43,8 @@ class IanvsMarkdownInlineLinkBuilder extends MarkdownElementBuilder {
         autolink &&
         label.toLowerCase().startsWith('www.') &&
         label.endsWith('>');
+    final keepsRenderedControl =
+        editing && !wikiLink && !tagLink && !angleWwwFallback;
     // Obsidian resolves both `()` and `(<>)` to the current note instead of
     // exposing an empty destination to link interaction callbacks.
     final href = !wikiLink && !tagLink && sourceHref?.isEmpty == true
@@ -77,9 +79,7 @@ class IanvsMarkdownInlineLinkBuilder extends MarkdownElementBuilder {
           : null,
       tagLink: tagLink,
       preferredStyle: effectivePreferredStyle,
-      onTapLink: autolink && !angleWwwFallback
-          ? onTapAutolink ?? onTapLink
-          : onTapLink,
+      onTapLink: keepsRenderedControl ? _consumeMarkdownLinkTap : onTapLink,
       enableFileLinkChips: enableFileLinkChips,
       theme: theme,
     );
@@ -96,6 +96,8 @@ class IanvsMarkdownInlineLinkBuilder extends MarkdownElementBuilder {
     );
   }
 }
+
+void _consumeMarkdownLinkTap(String _, String? _, String _) {}
 
 class _MarkdownInlineLink extends StatefulWidget {
   const _MarkdownInlineLink({
