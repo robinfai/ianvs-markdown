@@ -4104,6 +4104,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             _activateRenderedBlock(block, tapCount: _pointerTapCount),
         onTapLink: (text, href, title) =>
             _handleRenderedLinkTap(block, text: text, href: href, title: title),
+        onTapAutolink: (_, _, _) => _pendingRenderedTapGlobal = null,
         imageBuilder: widget.imageBuilder,
         onImageResize: (request) => _resizeImage(block, request),
         checkboxBuilder: sourceTasks.isNotEmpty

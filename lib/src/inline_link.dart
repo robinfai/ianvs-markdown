@@ -12,12 +12,14 @@ const _obsidianCurrentNoteHref = 'app://obsidian.md/index.html';
 class IanvsMarkdownInlineLinkBuilder extends MarkdownElementBuilder {
   IanvsMarkdownInlineLinkBuilder({
     required this.onTapLink,
+    this.onTapAutolink,
     required this.enableFileLinkChips,
     this.wikiLinkExists,
     this.theme,
   });
 
   final MarkdownTapLinkCallback? onTapLink;
+  final MarkdownTapLinkCallback? onTapAutolink;
   final bool enableFileLinkChips;
   final IanvsMarkdownWikiLinkExists? wikiLinkExists;
   final IanvsMarkdownThemeData? theme;
@@ -33,6 +35,14 @@ class IanvsMarkdownInlineLinkBuilder extends MarkdownElementBuilder {
     final sourceHref = element.attributes['href'];
     final wikiLink = element.attributes['data-ianvs-wiki-link'] == 'true';
     final tagLink = element.attributes['data-ianvs-tag'] == 'true';
+    final autolink = element.attributes['data-ianvs-autolink'] == 'true';
+    // `<www.example.com>` is not a valid angle autolink. The Obsidian parser
+    // intentionally renders it as a literal `<` plus the bare-link fallback
+    // `www.example.com>`, whose click keeps the existing source-edit path.
+    final angleWwwFallback =
+        autolink &&
+        label.toLowerCase().startsWith('www.') &&
+        label.endsWith('>');
     // Obsidian resolves both `()` and `(<>)` to the current note instead of
     // exposing an empty destination to link interaction callbacks.
     final href = !wikiLink && !tagLink && sourceHref?.isEmpty == true
@@ -67,7 +77,9 @@ class IanvsMarkdownInlineLinkBuilder extends MarkdownElementBuilder {
           : null,
       tagLink: tagLink,
       preferredStyle: effectivePreferredStyle,
-      onTapLink: onTapLink,
+      onTapLink: autolink && !angleWwwFallback
+          ? onTapAutolink ?? onTapLink
+          : onTapLink,
       enableFileLinkChips: enableFileLinkChips,
       theme: theme,
     );

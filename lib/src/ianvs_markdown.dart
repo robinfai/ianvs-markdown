@@ -46,6 +46,7 @@ class IanvsMarkdown extends StatelessWidget {
     this.styleSheetTheme = MarkdownStyleSheetBaseTheme.material,
     this.onSelectionChanged,
     this.onTapLink,
+    this.onTapAutolink,
     this.onTapText,
     this.blockSyntaxes,
     this.inlineSyntaxes,
@@ -80,6 +81,7 @@ class IanvsMarkdown extends StatelessWidget {
   final MarkdownStyleSheetBaseTheme styleSheetTheme;
   final MarkdownOnSelectionChangedCallback? onSelectionChanged;
   final MarkdownTapLinkCallback? onTapLink;
+  final MarkdownTapLinkCallback? onTapAutolink;
   final VoidCallback? onTapText;
   final List<md.BlockSyntax>? blockSyntaxes;
   final List<md.InlineSyntax>? inlineSyntaxes;
@@ -178,6 +180,7 @@ class IanvsMarkdown extends StatelessWidget {
       ),
       'a': IanvsMarkdownInlineLinkBuilder(
         onTapLink: onTapLink,
+        onTapAutolink: onTapAutolink,
         enableFileLinkChips: enableFileLinkChips,
         wikiLinkExists: wikiLinkExists,
         theme: colors,
@@ -455,6 +458,7 @@ class IanvsMarkdown extends StatelessWidget {
       styleSheetTheme: styleSheetTheme,
       onSelectionChanged: onSelectionChanged,
       onTapLink: onTapLink,
+      onTapAutolink: onTapAutolink,
       onTapText: onTapText,
       blockSyntaxes: blockSyntaxes,
       inlineSyntaxes: inlineSyntaxes,
@@ -511,6 +515,7 @@ class IanvsMarkdown extends StatelessWidget {
       ),
       styleSheetTheme: styleSheetTheme,
       onTapLink: onTapLink,
+      onTapAutolink: onTapAutolink,
       blockSyntaxes: blockSyntaxes,
       inlineSyntaxes: inlineSyntaxes,
       extensionSet: extensionSet,

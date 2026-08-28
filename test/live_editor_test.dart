@@ -586,29 +586,58 @@ void main() {
     expect(controller.text, source);
   });
 
-  testWidgets('live preview activates exact angle autolink source', (
+  testWidgets('live preview autolinks keep rendered controls on normal click', (
     tester,
   ) async {
+    const url = 'https://example.com/path?x=1#frag';
     const source =
-        'Angle <https://example.com/path?q=1#f> and <user@example.com>.';
+        'Before\n\n'
+        'Bare $url omega\n\n'
+        'Angle <$url> omega\n\n'
+        'After';
     final controller = IanvsMarkdownController(text: source);
+    String? openedHref;
     addTearDown(controller.dispose);
-    await tester.pumpWidget(app(controller));
-    await tester.pumpAndSettle();
-
-    expect(find.text('https://example.com/path?q=1#f'), findsOneWidget);
-    expect(find.text('user@example.com'), findsOneWidget);
-    expect(controller.text, source);
-
-    await tester.tap(find.text('https://example.com/path?q=1#f'));
-    await tester.pumpAndSettle();
-
-    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
-    final field = tester.widget<TextField>(
-      find.descendant(of: active, matching: find.byType(TextField)),
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1000,
+            height: 720,
+            child: IanvsMarkdownLiveEditor(
+              controller: controller,
+              onTapLink: (text, href, title) => openedHref = href,
+            ),
+          ),
+        ),
+      ),
     );
-    expect(field.controller?.text, source);
+    await tester.pumpAndSettle();
+
+    final links = find.text(url);
+    expect(links, findsNWidgets(2));
+    expect(find.text('<$url>'), findsNothing);
+
+    for (final link in <Finder>[links.first, links.last]) {
+      for (var tapCount = 1; tapCount <= 3; tapCount += 1) {
+        await tester.tap(link);
+        await tester.pump(const Duration(milliseconds: 100));
+
+        expect(
+          find.byKey(const ValueKey('ianvs-markdown-active-block')),
+          findsNothing,
+          reason: 'tap $tapCount on ${link == links.first ? 'bare' : 'angle'}',
+        );
+        expect(openedHref, isNull);
+      }
+      await tester.pumpAndSettle();
+    }
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyQ);
+    await tester.pump();
+
     expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
   });
 
   testWidgets('ordinary active rail follows only the caret line', (
