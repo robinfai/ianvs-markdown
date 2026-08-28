@@ -8598,6 +8598,50 @@ Standard[^note] and inline ^[inline body].
     expect(controller.isDirty, isFalse);
   });
 
+  testWidgets('comment clicks preserve Obsidian source selections', (
+    tester,
+  ) async {
+    const comment = '%%secret words%%';
+    const source = 'Before $comment after.';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final metadata = find.text(comment);
+    final paragraph = tester.renderObject<RenderParagraph>(
+      find.descendant(of: metadata, matching: find.byType(RichText)),
+    );
+    const metadataOffset = 9;
+    final caret = paragraph.getOffsetForCaret(
+      const TextPosition(offset: metadataOffset),
+      Rect.zero,
+    );
+    final target = paragraph.localToGlobal(
+      caret + Offset(.1, paragraph.size.height / 2),
+    );
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(controller.selection.isCollapsed, isTrue);
+    expect(
+      controller.selection.extentOffset,
+      source.indexOf(comment) + metadataOffset,
+    );
+
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(controller.selection.textInside(source), 'words');
+
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(controller.selection.textInside(source), source);
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('live preview keeps a soft-line block ID candidate literal', (
     tester,
   ) async {
