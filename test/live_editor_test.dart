@@ -1143,6 +1143,45 @@ void main() {
     expect(controller.isDirty, isFalse);
   });
 
+  testWidgets('ArrowDown stays at a collapsed heading at document end', (
+    tester,
+  ) async {
+    const source = '# Heading\nBody';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('折叠标题内容'));
+    await tester.pumpAndSettle();
+    expect(find.text('Body'), findsNothing);
+
+    await tester.tap(find.text('Heading'));
+    await tester.pump();
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    var field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    field.controller?.selection = TextSelection.collapsed(
+      offset: field.controller!.text.length,
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+
+    expect(active, findsOneWidget);
+    field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, '# Heading');
+    expect(field.controller?.selection.extentOffset, '# Heading'.length);
+    expect(field.focusNode?.hasFocus, isTrue);
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets(
     'shift vertical arrows select across blocks at the visual column',
     (tester) async {

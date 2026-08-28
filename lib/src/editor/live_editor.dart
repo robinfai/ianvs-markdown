@@ -1416,6 +1416,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       if (nextIndex != null && nextIndex > blockIndex + 1) {
         return _verticalTargetInBlock(_blocks[nextIndex], atStart: true);
       }
+      if (nextIndex == null && blockIndex + 1 < _blocks.length) return null;
       final gapEnd = next?.start ?? source.length;
       final firstGapLineStart = block.end + 1;
       if (firstGapLineStart < gapEnd) {
@@ -1659,6 +1660,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       final next = nextIndex == null ? null : _blocks[nextIndex];
       if (nextIndex != null && nextIndex > activeIndex + 1) {
         _activateBlockVertically(_blocks[nextIndex], atStart: true);
+        return KeyEventResult.handled;
+      }
+      if (nextIndex == null && activeIndex + 1 < _blocks.length) {
         return KeyEventResult.handled;
       }
       final gapEnd = next?.start ?? widget.controller.text.length;
