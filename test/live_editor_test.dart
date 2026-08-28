@@ -44,6 +44,21 @@ void main() {
     return editable!;
   }
 
+  Finder selectableTextWithPlainText(String text) => find.byWidgetPredicate(
+    (widget) =>
+        widget is SelectableText &&
+        (widget.data ?? widget.textSpan?.toPlainText()) == text,
+  );
+
+  Finder selectableTextContainingPlainText(String text) =>
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is SelectableText &&
+            (widget.data ?? widget.textSpan?.toPlainText() ?? '').contains(
+              text,
+            ),
+      );
+
   testWidgets('clicking a rendered block edits its exact source in place', (
     tester,
   ) async {
@@ -8581,7 +8596,7 @@ Standard[^note] and inline ^[inline body].
     await tester.pumpAndSettle();
 
     expect(find.text('%%secret%%'), findsOneWidget);
-    expect(find.text(' ^block-id'), findsOneWidget);
+    expect(selectableTextContainingPlainText('^block-id'), findsOneWidget);
     expect(find.text('[^note]'), findsOneWidget);
     expect(find.text('^[inline body]'), findsOneWidget);
     expect(find.text('1.'), findsNothing);
@@ -8831,8 +8846,9 @@ Standard[^note] and inline ^[inline body].
     await tester.pumpWidget(app(controller));
     await tester.pumpAndSettle();
 
-    expect(find.text('^paragraph_id'), findsOneWidget);
-    await tester.tap(find.text('^paragraph_id'));
+    final paragraphId = selectableTextWithPlainText('^paragraph_id');
+    expect(paragraphId, findsOneWidget);
+    await tester.tap(paragraphId);
     await tester.pump();
 
     final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
@@ -8841,7 +8857,7 @@ Standard[^note] and inline ^[inline body].
     );
     expect(field.controller?.text, paragraphBlock);
 
-    await tester.tap(find.text('^heading_id'));
+    await tester.tap(selectableTextWithPlainText('^heading_id'));
     await tester.pump();
     field = tester.widget<TextField>(
       find.descendant(of: active, matching: find.byType(TextField)),
@@ -8859,18 +8875,15 @@ Standard[^note] and inline ^[inline body].
     await tester.pumpWidget(app(controller));
     await tester.pumpAndSettle();
 
-    final metadata = find.text(' ^paragraph-id');
-    final paragraph = tester.renderObject<RenderParagraph>(
-      find.descendant(of: metadata, matching: find.byType(RichText)),
+    final paragraph = editableWithin(
+      tester,
+      selectableTextWithPlainText('Paragraph end ^paragraph-id'),
     );
     const metadataOffset = 6;
-    final caret = paragraph.getOffsetForCaret(
-      const TextPosition(offset: metadataOffset),
-      Rect.zero,
+    final caret = paragraph.getLocalRectForCaret(
+      const TextPosition(offset: 13 + metadataOffset),
     );
-    final target = paragraph.localToGlobal(
-      caret + Offset(.1, paragraph.size.height / 2),
-    );
+    final target = paragraph.localToGlobal(caret.center);
     await tester.tapAt(target);
     await tester.pump(const Duration(milliseconds: 100));
 
@@ -8890,6 +8903,69 @@ Standard[^note] and inline ^[inline body].
       controller.selection.textInside(source),
       'Paragraph end ^paragraph-id',
     );
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
+  testWidgets('block ID hides its caret without shifting source clicks', (
+    tester,
+  ) async {
+    const source = 'Before\n\nAlpha bravo ^probe-id\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    Finder paragraphFinder() => find.byWidgetPredicate(
+      (widget) =>
+          widget is SelectableText &&
+          (widget.data ?? widget.textSpan?.toPlainText()) ==
+              'Alpha bravo ^probe-id',
+    );
+    TextSpan hiddenCaret(SelectableText text) =>
+        _textSpanLeaves(text.textSpan!).singleWhere((span) => span.text == '^');
+
+    var caret = hiddenCaret(tester.widget<SelectableText>(paragraphFinder()));
+    expect(caret.style?.fontSize, 0);
+    expect(caret.style?.color, Colors.transparent);
+
+    var editable = editableWithin(tester, paragraphFinder());
+    var target = editable.localToGlobal(
+      editable.getLocalRectForCaret(const TextPosition(offset: 10)).center,
+    );
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(controller.selection.isCollapsed, isTrue);
+    expect(controller.selection.extentOffset, 18);
+    var active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    var fieldFinder = find.descendant(
+      of: active,
+      matching: find.byType(TextField),
+    );
+    var field = tester.widget<TextField>(fieldFinder);
+    caret = _textSpanLeaves(
+      field.controller!.buildTextSpan(
+        context: tester.element(fieldFinder),
+        style: field.style,
+        withComposing: false,
+      ),
+    ).singleWhere((span) => span.text == '^');
+    expect(caret.style?.fontSize, 0);
+    expect(caret.style?.color, Colors.transparent);
+
+    await tester.tap(find.text('After'));
+    await tester.pumpAndSettle();
+    editable = editableWithin(tester, paragraphFinder());
+    final idCaret = editable.getLocalRectForCaret(
+      const TextPosition(offset: 18),
+    );
+    target = editable.localToGlobal(idCaret.center);
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(controller.selection.isCollapsed, isTrue);
+    expect(controller.selection.extentOffset, 26);
     expect(controller.text, source);
     expect(controller.isDirty, isFalse);
   });
@@ -8950,7 +9026,7 @@ Standard[^note] and inline ^[inline body].
     await tester.pumpAndSettle();
 
     expect(find.textContaining('^soft-id'), findsOneWidget);
-    expect(find.text(' ^final-id'), findsOneWidget);
+    expect(selectableTextWithPlainText('Final ^final-id'), findsOneWidget);
 
     await tester.tap(find.textContaining('^soft-id'));
     await tester.pump();

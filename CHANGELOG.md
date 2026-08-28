@@ -25,6 +25,9 @@
 - Keep trailing and table-cell-shaped `^block-id` text literal inside inline,
   fenced, and true indented code blocks across Reading, source styling, and
   Live Preview.
+- Collapse the leading `^` of valid block IDs in inactive and active Live
+  Preview while keeping the identifier visible and preserving the complete
+  source character in exact caret, word, and physical-line selections.
 - Prevent comment-shaped text inside inline, fenced, or indented code from
   prematurely closing an outer Obsidian comment; source styling and Reading
   now consume the complete outer range.

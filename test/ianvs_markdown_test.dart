@@ -3619,7 +3619,7 @@ Standard[^standard] and inline ^[inline footnote body].
 
     expect(find.text('%%inline secret%%'), findsOneWidget);
     expect(find.text('%%second secret%%'), findsOneWidget);
-    expect(find.text(' ^probe-block'), findsOneWidget);
+    expect(_renderedPlainTextContains(tester, ' ^probe-block'), isTrue);
     expect(find.text('[^standard]'), findsOneWidget);
     expect(find.text('^[inline footnote body]'), findsOneWidget);
     expect(find.text('[^standard]: Definition source.'), findsOneWidget);
@@ -4010,9 +4010,9 @@ fenced ^fence-id
       ),
     );
 
-    expect(find.text(' ^under_score'), findsOneWidget);
-    expect(find.text(' ^space-id'), findsOneWidget);
-    expect(find.text('^standalone-id'), findsOneWidget);
+    expect(_renderedPlainTextContains(tester, ' ^under_score'), isTrue);
+    expect(_renderedPlainTextContains(tester, ' ^space-id'), isTrue);
+    expect(_renderedPlainTextContains(tester, '^standalone-id'), isTrue);
   });
 
   testWidgets('editing mode subdues a block ID inside a table cell', (
@@ -4030,9 +4030,9 @@ fenced ^fence-id
       ),
     );
 
-    final metadata = tester.widget<Text>(find.text('^table_id'));
-    expect(metadata.style?.fontFamily, isNotNull);
-    expect(metadata.style?.color, isNotNull);
+    final metadataStyle = _renderedTextStyle(tester, 'table_id');
+    expect(metadataStyle?.fontFamily, isNotNull);
+    expect(metadataStyle?.color, isNotNull);
   });
 
   test('Obsidian preprocessing expands empty and nested inline footnotes', () {
@@ -5132,6 +5132,42 @@ bool _renderedPlainTextContains(WidgetTester tester, String text) {
                 widget.data?.contains(text) ??
                 false,
           );
+}
+
+TextStyle? _renderedTextStyle(WidgetTester tester, String text) {
+  TextStyle? findStyle(
+    InlineSpan span, [
+    TextStyle inherited = const TextStyle(),
+  ]) {
+    if (span is! TextSpan) return null;
+    final style = inherited.merge(span.style);
+    if (span.text?.contains(text) ?? false) return style;
+    for (final child in span.children ?? const <InlineSpan>[]) {
+      final childStyle = findStyle(child, style);
+      if (childStyle != null) return childStyle;
+    }
+    return null;
+  }
+
+  for (final widget in tester.widgetList<RichText>(find.byType(RichText))) {
+    final style = findStyle(widget.text);
+    if (style != null) return style;
+  }
+  for (final widget in tester.widgetList<Text>(find.byType(Text))) {
+    final span = widget.textSpan;
+    if (span == null) continue;
+    final style = findStyle(span);
+    if (style != null) return style;
+  }
+  for (final widget in tester.widgetList<SelectableText>(
+    find.byType(SelectableText),
+  )) {
+    final span = widget.textSpan;
+    if (span == null) continue;
+    final style = findStyle(span);
+    if (style != null) return style;
+  }
+  return null;
 }
 
 bool _textSpanContainsColor(InlineSpan span, Color color) {

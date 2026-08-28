@@ -3622,19 +3622,22 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     _blockController.hiddenLeadingCharacters = revealHiddenMarker
         ? 0
         : hiddenMarkerEnd;
-    _blockController.hiddenMarkerRanges = quoteMarker != null && !callout
-        ? _hiddenQuoteMarkerRanges(quoteLines, activeSelection.extentOffset)
-        : setextUnderline != null
-        ? <_HiddenMarkerSpan>[
-            _HiddenMarkerSpan(
-              TextRange(
-                start: block.source.lastIndexOf('\n'),
-                end: block.source.length,
-              ),
-              _collapsedGapPrefixStyle,
-            ),
-          ]
-        : const <_HiddenMarkerSpan>[];
+    final hiddenMarkerRanges = <_HiddenMarkerSpan>[
+      if (quoteMarker != null && !callout)
+        ..._hiddenQuoteMarkerRanges(quoteLines, activeSelection.extentOffset)
+      else if (setextUnderline != null)
+        _HiddenMarkerSpan(
+          TextRange(
+            start: block.source.lastIndexOf('\n'),
+            end: block.source.length,
+          ),
+          _collapsedGapPrefixStyle,
+        ),
+      ..._hiddenBlockIdCaretRanges(block.source),
+    ]..sort((a, b) => a.range.start.compareTo(b.range.start));
+    _blockController.hiddenMarkerRanges = List<_HiddenMarkerSpan>.unmodifiable(
+      hiddenMarkerRanges,
+    );
     var activeTextStyle = _isEmptyAtxHeadingSource(block.source)
         ? (styleSheet.p ?? const TextStyle(fontSize: 14.5, height: 1.58))
               .copyWith(color: colors.textPrimary)
@@ -7494,6 +7497,21 @@ final class _HiddenMarkerSpan {
 
   final TextRange range;
   final TextStyle style;
+}
+
+List<_HiddenMarkerSpan> _hiddenBlockIdCaretRanges(String source) {
+  final hidden = <_HiddenMarkerSpan>[];
+  for (final range in ianvsMarkdownBlockIdRanges(source)) {
+    final caret = source.indexOf('^', range.start);
+    if (caret < range.start || caret >= range.end) continue;
+    hidden.add(
+      _HiddenMarkerSpan(
+        TextRange(start: caret, end: caret + 1),
+        _collapsedGapPrefixStyle,
+      ),
+    );
+  }
+  return List<_HiddenMarkerSpan>.unmodifiable(hidden);
 }
 
 List<_QuoteLineLayout> _quoteLineLayouts(String source) {

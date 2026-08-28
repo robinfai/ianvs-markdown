@@ -748,19 +748,48 @@ final class IanvsMarkdownEditingMetadataBuilder extends MarkdownElementBuilder {
   ) {
     final colors = IanvsMarkdownThemeData.resolve(context, theme);
     final kind = element.attributes['kind'] ?? 'metadata';
-    final text = Text(
-      element.textContent,
-      semanticsLabel: 'Obsidian $kind editing metadata',
-      style: (parentStyle ?? preferredStyle ?? const TextStyle()).copyWith(
-        color: colors.textTertiary,
-        fontFamily: colors.monoFontFamily,
-        fontFamilyFallback: colors.monoFontFamilyFallback,
-        height: 1.45,
-      ),
+    final content = element.textContent;
+    final style = (parentStyle ?? preferredStyle ?? const TextStyle()).copyWith(
+      color: colors.textTertiary,
+      fontFamily: colors.monoFontFamily,
+      fontFamilyFallback: colors.monoFontFamilyFallback,
+      height: 1.45,
     );
+    final blockIdCaret = kind == 'block-id' ? content.indexOf('^') : -1;
+    final text = blockIdCaret < 0
+        ? Text(
+            content,
+            semanticsLabel: 'Obsidian $kind editing metadata',
+            style: style,
+          )
+        : Text.rich(
+            TextSpan(
+              children: <InlineSpan>[
+                if (blockIdCaret > 0)
+                  TextSpan(
+                    text: content.substring(0, blockIdCaret),
+                    style: style,
+                  ),
+                const TextSpan(text: '^', style: _hiddenBlockIdCaretStyle),
+                if (blockIdCaret + 1 < content.length)
+                  TextSpan(
+                    text: content.substring(blockIdCaret + 1),
+                    style: style,
+                  ),
+              ],
+            ),
+            semanticsLabel: 'Obsidian $kind editing metadata',
+          );
     return block ? Align(alignment: Alignment.centerLeft, child: text) : text;
   }
 }
+
+const TextStyle _hiddenBlockIdCaretStyle = TextStyle(
+  color: Colors.transparent,
+  fontSize: 0,
+  height: 0,
+  letterSpacing: 0,
+);
 
 /// Renders Reading-mode footnote references with Obsidian occurrence labels.
 ///
