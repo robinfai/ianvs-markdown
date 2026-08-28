@@ -6010,6 +6010,79 @@ Body
     expect(controller.text, expected);
   });
 
+  testWidgets('pending text does not overwrite the same external property', (
+    tester,
+  ) async {
+    const source = '''
+---
+title: A
+---
+Body
+''';
+    const updated = '''
+---
+title: External
+---
+Body
+''';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final input = find.byKey(
+      const ValueKey('ianvs-markdown-front-matter-input-title'),
+    );
+    await tester.tap(input);
+    await tester.enterText(input, 'Local');
+    controller.text = updated;
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+
+    expect(controller.text, updated);
+    expect(tester.widget<TextField>(input).controller?.text, 'External');
+  });
+
+  testWidgets('pending text preserves an unrelated external property', (
+    tester,
+  ) async {
+    const source = '''
+---
+title: A
+---
+Body
+''';
+    const updated = '''
+---
+title: A
+other: x
+---
+Body
+''';
+    const expected = '''
+---
+title: Local
+other: x
+---
+Body
+''';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final input = find.byKey(
+      const ValueKey('ianvs-markdown-front-matter-input-title'),
+    );
+    await tester.tap(input);
+    await tester.enterText(input, 'Local');
+    controller.text = updated;
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+
+    expect(controller.text, expected);
+  });
+
   testWidgets('lossy typed tag lists remain presentation-only', (tester) async {
     const source = '''
 ---

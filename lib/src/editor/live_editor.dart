@@ -3731,7 +3731,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     String value,
   ) {
     final target = _currentFrontMatterTarget(block, entry);
-    if (target == null) return;
+    if (target == null || !_canReplayFrontMatterEntry(entry, target.entry)) {
+      return;
+    }
     final replacement = replaceMarkdownFrontMatterTextValue(
       target.block.source,
       target.entry,
@@ -3747,7 +3749,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     bool value,
   ) {
     final target = _currentFrontMatterTarget(block, entry);
-    if (target == null) return;
+    if (target == null || !_canReplayFrontMatterEntry(entry, target.entry)) {
+      return;
+    }
     final replacement = replaceMarkdownFrontMatterBooleanValue(
       target.block.source,
       target.entry,
@@ -3763,7 +3767,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     num value,
   ) {
     final target = _currentFrontMatterTarget(block, entry);
-    if (target == null) return;
+    if (target == null || !_canReplayFrontMatterEntry(entry, target.entry)) {
+      return;
+    }
     final replacement = replaceMarkdownFrontMatterNumberValue(
       target.block.source,
       target.entry,
@@ -3779,7 +3785,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     String value,
   ) {
     final target = _currentFrontMatterTarget(block, entry);
-    if (target == null) return;
+    if (target == null || !_canReplayFrontMatterEntry(entry, target.entry)) {
+      return;
+    }
     final replacement = replaceMarkdownFrontMatterDateValue(
       target.block.source,
       target.entry,
@@ -3872,7 +3880,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     String key,
   ) {
     final target = _currentFrontMatterTarget(block, entry);
-    if (target == null) return;
+    if (target == null || !_canReplayFrontMatterEntry(entry, target.entry)) {
+      return;
+    }
     final replacement = replaceMarkdownFrontMatterKey(
       target.block.source,
       target.entry,
@@ -3880,6 +3890,16 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     );
     if (replacement == target.block.source) return;
     _replaceBlockSource(target.block, replacement);
+  }
+
+  bool _canReplayFrontMatterEntry(
+    MarkdownMetadataEntry base,
+    MarkdownMetadataEntry current,
+  ) {
+    return identical(base, current) ||
+        (base.type == current.type &&
+            base.value == current.value &&
+            listEquals(base.items, current.items));
   }
 
   ({IanvsMarkdownBlock block, MarkdownMetadataEntry entry})?
