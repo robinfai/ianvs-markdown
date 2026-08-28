@@ -1216,6 +1216,352 @@ void main() {
   });
 
   testWidgets(
+    'shift right crosses a folded heading without selecting hidden source',
+    (tester) async {
+      const source = '# Heading\nBody one two\n# Tail';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('折叠标题内容'));
+      await tester.pumpAndSettle();
+      expect(find.text('Body one two'), findsNothing);
+
+      await tester.tap(find.text('Heading'));
+      await tester.pump();
+      final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+      var field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      field.controller?.selection = TextSelection.collapsed(
+        offset: field.controller!.text.length,
+      );
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.pumpAndSettle();
+
+      field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      expect(field.controller?.text, '# Tail');
+      expect(
+        field.controller?.selection,
+        const TextSelection.collapsed(offset: 0),
+      );
+      expect(controller.selection, const TextSelection.collapsed(offset: 23));
+      expect(find.text('Body one two'), findsNothing);
+
+      field.controller?.value = const TextEditingValue(
+        text: 'X# Tail',
+        selection: TextSelection.collapsed(offset: 1),
+      );
+      await tester.pumpAndSettle();
+
+      expect(controller.text, '# Heading\nBody one two\nX# Tail');
+    },
+  );
+
+  testWidgets(
+    'folded shift selection copies visible text and replaces only its source',
+    (tester) async {
+      const source = '# Heading\nBody one two\n# Tail';
+      String? copied;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (methodCall) async {
+          if (methodCall.method == 'Clipboard.setData') {
+            copied =
+                (methodCall.arguments as Map<Object?, Object?>)['text']
+                    as String?;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('折叠标题内容'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Heading'));
+      await tester.pump();
+      final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+      var field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      field.controller?.selection = TextSelection.collapsed(
+        offset: field.controller!.text.length,
+      );
+
+      Future<void> shiftRight() async {
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+        await tester.pumpAndSettle();
+      }
+
+      await shiftRight();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pump();
+      expect(copied, '\n');
+
+      await shiftRight();
+      field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      expect(
+        field.controller?.selection,
+        const TextSelection(baseOffset: 0, extentOffset: 1),
+      );
+      expect(
+        controller.selection,
+        const TextSelection(baseOffset: 23, extentOffset: 24),
+      );
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pump();
+      expect(copied, '\n#');
+
+      field.controller?.value = const TextEditingValue(
+        text: 'X Tail',
+        selection: TextSelection.collapsed(offset: 1),
+      );
+      await tester.pumpAndSettle();
+
+      expect(controller.text, '# Heading\nBody one two\nX Tail');
+    },
+  );
+
+  testWidgets(
+    'reverse folded shift selection preserves its virtual first step',
+    (tester) async {
+      const source = '# Heading\nBody one two\n# Tail';
+      String? copied;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (methodCall) async {
+          if (methodCall.method == 'Clipboard.setData') {
+            copied =
+                (methodCall.arguments as Map<Object?, Object?>)['text']
+                    as String?;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('折叠标题内容'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Tail'));
+      await tester.pump();
+      final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+      var field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      field.controller?.selection = const TextSelection.collapsed(offset: 0);
+
+      Future<void> shiftLeft() async {
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+        await tester.pumpAndSettle();
+      }
+
+      await shiftLeft();
+      field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      expect(field.controller?.text, '# Tail');
+      expect(
+        field.controller?.selection,
+        const TextSelection.collapsed(offset: 0),
+      );
+      expect(controller.selection, const TextSelection.collapsed(offset: 23));
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pump();
+      expect(copied, '\n');
+
+      await shiftLeft();
+      field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      expect(field.controller?.text, '# Heading\nBody one two\n');
+      expect(
+        controller.selection,
+        const TextSelection(
+          baseOffset: 23,
+          extentOffset: 9,
+          isDirectional: true,
+        ),
+      );
+      expect(
+        controller.selection.textInside(controller.text),
+        '\nBody one two\n',
+      );
+
+      field.controller?.value = const TextEditingValue(
+        text: '# HeadingX',
+        selection: TextSelection.collapsed(offset: 10),
+      );
+      await tester.pumpAndSettle();
+
+      expect(controller.text, '# HeadingX# Tail');
+    },
+  );
+
+  testWidgets(
+    'forward Shift Option skips folded source and selects visible punctuation',
+    (tester) async {
+      const source = '# Heading\nBody one two\n# Tail';
+      String? copied;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (methodCall) async {
+          if (methodCall.method == 'Clipboard.setData') {
+            copied =
+                (methodCall.arguments as Map<Object?, Object?>)['text']
+                    as String?;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('折叠标题内容'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Heading'));
+      await tester.pump();
+      final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+      var field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      field.controller?.selection = TextSelection.collapsed(
+        offset: field.controller!.text.length,
+      );
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.pumpAndSettle();
+
+      field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      expect(field.controller?.text, '# Tail');
+      expect(
+        field.controller?.selection,
+        const TextSelection(
+          baseOffset: 0,
+          extentOffset: 1,
+          isDirectional: true,
+        ),
+      );
+      expect(
+        controller.selection,
+        const TextSelection(
+          baseOffset: 23,
+          extentOffset: 24,
+          isDirectional: true,
+        ),
+      );
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pump();
+      expect(copied, '\n#');
+
+      field.controller?.value = const TextEditingValue(
+        text: 'X Tail',
+        selection: TextSelection.collapsed(offset: 1),
+      );
+      await tester.pumpAndSettle();
+      expect(controller.text, '# Heading\nBody one two\nX Tail');
+    },
+  );
+
+  testWidgets('reverse Shift Option selects the folded source range', (
+    tester,
+  ) async {
+    const source = '# Heading\nBody one two\n# Tail';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('折叠标题内容'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tail'));
+    await tester.pump();
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    var field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    field.controller?.selection = const TextSelection.collapsed(offset: 0);
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.pumpAndSettle();
+
+    field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, '# Heading\nBody one two\n');
+    expect(
+      controller.selection,
+      const TextSelection(baseOffset: 23, extentOffset: 9, isDirectional: true),
+    );
+    expect(
+      controller.selection.textInside(controller.text),
+      '\nBody one two\n',
+    );
+
+    field.controller?.value = const TextEditingValue(
+      text: '# HeadingX',
+      selection: TextSelection.collapsed(offset: 10),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.text, '# HeadingX# Tail');
+  });
+
+  testWidgets(
     'shift vertical arrows select across blocks at the visual column',
     (tester) async {
       const source = 'abc\n\n123456\n\nxy';

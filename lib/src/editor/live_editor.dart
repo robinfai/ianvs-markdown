@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui' show BoxHeightStyle, PointerDeviceKind;
 
 import 'package:flutter/foundation.dart';
@@ -39,6 +40,18 @@ import 'reference_links.dart';
 import 'source_editor.dart';
 
 enum _RenderedTapSelection { caret, word, line }
+
+class _FoldedSelectionBridge {
+  const _FoldedSelectionBridge({
+    required this.originBlockStart,
+    required this.targetBlockStart,
+    required this.forward,
+  });
+
+  final int originBlockStart;
+  final int targetBlockStart;
+  final bool forward;
+}
 
 /// Obsidian-style Markdown editor with live, source, and reading modes.
 ///
@@ -174,6 +187,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   var _documentDragUpdateScheduled = false;
   var _documentDragExpansionAttempts = 0;
   var _documentDragEpoch = 0;
+  _FoldedSelectionBridge? _foldedSelectionBridge;
 
   bool get _ownsFocusNode => widget.focusNode == null;
   bool get _ownsScrollController => widget.scrollController == null;
@@ -210,6 +224,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       _refreshBlocks(_lastText);
       _activeBlockStart = null;
       _activeGapLine = false;
+      _foldedSelectionBridge = null;
       _blockController.revealLeadingMarker = false;
       widget.controller.addListener(_handleDocumentChanged);
       widget.controller.modeListenable.addListener(_handleModeChanged);
@@ -232,6 +247,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       _resetDocumentDragSelection();
       _activeBlockStart = null;
       _activeGapLine = false;
+      _foldedSelectionBridge = null;
       _blockController.revealLeadingMarker = false;
     }
     widget.onModeChanged?.call(next);
@@ -368,6 +384,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   }
 
   void _handleHeadingFoldsChanged() {
+    _foldedSelectionBridge = null;
     if (mounted) setState(() {});
   }
 
@@ -423,6 +440,10 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
 
   void _handleBlockChanged() {
     if (_syncingToBlock || _activeBlockStart == null) return;
+    final bridge = _foldedSelectionBridge;
+    if (bridge != null && !_foldedSelectionBridgeIsActive(bridge)) {
+      _foldedSelectionBridge = null;
+    }
     final document = widget.controller.value;
     final start = _editingStart.clamp(0, document.text.length);
     final end = _editingEnd.clamp(start, document.text.length);
@@ -638,6 +659,13 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         !hasShiftModifier) {
       widget.controller.redo();
       return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.keyC &&
+        !hasAltModifier &&
+        (hasMetaModifier || hasControlModifier) &&
+        !hasShiftModifier) {
+      final result = _handleFoldedSelectionCopy();
+      if (result == KeyEventResult.handled) return result;
     }
     if (key == LogicalKeyboardKey.keyK &&
         Theme.of(context).platform == TargetPlatform.macOS &&
@@ -1111,6 +1139,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   KeyEventResult _handleSelectAllDocument() {
     final source = widget.controller.text;
     if (source.isEmpty) return KeyEventResult.ignored;
+    _foldedSelectionBridge = null;
     final selection = TextSelection(
       baseOffset: 0,
       extentOffset: source.length,
@@ -1295,6 +1324,14 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       documentSelection.extentOffset,
       forward: forward,
     );
+    if (extendSelection) {
+      final foldedResult = _handleFoldedWordSelection(
+        documentSelection,
+        wordTarget,
+        forward: forward,
+      );
+      if (foldedResult != null) return foldedResult;
+    }
     final target = extendSelection
         ? wordTarget
         : _projectFoldedCaretTarget(wordTarget, forward: forward);
@@ -1321,7 +1358,61 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     return KeyEventResult.handled;
   }
 
+  KeyEventResult? _handleFoldedWordSelection(
+    TextSelection documentSelection,
+    int wordTarget, {
+    required bool forward,
+  }) {
+    if (!widget.enableHeadingFolding) return null;
+    final hidden = _headingFoldModel.hiddenBlockIndices(_headingFoldController);
+    final targetIndex = _verticalBlockIndexAt(wordTarget);
+    if (targetIndex < 0 || !hidden.contains(targetIndex)) return null;
+
+    final activeIndex = _blocks.indexWhere(
+      (block) => block.start == _activeBlockStart,
+    );
+    if (activeIndex < 0) return KeyEventResult.handled;
+    final visibleIndex = _adjacentVisibleBlockIndex(
+      targetIndex,
+      forward: forward,
+    );
+    if (visibleIndex == null) return KeyEventResult.handled;
+    final visible = _blocks[visibleIndex];
+
+    if (forward) {
+      final localTarget = _documentWordBoundary(
+        visible.source,
+        0,
+        forward: true,
+      );
+      _activateBlockHorizontally(visible, localOffset: 0);
+      _foldedSelectionBridge = _FoldedSelectionBridge(
+        originBlockStart: _blocks[activeIndex].start,
+        targetBlockStart: visible.start,
+        forward: true,
+      );
+      _blockController.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: localTarget,
+        isDirectional: true,
+      );
+      return KeyEventResult.handled;
+    }
+
+    final selection = TextSelection(
+      baseOffset: documentSelection.baseOffset,
+      extentOffset: visible.end,
+      affinity: documentSelection.affinity,
+      isDirectional: true,
+    );
+    final surface = _selectionSurfaceFor(selection);
+    _foldedSelectionBridge = null;
+    if (surface != null) _activateSelectionSurface(selection, surface);
+    return KeyEventResult.handled;
+  }
+
   KeyEventResult _handleVerticalSelection({required bool down}) {
+    _foldedSelectionBridge = null;
     final localSelection = _blockController.selection;
     if (!localSelection.isValid) return KeyEventResult.ignored;
 
@@ -1534,8 +1625,141 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     );
   }
 
+  KeyEventResult _handleFoldedSelectionCopy() {
+    final bridge = _foldedSelectionBridge;
+    if (bridge == null) return KeyEventResult.ignored;
+    if (!_foldedSelectionBridgeIsActive(bridge)) {
+      _foldedSelectionBridge = null;
+      return KeyEventResult.ignored;
+    }
+
+    final localSelection = _blockController.selection;
+    final selected = localSelection.textInside(_blockController.text);
+    final copied = bridge.forward ? '\n$selected' : '$selected\n';
+    unawaited(Clipboard.setData(ClipboardData(text: copied)));
+    return KeyEventResult.handled;
+  }
+
+  bool _foldedSelectionBridgeIsActive(_FoldedSelectionBridge bridge) {
+    final activeStart = bridge.forward
+        ? bridge.targetBlockStart
+        : bridge.originBlockStart;
+    if (_activeBlockStart != activeStart) return false;
+    final activeIndex = _blocks.indexWhere(
+      (block) => block.start == activeStart,
+    );
+    final targetIndex = _blocks.indexWhere(
+      (block) => block.start == bridge.targetBlockStart,
+    );
+    final originIndex = _blocks.indexWhere(
+      (block) => block.start == bridge.originBlockStart,
+    );
+    if (activeIndex < 0 || targetIndex < 0 || originIndex < 0) return false;
+    final active = _blocks[activeIndex];
+    if (_blockController.text != active.source) return false;
+    final selection = _blockController.selection;
+    if (!selection.isValid) return false;
+    if (selection.baseOffset != 0) return false;
+    if (!bridge.forward && !selection.isCollapsed) return false;
+
+    final hidden = _headingFoldModel.hiddenBlockIndices(_headingFoldController);
+    final first = math.min(originIndex, targetIndex) + 1;
+    final last = math.max(originIndex, targetIndex);
+    return first < last &&
+        Iterable<int>.generate(
+          last - first,
+          (offset) => first + offset,
+        ).any(hidden.contains);
+  }
+
+  KeyEventResult? _handleFoldedHorizontalSelectionTransition({
+    required bool right,
+  }) {
+    final selection = _blockController.selection;
+    final bridge = _foldedSelectionBridge;
+    if (bridge != null) {
+      if (!_foldedSelectionBridgeIsActive(bridge)) {
+        _foldedSelectionBridge = null;
+      } else {
+        if (!right && !bridge.forward) {
+          final originIndex = _blocks.indexWhere(
+            (block) => block.start == bridge.originBlockStart,
+          );
+          final targetIndex = _blocks.indexWhere(
+            (block) => block.start == bridge.targetBlockStart,
+          );
+          if (originIndex < 0 || targetIndex < 0) {
+            _foldedSelectionBridge = null;
+            return KeyEventResult.handled;
+          }
+          final documentSelection = TextSelection(
+            baseOffset: _blocks[originIndex].start,
+            extentOffset: _blocks[targetIndex].end,
+            isDirectional: true,
+          );
+          final surface = _selectionSurfaceFor(documentSelection);
+          _foldedSelectionBridge = null;
+          if (surface == null) return KeyEventResult.handled;
+          _activateSelectionSurface(documentSelection, surface);
+          return KeyEventResult.handled;
+        }
+        if (right != bridge.forward) {
+          if (!bridge.forward) {
+            _foldedSelectionBridge = null;
+            return KeyEventResult.handled;
+          }
+          final originIndex = _blocks.indexWhere(
+            (block) => block.start == bridge.originBlockStart,
+          );
+          if (originIndex < 0) return KeyEventResult.handled;
+          final origin = _blocks[originIndex];
+          _foldedSelectionBridge = null;
+          _activateBlockHorizontally(
+            origin,
+            localOffset: bridge.forward ? origin.source.length : 0,
+          );
+          return KeyEventResult.handled;
+        }
+      }
+    }
+
+    if (!selection.isCollapsed) return null;
+    final activeIndex = _blocks.indexWhere(
+      (block) => block.start == _activeBlockStart,
+    );
+    if (activeIndex < 0) return null;
+    final boundary = right ? _blockController.text.length : 0;
+    if (selection.extentOffset != boundary) return null;
+    final visibleIndex = _adjacentVisibleBlockIndex(
+      activeIndex,
+      forward: right,
+    );
+    if (visibleIndex == null ||
+        (right
+            ? visibleIndex <= activeIndex + 1
+            : visibleIndex >= activeIndex - 1)) {
+      return null;
+    }
+
+    final origin = _blocks[activeIndex];
+    final target = _blocks[visibleIndex];
+    if (right) {
+      _activateBlockHorizontally(target, localOffset: 0);
+    }
+    _foldedSelectionBridge = _FoldedSelectionBridge(
+      originBlockStart: origin.start,
+      targetBlockStart: target.start,
+      forward: right,
+    );
+    return KeyEventResult.handled;
+  }
+
   KeyEventResult _handleHorizontalSelection({required bool right}) {
     final localSelection = _blockController.selection;
+    final foldedTransition = _handleFoldedHorizontalSelectionTransition(
+      right: right,
+    );
+    if (foldedTransition != null) return foldedTransition;
     if (!localSelection.isValid ||
         (right
             ? localSelection.extentOffset != _blockController.text.length
@@ -1924,6 +2148,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     IanvsMarkdownBlock block, {
     required int localOffset,
   }) {
+    _foldedSelectionBridge = null;
     _blockController.revealLeadingMarker = false;
     _activeGapLine = false;
     final resolvedLocalOffset = localOffset.clamp(0, block.source.length);
@@ -1944,6 +2169,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   }
 
   void _activateDocumentCaret(int offset) {
+    _foldedSelectionBridge = null;
     _blockController.revealLeadingMarker = false;
     if (_blocks.isEmpty) return;
     final source = widget.controller.text;
@@ -2169,6 +2395,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     bool selectWholeSource = false,
     int? documentOffset,
   }) {
+    _foldedSelectionBridge = null;
     _blockController.revealLeadingMarker = false;
     _activeGapLine = false;
     final currentSelection = widget.controller.selection;
