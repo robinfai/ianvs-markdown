@@ -8973,43 +8973,60 @@ Standard[^note] and inline ^[inline body].
   testWidgets('comment clicks preserve Obsidian source selections', (
     tester,
   ) async {
-    const comment = '%%secret words%%';
-    const source = 'Before $comment after.';
+    const comment = '%%secret bravo%%';
+    const source = 'Before\n\nAlpha $comment omega\n\nAfter';
     final controller = IanvsMarkdownController(text: source);
     addTearDown(controller.dispose);
     await tester.pumpWidget(app(controller));
     await tester.pumpAndSettle();
 
     final metadata = find.text(comment);
-    final paragraph = tester.renderObject<RenderParagraph>(
+    RenderParagraph renderedComment() => tester.renderObject<RenderParagraph>(
       find.descendant(of: metadata, matching: find.byType(RichText)),
     );
-    const metadataOffset = 9;
-    final caret = paragraph.getOffsetForCaret(
-      const TextPosition(offset: metadataOffset),
+    var paragraph = renderedComment();
+    const bodyOffset = 12;
+    var caret = paragraph.getOffsetForCaret(
+      const TextPosition(offset: bodyOffset),
       Rect.zero,
     );
-    final target = paragraph.localToGlobal(
+    var target = paragraph.localToGlobal(
       caret + Offset(.1, paragraph.size.height / 2),
     );
     await tester.tapAt(target);
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(controller.selection.isCollapsed, isTrue);
-    expect(
-      controller.selection.extentOffset,
-      source.indexOf(comment) + metadataOffset,
-    );
+    expect(controller.selection.extentOffset, 26);
 
     await tester.tapAt(target);
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(controller.selection.textInside(source), 'words');
+    expect(controller.selection.textInside(source), 'bravo');
 
     await tester.tapAt(target);
     await tester.pumpAndSettle();
 
-    expect(controller.selection.textInside(source), source);
+    expect(
+      controller.selection.textInside(source),
+      'Alpha %%secret bravo%% omega',
+    );
+
+    await tester.tap(find.text('After'));
+    await tester.pumpAndSettle();
+    paragraph = renderedComment();
+    caret = paragraph.getOffsetForCaret(
+      const TextPosition(offset: 1),
+      Rect.zero,
+    );
+    target = paragraph.localToGlobal(
+      caret + Offset(.1, paragraph.size.height / 2),
+    );
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(controller.selection.isCollapsed, isTrue);
+    expect(controller.selection.extentOffset, 15);
     expect(controller.text, source);
     expect(controller.isDirty, isFalse);
   });
