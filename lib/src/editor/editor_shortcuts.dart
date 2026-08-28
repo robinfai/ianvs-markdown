@@ -238,11 +238,10 @@ class _MarkdownPasteAction extends ContextAction<PasteTextIntent> {
     PasteTextIntent intent,
     Action<PasteTextIntent>? defaultAction,
   ) async {
-    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final data = await readPlainTextClipboardSafely();
     final pastedText = data?.text;
-    final replacement = pastedText == null
-        ? null
-        : smartUrlPasteValue(controller.value, pastedText);
+    if (pastedText == null) return;
+    final replacement = smartUrlPasteValue(controller.value, pastedText);
     if (replacement == null) {
       defaultAction?.invoke(intent);
       return;

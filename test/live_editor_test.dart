@@ -3805,6 +3805,48 @@ void main() {
     expect(controller.text, 'plain text');
   });
 
+  testWidgets('smart paste ignores an unavailable platform clipboard', (
+    tester,
+  ) async {
+    final controller = IanvsMarkdownController(text: 'Label');
+    addTearDown(controller.dispose);
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (methodCall) async {
+        if (methodCall.method == 'Clipboard.getData') {
+          throw PlatformException(code: 'clipboard-unavailable');
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Label'));
+    await tester.pump();
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    field.controller?.selection = const TextSelection(
+      baseOffset: 0,
+      extentOffset: 5,
+    );
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyV);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+
+    expect(controller.text, 'Label');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('word deletion keeps Markdown punctuation in separate segments', (
     tester,
   ) async {
@@ -11068,6 +11110,51 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
       controller.redo();
       await tester.pumpAndSettle();
       expect(controller.text, contains('| plaintext |'));
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
+    'table paste ignores an unavailable platform clipboard',
+    (tester) async {
+      const source =
+          '| H |\n'
+          '| --- |\n'
+          '| alpha |';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (methodCall) async {
+          if (methodCall.method == 'Clipboard.getData') {
+            throw PlatformException(code: 'clipboard-unavailable');
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+      final cell = find.byKey(const ValueKey('ianvs-markdown-table-1-0'));
+      await tester.tap(cell);
+      tester.widget<TextField>(cell).controller?.selection =
+          const TextSelection(baseOffset: 0, extentOffset: 5);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyV);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+
+      expect(controller.text, source);
+      expect(tester.takeException(), isNull);
     },
     variant: const TargetPlatformVariant(<TargetPlatform>{
       TargetPlatform.macOS,

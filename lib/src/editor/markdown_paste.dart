@@ -1,5 +1,16 @@
 import 'package:flutter/services.dart';
 
+/// Reads plain text without surfacing platform clipboard availability errors.
+Future<ClipboardData?> readPlainTextClipboardSafely() async {
+  try {
+    return await Clipboard.getData(Clipboard.kTextPlain);
+  } on PlatformException {
+    return null;
+  } on MissingPluginException {
+    return null;
+  }
+}
+
 /// Returns an Obsidian-style Markdown link replacement when [pastedText] is a
 /// single HTTP(S) URL and [value] has a non-empty selection.
 TextEditingValue? smartUrlPasteValue(

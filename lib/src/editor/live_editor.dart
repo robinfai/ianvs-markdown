@@ -4703,7 +4703,7 @@ class _TablePasteAction extends ContextAction<PasteTextIntent> {
   }
 
   Future<void> _pasteSelectedText() async {
-    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final data = await readPlainTextClipboardSafely();
     if (!isCurrent()) return;
     final pastedText = data?.text;
     if (pastedText == null) return;
