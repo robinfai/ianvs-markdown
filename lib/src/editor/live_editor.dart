@@ -248,7 +248,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     if (_activeBlockStart != null && _blocks.isNotEmpty) {
       final documentSelection = widget.controller.selection;
       final activeIndex = _blocks.indexWhere(
-        (block) => block.start == _editingStart,
+        (block) => block.start == _activeBlockStart,
       );
       if (activeIndex < 0 && documentSelection.isCollapsed) {
         final selectionOffset = _documentSelectionOffset();
@@ -299,13 +299,22 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       if (keepsSelectionSurface) {
         _activeGapLine = false;
         _activeBlockStart = canonicalActive.start;
-        _editingStart = canonicalActive.start;
         _editingEnd = controllerEnd;
       } else if (selectionSurface != null) {
         _activeGapLine = false;
         _syncSelectionSurfaceFromDocument(documentSelection, selectionSurface);
       } else {
         final selectionOffset = _documentSelectionOffset();
+        final keepsTransientLeadingGap =
+            canonicalActive != null &&
+            _editingStart < canonicalActive.start &&
+            controllerEnd >= canonicalActive.end &&
+            controllerEnd <= nextStart &&
+            selectionOffset >= _editingStart &&
+            selectionOffset <= controllerEnd &&
+            controllerEnd <= source.length &&
+            _blockController.text ==
+                source.substring(_editingStart, controllerEnd);
         final keepsTransientTrailingGap =
             canonicalActive != null &&
             controllerEnd > canonicalActive.end &&
@@ -315,7 +324,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             controllerEnd <= source.length &&
             _blockController.text ==
                 source.substring(_editingStart, controllerEnd);
-        final selected = keepsTransientTrailingGap
+        final selected = keepsTransientLeadingGap || keepsTransientTrailingGap
             ? canonicalActive
             : markdownBlockAtOffset(_blocks, selectionOffset)!;
         _activeGapLine = keepsTransientTrailingGap;
@@ -323,9 +332,12 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             selected.start != _editingStart ||
             selected.source != _blockController.text;
         _activeBlockStart = selected.start;
-        _editingStart = selected.start;
-        _editingEnd = keepsTransientTrailingGap ? controllerEnd : selected.end;
-        if (!keepsTransientTrailingGap &&
+        if (!keepsTransientLeadingGap) _editingStart = selected.start;
+        _editingEnd = keepsTransientLeadingGap || keepsTransientTrailingGap
+            ? controllerEnd
+            : selected.end;
+        if (!keepsTransientLeadingGap &&
+            !keepsTransientTrailingGap &&
             (!_syncingFromBlock || requiresStructuralResync)) {
           if (_syncingFromBlock && requiresStructuralResync) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1390,7 +1402,14 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       blockIndex,
       forward: false,
     );
-    if (previousIndex == null) return null;
+    if (previousIndex == null) {
+      if (blockIndex != 0 || block.start == 0) return null;
+      final previousLineOffset = block.start - 1;
+      return _verticalTargetOnLine(
+        _lineStartAt(source, previousLineOffset),
+        _lineEndAt(source, previousLineOffset),
+      );
+    }
     final previous = _blocks[previousIndex];
     if (previousIndex < blockIndex - 1) {
       return _verticalTargetInBlock(previous, atStart: false);
@@ -1546,8 +1565,10 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     if (localOffset != 0) return KeyEventResult.ignored;
     final source = widget.controller.text;
     final boundary = _editingStart.clamp(0, source.length);
-    if (boundary == 0 || activeIndex == 0) {
-      return KeyEventResult.ignored;
+    if (boundary == 0) return KeyEventResult.ignored;
+    if (activeIndex == 0) {
+      _activateDocumentCaret(boundary - 1);
+      return KeyEventResult.handled;
     }
     final targetOffset = boundary - 1;
     final previousIndex = _adjacentVisibleBlockIndex(
@@ -1630,7 +1651,12 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       activeIndex,
       forward: false,
     );
-    if (previousIndex == null) return KeyEventResult.ignored;
+    if (previousIndex == null) {
+      final target = _verticalTargetFromBlock(activeIndex, down: false);
+      if (target == null) return KeyEventResult.ignored;
+      _activateDocumentCaret(target.offset);
+      return KeyEventResult.handled;
+    }
     final previous = _blocks[previousIndex];
     if (previousIndex < activeIndex - 1) {
       _activateBlockVertically(previous, atStart: false);

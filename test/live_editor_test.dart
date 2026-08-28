@@ -1065,6 +1065,35 @@ void main() {
     expect(field.focusNode?.hasFocus, isTrue);
   });
 
+  testWidgets('ArrowUp enters a leading blank line before the first block', (
+    tester,
+  ) async {
+    const source = '\nAlpha';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Alpha'));
+    await tester.pump();
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    var field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    field.controller?.selection = const TextSelection.collapsed(offset: 0);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+
+    expect(controller.selection, const TextSelection.collapsed(offset: 0));
+    field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, source);
+    expect(field.focusNode?.hasFocus, isTrue);
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('vertical arrows skip descendants of a collapsed heading', (
     tester,
   ) async {
@@ -3224,6 +3253,46 @@ void main() {
       const TextSelection.collapsed(offset: 2),
     );
     expect(field.focusNode?.hasFocus, isTrue);
+  });
+
+  testWidgets('ArrowLeft enters a leading blank line before the first block', (
+    tester,
+  ) async {
+    const source = '\nAlpha';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Alpha'));
+    await tester.pump();
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    var field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    field.controller?.selection = const TextSelection.collapsed(offset: 0);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+
+    expect(controller.selection, const TextSelection.collapsed(offset: 0));
+    field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, source);
+    expect(field.focusNode?.hasFocus, isTrue);
+    expect(controller.isDirty, isFalse);
+
+    field.controller?.value = const TextEditingValue(
+      text: 'X\nAlpha',
+      selection: TextSelection.collapsed(offset: 1),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.text, 'X\nAlpha');
+
+    controller.undo();
+    await tester.pumpAndSettle();
+    expect(controller.text, source);
   });
 
   testWidgets('horizontal arrows cross adjacent structural blocks', (
