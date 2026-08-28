@@ -8554,6 +8554,50 @@ Standard[^note] and inline ^[inline body].
     expect(controller.text, source);
   });
 
+  testWidgets('block ID clicks preserve Obsidian source selections', (
+    tester,
+  ) async {
+    const source = 'Before.\n\nParagraph end ^paragraph-id\n\nAfter.';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final metadata = find.text(' ^paragraph-id');
+    final paragraph = tester.renderObject<RenderParagraph>(
+      find.descendant(of: metadata, matching: find.byType(RichText)),
+    );
+    const metadataOffset = 6;
+    final caret = paragraph.getOffsetForCaret(
+      const TextPosition(offset: metadataOffset),
+      Rect.zero,
+    );
+    final target = paragraph.localToGlobal(
+      caret + Offset(.1, paragraph.size.height / 2),
+    );
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final expectedOffset = source.indexOf(' ^paragraph-id') + metadataOffset;
+    expect(controller.selection.isCollapsed, isTrue);
+    expect(controller.selection.extentOffset, expectedOffset);
+
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(controller.selection.textInside(source), 'paragraph');
+
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(
+      controller.selection.textInside(source),
+      'Paragraph end ^paragraph-id',
+    );
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('live preview keeps a soft-line block ID candidate literal', (
     tester,
   ) async {
