@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import 'theme.dart';
+
 /// Markdown source form associated with a resizable image.
 enum IanvsMarkdownImageSourceSyntax { standard, wiki }
 
@@ -32,6 +34,30 @@ class IanvsMarkdownImageResizeRequest {
 
 typedef IanvsMarkdownImageResizeHandler =
     void Function(IanvsMarkdownImageResizeRequest request);
+
+typedef IanvsMarkdownImageEditHandler = void Function(int imageIndex);
+
+/// Exact source ranges for one rendered standard Markdown image.
+@immutable
+class IanvsMarkdownStandardImageSource {
+  const IanvsMarkdownStandardImageSource({
+    required this.sourceRange,
+    required this.altRange,
+    required this.editableRange,
+  });
+
+  /// Complete image source, including `![` and its closing delimiter.
+  final TextRange sourceRange;
+
+  /// Alternative text without its surrounding brackets.
+  final TextRange altRange;
+
+  /// Destination and title content selected by Obsidian's image edit control.
+  ///
+  /// For inline images this excludes the surrounding parentheses. Reference
+  /// images use the reference label, and shortcut references use their alt.
+  final TextRange editableRange;
+}
 
 /// Image alternative text and optional pixel dimensions parsed from Obsidian
 /// Markdown.
@@ -99,7 +125,29 @@ String rewriteIanvsMarkdownImageWidth(
   required int? width,
   Set<String> linkReferenceLabels = const <String>{},
 }) {
-  if (imageIndex < 0 || source.isEmpty) return source;
+  final image = findIanvsMarkdownStandardImageSource(
+    source,
+    imageIndex: imageIndex,
+    linkReferenceLabels: linkReferenceLabels,
+  );
+  if (image == null) return source;
+  final alt = source.substring(image.altRange.start, image.altRange.end);
+  final replacement = _imageAltWithWidth(alt, width);
+  return source.replaceRange(
+    image.altRange.start,
+    image.altRange.end,
+    replacement,
+  );
+}
+
+/// Finds the rendered standard image at [imageIndex] without counting images
+/// hidden in code, comments, escapes, or unresolved reference syntax.
+IanvsMarkdownStandardImageSource? findIanvsMarkdownStandardImageSource(
+  String source, {
+  required int imageIndex,
+  Set<String> linkReferenceLabels = const <String>{},
+}) {
+  if (imageIndex < 0 || source.isEmpty) return null;
   var renderedImageIndex = 0;
   var index = 0;
   while (index + 1 < source.length) {
@@ -132,24 +180,64 @@ String rewriteIanvsMarkdownImageWidth(
       continue;
     }
     final alt = source.substring(index + 2, labelEnd);
-    final syntaxEnd = _standardImageSyntaxEnd(
-      source,
-      labelEnd,
-      alt,
-      linkReferenceLabels,
-    );
-    if (syntaxEnd == null) {
-      index = labelEnd + 1;
-      continue;
+    final following = labelEnd + 1;
+    late final int syntaxEnd;
+    late final TextRange editableRange;
+    if (following < source.length && source.codeUnitAt(following) == 0x28) {
+      final destinationEnd = _balancedDelimiterEnd(
+        source,
+        following,
+        opening: 0x28,
+        closing: 0x29,
+      );
+      if (destinationEnd == null) {
+        index = labelEnd + 1;
+        continue;
+      }
+      syntaxEnd = destinationEnd + 1;
+      editableRange = TextRange(start: following + 1, end: destinationEnd);
+    } else if (following < source.length &&
+        source.codeUnitAt(following) == 0x5b) {
+      final referenceEnd = _balancedDelimiterEnd(
+        source,
+        following,
+        opening: 0x5b,
+        closing: 0x5d,
+      );
+      if (referenceEnd == null) {
+        index = labelEnd + 1;
+        continue;
+      }
+      final explicit = source.substring(following + 1, referenceEnd);
+      final label = explicit.isEmpty ? alt : explicit;
+      if (!linkReferenceLabels.contains(_normalizeReferenceLabel(label))) {
+        index = referenceEnd + 1;
+        continue;
+      }
+      syntaxEnd = referenceEnd + 1;
+      editableRange = explicit.isEmpty
+          ? TextRange(start: index + 2, end: labelEnd)
+          : TextRange(start: following + 1, end: referenceEnd);
+    } else {
+      if (!linkReferenceLabels.contains(_normalizeReferenceLabel(alt))) {
+        index = labelEnd + 1;
+        continue;
+      }
+      syntaxEnd = following;
+      editableRange = TextRange(start: index + 2, end: labelEnd);
     }
+
     if (renderedImageIndex == imageIndex) {
-      final replacement = _imageAltWithWidth(alt, width);
-      return source.replaceRange(index + 2, labelEnd, replacement);
+      return IanvsMarkdownStandardImageSource(
+        sourceRange: TextRange(start: index, end: syntaxEnd),
+        altRange: TextRange(start: index + 2, end: labelEnd),
+        editableRange: editableRange,
+      );
     }
     renderedImageIndex += 1;
     index = syntaxEnd;
   }
-  return source;
+  return null;
 }
 
 /// Rewrites or removes the size segment of a standalone Wiki image embed.
@@ -179,41 +267,6 @@ String _imageAltWithWidth(String alt, int? width) {
   }
   final base = dimensions.hasDimensions ? dimensions.alt : alt;
   return base == null || base.isEmpty ? '$width' : '$base|$width';
-}
-
-int? _standardImageSyntaxEnd(
-  String source,
-  int labelEnd,
-  String alt,
-  Set<String> linkReferenceLabels,
-) {
-  final following = labelEnd + 1;
-  if (following < source.length && source.codeUnitAt(following) == 0x28) {
-    final destinationEnd = _balancedDelimiterEnd(
-      source,
-      following,
-      opening: 0x28,
-      closing: 0x29,
-    );
-    return destinationEnd == null ? null : destinationEnd + 1;
-  }
-  if (following < source.length && source.codeUnitAt(following) == 0x5b) {
-    final referenceEnd = _balancedDelimiterEnd(
-      source,
-      following,
-      opening: 0x5b,
-      closing: 0x5d,
-    );
-    if (referenceEnd == null) return null;
-    final explicit = source.substring(following + 1, referenceEnd);
-    final label = explicit.isEmpty ? alt : explicit;
-    return linkReferenceLabels.contains(_normalizeReferenceLabel(label))
-        ? referenceEnd + 1
-        : null;
-  }
-  return linkReferenceLabels.contains(_normalizeReferenceLabel(alt))
-      ? following
-      : null;
 }
 
 String _normalizeReferenceLabel(String label) =>
@@ -289,6 +342,177 @@ bool _isEscaped(String source, int index) {
     slashes += 1;
   }
   return slashes.isOdd;
+}
+
+/// Obsidian-style Live Preview controls for a resolved Markdown image.
+class IanvsMarkdownInteractiveImage extends StatefulWidget {
+  const IanvsMarkdownInteractiveImage({
+    super.key,
+    required this.child,
+    required this.expandedImageBuilder,
+    this.alt,
+    this.title,
+    this.onEdit,
+    this.theme,
+  });
+
+  final Widget child;
+  final WidgetBuilder expandedImageBuilder;
+  final String? alt;
+  final String? title;
+  final VoidCallback? onEdit;
+  final IanvsMarkdownThemeData? theme;
+
+  @override
+  State<IanvsMarkdownInteractiveImage> createState() =>
+      _IanvsMarkdownInteractiveImageState();
+}
+
+class _IanvsMarkdownInteractiveImageState
+    extends State<IanvsMarkdownInteractiveImage> {
+  var _controlsVisible = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = IanvsMarkdownThemeData.resolve(context, widget.theme);
+    final alt = widget.alt?.trim();
+    final title = widget.title?.trim();
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onExit: (_) {
+        if (_controlsVisible && mounted) {
+          setState(() => _controlsVisible = false);
+        }
+      },
+      child: GestureDetector(
+        key: const ValueKey('ianvs-markdown-image-interaction'),
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          if (!_controlsVisible) setState(() => _controlsVisible = true);
+        },
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Semantics(
+              image: true,
+              label: alt == null || alt.isEmpty ? null : alt,
+              hint: title == null || title.isEmpty ? null : title,
+              excludeSemantics: true,
+              child: widget.child,
+            ),
+            if (_controlsVisible)
+              PositionedDirectional(
+                top: 8,
+                end: 8,
+                child: Material(
+                  key: const ValueKey('ianvs-markdown-image-controls'),
+                  color: colors.surfaceRaised.withValues(alpha: .96),
+                  elevation: 4,
+                  shadowColor: Colors.black.withValues(alpha: .3),
+                  borderRadius: BorderRadius.circular(colors.smallRadius),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _imageAction(
+                        key: const ValueKey('ianvs-markdown-image-zoom'),
+                        label: 'Zoom image',
+                        icon: Icons.zoom_out_map_rounded,
+                        colors: colors,
+                        onPressed: _showExpanded,
+                      ),
+                      if (widget.onEdit != null)
+                        _imageAction(
+                          key: const ValueKey('ianvs-markdown-image-edit'),
+                          label: 'Edit image block',
+                          icon: Icons.edit_outlined,
+                          colors: colors,
+                          onPressed: widget.onEdit!,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _imageAction({
+    required Key key,
+    required String label,
+    required IconData icon,
+    required IanvsMarkdownThemeData colors,
+    required VoidCallback onPressed,
+  }) {
+    return IconButton(
+      key: key,
+      tooltip: label,
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+      padding: EdgeInsets.zero,
+      color: colors.textSecondary,
+      iconSize: 18,
+      onPressed: onPressed,
+      icon: Icon(icon),
+    );
+  }
+
+  Future<void> _showExpanded() async {
+    final alt = widget.alt?.trim();
+    await showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: .88),
+      builder: (dialogContext) => Material(
+        key: const ValueKey('ianvs-markdown-image-viewer'),
+        color: Colors.black.withValues(alpha: .92),
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: 52,
+                child: Row(
+                  children: [
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        alt == null || alt.isEmpty ? 'Image' : alt,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      key: const ValueKey('ianvs-markdown-image-viewer-close'),
+                      tooltip: 'Close image viewer',
+                      color: Colors.white,
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      icon: const Icon(Icons.close),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: InteractiveViewer(
+                  minScale: .5,
+                  maxScale: 6,
+                  child: Center(
+                    child: widget.expandedImageBuilder(dialogContext),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Applies Obsidian image dimensions and optional desktop resize affordances

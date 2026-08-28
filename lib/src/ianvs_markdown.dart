@@ -52,6 +52,7 @@ class IanvsMarkdown extends StatelessWidget {
     this.extensionSet,
     this.imageBuilder,
     this.onImageResize,
+    this.onEditImage,
     this.checkboxBuilder,
     this.bulletBuilder,
     this.builders = const <String, MarkdownElementBuilder>{},
@@ -90,6 +91,10 @@ class IanvsMarkdown extends StatelessWidget {
   /// images. [IanvsMarkdownLiveEditor] uses this internally for exact source
   /// updates; renderer hosts can use it with the public rewrite helpers.
   final IanvsMarkdownImageResizeHandler? onImageResize;
+
+  /// Adds Obsidian-style image controls in editing mode and reports which
+  /// rendered standard image requested source editing.
+  final IanvsMarkdownImageEditHandler? onEditImage;
   final MarkdownCheckboxBuilder? checkboxBuilder;
   final MarkdownBulletBuilder? bulletBuilder;
   final Map<String, MarkdownElementBuilder> builders;
@@ -374,23 +379,36 @@ class IanvsMarkdown extends StatelessWidget {
             theme: colors,
           );
         }
-        final image = builder(uri, title, dimensions.alt);
+        Widget image = builder(uri, title, dimensions.alt);
         final resize = onImageResize;
-        if (!dimensions.hasDimensions && resize == null) return image;
-        return IanvsMarkdownSizedImage(
-          dimensions: dimensions,
-          resizeColor: colors.accent,
-          onResize: resize == null
-              ? null
-              : (width) => resize(
-                  IanvsMarkdownImageResizeRequest(
-                    syntax: IanvsMarkdownImageSourceSyntax.standard,
-                    imageIndex: currentImageIndex,
-                    width: width,
+        if (dimensions.hasDimensions || resize != null) {
+          image = IanvsMarkdownSizedImage(
+            dimensions: dimensions,
+            resizeColor: colors.accent,
+            onResize: resize == null
+                ? null
+                : (width) => resize(
+                    IanvsMarkdownImageResizeRequest(
+                      syntax: IanvsMarkdownImageSourceSyntax.standard,
+                      imageIndex: currentImageIndex,
+                      width: width,
+                    ),
                   ),
-                ),
-          child: image,
-        );
+            child: image,
+          );
+        }
+        if (obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing) {
+          final edit = onEditImage;
+          image = IanvsMarkdownInteractiveImage(
+            alt: dimensions.alt,
+            title: title,
+            theme: colors,
+            onEdit: edit == null ? null : () => edit(currentImageIndex),
+            expandedImageBuilder: (_) => builder(uri, title, dimensions.alt),
+            child: image,
+          );
+        }
+        return image;
       },
       checkboxBuilder: (checked) {
         final task = taskIndex < taskProjection.tasks.length
@@ -463,6 +481,7 @@ class IanvsMarkdown extends StatelessWidget {
       extensionSet: extensionSet,
       imageBuilder: imageBuilder,
       onImageResize: onImageResize,
+      onEditImage: onEditImage,
       checkboxBuilder: checkboxBuilder,
       bulletBuilder: bulletBuilder,
       builders: builders,
@@ -518,6 +537,7 @@ class IanvsMarkdown extends StatelessWidget {
       extensionSet: extensionSet,
       imageBuilder: imageBuilder,
       onImageResize: onImageResize,
+      onEditImage: onEditImage,
       builders: builders,
       paddingBuilders: paddingBuilders,
       fitContent: true,

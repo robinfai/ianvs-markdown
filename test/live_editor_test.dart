@@ -569,6 +569,134 @@ void main() {
     expect(find.text(url), findsNothing);
   });
 
+  testWidgets(
+    'live preview image controls preserve projection and edit range',
+    (tester) async {
+      final semanticsHandle = tester.ensureSemantics();
+      const url = 'https://httpbin.org/image/png';
+      const imageSource = '![Alt bravo]($url "Image title")';
+      const source = 'Before\n\n$imageSource\n\nAfter';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 1000,
+              height: 720,
+              child: IanvsMarkdownLiveEditor(
+                controller: controller,
+                imageBuilder: (uri, title, alt) => const SizedBox(
+                  key: ValueKey('host-standard-image'),
+                  width: 160,
+                  height: 100,
+                  child: ColoredBox(color: Colors.pink),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final image = find.byKey(const ValueKey('host-standard-image'));
+      expect(image, findsOneWidget);
+      final imageSemantics = find.bySemanticsLabel('Alt bravo');
+      expect(imageSemantics, findsOneWidget);
+      expect(tester.getSemantics(imageSemantics).hint, 'Image title');
+      expect(find.text(imageSource), findsNothing);
+      expect(
+        find.byKey(const ValueKey('ianvs-markdown-image-controls')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('ianvs-markdown-active-block')),
+        findsNothing,
+      );
+
+      final imageTap = tester.getCenter(image) + const Offset(-30, 20);
+      for (var tapCount = 1; tapCount <= 3; tapCount += 1) {
+        await tester.tapAt(imageTap);
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(
+          find.byKey(const ValueKey('ianvs-markdown-active-block')),
+          findsNothing,
+          reason: 'tap $tapCount',
+        );
+        expect(controller.text, source);
+      }
+      expect(
+        find.byKey(const ValueKey('ianvs-markdown-image-controls')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('ianvs-markdown-image-zoom')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('ianvs-markdown-image-viewer')),
+        findsOneWidget,
+      );
+      expect(find.text('Alt bravo'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('ianvs-markdown-image-viewer-close')),
+        findsOneWidget,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('ianvs-markdown-image-viewer')),
+        findsNothing,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('ianvs-markdown-image-edit')));
+      await tester.pumpAndSettle();
+
+      final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+      final field = find.descendant(
+        of: active,
+        matching: find.byType(TextField),
+      );
+      expect(active, findsOneWidget);
+      expect(field, findsOneWidget);
+      expect(image, findsOneWidget);
+      final editStart = source.indexOf(url);
+      final editEnd = source.indexOf(')', editStart);
+      expect(
+        controller.selection,
+        TextSelection(baseOffset: editStart, extentOffset: editEnd),
+      );
+      final textField = tester.widget<TextField>(field);
+      expect(
+        textField.controller?.selection,
+        TextSelection(
+          baseOffset: imageSource.indexOf(url),
+          extentOffset: imageSource.indexOf(')'),
+        ),
+      );
+
+      final local = textField.controller!.value;
+      final replaced = local.text.replaceRange(
+        local.selection.start,
+        local.selection.end,
+        'Q',
+      );
+      tester.testTextInput.updateEditingValue(
+        TextEditingValue(
+          text: replaced,
+          selection: TextSelection.collapsed(offset: local.selection.start + 1),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(controller.text, 'Before\n\n![Alt bravo](Q)\n\nAfter');
+      expect(controller.text.indexOf('Q'), 21);
+      controller.undo();
+      await tester.pumpAndSettle();
+      expect(controller.text, source);
+      semanticsHandle.dispose();
+    },
+  );
+
   testWidgets('live preview keeps extra-whitespace reference labels literal', (
     tester,
   ) async {

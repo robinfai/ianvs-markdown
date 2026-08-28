@@ -3614,6 +3614,18 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     }
     final styleSheet =
         widget.styleSheet ?? ianvsMarkdownStyleSheet(context, colors);
+    final standardImages = <IanvsMarkdownStandardImageSource>[];
+    if (widget.imageBuilder != null) {
+      for (var imageIndex = 0; ; imageIndex += 1) {
+        final image = findIanvsMarkdownStandardImageSource(
+          block.source,
+          imageIndex: imageIndex,
+          linkReferenceLabels: _linkReferences.labels,
+        );
+        if (image == null) break;
+        standardImages.add(image);
+      }
+    }
     final fencedCode = block.type == IanvsMarkdownBlockType.fencedCode;
     final indentedCode = block.type == IanvsMarkdownBlockType.indentedCode;
     final displayMath = block.type == IanvsMarkdownBlockType.displayMath;
@@ -3902,6 +3914,35 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         setextUnderline: setextUnderline,
         child: editor,
       );
+    } else if (standardImages.isNotEmpty) {
+      activeChild = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          editor,
+          for (final image in standardImages)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: IanvsMarkdown(
+                  data: block.source.substring(
+                    image.sourceRange.start,
+                    image.sourceRange.end,
+                  ),
+                  selectable: false,
+                  styleSheet: widget.styleSheet,
+                  imageBuilder: widget.imageBuilder,
+                  showListIndentationGuides: false,
+                  softLineBreak: widget.softLineBreak,
+                  renderBudget: widget.renderBudget,
+                  obsidianMetadataMode:
+                      IanvsMarkdownObsidianMetadataMode.editing,
+                  theme: colors,
+                ),
+              ),
+            ),
+        ],
+      );
     } else if (displayMath) {
       activeChild = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -4157,6 +4198,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             _handleRenderedLinkTap(block, text: text, href: href, title: title),
         imageBuilder: widget.imageBuilder,
         onImageResize: (request) => _resizeImage(block, request),
+        onEditImage: (imageIndex) => _editStandardImage(block, imageIndex),
         checkboxBuilder: sourceTasks.isNotEmpty
             ? (checked) {
                 final taskIndex = renderedTaskIndex;
@@ -4410,6 +4452,24 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     };
     if (replacement == block.source) return;
     _replaceBlockSource(block, replacement);
+  }
+
+  void _editStandardImage(IanvsMarkdownBlock block, int imageIndex) {
+    final image = findIanvsMarkdownStandardImageSource(
+      block.source,
+      imageIndex: imageIndex,
+      linkReferenceLabels: _linkReferences.labels,
+    );
+    if (image == null) return;
+    final selection = TextSelection(
+      baseOffset: block.start + image.editableRange.start,
+      extentOffset: block.start + image.editableRange.end,
+    );
+    _activateSelectionSurface(selection, (
+      first: block,
+      start: block.start,
+      end: block.end,
+    ));
   }
 
   void _setTaskChecked(

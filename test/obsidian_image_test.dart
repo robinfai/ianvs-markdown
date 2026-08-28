@@ -98,6 +98,52 @@ void main() {
     );
   });
 
+  test('finds exact editable ranges for rendered standard images', () {
+    const source =
+        r'`![code](code.png)` %% ![hidden](hidden.png) %% '
+        r'\![escaped](escaped.png) '
+        '![First](image_(1).png "Caption") '
+        '![Second][diagram-ref] ![Missing][missing-ref]';
+    const references = <String>{'diagram-ref'};
+
+    final inline = findIanvsMarkdownStandardImageSource(
+      source,
+      imageIndex: 0,
+      linkReferenceLabels: references,
+    );
+    expect(inline, isNotNull);
+    expect(
+      source.substring(inline!.sourceRange.start, inline.sourceRange.end),
+      '![First](image_(1).png "Caption")',
+    );
+    expect(
+      source.substring(inline.editableRange.start, inline.editableRange.end),
+      'image_(1).png "Caption"',
+    );
+
+    final reference = findIanvsMarkdownStandardImageSource(
+      source,
+      imageIndex: 1,
+      linkReferenceLabels: references,
+    );
+    expect(reference, isNotNull);
+    expect(
+      source.substring(
+        reference!.editableRange.start,
+        reference.editableRange.end,
+      ),
+      'diagram-ref',
+    );
+    expect(
+      findIanvsMarkdownStandardImageSource(
+        source,
+        imageIndex: 2,
+        linkReferenceLabels: references,
+      ),
+      isNull,
+    );
+  });
+
   test('rewrites and resets Wiki image sizes without normalizing source', () {
     expect(
       rewriteIanvsMarkdownWikiImageWidth(
@@ -623,52 +669,70 @@ void main() {
     );
   }, variant: desktopPlatform);
 
-  testWidgets('Live Preview sizes inactive images and edits exact source', (
-    tester,
-  ) async {
-    const source = '![Diagram|120x80](diagram.png)';
-    final controller = IanvsMarkdownController(text: '$source\n\nTail');
-    addTearDown(controller.dispose);
-    String? receivedAlt;
+  testWidgets(
+    'Live Preview sizes images and edits source through its control',
+    (tester) async {
+      const source = '![Diagram|120x80](diagram.png)';
+      final controller = IanvsMarkdownController(text: '$source\n\nTail');
+      addTearDown(controller.dispose);
+      String? receivedAlt;
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SizedBox(
-            width: 900,
-            height: 700,
-            child: IanvsMarkdownLiveEditor(
-              controller: controller,
-              imageBuilder: (uri, title, alt) {
-                receivedAlt = alt;
-                return const ColoredBox(
-                  key: ValueKey('host-live-image'),
-                  color: Colors.orange,
-                );
-              },
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 900,
+              height: 700,
+              child: IanvsMarkdownLiveEditor(
+                controller: controller,
+                imageBuilder: (uri, title, alt) {
+                  receivedAlt = alt;
+                  return const ColoredBox(
+                    key: ValueKey('host-live-image'),
+                    color: Colors.orange,
+                  );
+                },
+              ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(receivedAlt, 'Diagram');
-    final sized = tester.widget<SizedBox>(
-      find.byKey(const ValueKey('ianvs-markdown-image-size')),
-    );
-    expect(sized.width, 120);
-    expect(sized.height, 80);
+      expect(receivedAlt, 'Diagram');
+      final sized = tester.widget<SizedBox>(
+        find.byKey(const ValueKey('ianvs-markdown-image-size')),
+      );
+      expect(sized.width, 120);
+      expect(sized.height, 80);
 
-    await tester.tap(find.byKey(const ValueKey('host-live-image')));
-    await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('host-live-image')));
+      await tester.pump();
 
-    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
-    expect(active, findsOneWidget);
-    final field = tester.widget<TextField>(
-      find.descendant(of: active, matching: find.byType(TextField)),
-    );
-    expect(field.controller?.text, source);
-    expect(controller.text, '$source\n\nTail');
-  });
+      expect(
+        find.byKey(const ValueKey('ianvs-markdown-active-block')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('ianvs-markdown-image-controls')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('ianvs-markdown-image-edit')));
+      await tester.pump();
+
+      final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+      expect(active, findsOneWidget);
+      final field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      expect(field.controller?.text, source);
+      expect(
+        field.controller?.selection,
+        const TextSelection(baseOffset: 18, extentOffset: 29),
+      );
+      expect(find.byKey(const ValueKey('host-live-image')), findsOneWidget);
+      expect(controller.text, '$source\n\nTail');
+    },
+  );
 }
