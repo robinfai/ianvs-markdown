@@ -9723,6 +9723,84 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     );
   });
 
+  testWidgets('fenced code clicks map visual lines to exact source offsets', (
+    tester,
+  ) async {
+    const source =
+        'Before\n\n```dart\nalpha bravo\ncharlie delta\n```\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    RenderEditable renderedCode() => editableWithin(
+      tester,
+      find.descendant(
+        of: find.byKey(const ValueKey('ianvs-markdown-code-block')),
+        matching: find.byType(SelectableText),
+      ),
+    );
+
+    var editable = renderedCode();
+    var target = editable.localToGlobal(
+      editable.getLocalRectForCaret(const TextPosition(offset: 10)).center,
+    );
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(controller.selection.isCollapsed, isTrue);
+    expect(controller.selection.extentOffset, 26);
+
+    await tester.tap(find.text('After'));
+    await tester.pumpAndSettle();
+    editable = renderedCode();
+    target = editable.localToGlobal(
+      editable.getLocalRectForCaret(const TextPosition(offset: 22)).center,
+    );
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(controller.selection.isCollapsed, isTrue);
+    expect(controller.selection.extentOffset, 38);
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
+  testWidgets('fenced code multi-click selects only its physical body line', (
+    tester,
+  ) async {
+    const source =
+        'Before\n\n```dart\nalpha bravo\ncharlie delta\n```\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final editable = editableWithin(
+      tester,
+      find.descendant(
+        of: find.byKey(const ValueKey('ianvs-markdown-code-block')),
+        matching: find.byType(SelectableText),
+      ),
+    );
+    final target = editable.localToGlobal(
+      editable.getLocalRectForCaret(const TextPosition(offset: 8)).center,
+    );
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(controller.selection.textInside(source), 'bravo');
+
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(controller.selection.textInside(source), 'alpha bravo');
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('active nested fences hide flair and preserve exact source', (
     tester,
   ) async {
