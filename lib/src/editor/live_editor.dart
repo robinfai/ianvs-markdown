@@ -2853,6 +2853,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             final headingSection = _headingFoldModel.sectionAtBlockIndex(index);
             final coveredByActiveSelection =
                 _activeBlockStart != null &&
+                block.start != _activeBlockStart &&
                 block.start > _editingStart &&
                 block.start < _editingEnd;
             if (coveredByActiveSelection) {

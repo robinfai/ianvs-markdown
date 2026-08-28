@@ -1333,6 +1333,45 @@ void main() {
     expect(controller.text, source);
   });
 
+  testWidgets('Command+A keeps leading blank lines in the active selection', (
+    tester,
+  ) async {
+    const source = '\nAlpha\n\nBeta';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Alpha'));
+    await tester.pump();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await tester.pumpAndSettle();
+
+    expect(controller.selection.baseOffset, 0);
+    expect(controller.selection.extentOffset, source.length);
+    expect(controller.selection.isDirectional, isTrue);
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    expect(active, findsOneWidget);
+    final field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, source);
+    expect(field.focusNode?.hasFocus, isTrue);
+
+    field.controller?.value = const TextEditingValue(
+      text: 'Z',
+      selection: TextSelection.collapsed(offset: 1),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.text, 'Z');
+
+    controller.undo();
+    await tester.pumpAndSettle();
+    expect(controller.text, source);
+  });
+
   testWidgets(
     'mouse drag selects forward and backward across Markdown blocks',
     (tester) async {
