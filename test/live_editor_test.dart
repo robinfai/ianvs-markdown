@@ -1182,6 +1182,41 @@ void main() {
     expect(controller.isDirty, isFalse);
   });
 
+  testWidgets('a folded heading gap skips hidden descendants', (tester) async {
+    const source = '# Heading\n\nBody\n\n# Tail';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('折叠标题内容'));
+    await tester.pumpAndSettle();
+    expect(find.text('Body'), findsNothing);
+
+    await tester.tap(
+      find.byKey(const ValueKey('ianvs-markdown-gap-9')),
+    );
+    await tester.pump();
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    var field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, '# Heading\n');
+    expect(field.focusNode?.hasFocus, isTrue);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+
+    expect(active, findsOneWidget);
+    field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, '# Tail');
+    expect(field.focusNode?.hasFocus, isTrue);
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets(
     'shift vertical arrows select across blocks at the visual column',
     (tester) async {

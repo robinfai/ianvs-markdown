@@ -1727,9 +1727,15 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     final source = widget.controller.text;
     final lineEnd = _lineEndAt(source, documentOffset);
     final nextLineStart = lineEnd < source.length ? lineEnd + 1 : source.length;
-    final next = activeIndex + 1 < _blocks.length
-        ? _blocks[activeIndex + 1]
-        : null;
+    final nextIndex = _adjacentVisibleBlockIndex(activeIndex, forward: true);
+    final next = nextIndex == null ? null : _blocks[nextIndex];
+    if (nextIndex != null && nextIndex > activeIndex + 1) {
+      _activateBlockVertically(_blocks[nextIndex], atStart: true);
+      return KeyEventResult.handled;
+    }
+    if (nextIndex == null && activeIndex + 1 < _blocks.length) {
+      return KeyEventResult.handled;
+    }
     if (next != null && nextLineStart >= next.start) {
       _activateBlockVertically(next, atStart: true);
       return KeyEventResult.handled;
