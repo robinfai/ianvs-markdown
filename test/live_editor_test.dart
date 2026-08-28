@@ -4736,6 +4736,44 @@ cssclasses:
     },
   );
 
+  testWidgets('dragging inside a property value stays local', (tester) async {
+    const source = '''
+---
+title: Alpha
+---
+Body
+''';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final input = find.byKey(
+      const ValueKey('ianvs-markdown-front-matter-input-title'),
+    );
+    final rect = tester.getRect(input);
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    addTearDown(mouse.removePointer);
+
+    await mouse.down(Offset(rect.left + 4, rect.center.dy));
+    await mouse.moveTo(Offset(rect.left + 32, rect.center.dy));
+    await tester.pumpAndSettle();
+
+    expect(input, findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
+    expect(
+      tester.widget<TextField>(input).controller?.selection.isCollapsed,
+      isFalse,
+    );
+    expect(controller.text, source);
+
+    await mouse.up();
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('property text Escape cancels and focus loss commits', (
     tester,
   ) async {

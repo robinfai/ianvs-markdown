@@ -2084,7 +2084,12 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       event.position,
       event.viewId,
     );
-    return result.path.any((entry) => entry.target is RenderEditable);
+    final activeEditable = _activeRenderEditable();
+    return result.path.any((entry) {
+      final target = entry.target;
+      return target is RenderEditable &&
+          (target.readOnly || identical(target, activeEditable));
+    });
   }
 
   void _handleDocumentDragPointerMove(PointerMoveEvent event) {
