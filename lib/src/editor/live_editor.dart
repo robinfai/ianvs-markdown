@@ -4666,7 +4666,7 @@ TextEditingValue? _tablePlainPasteValue(
   String pastedText,
 ) {
   final selection = value.selection;
-  if (!selection.isValid || selection.isCollapsed) return null;
+  if (!selection.isValid) return null;
   final start = selection.start;
   final end = selection.end;
   if (start < 0 || end > value.text.length) return null;
@@ -4695,7 +4695,7 @@ class _TablePasteAction extends ContextAction<PasteTextIntent> {
   Object? invoke(PasteTextIntent intent, [BuildContext? context]) {
     final defaultAction = callingAction;
     final selection = controller.selection;
-    if (!selection.isValid || selection.isCollapsed) {
+    if (!selection.isValid) {
       return defaultAction?.invoke(intent);
     }
     unawaited(_pasteSelectedText());

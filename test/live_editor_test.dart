@@ -11117,6 +11117,57 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
   );
 
   testWidgets(
+    'table collapsed paste keeps preceding typing in a separate undo step',
+    (tester) async {
+      const source =
+          '| H |\n'
+          '| --- |\n'
+          '| alpha |';
+      const typed =
+          '| H |\n'
+          '| --- |\n'
+          '| alphax |';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (methodCall) async => methodCall.method == 'Clipboard.getData'
+            ? const <String, dynamic>{'text': '-paste'}
+            : null,
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+      final cell = find.byKey(const ValueKey('ianvs-markdown-table-1-0'));
+      await tester.tap(cell);
+      await tester.pump();
+      await tester.enterText(cell, 'alphax');
+      await tester.pump();
+      tester.widget<TextField>(cell).controller?.selection =
+          const TextSelection.collapsed(offset: 6);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyV);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+      expect(controller.text, contains('| alphax-paste |'));
+
+      controller.undo();
+      await tester.pumpAndSettle();
+      expect(controller.text, typed);
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
     'table paste ignores an unavailable platform clipboard',
     (tester) async {
       const source =
