@@ -11017,6 +11017,64 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
   );
 
   testWidgets(
+    'table plain paste reads once, filters, and keeps typing separate',
+    (tester) async {
+      const source =
+          '| H |\n'
+          '| --- |\n'
+          '| alpha |';
+      const typed =
+          '| H |\n'
+          '| --- |\n'
+          '| alphax |';
+      var clipboardReads = 0;
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (methodCall) async {
+          if (methodCall.method != 'Clipboard.getData') return null;
+          clipboardReads += 1;
+          return const <String, dynamic>{'text': 'plain|\ntext'};
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+      final cell = find.byKey(const ValueKey('ianvs-markdown-table-1-0'));
+      await tester.tap(cell);
+      await tester.pump();
+      await tester.enterText(cell, 'alphax');
+      await tester.pump();
+      tester.widget<TextField>(cell).controller?.selection =
+          const TextSelection(baseOffset: 0, extentOffset: 6);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyV);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+
+      expect(clipboardReads, 1);
+      expect(controller.text, contains('| plaintext |'));
+      controller.undo();
+      await tester.pumpAndSettle();
+      expect(controller.text, typed);
+      controller.redo();
+      await tester.pumpAndSettle();
+      expect(controller.text, contains('| plaintext |'));
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
     'table Option+Backspace deletes focused cell Markdown punctuation',
     (tester) async {
       const source =

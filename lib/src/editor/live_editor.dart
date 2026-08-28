@@ -4658,6 +4658,26 @@ int _liveListIndentationColumns(String source) {
 bool _isMarkerOnlyListSource(String source) =>
     RegExp(r'^[ \t]*(?:[-+*]|\d{1,9}[.)])[ \t]*$').hasMatch(source);
 
+final TextInputFormatter _tableCellInputFormatter =
+    FilteringTextInputFormatter.deny(RegExp(r'[\r\n|]'));
+
+TextEditingValue? _tablePlainPasteValue(
+  TextEditingValue value,
+  String pastedText,
+) {
+  final selection = value.selection;
+  if (!selection.isValid || selection.isCollapsed) return null;
+  final start = selection.start;
+  final end = selection.end;
+  if (start < 0 || end > value.text.length) return null;
+  final replacement = value.copyWith(
+    text: value.text.replaceRange(start, end, pastedText),
+    selection: TextSelection.collapsed(offset: start + pastedText.length),
+    composing: TextRange.empty,
+  );
+  return _tableCellInputFormatter.formatEditUpdate(value, replacement);
+}
+
 class _TablePasteAction extends ContextAction<PasteTextIntent> {
   _TablePasteAction({
     required this.controller,
@@ -4678,28 +4698,23 @@ class _TablePasteAction extends ContextAction<PasteTextIntent> {
     if (!selection.isValid || selection.isCollapsed) {
       return defaultAction?.invoke(intent);
     }
-    unawaited(_pasteSelectedText(intent, defaultAction));
+    unawaited(_pasteSelectedText());
     return null;
   }
 
-  Future<void> _pasteSelectedText(
-    PasteTextIntent intent,
-    Action<PasteTextIntent>? defaultAction,
-  ) async {
+  Future<void> _pasteSelectedText() async {
     final data = await Clipboard.getData(Clipboard.kTextPlain);
     if (!isCurrent()) return;
     final pastedText = data?.text;
-    final replacement = pastedText == null
-        ? null
-        : smartUrlPasteValue(
-            controller.value,
-            pastedText,
-            escapeTablePipes: true,
-          );
-    if (replacement == null) {
-      defaultAction?.invoke(intent);
-      return;
-    }
+    if (pastedText == null) return;
+    final replacement =
+        smartUrlPasteValue(
+          controller.value,
+          pastedText,
+          escapeTablePipes: true,
+        ) ??
+        _tablePlainPasteValue(controller.value, pastedText);
+    if (replacement == null) return;
     commitHistoryGroup();
     controller.value = replacement;
     onChanged(replacement);
@@ -5519,9 +5534,7 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                                       autocorrect: false,
                                       enableSuggestions: false,
                                       inputFormatters: [
-                                        FilteringTextInputFormatter.deny(
-                                          RegExp(r'[\r\n|]'),
-                                        ),
+                                        _tableCellInputFormatter,
                                       ],
                                       textAlign: cell.alignment,
                                       style: TextStyle(
