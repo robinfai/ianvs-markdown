@@ -2606,8 +2606,12 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     if (block.type == IanvsMarkdownBlockType.indentedCode) {
       return _indentedCodeDocumentOffsetAtRenderedPoint(block, globalPosition);
     }
-    if (block.type == IanvsMarkdownBlockType.blockquote) {
-      return _blockquoteDocumentOffsetAtRenderedPoint(block, globalPosition);
+    if (block.type == IanvsMarkdownBlockType.blockquote ||
+        block.type == IanvsMarkdownBlockType.heading) {
+      return _markdownProjectionDocumentOffsetAtRenderedPoint(
+        block,
+        globalPosition,
+      );
     }
     final definition = _livePreviewFootnoteDefinition(block.source);
     if (definition == null) return null;
@@ -2644,7 +2648,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     return null;
   }
 
-  int? _blockquoteDocumentOffsetAtRenderedPoint(
+  int? _markdownProjectionDocumentOffsetAtRenderedPoint(
     IanvsMarkdownBlock block,
     Offset globalPosition,
   ) {

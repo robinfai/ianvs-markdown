@@ -5097,6 +5097,77 @@ void main() {
     expect(controller.text, '$heading\n\nAfter');
   });
 
+  testWidgets('ATX heading clicks map visible text to exact source offsets', (
+    tester,
+  ) async {
+    const source = 'Before\n\n## Alpha bravo\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final editable = editableWithin(tester, find.text('Alpha bravo'));
+    const visibleOffset = 6;
+    final target = editable.localToGlobal(
+      editable
+          .getLocalRectForCaret(const TextPosition(offset: visibleOffset))
+          .center,
+    );
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(
+      controller.selection,
+      TextSelection.collapsed(
+        offset: source.indexOf('Alpha bravo') + visibleOffset,
+      ),
+    );
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
+  testWidgets('heading multi-click selections preserve physical source lines', (
+    tester,
+  ) async {
+    const source =
+        'Before\n\n## Alpha bravo\n\nSetext bravo\n------------\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    Future<Offset> targetWithin(Finder finder, int offset) async {
+      final editable = editableWithin(tester, finder);
+      return editable.localToGlobal(
+        editable.getLocalRectForCaret(TextPosition(offset: offset)).center,
+      );
+    }
+
+    var target = await targetWithin(find.text('Alpha bravo'), 8);
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(controller.selection.textInside(source), 'bravo');
+
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+    expect(controller.selection.textInside(source), '## Alpha bravo');
+
+    await tester.tap(find.text('After'));
+    await tester.pumpAndSettle();
+    target = await targetWithin(find.text('Setext bravo'), 9);
+    for (var tap = 0; tap < 3; tap += 1) {
+      await tester.tapAt(target);
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    await tester.pumpAndSettle();
+
+    expect(controller.selection.textInside(source), 'Setext bravo');
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('active ATX headings expose compact H1-H6 badges', (
     tester,
   ) async {
