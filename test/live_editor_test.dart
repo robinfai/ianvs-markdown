@@ -1193,9 +1193,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Body'), findsNothing);
 
-    await tester.tap(
-      find.byKey(const ValueKey('ianvs-markdown-gap-9')),
-    );
+    await tester.tap(find.byKey(const ValueKey('ianvs-markdown-gap-9')));
     await tester.pump();
     final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
     var field = tester.widget<TextField>(
@@ -10599,10 +10597,28 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     );
     expect(fields, findsNWidgets(4));
     expect(tester.widget<TextField>(fields.at(1)).textAlign, TextAlign.right);
+    await tester.tap(fields.at(3));
+    await tester.pump();
+    final editedField = tester.widget<TextField>(fields.at(3));
+    editedField.controller?.selection = const TextSelection.collapsed(
+      offset: 3,
+    );
+    await tester.pump();
+    final originalCellEnd = controller.text.indexOf('two') + 'two'.length;
+    expect(
+      controller.selection,
+      TextSelection.collapsed(offset: originalCellEnd),
+    );
     await tester.enterText(fields.at(3), 'updated');
     await tester.pump();
 
     expect(controller.text, '| A | B |\n| :--- | ---: |\n| one | updated |');
+    expect(
+      controller.selection,
+      TextSelection.collapsed(
+        offset: controller.text.indexOf('updated') + 'updated'.length,
+      ),
+    );
     expect(
       find.byKey(const ValueKey('ianvs-markdown-active-block')),
       findsNothing,
@@ -10610,6 +10626,10 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     controller.undo();
     await tester.pump();
     expect(controller.text, '| A | B |\n| :--- | ---: |\n| one | two |');
+    expect(
+      controller.selection,
+      TextSelection.collapsed(offset: originalCellEnd),
+    );
   });
 
   testWidgets('inactive table cells render inline Markdown until focused', (
@@ -12054,7 +12074,7 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
       expect(controller.text, source);
       expect(
         controller.selection,
-        TextSelection.collapsed(offset: documentCaret),
+        TextSelection.collapsed(offset: source.indexOf('**cell**') + 6),
       );
       expect(
         tester.widget<TextField>(cell).controller?.selection,
@@ -12130,7 +12150,15 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
       await tester.pumpAndSettle();
 
       expect(controller.text, source);
-      expect(controller.selection, const TextSelection.collapsed(offset: 0));
+      final cellStart = source.indexOf('**cell**');
+      expect(
+        controller.selection,
+        TextSelection(
+          baseOffset: cellStart,
+          extentOffset: cellStart + 2,
+          isDirectional: true,
+        ),
+      );
       expect(
         tester.widget<TextField>(cell).controller?.selection,
         const TextSelection(

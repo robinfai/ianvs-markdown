@@ -3527,6 +3527,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           onCommitHistoryGroup: widget.controller.commitHistoryGroup,
           onCellChanged: _replaceTableCell,
           onCellFormatted: _replaceFormattedTableCell,
+          onCellSelectionChanged: _syncTableCellSelection,
           onSelectAll: _handleSelectAllDocument,
           onDeleteLine: _deleteTableLine,
           onAddRow: () => _appendTableRow(block),
@@ -4071,7 +4072,10 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     return null;
   }
 
-  void _replaceTableCell(_EditableTableCell cell, String replacement) {
+  void _replaceTableCell(
+    _EditableTableCell cell,
+    TextEditingValue replacement,
+  ) {
     final current = widget.controller.value;
     final editStart = cell.isSynthetic ? cell.lineStart : cell.start;
     final editEnd = cell.isSynthetic ? cell.lineEnd : cell.end;
@@ -4079,9 +4083,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         ? _materializeTableLineCell(
             cell.lineSource,
             column: cell.column,
-            replacement: replacement,
+            replacement: replacement.text,
           )
-        : replacement;
+        : replacement.text;
     if (editStart < 0 || editEnd < editStart || editEnd > current.text.length) {
       return;
     }
@@ -4101,8 +4105,16 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         isDirectional: selection.isDirectional,
       );
     }
+    final nextText = current.text.replaceRange(
+      editStart,
+      editEnd,
+      sourceReplacement,
+    );
+    selection =
+        _tableCellDocumentSelection(cell, nextText, replacement.selection) ??
+        selection;
     widget.controller.value = current.copyWith(
-      text: current.text.replaceRange(editStart, editEnd, sourceReplacement),
+      text: nextText,
       selection: selection,
       composing: TextRange.empty,
     );
@@ -4112,24 +4124,46 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     _EditableTableCell cell,
     TextEditingValue replacement,
   ) {
-    _replaceTableCell(cell, replacement.text);
-    final selection = replacement.selection;
-    if (!selection.isValid) return;
-    final source = widget.controller.text;
-    if (cell.lineStart < 0 || cell.lineStart > source.length) return;
+    _replaceTableCell(cell, replacement);
+  }
+
+  void _syncTableCellSelection(
+    _EditableTableCell cell,
+    TextEditingValue value,
+  ) {
+    final selection = _tableCellDocumentSelection(
+      cell,
+      widget.controller.text,
+      value.selection,
+    );
+    if (selection == null || selection == widget.controller.selection) return;
+    widget.controller.selection = selection;
+  }
+
+  TextSelection? _tableCellDocumentSelection(
+    _EditableTableCell cell,
+    String source,
+    TextSelection localSelection,
+  ) {
+    if (!localSelection.isValid ||
+        cell.lineStart < 0 ||
+        cell.lineStart > source.length) {
+      return null;
+    }
     final newline = source.indexOf('\n', cell.lineStart);
     final lineEnd = newline < 0 ? source.length : newline;
     final line = source.substring(cell.lineStart, lineEnd);
     final ranges = _tableLineCellRanges(_EditableTableLine(line, 0));
-    if (cell.column >= ranges.length) return;
+    if (cell.column >= ranges.length) return null;
     final range = ranges[cell.column];
     final cellStart = cell.lineStart + range.$1;
     final cellLength = range.$2 - range.$1;
-    widget.controller.selection = TextSelection(
-      baseOffset: cellStart + selection.baseOffset.clamp(0, cellLength),
-      extentOffset: cellStart + selection.extentOffset.clamp(0, cellLength),
-      affinity: selection.affinity,
-      isDirectional: selection.isDirectional,
+    return TextSelection(
+      baseOffset: cellStart + localSelection.baseOffset.clamp(0, cellLength),
+      extentOffset:
+          cellStart + localSelection.extentOffset.clamp(0, cellLength),
+      affinity: localSelection.affinity,
+      isDirectional: localSelection.isDirectional,
     );
   }
 
@@ -5090,6 +5124,7 @@ class _EditableMarkdownTable extends StatefulWidget {
     required this.onCommitHistoryGroup,
     required this.onCellChanged,
     required this.onCellFormatted,
+    required this.onCellSelectionChanged,
     required this.onSelectAll,
     required this.onDeleteLine,
     required this.onAddRow,
@@ -5103,9 +5138,12 @@ class _EditableMarkdownTable extends StatefulWidget {
   final IanvsMarkdownThemeData colors;
   final Set<String> linkReferenceLabels;
   final VoidCallback onCommitHistoryGroup;
-  final void Function(_EditableTableCell cell, String value) onCellChanged;
+  final void Function(_EditableTableCell cell, TextEditingValue value)
+  onCellChanged;
   final void Function(_EditableTableCell cell, TextEditingValue value)
   onCellFormatted;
+  final void Function(_EditableTableCell cell, TextEditingValue value)
+  onCellSelectionChanged;
   final VoidCallback onSelectAll;
   final ValueChanged<_EditableTableCell> onDeleteLine;
   final VoidCallback onAddRow;
@@ -5125,6 +5163,7 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
     debugLabel: 'ianvs-markdown-table-geometry',
   );
   final Map<String, _TableCellEditingController> _controllers = {};
+  final Set<String> _syncingControllerKeys = {};
   final Map<String, FocusNode> _focusNodes = {};
   final Map<String, GlobalKey> _cellGeometryKeys = {};
   final Map<int, LayerLink> _rowHandleLinks = {};
@@ -5167,20 +5206,28 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
         node.addListener(_handleCellFocusChanged);
         return node;
       });
-      final controller = _controllers.putIfAbsent(
-        cell.key,
-        () => _TableCellEditingController(text: cell.text),
-      );
-      if (controller.text != cell.text) {
-        controller.value = TextEditingValue(
-          text: cell.text,
-          selection: TextSelection.collapsed(
-            offset: controller.selection.extentOffset.clamp(
-              0,
-              cell.text.length,
-            ),
-          ),
+      final controller = _controllers.putIfAbsent(cell.key, () {
+        final controller = _TableCellEditingController(text: cell.text);
+        controller.addListener(
+          () => _handleCellControllerChanged(cell.key, controller),
         );
+        return controller;
+      });
+      if (controller.text != cell.text) {
+        _syncingControllerKeys.add(cell.key);
+        try {
+          controller.value = TextEditingValue(
+            text: cell.text,
+            selection: TextSelection.collapsed(
+              offset: controller.selection.extentOffset.clamp(
+                0,
+                cell.text.length,
+              ),
+            ),
+          );
+        } finally {
+          _syncingControllerKeys.remove(cell.key);
+        }
       }
     }
     final removedControllers = _controllers.keys
@@ -5212,6 +5259,20 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
 
   void _handleCellFocusChanged() {
     if (mounted) setState(() {});
+  }
+
+  void _handleCellControllerChanged(
+    String key,
+    TextEditingController controller,
+  ) {
+    if (!mounted ||
+        _syncingControllerKeys.contains(key) ||
+        !identical(_controllers[key], controller)) {
+      return;
+    }
+    final cell = _cellForKey(key);
+    if (cell == null || controller.text != cell.text) return;
+    widget.onCellSelectionChanged(cell, controller.value);
   }
 
   _EditableTableCell? _cellForKey(String key) {
@@ -5826,8 +5887,10 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                                           vertical: 4.5,
                                         ),
                                       ),
-                                      onChanged: (value) =>
-                                          widget.onCellChanged(cell, value),
+                                      onChanged: (_) => widget.onCellChanged(
+                                        cell,
+                                        controller.value,
+                                      ),
                                     ),
                                   ),
                                 ),
