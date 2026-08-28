@@ -2513,12 +2513,13 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       _resetDocumentDragSelection();
       return;
     }
-    final renderedOffset = block.type == IanvsMarkdownBlockType.indentedCode
-        ? _indentedCodeDocumentOffsetAtRenderedPoint(block, origin)
-        : null;
+    final renderedOffset = _projectedDocumentOffsetAtRenderedPoint(
+      block,
+      origin,
+    );
     final latest = _documentDragLatest;
     final renderedExtent = renderedOffset != null && latest != null
-        ? _indentedCodeDocumentOffsetAtRenderedPoint(block, latest)
+        ? _projectedDocumentOffsetAtRenderedPoint(block, latest)
         : null;
     final epoch = _documentDragEpoch;
     _activateBlock(block, documentOffset: renderedOffset ?? block.end);
@@ -2594,6 +2595,48 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         }
       }
       lineStart += line.length + 1;
+    }
+    return null;
+  }
+
+  int? _projectedDocumentOffsetAtRenderedPoint(
+    IanvsMarkdownBlock block,
+    Offset globalPosition,
+  ) {
+    if (block.type == IanvsMarkdownBlockType.indentedCode) {
+      return _indentedCodeDocumentOffsetAtRenderedPoint(block, globalPosition);
+    }
+    final definition = _livePreviewFootnoteDefinition(block.source);
+    if (definition == null) return null;
+    final root = _renderedBlockTapKeys[block.start]?.currentContext
+        ?.findRenderObject();
+    if (root == null || !root.attached) return null;
+    final editables = <RenderEditable>[];
+    void collect(RenderObject child) {
+      if (child is RenderEditable && child.readOnly) {
+        editables.add(child);
+        return;
+      }
+      child.visitChildren(collect);
+    }
+
+    root.visitChildren(collect);
+    for (final editable in editables) {
+      if (!editable.attached || !editable.hasSize) continue;
+      final local = editable.globalToLocal(globalPosition);
+      if (local.dy < -1 || local.dy > editable.size.height + 1) continue;
+      final visibleText = editable.text?.toPlainText() ?? '';
+      final visibleOffset = editable
+          .getPositionForPoint(globalPosition)
+          .offset
+          .clamp(0, visibleText.length);
+      final localSourceOffset = definition.sourceOffsetForVisibleOffset(
+        visibleText,
+        visibleOffset,
+      );
+      if (localSourceOffset != null) {
+        return block.start + localSourceOffset;
+      }
     }
     return null;
   }
@@ -2775,11 +2818,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             renderObject.size,
           )
         : null;
-    final indentedCodeTapOffset =
-        tapCount == 1 &&
-            block.type == IanvsMarkdownBlockType.indentedCode &&
-            pendingGlobal != null
-        ? _indentedCodeDocumentOffsetAtRenderedPoint(block, pendingGlobal)
+    final projectedTapOffset = tapCount == 1 && pendingGlobal != null
+        ? _projectedDocumentOffsetAtRenderedPoint(block, pendingGlobal)
         : null;
     _activateBlock(
       block,
@@ -2788,15 +2828,15 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           block.type == IanvsMarkdownBlockType.thematicBreak &&
               !selectThematicSource
           ? block.end
-          : indentedCodeTapOffset ?? tapOffset,
+          : projectedTapOffset ?? tapOffset,
     );
-    if (indentedCodeTapOffset != null) {
+    if (projectedTapOffset != null) {
       _projectedRenderedTapBlockStart = block.start;
-      _projectedRenderedTapLocalOffset = indentedCodeTapOffset - block.start;
+      _projectedRenderedTapLocalOffset = projectedTapOffset - block.start;
     }
     if (pendingGlobal != null &&
         block.type != IanvsMarkdownBlockType.thematicBreak &&
-        indentedCodeTapOffset == null) {
+        projectedTapOffset == null) {
       _placeSelectionAtRenderedTap(
         block,
         pendingGlobal,
@@ -4081,12 +4121,6 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         )
         .toList(growable: false);
     final edits = <_LivePreviewRenderingEdit>[
-      for (final reference in footnoteReferences)
-        _LivePreviewRenderingEdit(
-          start: reference.sourceRange.start - block.start,
-          end: reference.sourceRange.end - block.start,
-          replacement: '<sup>${reference.label}</sup>',
-        ),
       for (final range in _crossParagraphHighlightLiteralRuns)
         if (range.start >= block.start &&
             range.end <= block.end &&
@@ -4109,37 +4143,33 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         edit.replacement,
       );
     }
-    final footnoteDefinition = prepareObsidianFootnoteDefinitionForEditing(
-      projectedBlock,
-      document: widget.controller.text,
-    );
-    var source = footnoteDefinition ?? projectedBlock;
-    if (footnoteDefinition == null && _isEmptyAtxHeadingSource(source)) {
+    var source =
+        _livePreviewFootnoteDefinition(projectedBlock)?.renderedSource ??
+        projectedBlock;
+    if (_isEmptyAtxHeadingSource(source)) {
       // Obsidian keeps marker-only ATX prefixes literal in Live Preview. The
       // Markdown renderer otherwise interprets them as empty headings and
       // drops the hashes, so escape only the first marker for display.
       source = source.replaceFirst('#', r'\#');
     }
-    if (footnoteDefinition == null) {
-      source = source
-          .split('\n')
-          .map((line) {
-            final task = RegExp(
-              r'^((?:(?:[ \t]{0,3}>[ \t]?)+)?[ \t]*(?:[-+*]|\d{1,9}[.)])[ \t]+\[([^\r\n])\][ \t]+)(.*)$',
-            ).firstMatch(line);
-            final marker = task?.group(2);
-            final content = task?.group(3) ?? '';
-            if (task == null ||
-                marker == null ||
-                !ianvsMarkdownTaskMarkerUsesDoneText(marker) ||
-                content.isEmpty ||
-                content.startsWith('~~') && content.endsWith('~~')) {
-              return line;
-            }
-            return '${task.group(1)}~~$content~~';
-          })
-          .join('\n');
-    }
+    source = source
+        .split('\n')
+        .map((line) {
+          final task = RegExp(
+            r'^((?:(?:[ \t]{0,3}>[ \t]?)+)?[ \t]*(?:[-+*]|\d{1,9}[.)])[ \t]+\[([^\r\n])\][ \t]+)(.*)$',
+          ).firstMatch(line);
+          final marker = task?.group(2);
+          final content = task?.group(3) ?? '';
+          if (task == null ||
+              marker == null ||
+              !ianvsMarkdownTaskMarkerUsesDoneText(marker) ||
+              content.isEmpty ||
+              content.startsWith('~~') && content.endsWith('~~')) {
+            return line;
+          }
+          return '${task.group(1)}~~$content~~';
+        })
+        .join('\n');
     if (block.type == IanvsMarkdownBlockType.unorderedList ||
         block.type == IanvsMarkdownBlockType.orderedList ||
         block.type == IanvsMarkdownBlockType.taskList) {
@@ -7593,6 +7623,70 @@ final class _LivePreviewRenderingEdit {
   final int start;
   final int end;
   final String replacement;
+}
+
+final class _LivePreviewFootnoteDefinition {
+  const _LivePreviewFootnoteDefinition({
+    required this.label,
+    required this.body,
+    required this.labelStart,
+    required this.bodyStart,
+  });
+
+  final String label;
+  final String body;
+  final int labelStart;
+  final int bodyStart;
+
+  String get renderedSource => body.isEmpty ? label : '$label $body';
+
+  int? sourceOffsetForVisibleOffset(String visibleText, int visibleOffset) {
+    final safeOffset = visibleOffset.clamp(0, visibleText.length);
+    if (safeOffset <= label.length) return labelStart + safeOffset;
+    if (body.isEmpty) return bodyStart;
+
+    final visibleBodyStart = (label.length + 1).clamp(0, visibleText.length);
+    if (safeOffset <= visibleBodyStart) return bodyStart;
+    final visibleBody = visibleText.substring(visibleBodyStart);
+    final bodyOffset = _markdownSourceOffsetForVisibleOffset(
+      body,
+      visibleBody,
+      safeOffset - visibleBodyStart,
+    );
+    return bodyOffset == null ? null : bodyStart + bodyOffset;
+  }
+}
+
+_LivePreviewFootnoteDefinition? _livePreviewFootnoteDefinition(String source) {
+  final match = RegExp(
+    r'^( {0,3}\[\^)([^\] \r\n\x00\t]+)(\]:[ \t]*)(.*)$',
+    dotAll: true,
+  ).firstMatch(source);
+  if (match == null) return null;
+  final prefix = match.group(1)!;
+  final label = match.group(2)!;
+  final separator = match.group(3)!;
+  return _LivePreviewFootnoteDefinition(
+    label: label,
+    body: match.group(4) ?? '',
+    labelStart: prefix.length,
+    bodyStart: prefix.length + label.length + separator.length,
+  );
+}
+
+int? _markdownSourceOffsetForVisibleOffset(
+  String source,
+  String visible,
+  int visibleOffset,
+) {
+  final safeOffset = visibleOffset.clamp(0, visible.length);
+  var sourceOffset = 0;
+  for (var index = 0; index < safeOffset; index += 1) {
+    final next = source.indexOf(visible[index], sourceOffset);
+    if (next < 0) return null;
+    sourceOffset = next + 1;
+  }
+  return sourceOffset;
 }
 
 class _BlockEditingController extends TextEditingController {

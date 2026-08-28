@@ -894,9 +894,11 @@ _ObsidianFootnoteReferencePresentation? _obsidianFootnoteReferencePresentation(
   );
 }
 
-/// Returns a standard footnote definition formatted as the numbered list item
-/// Obsidian shows in editing view, or null when [source] is not a referenced
-/// definition.
+/// Formats a referenced standard footnote as a document-numbered list item.
+///
+/// This remains available for hosts that intentionally want a compact custom
+/// projection. `IanvsMarkdownLiveEditor` keeps Obsidian's label-based Live
+/// Preview instead and uses numbered definitions only in Reading mode.
 String? prepareObsidianFootnoteDefinitionForEditing(
   String source, {
   required String document,
@@ -925,8 +927,10 @@ Map<String, int> collectObsidianStandardFootnoteOrdinals(String source) {
   return Map<String, int>.unmodifiable(collector.standardOrdinals);
 }
 
-/// One footnote reference projected as a compact ordinal in inactive Live
-/// Preview while the exact Markdown remains owned by the editor controller.
+/// One footnote reference source range with its document-wide Reading ordinal.
+///
+/// Live Preview keeps the exact marker visible; the ordinal presentation is
+/// used by Reading mode and remains available to custom hosts.
 @immutable
 final class IanvsMarkdownLivePreviewFootnoteReference {
   const IanvsMarkdownLivePreviewFootnoteReference({
@@ -944,8 +948,7 @@ final class IanvsMarkdownLivePreviewFootnoteReference {
       occurrence == 1 ? '[$ordinal]' : '[$ordinal-${occurrence - 1}]';
 }
 
-/// Collects the source ranges and shared ordinals shown by inactive Live
-/// Preview for standard and inline footnotes.
+/// Collects source ranges and shared Reading ordinals for footnote references.
 ///
 /// Undefined standard references remain literal and do not consume an
 /// ordinal. Comments and code retain their higher parsing priority. Nested

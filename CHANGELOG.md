@@ -36,11 +36,11 @@
   consumed or styled as Obsidian metadata, while table-cell IDs stay intact.
 - Resolve empty ordinary-link destinations to Obsidian's current-note URI in
   link callbacks, including both `()` and `(<>)` source forms.
-- Render defined standard and inline footnotes as shared `[N]` / `[N-k]`
-  ordinals in inactive Live Preview, while undefined references remain literal,
-  definition blocks keep document-wide numbering, and activation restores the
-  exact Markdown source; single- and multi-line code spans retain literal
-  footnote-shaped text in Reading and Live Preview.
+- Keep defined, undefined, and inline footnote markers byte-exact in inactive
+  Live Preview, while definition blocks retain their labels without definition
+  punctuation and activation restores the complete Markdown source. Reading
+  mode alone renders the shared `[N]` / `[N-k]` sequence; single- and multi-line
+  code spans retain literal footnote-shaped text in both modes.
 - Keep an isolated `==before / blank line / after==` attempt fully literal in
   Reading and inactive Live Preview instead of projecting both sides as
   independent unclosed highlights; exact source and higher-priority literal

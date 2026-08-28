@@ -8422,10 +8422,10 @@ $$''');
     expect(controller.text, source);
   });
 
-  testWidgets(
-    'live preview hides inactive footnotes and reveals exact source',
-    (tester) async {
-      const source = '''
+  testWidgets('live preview keeps inactive footnote markers as exact source', (
+    tester,
+  ) async {
+    const source = '''
 # Metadata
 
 Visible %%secret%% after. ^block-id
@@ -8434,48 +8434,204 @@ Standard[^note] and inline ^[inline body].
 
 [^note]: Definition with **bold**.
 ''';
-      final controller = IanvsMarkdownController(text: source);
-      addTearDown(controller.dispose);
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
 
-      await tester.pumpWidget(app(controller));
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
 
-      expect(find.text('%%secret%%'), findsOneWidget);
-      expect(find.text(' ^block-id'), findsOneWidget);
-      expect(find.text('[^note]'), findsNothing);
-      expect(find.text('^[inline body]'), findsNothing);
-      final footnotePreview = find.byWidgetPredicate(
-        (widget) =>
-            widget is SelectableText &&
-            (widget.data ?? widget.textSpan?.toPlainText() ?? '') ==
-                'Standard[1] and inline [2].',
-      );
-      expect(footnotePreview, findsOneWidget);
-      expect(find.text('1.'), findsOneWidget);
-      expect(find.textContaining('Definition with'), findsOneWidget);
-      expect(find.textContaining('[^note]:'), findsNothing);
+    expect(find.text('%%secret%%'), findsOneWidget);
+    expect(find.text(' ^block-id'), findsOneWidget);
+    expect(find.text('[^note]'), findsOneWidget);
+    expect(find.text('^[inline body]'), findsOneWidget);
+    expect(find.text('1.'), findsNothing);
+    expect(find.textContaining('Definition with'), findsOneWidget);
+    expect(find.textContaining('[^note]:'), findsNothing);
 
-      await tester.tap(footnotePreview);
-      await tester.pump();
-      var active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
-      var field = tester.widget<TextField>(
-        find.descendant(of: active, matching: find.byType(TextField)),
-      );
-      expect(
-        field.controller?.text,
-        'Standard[^note] and inline ^[inline body].',
-      );
-      expect(controller.text, source);
+    await tester.tap(find.text('[^note]'));
+    await tester.pump();
+    var active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    var field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(
+      field.controller?.text,
+      'Standard[^note] and inline ^[inline body].',
+    );
+    expect(controller.text, source);
 
-      await tester.tap(find.text('%%secret%%'));
-      await tester.pump();
-      active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
-      field = tester.widget<TextField>(
-        find.descendant(of: active, matching: find.byType(TextField)),
-      );
-      expect(field.controller?.text, 'Visible %%secret%% after. ^block-id');
-    },
-  );
+    await tester.tap(find.text('%%secret%%'));
+    await tester.pump();
+    active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, 'Visible %%secret%% after. ^block-id');
+  });
+
+  testWidgets('footnote marker clicks preserve Obsidian source selections', (
+    tester,
+  ) async {
+    const source = 'Before[^note] after.\n\n[^note]: Definition.';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final marker = find.text('[^note]');
+    final paragraph = tester.renderObject<RenderParagraph>(
+      find.descendant(of: marker, matching: find.byType(RichText)),
+    );
+    const markerOffset = 4;
+    final caret = paragraph.getOffsetForCaret(
+      const TextPosition(offset: markerOffset),
+      Rect.zero,
+    );
+    final target = paragraph.localToGlobal(
+      caret + Offset(.1, paragraph.size.height / 2),
+    );
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(controller.selection.isCollapsed, isTrue);
+    expect(
+      controller.selection.extentOffset,
+      source.indexOf('[^note]') + markerOffset,
+    );
+
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(controller.selection.textInside(source), 'note');
+
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(controller.selection.textInside(source), 'Before[^note] after.');
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
+  testWidgets('footnote definition clicks map its projection to source', (
+    tester,
+  ) async {
+    const source = 'Before[^note] after.\n\n[^note]: Definition text.';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final preview = find.text('note Definition text.');
+    final editable = editableWithin(tester, preview);
+    const bodyOffset = 8;
+    const visibleOffset = 5 + bodyOffset;
+    final target = editable.localToGlobal(
+      editable
+          .getLocalRectForCaret(const TextPosition(offset: visibleOffset))
+          .center,
+    );
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final expectedOffset = source.indexOf('Definition') + bodyOffset;
+    expect(controller.selection.isCollapsed, isTrue);
+    expect(controller.selection.extentOffset, expectedOffset);
+
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(controller.selection.textInside(source), 'Definition');
+
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(
+      controller.selection.textInside(source),
+      '[^note]: Definition text.',
+    );
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
+  testWidgets('footnote definition drag maps its projected body to source', (
+    tester,
+  ) async {
+    const source = 'Before[^note] after.\n\n[^note]: Definition text.';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final editable = editableWithin(tester, find.text('note Definition text.'));
+    const visibleBodyStart = 5;
+    const sourceStart = 2;
+    const sourceEnd = 11;
+    final start = editable.localToGlobal(
+      editable
+          .getLocalRectForCaret(
+            const TextPosition(offset: visibleBodyStart + sourceStart),
+          )
+          .center,
+    );
+    final end = editable.localToGlobal(
+      editable
+          .getLocalRectForCaret(
+            const TextPosition(offset: visibleBodyStart + sourceEnd),
+          )
+          .center,
+    );
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    addTearDown(mouse.removePointer);
+    await mouse.down(start);
+    await mouse.moveTo(end);
+    await tester.pumpAndSettle();
+    await mouse.up();
+    await tester.pumpAndSettle();
+
+    final bodyStart = source.indexOf('Definition');
+    expect(
+      controller.selection,
+      TextSelection(
+        baseOffset: bodyStart + sourceStart,
+        extentOffset: bodyStart + sourceEnd,
+        isDirectional: true,
+      ),
+    );
+    expect(controller.selection.textInside(source), 'finition ');
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
+  testWidgets('formatted footnote definition click keeps exact source offset', (
+    tester,
+  ) async {
+    const source = 'Before[^note].\n\n[^note]: Definition **bold** tail.';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final preview = find.byWidgetPredicate(
+      (widget) =>
+          widget is SelectableText &&
+          (widget.data ?? widget.textSpan?.toPlainText() ?? '') ==
+              'note Definition bold tail.',
+    );
+    final editable = editableWithin(tester, preview);
+    const visibleOffset = 5 + 11 + 2;
+    final target = editable.localToGlobal(
+      editable
+          .getLocalRectForCaret(const TextPosition(offset: visibleOffset))
+          .center,
+    );
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(controller.selection.isCollapsed, isTrue);
+    expect(controller.selection.extentOffset, source.indexOf('bold') + 2);
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
 
   testWidgets('live preview edits a standalone comment across blank lines', (
     tester,
@@ -8667,7 +8823,9 @@ Standard[^note] and inline ^[inline body].
     expect(controller.text, source);
   });
 
-  testWidgets('live preview shares mixed footnote numbering', (tester) async {
+  testWidgets('live preview keeps mixed footnote markers literal', (
+    tester,
+  ) async {
     const source = '''
 Inline ^[first], missing[^missing], standard[^a], repeated[^a], empty ^[], and second[^b].
 
@@ -8681,42 +8839,17 @@ Inline ^[first], missing[^missing], standard[^a], repeated[^a], empty ^[], and s
     await tester.pumpWidget(app(controller));
     await tester.pumpAndSettle();
 
-    expect(find.text('^[first]'), findsNothing);
+    expect(find.text('^[first]'), findsOneWidget);
     expect(find.text('[^missing]'), findsOneWidget);
-    expect(find.text('[^a]'), findsNothing);
-    expect(find.text('^[]'), findsNothing);
-    final footnotePreview = find.byWidgetPredicate(
-      (widget) =>
-          widget is SelectableText &&
-          (widget.data ?? widget.textSpan?.toPlainText() ?? '').contains(
-            'Inline [1]',
-          ),
-    );
-    expect(footnotePreview, findsOneWidget);
-    final preview = tester.widget<SelectableText>(footnotePreview);
-    expect(
-      preview.data ?? preview.textSpan?.toPlainText(),
-      'Inline [1], missing',
-    );
-    final footnotePreviewTail = find.byWidgetPredicate(
-      (widget) =>
-          widget is SelectableText &&
-          (widget.data ?? widget.textSpan?.toPlainText() ?? '').contains(
-            'standard[2]',
-          ),
-    );
-    expect(footnotePreviewTail, findsOneWidget);
-    final previewTail = tester.widget<SelectableText>(footnotePreviewTail);
-    expect(
-      previewTail.data ?? previewTail.textSpan?.toPlainText(),
-      ', standard[2], repeated[2-1], empty [3], and second[4].',
-    );
-    expect(find.text('2.'), findsOneWidget);
-    expect(find.text('4.'), findsOneWidget);
+    expect(find.text('[^a]'), findsNWidgets(2));
+    expect(find.text('^[]'), findsOneWidget);
+    expect(find.text('[^b]'), findsOneWidget);
+    expect(find.text('2.'), findsNothing);
+    expect(find.text('4.'), findsNothing);
     expect(find.textContaining('Alpha.'), findsOneWidget);
     expect(find.textContaining('Beta.'), findsOneWidget);
 
-    await tester.tap(footnotePreview);
+    await tester.tap(find.text('^[first]'));
     await tester.pump();
     final field = tester.widget<TextField>(
       find.descendant(
@@ -8732,7 +8865,7 @@ Inline ^[first], missing[^missing], standard[^a], repeated[^a], empty ^[], and s
     expect(controller.text, source);
   });
 
-  testWidgets('live preview projects inline footnotes inside formatting', (
+  testWidgets('live preview keeps inline footnotes inside formatting literal', (
     tester,
   ) async {
     const source = r'''
@@ -8745,8 +8878,7 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     await tester.pumpWidget(app(controller));
     await tester.pumpAndSettle();
 
-    expect(find.text('^[bold body]'), findsNothing);
-    expect(find.text('^[link body]'), findsNothing);
+    expect(find.text('^[bold body]'), findsOneWidget);
     final visibleSegments = <String>[
       ...tester
           .widgetList<SelectableText>(find.byType(SelectableText))
@@ -8756,10 +8888,9 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
           .map((widget) => widget.data ?? widget.textSpan?.toPlainText() ?? ''),
     ];
     expect(
-      visibleSegments.any((text) => text.contains('before [1] after')),
+      visibleSegments.any((text) => text.contains('^[link body]')),
       isTrue,
     );
-    expect(visibleSegments.any((text) => text.contains('linked [2]')), isTrue);
     expect(controller.text, source);
   });
 
@@ -8786,18 +8917,10 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
       return text.contains('^[not-footnote]');
     });
     expect(code, findsAtLeastNWidgets(1));
-    expect(find.text('[^a]'), findsNothing);
-    final previewTail = find.byWidgetPredicate(
-      (widget) =>
-          widget is SelectableText &&
-          (widget.data ?? widget.textSpan?.toPlainText() ?? '').contains(
-            'standard[1]',
-          ),
-    );
-    expect(previewTail, findsOneWidget);
-    expect(find.text('1.'), findsOneWidget);
+    expect(find.text('[^a]'), findsOneWidget);
+    expect(find.text('1.'), findsNothing);
 
-    await tester.tap(previewTail);
+    await tester.tap(find.text('[^a]'));
     await tester.pump();
     final field = tester.widget<TextField>(
       find.descendant(
