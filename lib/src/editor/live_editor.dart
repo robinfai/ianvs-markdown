@@ -1349,6 +1349,20 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     );
   }
 
+  int? _adjacentVisibleBlockIndex(int blockIndex, {required bool forward}) {
+    final hiddenBlockIndices = widget.enableHeadingFolding
+        ? _headingFoldModel.hiddenBlockIndices(_headingFoldController)
+        : const <int>{};
+    for (
+      var index = blockIndex + (forward ? 1 : -1);
+      index >= 0 && index < _blocks.length;
+      index += forward ? 1 : -1
+    ) {
+      if (!hiddenBlockIndices.contains(index)) return index;
+    }
+    return null;
+  }
+
   ({int offset, int lineStart, int lineEnd})? _verticalTargetFromBlock(
     int blockIndex, {
     required bool down,
@@ -1356,9 +1370,11 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     final source = widget.controller.text;
     final block = _blocks[blockIndex];
     if (down) {
-      final next = blockIndex + 1 < _blocks.length
-          ? _blocks[blockIndex + 1]
-          : null;
+      final nextIndex = _adjacentVisibleBlockIndex(blockIndex, forward: true);
+      final next = nextIndex == null ? null : _blocks[nextIndex];
+      if (nextIndex != null && nextIndex > blockIndex + 1) {
+        return _verticalTargetInBlock(_blocks[nextIndex], atStart: true);
+      }
       final gapEnd = next?.start ?? source.length;
       final firstGapLineStart = block.end + 1;
       if (firstGapLineStart < gapEnd) {
@@ -1370,8 +1386,15 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       return next == null ? null : _verticalTargetInBlock(next, atStart: true);
     }
 
-    if (blockIndex == 0) return null;
-    final previous = _blocks[blockIndex - 1];
+    final previousIndex = _adjacentVisibleBlockIndex(
+      blockIndex,
+      forward: false,
+    );
+    if (previousIndex == null) return null;
+    final previous = _blocks[previousIndex];
+    if (previousIndex < blockIndex - 1) {
+      return _verticalTargetInBlock(previous, atStart: false);
+    }
     if (previous.end + 1 < block.start) {
       final lastGapLineOffset = block.start - 1;
       return _verticalTargetOnLine(
@@ -1566,9 +1589,12 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     _rememberVerticalNavigationPosition(localOffset);
 
     if (down) {
-      final next = activeIndex + 1 < _blocks.length
-          ? _blocks[activeIndex + 1]
-          : null;
+      final nextIndex = _adjacentVisibleBlockIndex(activeIndex, forward: true);
+      final next = nextIndex == null ? null : _blocks[nextIndex];
+      if (nextIndex != null && nextIndex > activeIndex + 1) {
+        _activateBlockVertically(_blocks[nextIndex], atStart: true);
+        return KeyEventResult.handled;
+      }
       final gapEnd = next?.start ?? widget.controller.text.length;
       final firstGapLineStart = active.end + 1;
       if (firstGapLineStart < gapEnd) {
@@ -1584,8 +1610,16 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       return KeyEventResult.handled;
     }
 
-    if (activeIndex == 0) return KeyEventResult.ignored;
-    final previous = _blocks[activeIndex - 1];
+    final previousIndex = _adjacentVisibleBlockIndex(
+      activeIndex,
+      forward: false,
+    );
+    if (previousIndex == null) return KeyEventResult.ignored;
+    final previous = _blocks[previousIndex];
+    if (previousIndex < activeIndex - 1) {
+      _activateBlockVertically(previous, atStart: false);
+      return KeyEventResult.handled;
+    }
     if (previous.end + 1 < active.start) {
       final lastGapLineStart = active.start - 1;
       _activateTrailingGapLine(
