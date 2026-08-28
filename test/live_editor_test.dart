@@ -9941,6 +9941,74 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     expect(controller.isDirty, isFalse);
   });
 
+  testWidgets('tab-indented code multi-click restores raw indentation', (
+    tester,
+  ) async {
+    const source = 'Before.\n\n\tTab-one\n\tTab-two\n\nAfter.';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final inactiveEditable = editableWithin(tester, find.text('Tab-one'));
+    final target = inactiveEditable.localToGlobal(
+      inactiveEditable
+          .getLocalRectForCaret(const TextPosition(offset: 2))
+          .center,
+    );
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(controller.selection.textInside(source), 'Tab');
+
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(controller.selection.textInside(source), '\tTab-one');
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
+  testWidgets('indented code gap activates its exact blank source line', (
+    tester,
+  ) async {
+    const source = 'Before.\n\n    four-one\n    four-two\n\nMiddle.';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    final codeBlock = parseMarkdownBlocks(
+      source,
+    ).singleWhere((block) => block.type == IanvsMarkdownBlockType.indentedCode);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(ValueKey('ianvs-markdown-gap-${codeBlock.end}')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      controller.selection,
+      TextSelection.collapsed(offset: codeBlock.end + 1),
+    );
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final fieldFinder = find.descendant(
+      of: active,
+      matching: find.byType(TextField),
+    );
+    final field = tester.widget<TextField>(fieldFinder);
+    expect(field.controller?.text, '    four-one\n    four-two\n');
+
+    await tester.enterText(fieldFinder, '    four-one\n    four-two\nZ');
+    await tester.pumpAndSettle();
+
+    expect(
+      controller.text,
+      'Before.\n\n    four-one\n    four-two\nZ\nMiddle.',
+    );
+  });
+
   testWidgets(
     'indented code drag maps its initial visual range to exact source',
     (tester) async {
