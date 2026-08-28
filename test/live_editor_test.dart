@@ -10632,6 +10632,74 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     );
   });
 
+  testWidgets('stale table input cannot edit an externally shifted table', (
+    tester,
+  ) async {
+    const source =
+        '| H | I |\n'
+        '| --- | --- |\n'
+        '| alpha | beta |';
+    const shifted = 'prefix\n\n$source';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+    final cell = find.byKey(const ValueKey('ianvs-markdown-table-1-0'));
+    await tester.tap(cell);
+    await tester.pump();
+    await tester.showKeyboard(cell);
+    expect(tester.testTextInput.isVisible, isTrue);
+
+    controller.text = shifted;
+    tester.testTextInput.enterText('Z');
+    await tester.pumpAndSettle();
+
+    expect(controller.text, shifted);
+    expect(find.text('prefix'), findsOneWidget);
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const ValueKey('ianvs-markdown-table-1-0')),
+          )
+          .controller
+          ?.text,
+      'alpha',
+    );
+  });
+
+  testWidgets('rapid table input resolves the latest cell source', (
+    tester,
+  ) async {
+    const source =
+        '| H | I |\n'
+        '| --- | --- |\n'
+        '| alpha | beta |';
+    const expected =
+        '| H | I |\n'
+        '| --- | --- |\n'
+        '| AB | beta |';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+    final cell = find.byKey(const ValueKey('ianvs-markdown-table-1-0'));
+    await tester.tap(cell);
+    await tester.pump();
+    await tester.showKeyboard(cell);
+
+    tester.testTextInput.enterText('A');
+    tester.testTextInput.enterText('AB');
+    await tester.pumpAndSettle();
+
+    expect(controller.text, expected);
+    expect(
+      controller.selection,
+      TextSelection.collapsed(offset: expected.indexOf('AB') + 'AB'.length),
+    );
+  });
+
   testWidgets('inactive table cells render inline Markdown until focused', (
     tester,
   ) async {

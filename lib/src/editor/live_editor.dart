@@ -4076,13 +4076,19 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     _EditableTableCell cell,
     TextEditingValue replacement,
   ) {
+    final currentCell = _currentTableCell(cell);
+    if (currentCell == null) return;
     final current = widget.controller.value;
-    final editStart = cell.isSynthetic ? cell.lineStart : cell.start;
-    final editEnd = cell.isSynthetic ? cell.lineEnd : cell.end;
-    final sourceReplacement = cell.isSynthetic
+    final editStart = currentCell.isSynthetic
+        ? currentCell.lineStart
+        : currentCell.start;
+    final editEnd = currentCell.isSynthetic
+        ? currentCell.lineEnd
+        : currentCell.end;
+    final sourceReplacement = currentCell.isSynthetic
         ? _materializeTableLineCell(
-            cell.lineSource,
-            column: cell.column,
+            currentCell.lineSource,
+            column: currentCell.column,
             replacement: replacement.text,
           )
         : replacement.text;
@@ -4111,7 +4117,11 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       sourceReplacement,
     );
     selection =
-        _tableCellDocumentSelection(cell, nextText, replacement.selection) ??
+        _tableCellDocumentSelection(
+          currentCell,
+          nextText,
+          replacement.selection,
+        ) ??
         selection;
     widget.controller.value = current.copyWith(
       text: nextText,
@@ -4131,13 +4141,32 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     _EditableTableCell cell,
     TextEditingValue value,
   ) {
+    final currentCell = _currentTableCell(cell);
+    if (currentCell == null) return;
     final selection = _tableCellDocumentSelection(
-      cell,
+      currentCell,
       widget.controller.text,
       value.selection,
     );
     if (selection == null || selection == widget.controller.selection) return;
     widget.controller.selection = selection;
+  }
+
+  _EditableTableCell? _currentTableCell(_EditableTableCell snapshot) {
+    final blockIndex = _blocks.indexWhere(
+      (block) =>
+          block.type == IanvsMarkdownBlockType.table &&
+          block.start == snapshot.tableStart,
+    );
+    if (blockIndex < 0) return null;
+    final model = _parseEditableTable(_blocks[blockIndex]);
+    if (snapshot.row < 0 ||
+        snapshot.row >= model.rows.length ||
+        snapshot.column < 0 ||
+        snapshot.column >= model.rows[snapshot.row].length) {
+      return null;
+    }
+    return model.rows[snapshot.row][snapshot.column];
   }
 
   TextSelection? _tableCellDocumentSelection(
@@ -4168,11 +4197,12 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   }
 
   void _deleteTableLine(_EditableTableCell cell) {
+    final currentCell = _currentTableCell(cell);
+    if (currentCell == null) return;
     final current = widget.controller.value;
-    final caret = (cell.isSynthetic ? cell.lineStart : cell.start).clamp(
-      0,
-      current.text.length,
-    );
+    final caret =
+        (currentCell.isSynthetic ? currentCell.lineStart : currentCell.start)
+            .clamp(0, current.text.length);
     widget.controller.selection = TextSelection.collapsed(offset: caret);
     widget.controller.deleteSelectedLines();
   }
@@ -6431,6 +6461,7 @@ bool _isTableAsciiPunctuation(int codeUnit) =>
 
 final class _EditableTableCell {
   const _EditableTableCell({
+    required this.tableStart,
     required this.row,
     required this.column,
     required this.start,
@@ -6444,6 +6475,7 @@ final class _EditableTableCell {
     required this.isSynthetic,
   });
 
+  final int tableStart;
   final int row;
   final int column;
   final int start;
@@ -6515,6 +6547,7 @@ _EditableTableModel _parseEditableTable(IanvsMarkdownBlock block) {
     rows.add([
       for (var column = 0; column < columnCount; column += 1)
         _EditableTableCell(
+          tableStart: block.start,
           row: rowIndex,
           column: column,
           start: column < ranges.length
