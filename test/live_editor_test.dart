@@ -5894,6 +5894,122 @@ Body
     expect(controller.text, expected);
   });
 
+  testWidgets('pending aliases merge with an external alias update', (
+    tester,
+  ) async {
+    const source = '''
+---
+aliases:
+---
+Body
+''';
+    const updated = '''
+---
+aliases:
+  - External
+---
+Body
+''';
+    const expected = '''
+---
+aliases:
+  - External
+  - Pending
+---
+Body
+''';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final input = find.byKey(
+      const ValueKey('ianvs-markdown-front-matter-list-input-aliases'),
+    );
+    await tester.tap(input);
+    await tester.enterText(input, 'Pending');
+    controller.text = updated;
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+
+    expect(controller.text, expected);
+  });
+
+  testWidgets('pending tags do not overwrite a recreated tags property', (
+    tester,
+  ) async {
+    const source = '''
+---
+tags: [old]
+---
+Body
+''';
+    const updated = '''
+---
+other: x
+tags: [fresh]
+---
+Body
+''';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final input = find.byKey(
+      const ValueKey('ianvs-markdown-front-matter-list-input-tags'),
+    );
+    await tester.tap(input);
+    await tester.enterText(input, 'pending');
+    controller.text = updated;
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+
+    expect(controller.text, updated);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-front-matter-chip-tags-0')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('stale alias removal preserves an external alias addition', (
+    tester,
+  ) async {
+    const source = '''
+---
+aliases: [A, B]
+---
+Body
+''';
+    const updated = '''
+---
+aliases: [A, B, C]
+---
+Body
+''';
+    const expected = '''
+---
+aliases:
+  - B
+  - C
+---
+Body
+''';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final remove = find.byKey(
+      const ValueKey('ianvs-markdown-front-matter-chip-remove-aliases-0'),
+    );
+    controller.text = updated;
+    await tester.tap(remove);
+    await tester.pumpAndSettle();
+
+    expect(controller.text, expected);
+  });
+
   testWidgets('lossy typed tag lists remain presentation-only', (tester) async {
     const source = '''
 ---

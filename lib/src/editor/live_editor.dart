@@ -3795,14 +3795,75 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     List<String> values,
   ) {
     final target = _currentFrontMatterTarget(block, entry);
-    if (target == null) return;
+    if (target == null || !target.entry.listValuesEditable) return;
+    var resolvedValues = values;
+    if (!identical(target.entry, entry)) {
+      final rebased = _rebaseFrontMatterListEdit(
+        base: entry.items,
+        local: values,
+        remote: target.entry.items,
+        suppressDuplicates: _isAliasProperty(entry.key),
+      );
+      if (rebased == null) return;
+      resolvedValues = rebased;
+    }
     final replacement = replaceMarkdownFrontMatterListValue(
       target.block.source,
       target.entry,
-      values,
+      resolvedValues,
     );
     if (replacement == target.block.source) return;
     _replaceBlockSource(target.block, replacement);
+  }
+
+  bool _isAliasProperty(String key) {
+    final normalized = key.toLowerCase().replaceAll('-', '_');
+    return normalized == 'alias' || normalized == 'aliases';
+  }
+
+  List<int>? _subsequencePositions(
+    List<String> subsequence,
+    List<String> values,
+  ) {
+    final positions = <int>[];
+    var valueIndex = 0;
+    for (final item in subsequence) {
+      while (valueIndex < values.length && values[valueIndex] != item) {
+        valueIndex += 1;
+      }
+      if (valueIndex >= values.length) return null;
+      positions.add(valueIndex);
+      valueIndex += 1;
+    }
+    return positions;
+  }
+
+  List<String>? _rebaseFrontMatterListEdit({
+    required List<String> base,
+    required List<String> local,
+    required List<String> remote,
+    required bool suppressDuplicates,
+  }) {
+    final basePositions = _subsequencePositions(base, remote);
+    if (basePositions == null) return null;
+    if (listEquals(local, base)) return List<String>.of(remote);
+    if (local.length == base.length + 1 &&
+        listEquals(local.sublist(0, base.length), base)) {
+      final result = List<String>.of(remote);
+      final added = local.last;
+      if (!suppressDuplicates || !result.contains(added)) result.add(added);
+      return result;
+    }
+    if (local.length + 1 == base.length) {
+      for (var removedIndex = 0; removedIndex < base.length; removedIndex++) {
+        final candidate = List<String>.of(base)..removeAt(removedIndex);
+        if (!listEquals(candidate, local)) continue;
+        final result = List<String>.of(remote)
+          ..removeAt(basePositions[removedIndex]);
+        return result;
+      }
+    }
+    return null;
   }
 
   void _setFrontMatterKey(
