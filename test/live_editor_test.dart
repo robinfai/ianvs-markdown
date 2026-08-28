@@ -10837,6 +10837,46 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
   );
 
   testWidgets(
+    'table formatting keeps preceding typing in a separate undo step',
+    (tester) async {
+      const source =
+          '| H |\n'
+          '| --- |\n'
+          '| alpha |';
+      const typed =
+          '| H |\n'
+          '| --- |\n'
+          '| alphax |';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+      final cell = find.byKey(const ValueKey('ianvs-markdown-table-1-0'));
+      await tester.tap(cell);
+      await tester.pump();
+      await tester.enterText(cell, 'alphax');
+      await tester.pump();
+      tester.widget<TextField>(cell).controller?.selection =
+          const TextSelection(baseOffset: 0, extentOffset: 6);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyB);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+      expect(controller.text, contains('| **alphax** |'));
+
+      controller.undo();
+      await tester.pumpAndSettle();
+      expect(controller.text, typed);
+      expect(tester.widget<TextField>(cell).controller?.text, 'alphax');
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
     'table smart paste targets the focused cell instead of stale selection',
     (tester) async {
       const url = 'https://example.com';

@@ -5278,8 +5278,10 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
     }
     final replacement = commandController.value;
     commandController.dispose();
+    widget.onCommitHistoryGroup();
     cellController.value = replacement;
     widget.onCellFormatted(cell, replacement);
+    widget.onCommitHistoryGroup();
   }
 
   void _moveTab(_EditableTableCell cell, {required bool backwards}) {
