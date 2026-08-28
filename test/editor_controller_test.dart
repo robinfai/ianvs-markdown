@@ -3080,6 +3080,25 @@ void main() {
     expect(inactive.map((span) => span.text).join(), source);
   });
 
+  test('inline math keeps native word selection and exposes exact ranges', () {
+    const source =
+        r'Alpha $bravo + charlie$ omega and `literal $not_math$ code`.';
+    final matches = ianvsMarkdownInlineMathSources(source);
+
+    expect(matches, hasLength(1));
+    expect(matches.single.sourceRange.textInside(source), r'$bravo + charlie$');
+    expect(matches.single.contentRange.textInside(source), 'bravo + charlie');
+    expect(matches.single.delimiterLength, 1);
+    final bravo = source.indexOf('bravo');
+    expect(
+      ianvsMarkdownInlineSourceRangeAt(
+        source,
+        TextRange(start: bravo, end: bravo + 5),
+      ),
+      isNull,
+    );
+  });
+
   test('escaped first backtick leaves the remaining run as code', () {
     const syntax = IanvsMarkdownSyntaxTheme(
       heading: TextStyle(fontWeight: FontWeight.w600),

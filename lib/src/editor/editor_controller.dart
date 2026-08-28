@@ -2332,6 +2332,40 @@ TextRange? ianvsMarkdownInlineSourceRangeAt(
   });
 }
 
+/// One parsed inline-math source span used by Live Preview projection.
+@immutable
+final class IanvsMarkdownInlineMathSource {
+  const IanvsMarkdownInlineMathSource({
+    required this.sourceRange,
+    required this.contentRange,
+    required this.delimiterLength,
+  });
+
+  final TextRange sourceRange;
+  final TextRange contentRange;
+  final int delimiterLength;
+
+  String expressionFrom(String source) => contentRange.textInside(source);
+}
+
+/// Returns inline-math spans after applying the same exclusions as source
+/// highlighting, including fenced/inline code, comments, and block metadata.
+List<IanvsMarkdownInlineMathSource> ianvsMarkdownInlineMathSources(
+  String text, {
+  Set<String>? linkReferenceLabels,
+}) {
+  if (text.isEmpty) return const <IanvsMarkdownInlineMathSource>[];
+  final matches = <IanvsMarkdownInlineMathSource>[];
+  _markdownSyntaxTokens(
+    text,
+    _inlineRangeProbeTheme,
+    linkReferenceLabels:
+        linkReferenceLabels ?? MarkdownLinkReferenceContext.parse(text).labels,
+    inlineMathSources: matches,
+  );
+  return List<IanvsMarkdownInlineMathSource>.unmodifiable(matches);
+}
+
 const _inlineRangeProbeTheme = IanvsMarkdownSyntaxTheme(
   heading: TextStyle(),
   marker: TextStyle(),
@@ -2453,6 +2487,7 @@ List<_SyntaxToken> _markdownSyntaxTokens(
   IanvsMarkdownSyntaxTheme theme, {
   required Set<String> linkReferenceLabels,
   List<TextRange> highlightLiteralRanges = const <TextRange>[],
+  List<IanvsMarkdownInlineMathSource>? inlineMathSources,
 }) {
   final tokens = <_SyntaxToken>[];
   final fencedRanges = <TextRange>[];
@@ -2605,6 +2640,7 @@ List<_SyntaxToken> _markdownSyntaxTokens(
     text,
     theme,
     <TextRange>[...codeExcludedRanges, ...codeRanges],
+    sources: inlineMathSources,
   );
   final inlineHtmlLiteralRanges = _addInlineHtmlSyntaxTokens(
     tokens,
@@ -2727,8 +2763,9 @@ List<TextRange> _addInlineMathSyntaxTokens(
   List<_SyntaxToken> target,
   String text,
   IanvsMarkdownSyntaxTheme theme,
-  List<TextRange> excludedRanges,
-) {
+  List<TextRange> excludedRanges, {
+  List<IanvsMarkdownInlineMathSource>? sources,
+}) {
   final ranges = <TextRange>[];
   var index = 0;
   while (index < text.length) {
@@ -2782,6 +2819,13 @@ List<TextRange> _addInlineMathSyntaxTokens(
 
       final revealRange = TextRange(start: index, end: closingEnd);
       ranges.add(revealRange);
+      sources?.add(
+        IanvsMarkdownInlineMathSource(
+          sourceRange: revealRange,
+          contentRange: TextRange(start: contentStart, end: closingStart),
+          delimiterLength: delimiterLength,
+        ),
+      );
       target
         ..add(
           _SyntaxToken(
@@ -2789,6 +2833,7 @@ List<TextRange> _addInlineMathSyntaxTokens(
             contentStart,
             theme.marker,
             inlineMarkerRange: revealRange,
+            selectsInlineSource: false,
           ),
         )
         ..add(_SyntaxToken(contentStart, closingStart, theme.math))
@@ -2798,6 +2843,7 @@ List<TextRange> _addInlineMathSyntaxTokens(
             closingEnd,
             theme.marker,
             inlineMarkerRange: revealRange,
+            selectsInlineSource: false,
           ),
         );
       index = closingEnd;

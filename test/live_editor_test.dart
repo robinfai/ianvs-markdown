@@ -8587,8 +8587,9 @@ $$''');
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('formula:E = mc^2'));
+    await tester.tap(find.textContaining('Inline').first);
     await tester.pump();
+    expect(find.text('formula:E = mc^2'), findsOneWidget);
     final fieldFinder = find.descendant(
       of: find.byKey(const ValueKey('ianvs-markdown-active-block')),
       matching: find.byType(TextField),
@@ -8609,16 +8610,126 @@ $$''');
       span(),
     ).where((leaf) => leaf.text == r'$').toList();
     expect(delimiters, hasLength(2));
-    expect(delimiters.every((leaf) => leaf.style?.fontSize == .01), isTrue);
+    expect(delimiters.every((leaf) => leaf.style?.fontSize == 0), isTrue);
+    expect(find.text('formula:E = mc^2'), findsOneWidget);
 
     field.controller!.selection = TextSelection.collapsed(
       offset: source.indexOf('mc'),
     );
     await tester.pump();
+    expect(find.text('formula:E = mc^2'), findsNothing);
     delimiters = _textSpanLeaves(
       span(),
     ).where((leaf) => leaf.text == r'$').toList();
     expect(delimiters.every((leaf) => leaf.style?.fontSize != .01), isTrue);
+    expect(controller.text, source);
+  });
+
+  testWidgets('inline math clicks preserve Obsidian source selections', (
+    tester,
+  ) async {
+    const line = r'Alpha $bravo + charlie$ omega';
+    const source = 'Before\n\n$line\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1000,
+            height: 720,
+            child: IanvsMarkdownLiveEditor(
+              controller: controller,
+              mathBuilder: (context, expression, {required displayMode}) =>
+                  Text(
+                    expression,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 14.5,
+                    ),
+                  ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.textContaining('Alpha').first);
+    await tester.pumpAndSettle();
+    final formula = find.text('bravo + charlie');
+    expect(formula, findsOneWidget);
+    final paragraph = tester.renderObject<RenderParagraph>(formula);
+    final caret = paragraph.getOffsetForCaret(
+      const TextPosition(offset: 2),
+      Rect.zero,
+    );
+    final target = paragraph.localToGlobal(
+      caret + Offset(.1, paragraph.size.height / 2),
+    );
+
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(controller.selection.isCollapsed, isTrue);
+    expect(controller.selection.extentOffset, 17);
+    expect(formula, findsNothing);
+
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(controller.selection.textInside(source), 'bravo');
+
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(controller.selection.textInside(source), line);
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
+  testWidgets('inactive inline math keeps list source prefixes collapsed', (
+    tester,
+  ) async {
+    const source = r'- Alpha $x + y$ omega';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1000,
+            height: 720,
+            child: IanvsMarkdownLiveEditor(
+              controller: controller,
+              mathBuilder: (context, expression, {required displayMode}) =>
+                  Text('formula:$expression'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.textContaining('Alpha').first);
+    await tester.pumpAndSettle();
+
+    final fieldFinder = find.descendant(
+      of: find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      matching: find.byType(TextField),
+    );
+    final field = tester.widget<TextField>(fieldFinder);
+    final leaves = _textSpanLeaves(
+      field.controller!.buildTextSpan(
+        context: tester.element(fieldFinder),
+        style: field.style,
+        withComposing: false,
+      ),
+    );
+    final prefix = leaves.singleWhere((leaf) => leaf.text == '- ');
+    expect(prefix.style?.fontSize, 4);
+    expect(prefix.style?.color, Colors.transparent);
+    expect(find.text('formula:x + y'), findsOneWidget);
     expect(controller.text, source);
   });
 

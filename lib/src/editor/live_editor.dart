@@ -3606,6 +3606,18 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         (styleSheet.listIndent ?? 24) +
         (styleSheet.listBulletPadding?.horizontal ?? 4);
     final activeSelection = _blockController.selection;
+    final inactiveInlineMathSources =
+        ianvsMarkdownInlineMathSources(
+              block.source,
+              linkReferenceLabels: _linkReferences.labels,
+            )
+            .where(
+              (source) => !_selectionRevealsSourceRange(
+                activeSelection,
+                source.sourceRange,
+              ),
+            )
+            .toList(growable: false);
     _blockController.leadingMarkerCharacters = hiddenMarkerEnd;
     _blockController.collapsedLeadingCharacters = 0;
     if (hiddenMarkerEnd == 0 ||
@@ -3623,6 +3635,11 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         ? 0
         : hiddenMarkerEnd;
     final hiddenMarkerRanges = <_HiddenMarkerSpan>[
+      if (hiddenMarkerEnd > 0 && !revealHiddenMarker)
+        _HiddenMarkerSpan(
+          TextRange(start: 0, end: hiddenMarkerEnd),
+          _hiddenTaskMarkerStyle,
+        ),
       if (quoteMarker != null && !callout)
         ..._hiddenQuoteMarkerRanges(quoteLines, activeSelection.extentOffset)
       else if (setextUnderline != null)
@@ -3634,6 +3651,26 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           _collapsedGapPrefixStyle,
         ),
       ..._hiddenBlockIdCaretRanges(block.source),
+      for (final source in inactiveInlineMathSources) ...[
+        _HiddenMarkerSpan(
+          TextRange(
+            start: source.sourceRange.start,
+            end: source.contentRange.start,
+          ),
+          _collapsedGapPrefixStyle,
+        ),
+        _HiddenMarkerSpan(
+          source.contentRange,
+          _hiddenInlineMathContentStyle(colors),
+        ),
+        _HiddenMarkerSpan(
+          TextRange(
+            start: source.contentRange.end,
+            end: source.sourceRange.end,
+          ),
+          _collapsedGapPrefixStyle,
+        ),
+      ],
     ]..sort((a, b) => a.range.start.compareTo(b.range.start));
     _blockController.hiddenMarkerRanges = List<_HiddenMarkerSpan>.unmodifiable(
       hiddenMarkerRanges,
@@ -3660,7 +3697,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         decorationColor: colors.taskDoneColor,
       );
     }
-    final editor = TextField(
+    final textEditor = TextField(
       key: _activeEditorKey,
       controller: _blockController,
       focusNode: _focusNode,
@@ -3684,6 +3721,17 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         contentPadding: EdgeInsets.symmetric(vertical: 3),
       ),
     );
+    final Widget editor = inactiveInlineMathSources.isEmpty
+        ? textEditor
+        : _ActiveInlineMathPreview(
+            controller: _blockController,
+            sources: inactiveInlineMathSources,
+            sourceText: block.source,
+            textStyle: activeTextStyle,
+            colors: colors,
+            mathBuilder: widget.mathBuilder,
+            child: textEditor,
+          );
     Widget activeListEditor(double markerExtent) {
       return Expanded(
         child: _ActiveTextLineRail(
@@ -4937,6 +4985,96 @@ class _LivePreviewIndentedCode extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _ActiveInlineMathPreview extends StatelessWidget {
+  const _ActiveInlineMathPreview({
+    required this.controller,
+    required this.sources,
+    required this.sourceText,
+    required this.textStyle,
+    required this.colors,
+    required this.mathBuilder,
+    required this.child,
+  });
+
+  final TextEditingController controller;
+  final List<IanvsMarkdownInlineMathSource> sources;
+  final String sourceText;
+  final TextStyle textStyle;
+  final IanvsMarkdownThemeData colors;
+  final IanvsMarkdownMathBuilder? mathBuilder;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final editableWidth = constraints.maxWidth - 2.5;
+        final painter =
+            TextPainter(
+              text: controller.buildTextSpan(
+                context: context,
+                style: textStyle,
+                withComposing: false,
+              ),
+              textDirection: Directionality.of(context),
+              textScaler: MediaQuery.textScalerOf(context),
+              textWidthBasis: TextWidthBasis.parent,
+            )..layout(
+              maxWidth: constraints.hasBoundedWidth
+                  ? editableWidth.clamp(0, double.infinity)
+                  : MediaQuery.sizeOf(context).width,
+            );
+        final previews = <Widget>[];
+        for (final source in sources) {
+          final boxes = painter.getBoxesForSelection(
+            TextSelection(
+              baseOffset: source.contentRange.start,
+              extentOffset: source.contentRange.end,
+            ),
+            boxHeightStyle: BoxHeightStyle.tight,
+          );
+          if (boxes.isEmpty) continue;
+          final first = boxes.first;
+          final sameLine = boxes.where(
+            (box) => (box.top - first.top).abs() < .5,
+          );
+          final left = sameLine.map((box) => box.left).reduce(math.min);
+          final right = sameLine.map((box) => box.right).reduce(math.max);
+          final top = sameLine.map((box) => box.top).reduce(math.min);
+          final bottom = sameLine.map((box) => box.bottom).reduce(math.max);
+          previews.add(
+            Positioned(
+              key: ValueKey(
+                'ianvs-markdown-active-inline-math-'
+                '${source.sourceRange.start}',
+              ),
+              left: left,
+              top: 3 + top,
+              width: math.max(1, right - left),
+              height: math.max(painter.preferredLineHeight, bottom - top),
+              child: IgnorePointer(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: IanvsMarkdownMath(
+                    expression: source.expressionFrom(sourceText),
+                    displayMode: false,
+                    inline: true,
+                    mathBuilder: mathBuilder,
+                    textStyle: textStyle,
+                    theme: colors,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+        return Stack(clipBehavior: Clip.none, children: [child, ...previews]);
+      },
     );
   }
 }
@@ -7498,6 +7636,22 @@ final class _HiddenMarkerSpan {
   final TextRange range;
   final TextStyle style;
 }
+
+bool _selectionRevealsSourceRange(TextSelection selection, TextRange range) {
+  if (!selection.isValid) return false;
+  if (selection.isCollapsed) {
+    return selection.extentOffset >= range.start &&
+        selection.extentOffset < range.end;
+  }
+  return selection.start < range.end && selection.end > range.start;
+}
+
+TextStyle _hiddenInlineMathContentStyle(IanvsMarkdownThemeData colors) =>
+    TextStyle(
+      color: Colors.transparent,
+      fontFamily: colors.monoFontFamily,
+      fontFamilyFallback: colors.monoFontFamilyFallback,
+    );
 
 List<_HiddenMarkerSpan> _hiddenBlockIdCaretRanges(String source) {
   final hidden = <_HiddenMarkerSpan>[];
