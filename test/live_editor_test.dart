@@ -5852,6 +5852,48 @@ tags:
     );
   });
 
+  testWidgets('pending aliases rebase onto an external front matter update', (
+    tester,
+  ) async {
+    const source = '''
+---
+title: A
+aliases:
+---
+Body
+''';
+    const updated = '''
+---
+title: Longer
+aliases:
+---
+Body
+''';
+    const expected = '''
+---
+title: Longer
+aliases:
+  - Alias
+---
+Body
+''';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final input = find.byKey(
+      const ValueKey('ianvs-markdown-front-matter-list-input-aliases'),
+    );
+    await tester.tap(input);
+    await tester.enterText(input, 'Alias');
+    controller.text = updated;
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+
+    expect(controller.text, expected);
+  });
+
   testWidgets('lossy typed tag lists remain presentation-only', (tester) async {
     const source = '''
 ---

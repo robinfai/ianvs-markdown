@@ -3730,13 +3730,15 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     MarkdownMetadataEntry entry,
     String value,
   ) {
+    final target = _currentFrontMatterTarget(block, entry);
+    if (target == null) return;
     final replacement = replaceMarkdownFrontMatterTextValue(
-      block.source,
-      entry,
+      target.block.source,
+      target.entry,
       value,
     );
-    if (replacement == block.source) return;
-    _replaceBlockSource(block, replacement);
+    if (replacement == target.block.source) return;
+    _replaceBlockSource(target.block, replacement);
   }
 
   void _setFrontMatterBoolean(
@@ -3744,13 +3746,15 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     MarkdownMetadataEntry entry,
     bool value,
   ) {
+    final target = _currentFrontMatterTarget(block, entry);
+    if (target == null) return;
     final replacement = replaceMarkdownFrontMatterBooleanValue(
-      block.source,
-      entry,
+      target.block.source,
+      target.entry,
       value,
     );
-    if (replacement == block.source) return;
-    _replaceBlockSource(block, replacement);
+    if (replacement == target.block.source) return;
+    _replaceBlockSource(target.block, replacement);
   }
 
   void _setFrontMatterNumber(
@@ -3758,13 +3762,15 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     MarkdownMetadataEntry entry,
     num value,
   ) {
+    final target = _currentFrontMatterTarget(block, entry);
+    if (target == null) return;
     final replacement = replaceMarkdownFrontMatterNumberValue(
-      block.source,
-      entry,
+      target.block.source,
+      target.entry,
       value,
     );
-    if (replacement == block.source) return;
-    _replaceBlockSource(block, replacement);
+    if (replacement == target.block.source) return;
+    _replaceBlockSource(target.block, replacement);
   }
 
   void _setFrontMatterDate(
@@ -3772,13 +3778,15 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     MarkdownMetadataEntry entry,
     String value,
   ) {
+    final target = _currentFrontMatterTarget(block, entry);
+    if (target == null) return;
     final replacement = replaceMarkdownFrontMatterDateValue(
-      block.source,
-      entry,
+      target.block.source,
+      target.entry,
       value,
     );
-    if (replacement == block.source) return;
-    _replaceBlockSource(block, replacement);
+    if (replacement == target.block.source) return;
+    _replaceBlockSource(target.block, replacement);
   }
 
   void _setFrontMatterList(
@@ -3786,13 +3794,15 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     MarkdownMetadataEntry entry,
     List<String> values,
   ) {
+    final target = _currentFrontMatterTarget(block, entry);
+    if (target == null) return;
     final replacement = replaceMarkdownFrontMatterListValue(
-      block.source,
-      entry,
+      target.block.source,
+      target.entry,
       values,
     );
-    if (replacement == block.source) return;
-    _replaceBlockSource(block, replacement);
+    if (replacement == target.block.source) return;
+    _replaceBlockSource(target.block, replacement);
   }
 
   void _setFrontMatterKey(
@@ -3800,9 +3810,48 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     MarkdownMetadataEntry entry,
     String key,
   ) {
-    final replacement = replaceMarkdownFrontMatterKey(block.source, entry, key);
-    if (replacement == block.source) return;
-    _replaceBlockSource(block, replacement);
+    final target = _currentFrontMatterTarget(block, entry);
+    if (target == null) return;
+    final replacement = replaceMarkdownFrontMatterKey(
+      target.block.source,
+      target.entry,
+      key,
+    );
+    if (replacement == target.block.source) return;
+    _replaceBlockSource(target.block, replacement);
+  }
+
+  ({IanvsMarkdownBlock block, MarkdownMetadataEntry entry})?
+  _currentFrontMatterTarget(
+    IanvsMarkdownBlock block,
+    MarkdownMetadataEntry entry,
+  ) {
+    final current = widget.controller.text;
+    if (block.start >= 0 &&
+        block.end >= block.start &&
+        block.end <= current.length &&
+        current.substring(block.start, block.end) == block.source) {
+      return (block: block, entry: entry);
+    }
+    IanvsMarkdownBlock? currentBlock;
+    for (final candidate in parseMarkdownBlocks(
+      current,
+      splitListItems: true,
+    )) {
+      if (candidate.type == IanvsMarkdownBlockType.frontMatter) {
+        currentBlock = candidate;
+        break;
+      }
+    }
+    if (currentBlock == null) return null;
+    final document = parseMarkdownFrontMatter(currentBlock.source);
+    if (!document.hasFrontMatter) return null;
+    for (final candidate in document.entries) {
+      if (candidate.key == entry.key) {
+        return (block: currentBlock, entry: candidate);
+      }
+    }
+    return null;
   }
 
   void _replaceTableCell(_EditableTableCell cell, String replacement) {
@@ -3944,7 +3993,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     final current = widget.controller.value;
     if (block.start < 0 ||
         block.end < block.start ||
-        block.end > current.text.length) {
+        block.end > current.text.length ||
+        current.text.substring(block.start, block.end) != block.source) {
       return;
     }
     final delta = replacement.length - (block.end - block.start);
