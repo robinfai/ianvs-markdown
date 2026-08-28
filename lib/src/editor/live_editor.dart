@@ -277,11 +277,26 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           }
         }
       }
-      final canonicalActive = activeIndex < 0 ? null : _blocks[activeIndex];
-      final nextStart = activeIndex >= 0 && activeIndex + 1 < _blocks.length
-          ? _blocks[activeIndex + 1].start
-          : source.length;
       final controllerEnd = _editingStart + _blockController.text.length;
+      final matchesReparsedLeadingSurface =
+          activeIndex < 0 &&
+          _editingStart < _blocks.first.start &&
+          controllerEnd >= _blocks.first.end &&
+          controllerEnd <= source.length &&
+          _blockController.text ==
+              source.substring(_editingStart, controllerEnd);
+      final resolvedActiveIndex = activeIndex >= 0
+          ? activeIndex
+          : matchesReparsedLeadingSurface
+          ? 0
+          : -1;
+      final canonicalActive = resolvedActiveIndex < 0
+          ? null
+          : _blocks[resolvedActiveIndex];
+      final nextStart =
+          resolvedActiveIndex >= 0 && resolvedActiveIndex + 1 < _blocks.length
+          ? _blocks[resolvedActiveIndex + 1].start
+          : source.length;
       final selectionSurface =
           documentSelection.isValid && !documentSelection.isCollapsed
           ? _selectionSurfaceFor(documentSelection)

@@ -3390,6 +3390,98 @@ void main() {
     expect(controller.text, source);
   });
 
+  testWidgets(
+    'inserting a leading line keeps the gap editor and caret active',
+    (tester) async {
+      const source = '\nAlpha';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Alpha'));
+      await tester.pump();
+      final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+      var field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      field.controller?.selection = const TextSelection.collapsed(offset: 0);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pumpAndSettle();
+
+      field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      field.controller?.value = const TextEditingValue(
+        text: '\n\nAlpha',
+        selection: TextSelection.collapsed(offset: 1),
+      );
+      await tester.pumpAndSettle();
+
+      expect(controller.text, '\n\nAlpha');
+      expect(controller.selection, const TextSelection.collapsed(offset: 1));
+      field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      expect(field.controller?.text, '\n\nAlpha');
+      expect(
+        field.controller?.selection,
+        const TextSelection.collapsed(offset: 1),
+      );
+      expect(field.focusNode?.hasFocus, isTrue);
+
+      controller.undo();
+      await tester.pumpAndSettle();
+      expect(controller.text, source);
+    },
+  );
+
+  testWidgets('deleting the first character restores the leading gap caret', (
+    tester,
+  ) async {
+    const source = '\nAlpha';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Alpha'));
+    await tester.pump();
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final fieldFinder = find.descendant(
+      of: active,
+      matching: find.byType(TextField),
+    );
+    var field = tester.widget<TextField>(fieldFinder);
+    field.controller?.selection = const TextSelection.collapsed(offset: 0);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+
+    field = tester.widget<TextField>(fieldFinder);
+    field.controller?.value = const TextEditingValue(
+      text: 'X\nAlpha',
+      selection: TextSelection.collapsed(offset: 1),
+    );
+    await tester.pumpAndSettle();
+
+    field = tester.widget<TextField>(fieldFinder);
+    field.controller?.value = const TextEditingValue(
+      text: '\nAlpha',
+      selection: TextSelection.collapsed(offset: 0),
+    );
+    await tester.pumpAndSettle();
+
+    expect(controller.text, source);
+    expect(controller.selection, const TextSelection.collapsed(offset: 0));
+    field = tester.widget<TextField>(fieldFinder);
+    expect(field.controller?.text, source);
+    expect(
+      field.controller?.selection,
+      const TextSelection.collapsed(offset: 0),
+    );
+    expect(field.focusNode?.hasFocus, isTrue);
+  });
+
   testWidgets('horizontal arrows cross adjacent structural blocks', (
     tester,
   ) async {
