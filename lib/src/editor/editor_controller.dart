@@ -2292,12 +2292,13 @@ TextSpan buildMarkdownSourceTextSpan(
   return TextSpan(style: style, children: children);
 }
 
-/// Returns the smallest inline syntax range that completely contains
-/// [content], or null when [content] is ordinary Markdown text.
+/// Returns the smallest delimiter-backed inline syntax range that completely
+/// contains [content], or null when [content] keeps native word selection.
 ///
 /// This is kept out of the package export surface and shared with Live
 /// Preview so a desktop double click can select the same revealed source that
-/// Obsidian exposes, including its opening and closing delimiters.
+/// Obsidian exposes. Inline code deliberately keeps native word selection
+/// because its backticks remain visible even outside the active span.
 TextRange? ianvsMarkdownInlineSourceRangeAt(
   String text,
   TextRange content, {
@@ -2313,6 +2314,7 @@ TextRange? ianvsMarkdownInlineSourceRangeAt(
   );
   final candidates = <TextRange>{};
   for (final token in tokens) {
+    if (!token.selectsInlineSource) continue;
     final range = token.inlineMarkerRange;
     if (range == null || !range.isValid || range.isCollapsed) continue;
     if (content.start >= range.start && content.end <= range.end) {
@@ -3238,14 +3240,10 @@ List<TextRange> _addInlineCodeSyntaxTokens(
           ? TextRange(start: closingLineStart, end: closingEnd)
           : revealRange;
       ranges.add(revealRange);
-      target.add(
-        _SyntaxToken(
-          openingStart,
-          openingEnd,
-          markerStyle,
-          inlineMarkerRange: openingRevealRange,
-        ),
-      );
+      // Obsidian keeps code-span backticks visible in Live Preview, so these
+      // marker tokens do not participate in local reveal or double-click
+      // source expansion.
+      target.add(_SyntaxToken(openingStart, openingEnd, markerStyle));
 
       final contentStart = openingEnd;
       final contentEnd = closingStart;
@@ -3261,6 +3259,7 @@ List<TextRange> _addInlineCodeSyntaxTokens(
             contentStart + 1,
             contentStyle,
             inlineMarkerRange: openingRevealRange,
+            selectsInlineSource: false,
           ),
         );
         if (contentStart + 1 < contentEnd - 1) {
@@ -3274,19 +3273,13 @@ List<TextRange> _addInlineCodeSyntaxTokens(
             contentEnd,
             contentStyle,
             inlineMarkerRange: closingRevealRange,
+            selectsInlineSource: false,
           ),
         );
       } else if (contentStart < contentEnd) {
         target.add(_SyntaxToken(contentStart, contentEnd, contentStyle));
       }
-      target.add(
-        _SyntaxToken(
-          closingStart,
-          closingEnd,
-          markerStyle,
-          inlineMarkerRange: closingRevealRange,
-        ),
-      );
+      target.add(_SyntaxToken(closingStart, closingEnd, markerStyle));
       index = closingEnd;
       matched = true;
       break;
@@ -3766,10 +3759,14 @@ final class _SyntaxToken {
     this.end,
     this.style, {
     this.inlineMarkerRange,
+    this.selectsInlineSource = true,
   });
 
   final int start;
   final int end;
   final TextStyle style;
   final TextRange? inlineMarkerRange;
+
+  /// Whether this token's marker range expands a native word selection.
+  final bool selectsInlineSource;
 }

@@ -2516,7 +2516,6 @@ void main() {
           '*',
           '[',
           '](https://example.com/path)',
-          '`',
           '~~',
           '==',
         }.contains(span.text),
@@ -2524,6 +2523,12 @@ void main() {
       expect(hiddenMarkers, isNotEmpty);
       expect(
         hiddenMarkers.every((span) => span.style?.fontSize == .01),
+        isTrue,
+      );
+      expect(
+        inactive
+            .where((span) => span.text == '`')
+            .every((span) => span.style?.fontSize == 14),
         isTrue,
       );
 
@@ -2975,16 +2980,16 @@ void main() {
       expect(
         inactive
             .where((span) => span.text == '``')
-            .every((span) => span.style?.fontSize == .01),
+            .every((span) => span.style?.fontSize == 14),
         isTrue,
       );
 
       final paddedOpen = source.indexOf('` code `');
-      expect(spanAt(inactive, paddedOpen).style?.fontSize, .01);
+      expect(spanAt(inactive, paddedOpen).style?.fontSize, 14);
       expect(spanAt(inactive, paddedOpen + 1).style?.fontSize, .01);
       expect(spanAt(inactive, paddedOpen + 2).style?.fontFamily, 'monospace');
       expect(spanAt(inactive, paddedOpen + 6).style?.fontSize, .01);
-      expect(spanAt(inactive, paddedOpen + 7).style?.fontSize, .01);
+      expect(spanAt(inactive, paddedOpen + 7).style?.fontSize, 14);
 
       final adjacentOne = source.indexOf('one');
       expect(spanAt(inactive, adjacentOne).text, 'one``two');
@@ -3006,69 +3011,74 @@ void main() {
         'monospace',
       );
       expect(inactive.map((span) => span.text).join(), source);
+      final word = source.indexOf('code with');
+      expect(
+        ianvsMarkdownInlineSourceRangeAt(
+          source,
+          TextRange(start: word, end: word + 4),
+        ),
+        isNull,
+      );
     },
   );
 
-  test(
-    'multiline inline code keeps styling and reveals markers per visual line',
-    () {
-      const syntax = IanvsMarkdownSyntaxTheme(
-        heading: TextStyle(fontWeight: FontWeight.w600),
-        marker: TextStyle(color: Color(0xff777777)),
-        link: TextStyle(decoration: TextDecoration.underline),
-        code: TextStyle(
-          fontFamily: 'monospace',
-          backgroundColor: Color(0xffeeeeee),
-        ),
-        comment: TextStyle(fontStyle: FontStyle.italic),
-      );
-      const source = 'Before `line one\nline two` after.';
-      final opening = source.indexOf('`');
-      final closing = source.lastIndexOf('`');
+  test('multiline inline code keeps styling and visible markers', () {
+    const syntax = IanvsMarkdownSyntaxTheme(
+      heading: TextStyle(fontWeight: FontWeight.w600),
+      marker: TextStyle(color: Color(0xff777777)),
+      link: TextStyle(decoration: TextDecoration.underline),
+      code: TextStyle(
+        fontFamily: 'monospace',
+        backgroundColor: Color(0xffeeeeee),
+      ),
+      comment: TextStyle(fontStyle: FontStyle.italic),
+    );
+    const source = 'Before `line one\nline two` after.';
+    final opening = source.indexOf('`');
+    final closing = source.lastIndexOf('`');
 
-      List<TextSpan> build(int caret) => buildMarkdownSourceTextSpan(
-        TextEditingValue(
-          text: source,
-          selection: TextSelection.collapsed(offset: caret),
-        ),
-        style: const TextStyle(fontSize: 14),
-        syntaxTheme: syntax,
-        withComposing: false,
-        hideInactiveInlineMarkers: true,
-      ).children!.cast<TextSpan>().toList();
+    List<TextSpan> build(int caret) => buildMarkdownSourceTextSpan(
+      TextEditingValue(
+        text: source,
+        selection: TextSelection.collapsed(offset: caret),
+      ),
+      style: const TextStyle(fontSize: 14),
+      syntaxTheme: syntax,
+      withComposing: false,
+      hideInactiveInlineMarkers: true,
+    ).children!.cast<TextSpan>().toList();
 
-      TextSpan spanAt(List<TextSpan> spans, int offset) {
-        var cursor = 0;
-        for (final span in spans) {
-          final end = cursor + (span.text?.length ?? 0);
-          if (offset >= cursor && offset < end) return span;
-          cursor = end;
-        }
-        throw StateError('No span at $offset');
+    TextSpan spanAt(List<TextSpan> spans, int offset) {
+      var cursor = 0;
+      for (final span in spans) {
+        final end = cursor + (span.text?.length ?? 0);
+        if (offset >= cursor && offset < end) return span;
+        cursor = end;
       }
+      throw StateError('No span at $offset');
+    }
 
-      final inactive = build(0);
-      expect(spanAt(inactive, opening).style?.fontSize, .01);
-      expect(spanAt(inactive, closing).style?.fontSize, .01);
-      expect(
-        spanAt(inactive, source.indexOf('line one')).style?.fontFamily,
-        'monospace',
-      );
-      expect(
-        spanAt(inactive, source.indexOf('line two')).style?.fontFamily,
-        'monospace',
-      );
+    final inactive = build(0);
+    expect(spanAt(inactive, opening).style?.fontSize, 14);
+    expect(spanAt(inactive, closing).style?.fontSize, 14);
+    expect(
+      spanAt(inactive, source.indexOf('line one')).style?.fontFamily,
+      'monospace',
+    );
+    expect(
+      spanAt(inactive, source.indexOf('line two')).style?.fontFamily,
+      'monospace',
+    );
 
-      final firstLineActive = build(source.indexOf('one'));
-      expect(spanAt(firstLineActive, opening).style?.fontSize, 14);
-      expect(spanAt(firstLineActive, closing).style?.fontSize, .01);
+    final firstLineActive = build(source.indexOf('one'));
+    expect(spanAt(firstLineActive, opening).style?.fontSize, 14);
+    expect(spanAt(firstLineActive, closing).style?.fontSize, 14);
 
-      final secondLineActive = build(source.indexOf('two'));
-      expect(spanAt(secondLineActive, opening).style?.fontSize, .01);
-      expect(spanAt(secondLineActive, closing).style?.fontSize, 14);
-      expect(inactive.map((span) => span.text).join(), source);
-    },
-  );
+    final secondLineActive = build(source.indexOf('two'));
+    expect(spanAt(secondLineActive, opening).style?.fontSize, 14);
+    expect(spanAt(secondLineActive, closing).style?.fontSize, 14);
+    expect(inactive.map((span) => span.text).join(), source);
+  });
 
   test('escaped first backtick leaves the remaining run as code', () {
     const syntax = IanvsMarkdownSyntaxTheme(

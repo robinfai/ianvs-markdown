@@ -695,6 +695,43 @@ void main() {
     expect(controller.text, source);
   });
 
+  testWidgets('inline code clicks preserve Obsidian source selections', (
+    tester,
+  ) async {
+    const line = 'Alpha `bravo charlie` omega';
+    const source = 'Before\n\n$line\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    Finder paragraphFinder() => selectableTextWithPlainText(line);
+    expect(paragraphFinder(), findsOneWidget);
+    final paragraph = editableWithin(tester, paragraphFinder());
+    final caret = paragraph.getLocalRectForCaret(
+      const TextPosition(offset: 11),
+    );
+    final target = paragraph.localToGlobal(caret.center);
+
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(controller.selection.isCollapsed, isTrue);
+    expect(controller.selection.extentOffset, 19);
+
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(controller.selection.textInside(source), 'bravo');
+
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(controller.selection.textInside(source), line);
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('double click selects a complete triple emphasis run', (
     tester,
   ) async {
@@ -8315,7 +8352,7 @@ $$''');
   });
 
   testWidgets(
-    'active inline code keeps compact mono styling and local markers',
+    'active inline code keeps compact mono styling and visible markers',
     (tester) async {
       const source = 'Before `inline code` after.';
       final controller = IanvsMarkdownController(text: source);
@@ -8359,7 +8396,15 @@ $$''');
       );
       var markers = leaves.where((leaf) => leaf.text == '`').toList();
       expect(markers, hasLength(2));
-      expect(markers.every((leaf) => leaf.style?.fontSize == .01), isTrue);
+      expect(markers.every((leaf) => leaf.style?.fontSize != .01), isTrue);
+      expect(
+        markers.every(
+          (leaf) =>
+              leaf.style?.color ==
+              IanvsMarkdownThemeData.light.inlineCodeForeground,
+        ),
+        isTrue,
+      );
 
       field.controller!.selection = TextSelection.collapsed(
         offset: source.indexOf('code'),
