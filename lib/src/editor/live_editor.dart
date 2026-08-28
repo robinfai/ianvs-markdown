@@ -3925,9 +3925,11 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
               child: Align(
                 alignment: AlignmentDirectional.centerStart,
                 child: IanvsMarkdown(
-                  data: block.source.substring(
-                    image.sourceRange.start,
-                    image.sourceRange.end,
+                  data: _linkReferences.appendDefinitionsTo(
+                    block.source.substring(
+                      image.sourceRange.start,
+                      image.sourceRange.end,
+                    ),
                   ),
                   selectable: false,
                   styleSheet: widget.styleSheet,
@@ -4461,6 +4463,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       linkReferenceLabels: _linkReferences.labels,
     );
     if (image == null) return;
+    if (image.syntax != IanvsMarkdownStandardImageSourceSyntax.inline) {
+      return;
+    }
     final selection = TextSelection(
       baseOffset: block.start + image.editableRange.start,
       extentOffset: block.start + image.editableRange.end,

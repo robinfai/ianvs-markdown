@@ -37,14 +37,24 @@ typedef IanvsMarkdownImageResizeHandler =
 
 typedef IanvsMarkdownImageEditHandler = void Function(int imageIndex);
 
+enum IanvsMarkdownStandardImageSourceSyntax {
+  inline,
+  fullReference,
+  collapsedReference,
+  shortcutReference,
+}
+
 /// Exact source ranges for one rendered standard Markdown image.
 @immutable
 class IanvsMarkdownStandardImageSource {
   const IanvsMarkdownStandardImageSource({
+    required this.syntax,
     required this.sourceRange,
     required this.altRange,
     required this.editableRange,
   });
+
+  final IanvsMarkdownStandardImageSourceSyntax syntax;
 
   /// Complete image source, including `![` and its closing delimiter.
   final TextRange sourceRange;
@@ -183,6 +193,7 @@ IanvsMarkdownStandardImageSource? findIanvsMarkdownStandardImageSource(
     final following = labelEnd + 1;
     late final int syntaxEnd;
     late final TextRange editableRange;
+    late final IanvsMarkdownStandardImageSourceSyntax syntax;
     if (following < source.length && source.codeUnitAt(following) == 0x28) {
       final destinationEnd = _balancedDelimiterEnd(
         source,
@@ -195,6 +206,7 @@ IanvsMarkdownStandardImageSource? findIanvsMarkdownStandardImageSource(
         continue;
       }
       syntaxEnd = destinationEnd + 1;
+      syntax = IanvsMarkdownStandardImageSourceSyntax.inline;
       editableRange = TextRange(start: following + 1, end: destinationEnd);
     } else if (following < source.length &&
         source.codeUnitAt(following) == 0x5b) {
@@ -215,6 +227,9 @@ IanvsMarkdownStandardImageSource? findIanvsMarkdownStandardImageSource(
         continue;
       }
       syntaxEnd = referenceEnd + 1;
+      syntax = explicit.isEmpty
+          ? IanvsMarkdownStandardImageSourceSyntax.collapsedReference
+          : IanvsMarkdownStandardImageSourceSyntax.fullReference;
       editableRange = explicit.isEmpty
           ? TextRange(start: index + 2, end: labelEnd)
           : TextRange(start: following + 1, end: referenceEnd);
@@ -224,11 +239,13 @@ IanvsMarkdownStandardImageSource? findIanvsMarkdownStandardImageSource(
         continue;
       }
       syntaxEnd = following;
+      syntax = IanvsMarkdownStandardImageSourceSyntax.shortcutReference;
       editableRange = TextRange(start: index + 2, end: labelEnd);
     }
 
     if (renderedImageIndex == imageIndex) {
       return IanvsMarkdownStandardImageSource(
+        syntax: syntax,
         sourceRange: TextRange(start: index, end: syntaxEnd),
         altRange: TextRange(start: index + 2, end: labelEnd),
         editableRange: editableRange,
@@ -352,6 +369,8 @@ class IanvsMarkdownInteractiveImage extends StatefulWidget {
     required this.expandedImageBuilder,
     this.alt,
     this.title,
+    this.viewerLabel,
+    this.openViewerOnTap = false,
     this.onEdit,
     this.theme,
   });
@@ -360,6 +379,8 @@ class IanvsMarkdownInteractiveImage extends StatefulWidget {
   final WidgetBuilder expandedImageBuilder;
   final String? alt;
   final String? title;
+  final String? viewerLabel;
+  final bool openViewerOnTap;
   final VoidCallback? onEdit;
   final IanvsMarkdownThemeData? theme;
 
@@ -388,6 +409,10 @@ class _IanvsMarkdownInteractiveImageState
         key: const ValueKey('ianvs-markdown-image-interaction'),
         behavior: HitTestBehavior.opaque,
         onTap: () {
+          if (widget.openViewerOnTap) {
+            _showExpanded();
+            return;
+          }
           if (!_controlsVisible) setState(() => _controlsVisible = true);
         },
         child: Stack(
@@ -459,7 +484,10 @@ class _IanvsMarkdownInteractiveImageState
   }
 
   Future<void> _showExpanded() async {
-    final alt = widget.alt?.trim();
+    final viewerLabel = widget.viewerLabel?.trim();
+    final alt = viewerLabel == null || viewerLabel.isEmpty
+        ? widget.alt?.trim()
+        : viewerLabel;
     await showDialog<void>(
       context: context,
       barrierColor: Colors.black.withValues(alpha: .88),

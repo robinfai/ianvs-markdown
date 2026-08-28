@@ -697,6 +697,122 @@ void main() {
     },
   );
 
+  testWidgets('reference images split Live Preview and Reading semantics', (
+    tester,
+  ) async {
+    const url = 'https://httpbin.org/image/png';
+    const source =
+        'Before\n\n'
+        '![Full alt][img-ref]\n\n'
+        '![Collapsed alt][]\n\n'
+        '![Shortcut alt]\n\n'
+        '[img-ref]: $url "Image title"\n'
+        '[Collapsed alt]: $url "Collapsed title"\n'
+        '[Shortcut alt]: $url "Shortcut title"\n\n'
+        'After';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    final built = <String, ({String uri, String? title})>{};
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1000,
+            height: 720,
+            child: IanvsMarkdownLiveEditor(
+              controller: controller,
+              imageBuilder: (uri, title, alt) {
+                built[alt!] = (uri: uri.toString(), title: title);
+                return SizedBox(
+                  key: ValueKey('reference-image-$alt'),
+                  width: 160,
+                  height: 100,
+                  child: const ColoredBox(color: Colors.pink),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('reference-image-Full alt')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('reference-image-Collapsed alt')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('reference-image-Shortcut alt')),
+      findsNothing,
+    );
+    expect(built['Full alt'], (uri: 'img-ref', title: null));
+    expect(built['Collapsed alt'], (uri: url, title: 'Collapsed title'));
+    expect(
+      find.textContaining('![Shortcut alt]', findRichText: true),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-reference-definitions')),
+      findsOneWidget,
+    );
+    expect(find.text(url), findsNWidgets(3));
+
+    await tester.tap(
+      find.byKey(const ValueKey('reference-image-Collapsed alt')),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-image-controls')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('ianvs-markdown-image-edit')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
+    expect(controller.text, source);
+
+    built.clear();
+    controller.mode = IanvsMarkdownEditorMode.preview;
+    await tester.pumpAndSettle();
+
+    for (final alt in <String>['Full alt', 'Collapsed alt', 'Shortcut alt']) {
+      expect(
+        find.byKey(ValueKey('reference-image-$alt')),
+        findsOneWidget,
+        reason: alt,
+      );
+      expect(built[alt]?.uri, url, reason: alt);
+    }
+    expect(built['Full alt']?.title, 'Image title');
+    expect(built['Collapsed alt']?.title, 'Collapsed title');
+    expect(built['Shortcut alt']?.title, 'Shortcut title');
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-reference-definitions')),
+      findsNothing,
+    );
+    expect(find.text(url), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('reference-image-Full alt')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-image-viewer')),
+      findsOneWidget,
+    );
+    expect(find.text('Image title'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-image-viewer')),
+      findsNothing,
+    );
+  });
+
   testWidgets('live preview keeps extra-whitespace reference labels literal', (
     tester,
   ) async {

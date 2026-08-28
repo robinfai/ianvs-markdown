@@ -1047,6 +1047,28 @@ final answer = 42;
     );
   });
 
+  test('Live Preview projects Obsidian reference image variants', () {
+    const source = r'''
+![Inline](image.png)
+![Full alt][img-ref]
+![Collapsed alt][]
+![Shortcut alt]
+`![Code][img-ref]`
+%%![Comment][img-ref]%%
+![[Wiki image]]
+''';
+
+    expect(projectObsidianReferenceImagesForLivePreview(source), r'''
+![Inline](image.png)
+![Full alt](<img-ref>)
+![Collapsed alt][]
+!\[Shortcut alt\]
+`![Code][img-ref]`
+%%![Comment][img-ref]%%
+![[Wiki image]]
+''');
+  });
+
   testWidgets('renders a safe Obsidian inline HTML subset', (tester) async {
     String? tappedHref;
     await tester.pumpWidget(

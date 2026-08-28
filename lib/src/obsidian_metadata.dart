@@ -369,6 +369,91 @@ String prepareObsidianMarkdownForRendering(
   return _expandInlineFootnotes(withObsidianFootnoteDefinitions);
 }
 
+/// Matches Obsidian's Live Preview treatment of reference-style images.
+///
+/// Full references use their secondary label as a direct image target,
+/// collapsed references remain definition-backed images, and shortcut image
+/// syntax stays literal. Reading mode intentionally keeps the Markdown
+/// parser's standard resolution for all three forms.
+String projectObsidianReferenceImagesForLivePreview(String source) {
+  if (source.isEmpty || !source.contains('![')) return source;
+  final protected = <TextRange>[
+    ..._obsidianLiteralCodeRanges(source),
+    ...ianvsMarkdownCommentRanges(source),
+  ]..sort((left, right) => left.start.compareTo(right.start));
+  final edits = <({int start, int end, String replacement})>[];
+  var protectedIndex = 0;
+  var index = 0;
+  while (index + 1 < source.length) {
+    while (protectedIndex < protected.length &&
+        protected[protectedIndex].end <= index) {
+      protectedIndex += 1;
+    }
+    if (protectedIndex < protected.length &&
+        index >= protected[protectedIndex].start &&
+        index < protected[protectedIndex].end) {
+      index = protected[protectedIndex].end;
+      continue;
+    }
+    if (!source.startsWith('![', index) ||
+        source.startsWith('![[', index) ||
+        isIanvsMarkdownEscapedAt(source, index)) {
+      index += 1;
+      continue;
+    }
+    final bracketStart = index + 1;
+    final labelEnd = findIanvsMarkdownLinkLabelEnd(source, bracketStart);
+    if (labelEnd == null) {
+      index += 2;
+      continue;
+    }
+    final suffixStart = labelEnd + 1;
+    if (suffixStart < source.length && source.codeUnitAt(suffixStart) == 0x28) {
+      final inlineEnd = findIanvsMarkdownInlineLinkEnd(source, suffixStart);
+      index = inlineEnd ?? suffixStart + 1;
+      continue;
+    }
+    if (suffixStart < source.length && source.codeUnitAt(suffixStart) == 0x5b) {
+      if (suffixStart + 1 < source.length &&
+          source.codeUnitAt(suffixStart + 1) == 0x5d) {
+        index = suffixStart + 2;
+        continue;
+      }
+      final secondary = findIanvsMarkdownReferenceLabel(source, suffixStart);
+      if (secondary == null) {
+        index = suffixStart + 1;
+        continue;
+      }
+      final alt = source.substring(bracketStart + 1, labelEnd);
+      final target = secondary.label
+          .trim()
+          .replaceAll(RegExp(r'[\n\r\t ]+'), ' ')
+          .replaceAll(r'\', r'\\')
+          .replaceAll('>', r'\>');
+      edits.add((
+        start: index,
+        end: secondary.end,
+        replacement: '![$alt](<$target>)',
+      ));
+      index = secondary.end;
+      continue;
+    }
+
+    final alt = source.substring(bracketStart + 1, labelEnd);
+    edits.add((
+      start: index,
+      end: labelEnd + 1,
+      replacement: r'!\[' + alt + r'\]',
+    ));
+    index = labelEnd + 1;
+  }
+  var projected = source;
+  for (final edit in edits.reversed) {
+    projected = projected.replaceRange(edit.start, edit.end, edit.replacement);
+  }
+  return projected;
+}
+
 /// Projects literal backslashes in Obsidian inline-link destinations without
 /// changing the document source exposed by Live Preview or source mode.
 ///

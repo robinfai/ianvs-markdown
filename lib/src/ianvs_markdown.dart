@@ -33,6 +33,13 @@ import 'wiki_embed.dart';
 typedef IanvsMarkdownFallbackBuilder =
     Widget Function(BuildContext context, IanvsMarkdownRenderDecision decision);
 
+Set<String> _markdownReferenceLabels(String source) {
+  if (source.isEmpty) return const <String>{};
+  final document = md.Document(extensionSet: md.ExtensionSet.gitHubFlavored);
+  document.parseLines(source.split('\n'));
+  return document.linkReferences.keys.toSet();
+}
+
 /// A content-sized, reusable Markdown renderer.
 ///
 /// Images are represented by a safe placeholder unless [imageBuilder] is
@@ -342,9 +349,15 @@ class IanvsMarkdown extends StatelessWidget {
         mode: obsidianMetadataMode,
       ),
     );
+    final imageProjectedData =
+        obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing
+        ? projectObsidianReferenceImagesForLivePreview(preparedData)
+        : preparedData;
     final renderedData =
         projectObsidianInlineLinkDestinationBackslashesForRendering(
-          projectObsidianCrossParagraphHighlightsForRendering(preparedData),
+          projectObsidianCrossParagraphHighlightsForRendering(
+            imageProjectedData,
+          ),
         );
     final taskProjection = projectObsidianTaskMarkers(renderedData);
     final listIndentStep =
@@ -352,6 +365,7 @@ class IanvsMarkdown extends StatelessWidget {
         (effectiveStyleSheet.listBulletPadding?.horizontal ?? 4);
     var imageIndex = 0;
     var taskIndex = 0;
+    Set<String>? imageReferenceLabels;
     final body = MarkdownBody(
       key: ValueKey<bool>(softLineBreak),
       // flutter_markdown_plus only reparses when data or styles change, so
@@ -370,6 +384,12 @@ class IanvsMarkdown extends StatelessWidget {
         final currentImageIndex = imageIndex;
         imageIndex += 1;
         final dimensions = parseIanvsMarkdownImageDimensions(alt);
+        imageReferenceLabels ??= _markdownReferenceLabels(renderedData);
+        final sourceImage = findIanvsMarkdownStandardImageSource(
+          renderedData,
+          imageIndex: currentImageIndex,
+          linkReferenceLabels: imageReferenceLabels!,
+        );
         final builder = imageBuilder;
         if (builder == null) {
           return IanvsMarkdownBlockedImage(
@@ -397,17 +417,27 @@ class IanvsMarkdown extends StatelessWidget {
             child: image,
           );
         }
-        if (obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing) {
-          final edit = onEditImage;
-          image = IanvsMarkdownInteractiveImage(
-            alt: dimensions.alt,
-            title: title,
-            theme: colors,
-            onEdit: edit == null ? null : () => edit(currentImageIndex),
-            expandedImageBuilder: (_) => builder(uri, title, dimensions.alt),
-            child: image,
-          );
-        }
+        final editing =
+            obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing;
+        final edit = onEditImage;
+        final referenceTitle =
+            sourceImage?.syntax == IanvsMarkdownStandardImageSourceSyntax.inline
+            ? null
+            : title?.trim();
+        image = IanvsMarkdownInteractiveImage(
+          alt: dimensions.alt,
+          title: title,
+          viewerLabel: referenceTitle == null || referenceTitle.isEmpty
+              ? dimensions.alt
+              : referenceTitle,
+          openViewerOnTap: !editing,
+          theme: colors,
+          onEdit: !editing || edit == null
+              ? null
+              : () => edit(currentImageIndex),
+          expandedImageBuilder: (_) => builder(uri, title, dimensions.alt),
+          child: image,
+        );
         return image;
       },
       checkboxBuilder: (checked) {
