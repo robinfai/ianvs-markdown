@@ -174,6 +174,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   Duration? _lastPointerDownTimeStamp;
   Offset? _lastPointerDownGlobal;
   var _pointerTapCount = 0;
+  int? _projectedRenderedTapBlockStart;
+  int? _projectedRenderedTapLocalOffset;
   var _syncingFromBlock = false;
   var _syncingToBlock = false;
   double? _verticalNavigationX;
@@ -182,6 +184,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   Offset? _documentDragOrigin;
   Offset? _documentDragLatest;
   int? _documentDragAnchor;
+  Offset? _documentDragProjectedExtentPoint;
+  int? _documentDragProjectedExtent;
   var _documentDragActive = false;
   var _documentDragEnding = false;
   var _documentDragUpdateScheduled = false;
@@ -449,6 +453,10 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     final end = _editingEnd.clamp(start, document.text.length);
     final local = _blockController.value;
     final previousBlock = document.text.substring(start, end);
+    if (local.text != previousBlock) {
+      _projectedRenderedTapBlockStart = null;
+      _projectedRenderedTapLocalOffset = null;
+    }
     final removedRootOrderedLine = _rootOrderedExitLine(
       previousBlock,
       local.text,
@@ -2399,6 +2407,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     int? documentOffset,
   }) {
     _foldedSelectionBridge = null;
+    _projectedRenderedTapBlockStart = null;
+    _projectedRenderedTapLocalOffset = null;
     _blockController.revealLeadingMarker = false;
     _activeGapLine = false;
     final currentSelection = widget.controller.selection;
@@ -2503,8 +2513,24 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       _resetDocumentDragSelection();
       return;
     }
+    final renderedOffset = block.type == IanvsMarkdownBlockType.indentedCode
+        ? _indentedCodeDocumentOffsetAtRenderedPoint(block, origin)
+        : null;
+    final latest = _documentDragLatest;
+    final renderedExtent = renderedOffset != null && latest != null
+        ? _indentedCodeDocumentOffsetAtRenderedPoint(block, latest)
+        : null;
     final epoch = _documentDragEpoch;
-    _activateBlock(block, documentOffset: block.end);
+    _activateBlock(block, documentOffset: renderedOffset ?? block.end);
+    if (renderedOffset != null) {
+      _documentDragAnchor = renderedOffset;
+      _documentDragProjectedExtentPoint = renderedExtent == null
+          ? null
+          : latest;
+      _documentDragProjectedExtent = renderedExtent;
+      _scheduleDocumentDragUpdate();
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || epoch != _documentDragEpoch || !_documentDragActive) {
         return;
@@ -2531,6 +2557,45 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       0,
       widget.controller.text.length,
     );
+  }
+
+  int? _indentedCodeDocumentOffsetAtRenderedPoint(
+    IanvsMarkdownBlock block,
+    Offset globalPosition,
+  ) {
+    final root = _renderedBlockTapKeys[block.start]?.currentContext
+        ?.findRenderObject();
+    if (root == null || !root.attached) return null;
+    final editables = <RenderEditable>[];
+    void collect(RenderObject child) {
+      if (child is RenderEditable && child.readOnly) {
+        editables.add(child);
+        return;
+      }
+      child.visitChildren(collect);
+    }
+
+    root.visitChildren(collect);
+    var editableIndex = 0;
+    var lineStart = 0;
+    for (final line in block.source.split('\n')) {
+      if (line.isNotEmpty && editableIndex < editables.length) {
+        final editable = editables[editableIndex];
+        editableIndex += 1;
+        if (editable.attached && editable.hasSize) {
+          final local = editable.globalToLocal(globalPosition);
+          if (local.dy >= -1 && local.dy <= editable.size.height + 1) {
+            final content = _indentedCodeContentLine(line);
+            final prefixLength = line.length - content.length;
+            final position = editable.getPositionForPoint(globalPosition);
+            final visibleOffset = position.offset.clamp(0, content.length);
+            return block.start + lineStart + prefixLength + visibleOffset;
+          }
+        }
+      }
+      lineStart += line.length + 1;
+    }
+    return null;
   }
 
   IanvsMarkdownBlock? _renderedBlockAtGlobalPoint(Offset globalPosition) {
@@ -2591,6 +2656,19 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     final latest = _documentDragLatest;
     if (!_documentDragActive || anchor == null || latest == null) return;
 
+    final projectedExtent = _documentDragProjectedExtent;
+    if (projectedExtent != null &&
+        _documentDragProjectedExtentPoint == latest) {
+      _documentDragProjectedExtentPoint = null;
+      _documentDragProjectedExtent = null;
+      _documentDragExpansionAttempts = 0;
+      _applyDocumentDragSelection(anchor, projectedExtent);
+      if (_documentDragEnding) _resetDocumentDragSelection();
+      return;
+    }
+    _documentDragProjectedExtentPoint = null;
+    _documentDragProjectedExtent = null;
+
     final exactExtent = _documentOffsetAtActivePoint(latest);
     if (exactExtent != null) {
       _documentDragExpansionAttempts = 0;
@@ -2647,6 +2725,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     _documentDragOrigin = null;
     _documentDragLatest = null;
     _documentDragAnchor = null;
+    _documentDragProjectedExtentPoint = null;
+    _documentDragProjectedExtent = null;
     _documentDragActive = false;
     _documentDragEnding = false;
     _documentDragUpdateScheduled = false;
@@ -2665,6 +2745,10 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         elapsed <= const Duration(milliseconds: 500) &&
         previousPosition != null &&
         (event.position - previousPosition).distance <= 24;
+    if (!continuesSequence) {
+      _projectedRenderedTapBlockStart = null;
+      _projectedRenderedTapLocalOffset = null;
+    }
     _pointerTapCount = continuesSequence ? _pointerTapCount + 1 : 1;
     _lastPointerDownTimeStamp = event.timeStamp;
     _lastPointerDownGlobal = event.position;
@@ -2691,6 +2775,12 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             renderObject.size,
           )
         : null;
+    final indentedCodeTapOffset =
+        tapCount == 1 &&
+            block.type == IanvsMarkdownBlockType.indentedCode &&
+            pendingGlobal != null
+        ? _indentedCodeDocumentOffsetAtRenderedPoint(block, pendingGlobal)
+        : null;
     _activateBlock(
       block,
       selectWholeSource: selectThematicSource,
@@ -2698,10 +2788,15 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           block.type == IanvsMarkdownBlockType.thematicBreak &&
               !selectThematicSource
           ? block.end
-          : tapOffset,
+          : indentedCodeTapOffset ?? tapOffset,
     );
+    if (indentedCodeTapOffset != null) {
+      _projectedRenderedTapBlockStart = block.start;
+      _projectedRenderedTapLocalOffset = indentedCodeTapOffset - block.start;
+    }
     if (pendingGlobal != null &&
-        block.type != IanvsMarkdownBlockType.thematicBreak) {
+        block.type != IanvsMarkdownBlockType.thematicBreak &&
+        indentedCodeTapOffset == null) {
       _placeSelectionAtRenderedTap(
         block,
         pendingGlobal,
@@ -2735,6 +2830,14 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     _RenderedTapSelection selectionKind,
   ) {
     final position = editable.getPositionForPoint(globalPosition);
+    return _selectionAtEditablePosition(editable, position, selectionKind);
+  }
+
+  TextSelection _selectionAtEditablePosition(
+    RenderEditable editable,
+    TextPosition position,
+    _RenderedTapSelection selectionKind,
+  ) {
     final offset = position.offset.clamp(0, _blockController.text.length);
     final TextRange range;
     switch (selectionKind) {
@@ -2801,14 +2904,21 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       if (!mounted || tapCount != _pointerTapCount) return;
       final editable = _activeRenderEditable();
       if (editable == null) return;
+      final projectedOffset =
+          _projectedRenderedTapBlockStart == _activeBlockStart
+          ? _projectedRenderedTapLocalOffset
+          : null;
+      final selectionKind = tapCount >= 3
+          ? _RenderedTapSelection.line
+          : _RenderedTapSelection.word;
       _setActiveSelection(
-        _selectionAtEditablePoint(
-          editable,
-          globalPosition,
-          tapCount >= 3
-              ? _RenderedTapSelection.line
-              : _RenderedTapSelection.word,
-        ),
+        projectedOffset == null
+            ? _selectionAtEditablePoint(editable, globalPosition, selectionKind)
+            : _selectionAtEditablePosition(
+                editable,
+                TextPosition(offset: projectedOffset),
+                selectionKind,
+              ),
       );
     });
   }

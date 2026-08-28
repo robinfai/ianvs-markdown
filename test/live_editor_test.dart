@@ -9628,6 +9628,193 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     },
   );
 
+  testWidgets('indented code taps map dedented visual text to exact source', (
+    tester,
+  ) async {
+    const source =
+        'Before.\n\n'
+        '    four-one\n'
+        '    four-two\n\n'
+        'Middle.\n\n'
+        '\tTab-one\n'
+        '\tTab-two\n\n'
+        'After.';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final rendered = find.text('four-one');
+    final inactiveEditable = editableWithin(tester, rendered);
+    const visibleOffset = 4;
+    final target = inactiveEditable.localToGlobal(
+      inactiveEditable
+          .getLocalRectForCaret(const TextPosition(offset: visibleOffset))
+          .center,
+    );
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    final expectedOffset = source.indexOf('four-one') + visibleOffset;
+    expect(
+      controller.selection,
+      TextSelection.collapsed(offset: expectedOffset),
+    );
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, '    four-one\n    four-two');
+    expect(
+      field.controller?.selection,
+      const TextSelection.collapsed(offset: 8),
+    );
+    expect(field.focusNode?.hasFocus, isTrue);
+    expect(controller.text, source);
+
+    final renderedTab = find.text('Tab-one');
+    final inactiveTabEditable = editableWithin(tester, renderedTab);
+    const tabVisibleOffset = 3;
+    final tabTarget = inactiveTabEditable.localToGlobal(
+      inactiveTabEditable
+          .getLocalRectForCaret(const TextPosition(offset: tabVisibleOffset))
+          .center,
+    );
+    await tester.tapAt(tabTarget);
+    await tester.pumpAndSettle();
+
+    final expectedTabOffset = source.indexOf('Tab-one') + tabVisibleOffset;
+    expect(
+      controller.selection,
+      TextSelection.collapsed(offset: expectedTabOffset),
+    );
+    final tabField = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(tabField.controller?.text, '\tTab-one\n\tTab-two');
+    expect(
+      tabField.controller?.selection,
+      const TextSelection.collapsed(offset: 4),
+    );
+    expect(tabField.focusNode?.hasFocus, isTrue);
+    expect(controller.text, source);
+  });
+
+  testWidgets('indented code double click selects the visible word', (
+    tester,
+  ) async {
+    const source = 'Before.\n\n    four-one\n    four-two\n\nAfter.';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final inactiveEditable = editableWithin(tester, find.text('four-one'));
+    final target = inactiveEditable.localToGlobal(
+      inactiveEditable
+          .getLocalRectForCaret(const TextPosition(offset: 2))
+          .center,
+    );
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(controller.selection.textInside(source), 'four');
+
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(controller.selection.textInside(source), '    four-one');
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
+  testWidgets(
+    'indented code drag maps its initial visual range to exact source',
+    (tester) async {
+      const source = 'Before.\n\n    four-one\n    four-two\n\nAfter.';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      final firstEditable = editableWithin(tester, find.text('four-one'));
+      final secondEditable = editableWithin(tester, find.text('four-two'));
+      final start = firstEditable.localToGlobal(
+        firstEditable
+            .getLocalRectForCaret(const TextPosition(offset: 2))
+            .center,
+      );
+      final end = secondEditable.localToGlobal(
+        secondEditable
+            .getLocalRectForCaret(const TextPosition(offset: 4))
+            .center,
+      );
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(mouse.removePointer);
+      await mouse.down(start);
+      await mouse.moveTo(end);
+      await tester.pumpAndSettle();
+      await mouse.up();
+      await tester.pumpAndSettle();
+
+      final blockStart = source.indexOf('    four-one');
+      const firstLineLength = 12;
+      expect(
+        controller.selection,
+        TextSelection(
+          baseOffset: blockStart + 4 + 2,
+          extentOffset: blockStart + firstLineLength + 1 + 4 + 4,
+          isDirectional: true,
+        ),
+      );
+      expect(controller.selection.textInside(source), 'ur-one\n    four');
+      expect(controller.text, source);
+      expect(controller.isDirty, isFalse);
+    },
+  );
+
+  testWidgets('tab-indented code reverse drag keeps exact source direction', (
+    tester,
+  ) async {
+    const source = 'Before.\n\n\tTab-one\n\tTab-two\n\nAfter.';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final firstEditable = editableWithin(tester, find.text('Tab-one'));
+    final secondEditable = editableWithin(tester, find.text('Tab-two'));
+    final start = secondEditable.localToGlobal(
+      secondEditable.getLocalRectForCaret(const TextPosition(offset: 4)).center,
+    );
+    final end = firstEditable.localToGlobal(
+      firstEditable.getLocalRectForCaret(const TextPosition(offset: 2)).center,
+    );
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    addTearDown(mouse.removePointer);
+    await mouse.down(start);
+    await mouse.moveTo(end);
+    await tester.pumpAndSettle();
+    await mouse.up();
+    await tester.pumpAndSettle();
+
+    final blockStart = source.indexOf('\tTab-one');
+    const firstLineLength = 8;
+    expect(
+      controller.selection,
+      TextSelection(
+        baseOffset: blockStart + firstLineLength + 1 + 1 + 4,
+        extentOffset: blockStart + 1 + 2,
+        isDirectional: true,
+      ),
+    );
+    expect(controller.selection.textInside(source), 'b-one\n\tTab-');
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('active indented code keeps exact source and current-line rail', (
     tester,
   ) async {
