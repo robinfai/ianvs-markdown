@@ -4561,6 +4561,39 @@ void main() {
     expect(controller.text, source);
   });
 
+  testWidgets('whitespace-only documents activate their exact source', (
+    tester,
+  ) async {
+    const source = ' \t \n\n';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final editTarget = find.bySemanticsLabel('Edit Markdown block');
+    expect(tester.getSize(editTarget).width, greaterThan(100));
+    await tester.tap(editTarget);
+    await tester.pumpAndSettle();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, source);
+    expect(field.focusNode?.hasFocus, isTrue);
+
+    field.controller?.value = const TextEditingValue(
+      text: 'X',
+      selection: TextSelection.collapsed(offset: 1),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.text, 'X');
+
+    controller.undo();
+    await tester.pumpAndSettle();
+    expect(controller.text, source);
+  });
+
   testWidgets('extra source blank lines share one Obsidian paragraph gap', (
     tester,
   ) async {

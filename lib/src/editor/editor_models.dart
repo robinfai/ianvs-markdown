@@ -145,10 +145,10 @@ List<IanvsMarkdownBlock> parseMarkdownBlocks(
       IanvsMarkdownBlock(
         type: IanvsMarkdownBlockType.paragraph,
         start: 0,
-        end: 0,
+        end: source.length,
         firstLine: 0,
-        lastLine: 0,
-        source: '',
+        lastLine: lines.length - 1,
+        source: source,
       ),
     ];
   }

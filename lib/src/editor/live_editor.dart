@@ -3541,7 +3541,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     final sourceTasks = projectObsidianTaskMarkers(block.source).tasks;
     var renderedTaskIndex = 0;
     Widget rendered;
-    if (block.type == IanvsMarkdownBlockType.frontMatter) {
+    if (block.source.trim().isEmpty) {
+      rendered = const SizedBox.shrink();
+    } else if (block.type == IanvsMarkdownBlockType.frontMatter) {
       final document = parseMarkdownFrontMatter(block.source);
       if (!document.hasFrontMatter) {
         rendered = IanvsMarkdown(

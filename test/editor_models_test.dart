@@ -851,6 +851,18 @@ visible''';
     expect(blocks.single.end, 0);
   });
 
+  test('whitespace-only input remains one exact editable block', () {
+    const source = ' \t \n\n';
+    final blocks = parseMarkdownBlocks(source);
+
+    expect(blocks, hasLength(1));
+    expect(blocks.single.source, source);
+    expect(blocks.single.start, 0);
+    expect(blocks.single.end, source.length);
+    expect(blocks.single.firstLine, 0);
+    expect(blocks.single.lastLine, 1);
+  });
+
   test('live-preview projection can split contiguous lists into items', () {
     const source = '- first\n- [ ] second\n  - nested\n    - deep';
 
