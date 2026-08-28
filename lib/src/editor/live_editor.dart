@@ -2606,6 +2606,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     if (block.type == IanvsMarkdownBlockType.indentedCode) {
       return _indentedCodeDocumentOffsetAtRenderedPoint(block, globalPosition);
     }
+    if (block.type == IanvsMarkdownBlockType.blockquote) {
+      return _blockquoteDocumentOffsetAtRenderedPoint(block, globalPosition);
+    }
     final definition = _livePreviewFootnoteDefinition(block.source);
     if (definition == null) return null;
     final root = _renderedBlockTapKeys[block.start]?.currentContext
@@ -2637,6 +2640,60 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       if (localSourceOffset != null) {
         return block.start + localSourceOffset;
       }
+    }
+    return null;
+  }
+
+  int? _blockquoteDocumentOffsetAtRenderedPoint(
+    IanvsMarkdownBlock block,
+    Offset globalPosition,
+  ) {
+    final root = _renderedBlockTapKeys[block.start]?.currentContext
+        ?.findRenderObject();
+    if (root == null || !root.attached) return null;
+    final editables = <RenderEditable>[];
+    void collect(RenderObject child) {
+      if (child is RenderEditable && child.readOnly) {
+        editables.add(child);
+        return;
+      }
+      child.visitChildren(collect);
+    }
+
+    root.visitChildren(collect);
+    var sourceSearchStart = 0;
+    for (final editable in editables) {
+      if (!editable.attached || !editable.hasSize) continue;
+      final visibleText = editable.text?.toPlainText() ?? '';
+      if (visibleText.isEmpty) continue;
+      final visibleSourceStart = _markdownSourceOffsetForRenderedOffset(
+        block.source,
+        visibleText,
+        0,
+        sourceSearchStart: sourceSearchStart,
+      );
+      if (visibleSourceStart == null) continue;
+      final visibleSourceEnd = _markdownSourceOffsetForRenderedOffset(
+        block.source,
+        visibleText,
+        visibleText.length,
+        sourceSearchStart: visibleSourceStart,
+      );
+      final local = editable.globalToLocal(globalPosition);
+      if (local.dy >= -1 && local.dy <= editable.size.height + 1) {
+        final visibleOffset = editable
+            .getPositionForPoint(globalPosition)
+            .offset
+            .clamp(0, visibleText.length);
+        final sourceOffset = _markdownSourceOffsetForRenderedOffset(
+          block.source,
+          visibleText,
+          visibleOffset,
+          sourceSearchStart: visibleSourceStart,
+        );
+        if (sourceOffset != null) return block.start + sourceOffset;
+      }
+      if (visibleSourceEnd != null) sourceSearchStart = visibleSourceEnd;
     }
     return null;
   }
@@ -7681,6 +7738,28 @@ int? _markdownSourceOffsetForVisibleOffset(
 ) {
   final safeOffset = visibleOffset.clamp(0, visible.length);
   var sourceOffset = 0;
+  for (var index = 0; index < safeOffset; index += 1) {
+    final next = source.indexOf(visible[index], sourceOffset);
+    if (next < 0) return null;
+    sourceOffset = next + 1;
+  }
+  return sourceOffset;
+}
+
+int? _markdownSourceOffsetForRenderedOffset(
+  String source,
+  String visible,
+  int visibleOffset, {
+  required int sourceSearchStart,
+}) {
+  if (visible.isEmpty) return sourceSearchStart.clamp(0, source.length);
+  final safeOffset = visibleOffset.clamp(0, visible.length);
+  var sourceOffset = source.indexOf(
+    visible[0],
+    sourceSearchStart.clamp(0, source.length),
+  );
+  if (sourceOffset < 0) return null;
+  if (safeOffset == 0) return sourceOffset;
   for (var index = 0; index < safeOffset; index += 1) {
     final next = source.indexOf(visible[index], sourceOffset);
     if (next < 0) return null;

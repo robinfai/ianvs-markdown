@@ -41,6 +41,9 @@
   punctuation and activation restores the complete Markdown source. Reading
   mode alone renders the shared `[N]` / `[N-k]` sequence; single- and multi-line
   code spans retain literal footnote-shaped text in both modes.
+- Map inactive blockquote text clicks past hidden `>` prefixes before the block
+  becomes editable, preserving Obsidian's exact source caret and its raw-marker
+  triple-click line selection.
 - Keep an isolated `==before / blank line / after==` attempt fully literal in
   Reading and inactive Live Preview instead of projecting both sides as
   independent unclosed highlights; exact source and higher-priority literal
