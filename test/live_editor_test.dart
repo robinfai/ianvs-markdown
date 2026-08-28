@@ -5828,6 +5828,66 @@ second
   );
 
   testWidgets(
+    'property list input isolates chip edits from document undo',
+    (tester) async {
+      const source = '''
+---
+tags: [one, two]
+---
+# Body
+''';
+      const afterRemoval = '''
+---
+tags:
+  - one
+---
+# Body
+''';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey('ianvs-markdown-front-matter-chip-remove-tags-1'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(controller.text, afterRemoval);
+
+      final input = find.byKey(
+        const ValueKey('ianvs-markdown-front-matter-list-input-tags'),
+      );
+      await tester.tap(input);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyZ);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+      expect(controller.text, afterRemoval);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyZ);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.pumpAndSettle();
+      expect(controller.text, afterRemoval);
+
+      await tester.tap(find.text('Body'));
+      await tester.pump();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyZ);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+      expect(controller.text, source);
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
     'property Command+S commits pending input before saving',
     (tester) async {
       const source = '''
