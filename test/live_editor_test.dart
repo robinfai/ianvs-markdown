@@ -9170,6 +9170,59 @@ Standard[^note] and inline ^[inline body].
     expect(field.controller?.text, 'Visible %%secret%% after. ^block-id');
   });
 
+  testWidgets(
+    'multiline footnotes match Obsidian Live Preview and Reading projection',
+    (tester) async {
+      const source = '''
+Before
+
+Alpha bravo[^note] omega.
+
+[^note]: First line
+    Continuation line
+
+Inline ^[secret bravo] omega.
+
+After
+''';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      expect(find.text('[^note]'), findsOneWidget);
+      expect(find.text('^[secret bravo]'), findsOneWidget);
+      expect(find.textContaining('[^note]:'), findsNothing);
+      expect(find.textContaining('note First line'), findsOneWidget);
+      expect(find.textContaining('Continuation line'), findsOneWidget);
+
+      await tester.tap(find.textContaining('Continuation line'));
+      await tester.pumpAndSettle();
+
+      final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+      final field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      expect(
+        field.controller?.text,
+        '[^note]: First line\n    Continuation line',
+      );
+      expect(controller.text, source);
+
+      controller.mode = IanvsMarkdownEditorMode.preview;
+      await tester.pumpAndSettle();
+
+      for (final label in <String>['[1]', '[2]']) {
+        expect(find.text(label), findsOneWidget);
+      }
+      expect(find.textContaining('First line'), findsOneWidget);
+      expect(find.textContaining('Continuation line'), findsOneWidget);
+      expect(find.textContaining('secret bravo'), findsOneWidget);
+      expect(find.textContaining('[^note]:'), findsNothing);
+    },
+  );
+
   testWidgets('footnote marker clicks preserve Obsidian source selections', (
     tester,
   ) async {
@@ -9212,6 +9265,56 @@ Standard[^note] and inline ^[inline body].
     expect(controller.text, source);
     expect(controller.isDirty, isFalse);
   });
+
+  testWidgets(
+    'inline footnote clicks preserve Obsidian caret word and line selections',
+    (tester) async {
+      const source = 'Inline ^[secret bravo] omega.';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      final marker = find.text('^[secret bravo]');
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(of: marker, matching: find.byType(RichText)),
+      );
+      const markerOffset = 7;
+      final caret = paragraph.getOffsetForCaret(
+        const TextPosition(offset: markerOffset),
+        Rect.zero,
+      );
+      final target = paragraph.localToGlobal(
+        caret + Offset(.1, paragraph.size.height / 2),
+      );
+
+      await tester.tapAt(target);
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(controller.selection.isCollapsed, isTrue);
+      expect(
+        controller.selection.extentOffset,
+        source.indexOf('^[') + markerOffset,
+      );
+      final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+      final field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      expect(field.controller?.text, source);
+
+      await tester.tapAt(target);
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(controller.selection.textInside(source), 'secret');
+
+      await tester.tapAt(target);
+      await tester.pumpAndSettle();
+
+      expect(controller.selection.textInside(source), source);
+      expect(controller.text, source);
+      expect(controller.isDirty, isFalse);
+    },
+  );
 
   testWidgets('footnote definition clicks map its projection to source', (
     tester,
