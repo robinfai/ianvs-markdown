@@ -2919,9 +2919,17 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       if (!mounted || _activeBlockStart != block.start) return;
       final editable = _activeRenderEditable();
       if (editable == null) return;
-      _setActiveSelection(
-        _selectionAtEditablePoint(editable, globalPosition, selectionKind),
+      final localSelection = _selectionAtEditablePoint(
+        editable,
+        globalPosition,
+        selectionKind,
       );
+      if (selectionKind == _RenderedTapSelection.caret &&
+          localSelection.isCollapsed) {
+        _projectedRenderedTapBlockStart = block.start;
+        _projectedRenderedTapLocalOffset = localSelection.extentOffset;
+      }
+      _setActiveSelection(localSelection);
     });
   }
 

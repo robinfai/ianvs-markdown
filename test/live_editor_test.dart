@@ -8688,6 +8688,44 @@ $$''');
     expect(controller.isDirty, isFalse);
   });
 
+  testWidgets('inline HTML clicks preserve Obsidian source selections', (
+    tester,
+  ) async {
+    const line = 'Alpha <u>bravo charlie</u> omega';
+    const source = 'Before\n\n$line\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final paragraphFinder = selectableTextWithPlainText(
+      'Alpha bravo charlie omega',
+    );
+    expect(paragraphFinder, findsOneWidget);
+    final paragraph = editableWithin(tester, paragraphFinder);
+    final target = paragraph.localToGlobal(
+      paragraph.getLocalRectForCaret(const TextPosition(offset: 8)).center,
+    );
+
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(controller.selection.isCollapsed, isTrue);
+    expect(controller.selection.extentOffset, 19);
+
+    await tester.tapAt(target);
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(controller.selection.textInside(source), 'bravo');
+
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(controller.selection.textInside(source), line);
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('inactive inline math keeps list source prefixes collapsed', (
     tester,
   ) async {

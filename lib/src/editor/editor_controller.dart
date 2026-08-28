@@ -2896,6 +2896,7 @@ List<TextRange> _addInlineHtmlSyntaxTokens(
             match.end,
             theme.marker,
             inlineMarkerRange: range,
+            selectsInlineSource: false,
           ),
         );
         continue;
@@ -2922,6 +2923,7 @@ List<TextRange> _addInlineHtmlSyntaxTokens(
             openingRange.end,
             theme.marker,
             inlineMarkerRange: revealRange,
+            selectsInlineSource: false,
           ),
         )
         ..add(
@@ -2930,6 +2932,7 @@ List<TextRange> _addInlineHtmlSyntaxTokens(
             closingRange.end,
             theme.marker,
             inlineMarkerRange: revealRange,
+            selectsInlineSource: false,
           ),
         );
 

@@ -2313,6 +2313,14 @@ void main() {
       active.singleWhere((span) => span.text == '<u>').style?.fontSize,
       .01,
     );
+    final under = source.indexOf('under');
+    expect(
+      ianvsMarkdownInlineSourceRangeAt(
+        source,
+        TextRange(start: under, end: under + 5),
+      ),
+      isNull,
+    );
   });
 
   test(
