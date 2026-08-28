@@ -3020,6 +3020,62 @@ void main() {
     }
   });
 
+  testWidgets('Option arrows skip descendants of a collapsed heading', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    try {
+      const source = '# Heading\nBody\n# Tail';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      Future<void> optionArrow(LogicalKeyboardKey key) async {
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+        await tester.sendKeyEvent(key);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+        await tester.pumpAndSettle();
+      }
+
+      await tester.tap(find.byTooltip('折叠标题内容'));
+      await tester.pumpAndSettle();
+      expect(find.text('Body'), findsNothing);
+
+      await tester.tap(find.text('Heading'));
+      await tester.pump();
+      final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+      var field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      field.controller?.selection = TextSelection.collapsed(
+        offset: field.controller!.text.length,
+      );
+
+      await optionArrow(LogicalKeyboardKey.arrowRight);
+
+      expect(active, findsOneWidget);
+      field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      expect(field.controller?.text, '# Tail');
+      expect(field.controller?.selection.extentOffset, 0);
+
+      await optionArrow(LogicalKeyboardKey.arrowLeft);
+
+      field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      expect(field.controller?.text, '# Heading');
+      expect(field.controller?.selection.extentOffset, '# Heading'.length);
+      expect(field.focusNode?.hasFocus, isTrue);
+      expect(controller.text, source);
+      expect(controller.isDirty, isFalse);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
   testWidgets('Shift Option arrows select and replace across block gaps', (
     tester,
   ) async {

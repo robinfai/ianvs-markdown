@@ -1275,11 +1275,14 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       localSelection,
       _editingStart,
     );
-    final target = _documentWordBoundary(
+    final wordTarget = _documentWordBoundary(
       widget.controller.text,
       documentSelection.extentOffset,
       forward: forward,
     );
+    final target = extendSelection
+        ? wordTarget
+        : _projectFoldedCaretTarget(wordTarget, forward: forward);
     if (target == documentSelection.extentOffset ||
         target >= _editingStart && target <= _editingEnd) {
       return KeyEventResult.ignored;
@@ -1373,6 +1376,32 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       if (!hiddenBlockIndices.contains(index)) return index;
     }
     return null;
+  }
+
+  int _projectFoldedCaretTarget(int target, {required bool forward}) {
+    if (!widget.enableHeadingFolding) return target;
+    final blockIndex = _verticalBlockIndexAt(target);
+    if (blockIndex < 0 ||
+        !_headingFoldModel
+            .hiddenBlockIndices(_headingFoldController)
+            .contains(blockIndex)) {
+      return target;
+    }
+    final visibleIndex = _adjacentVisibleBlockIndex(
+      blockIndex,
+      forward: forward,
+    );
+    if (visibleIndex != null) {
+      final visible = _blocks[visibleIndex];
+      return forward ? visible.start : visible.end;
+    }
+    final fallbackIndex = _adjacentVisibleBlockIndex(
+      blockIndex,
+      forward: !forward,
+    );
+    if (fallbackIndex == null) return target;
+    final fallback = _blocks[fallbackIndex];
+    return forward ? fallback.end : fallback.start;
   }
 
   ({int offset, int lineStart, int lineEnd})? _verticalTargetFromBlock(
