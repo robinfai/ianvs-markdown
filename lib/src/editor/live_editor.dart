@@ -4721,9 +4721,14 @@ TextEditingValue? _runTableMarkdownCommand(
 
 class _TableWordDeletionAction
     extends ContextAction<DeleteToNextWordBoundaryIntent> {
-  _TableWordDeletionAction({required this.controller, required this.onChanged});
+  _TableWordDeletionAction({
+    required this.controller,
+    required this.commitHistoryGroup,
+    required this.onChanged,
+  });
 
   final TextEditingController controller;
+  final VoidCallback commitHistoryGroup;
   final ValueChanged<TextEditingValue> onChanged;
 
   @override
@@ -4738,8 +4743,10 @@ class _TableWordDeletionAction
       ),
     );
     if (replacement == null) return callingAction?.invoke(intent);
+    commitHistoryGroup();
     controller.value = replacement;
     onChanged(replacement);
+    commitHistoryGroup();
     return null;
   }
 }
@@ -5479,6 +5486,8 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                                     DeleteToNextWordBoundaryIntent:
                                         _TableWordDeletionAction(
                                           controller: controller,
+                                          commitHistoryGroup:
+                                              widget.onCommitHistoryGroup,
                                           onChanged: (value) =>
                                               _handleFormattedCellAction(
                                                 cell.key,

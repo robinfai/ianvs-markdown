@@ -11055,6 +11055,47 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
   );
 
   testWidgets(
+    'table Option+Backspace keeps preceding deletion in a separate undo step',
+    (tester) async {
+      const source =
+          '| H | I |\n'
+          '| --- | --- |\n'
+          '| x**cell** | beta |';
+      const typed =
+          '| H | I |\n'
+          '| --- | --- |\n'
+          '| **cell** | beta |';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+      final cell = find.byKey(const ValueKey('ianvs-markdown-table-1-0'));
+      await tester.tap(cell);
+      await tester.pump();
+      await tester.enterText(cell, '**cell**');
+      await tester.pump();
+      expect(controller.text, typed);
+      tester.widget<TextField>(cell).controller?.selection =
+          const TextSelection.collapsed(offset: '**cell**'.length);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+      await tester.pumpAndSettle();
+      expect(controller.text, contains('| **cell | beta |'));
+
+      controller.undo();
+      await tester.pumpAndSettle();
+      expect(controller.text, typed);
+      expect(tester.widget<TextField>(cell).controller?.text, '**cell**');
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
     'table Option+Left moves within focused cell Markdown punctuation',
     (tester) async {
       const source =
