@@ -15,6 +15,7 @@ void main() {
     IanvsMarkdownController controller, {
     bool showFrontMatter = true,
     bool enableHeadingFolding = true,
+    bool normalizeTablesOnEdit = false,
   }) {
     return MaterialApp(
       home: Scaffold(
@@ -25,6 +26,7 @@ void main() {
             controller: controller,
             showFrontMatter: showFrontMatter,
             enableHeadingFolding: enableHeadingFolding,
+            normalizeTablesOnEdit: normalizeTablesOnEdit,
           ),
         ),
       ),
@@ -12704,6 +12706,39 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     expect(
       controller.selection,
       TextSelection.collapsed(offset: originalCellEnd),
+    );
+  });
+
+  testWidgets('table edits normalize complete source like Obsidian', (
+    tester,
+  ) async {
+    const source =
+        '| Alpha | Bravo |\n'
+        '| --- | ---: |\n'
+        '| charlie | delta |';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller, normalizeTablesOnEdit: true));
+    await tester.pumpAndSettle();
+
+    final header = find.byKey(const ValueKey('ianvs-markdown-table-0-0'));
+    await tester.tap(header);
+    await tester.pump();
+    await tester.enterText(header, 'AlphaQ');
+    await tester.pumpAndSettle();
+
+    expect(
+      controller.text,
+      '| AlphaQ  | Bravo |\n'
+      '| ------- | ----: |\n'
+      '| charlie | delta |',
+    );
+    expect(
+      controller.selection,
+      TextSelection.collapsed(
+        offset: controller.text.indexOf('AlphaQ') + 'AlphaQ'.length,
+      ),
     );
   });
 

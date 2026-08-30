@@ -119,6 +119,7 @@ class IanvsMarkdownLiveEditor extends StatefulWidget {
     this.renderBudget = const IanvsMarkdownRenderBudget(),
     this.softLineBreak = true,
     this.enableFileLinkChips = false,
+    this.normalizeTablesOnEdit = true,
     this.theme,
   });
 
@@ -162,6 +163,13 @@ class IanvsMarkdownLiveEditor extends StatefulWidget {
   final IanvsMarkdownRenderBudget? renderBudget;
   final bool softLineBreak;
   final bool enableFileLinkChips;
+
+  /// Whether a changed table cell reformats its complete GFM table.
+  ///
+  /// Obsidian's Advanced Tables behavior writes aligned rows and separator
+  /// widths after a cell edit. Set this to false when a host must preserve
+  /// each table's original whitespace while typing.
+  final bool normalizeTablesOnEdit;
   final IanvsMarkdownThemeData? theme;
 
   @override
@@ -4725,6 +4733,57 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     final currentCell = _currentTableCell(cell);
     if (currentCell == null) return;
     final current = widget.controller.value;
+    if (widget.normalizeTablesOnEdit) {
+      final currentBlock = _currentTableBlock(currentCell.tableStart);
+      if (currentBlock == null) return;
+      final model = _parseEditableTable(currentBlock);
+      if (currentCell.row >= model.rows.length ||
+          currentCell.column >= model.rows[currentCell.row].length) {
+        return;
+      }
+      final rows = _editableTableTextRows(model);
+      rows[currentCell.row][currentCell.column] = replacement.text;
+      final serialized = _serializeEditableTable(rows, model.alignments);
+      if (serialized.isEmpty) return;
+      final nextText = current.text.replaceRange(
+        currentBlock.start,
+        currentBlock.end,
+        serialized,
+      );
+      IanvsMarkdownBlock? nextBlock;
+      for (final candidate in parseMarkdownBlocks(
+        nextText,
+        splitListItems: true,
+      )) {
+        if (candidate.type == IanvsMarkdownBlockType.table &&
+            candidate.start == currentBlock.start) {
+          nextBlock = candidate;
+          break;
+        }
+      }
+      _EditableTableCell? nextCell;
+      if (nextBlock != null) {
+        final nextModel = _parseEditableTable(nextBlock);
+        if (currentCell.row < nextModel.rows.length &&
+            currentCell.column < nextModel.rows[currentCell.row].length) {
+          nextCell = nextModel.rows[currentCell.row][currentCell.column];
+        }
+      }
+      final selection = nextCell == null
+          ? current.selection
+          : _tableCellDocumentSelection(
+                  nextCell,
+                  nextText,
+                  replacement.selection,
+                ) ??
+                current.selection;
+      widget.controller.value = current.copyWith(
+        text: nextText,
+        selection: selection,
+        composing: TextRange.empty,
+      );
+      return;
+    }
     final editStart = currentCell.isSynthetic
         ? currentCell.lineStart
         : currentCell.start;
@@ -4799,13 +4858,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   }
 
   _EditableTableCell? _currentTableCell(_EditableTableCell snapshot) {
-    final blockIndex = _blocks.indexWhere(
-      (block) =>
-          block.type == IanvsMarkdownBlockType.table &&
-          block.start == snapshot.tableStart,
-    );
-    if (blockIndex < 0) return null;
-    final model = _parseEditableTable(_blocks[blockIndex]);
+    final block = _currentTableBlock(snapshot.tableStart);
+    if (block == null) return null;
+    final model = _parseEditableTable(block);
     if (snapshot.row < 0 ||
         snapshot.row >= model.rows.length ||
         snapshot.column < 0 ||
@@ -4813,6 +4868,16 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       return null;
     }
     return model.rows[snapshot.row][snapshot.column];
+  }
+
+  IanvsMarkdownBlock? _currentTableBlock(int tableStart) {
+    for (final block in _blocks) {
+      if (block.type == IanvsMarkdownBlockType.table &&
+          block.start == tableStart) {
+        return block;
+      }
+    }
+    return null;
   }
 
   TextSelection? _tableCellDocumentSelection(
