@@ -310,6 +310,8 @@ class IanvsMarkdownHtmlInlineBuilder extends MarkdownElementBuilder {
         ? GestureDetector(
             key: kind == IanvsMarkdownHtmlInlineKind.subscript
                 ? const ValueKey('ianvs-markdown-html-subscript')
+                : kind == IanvsMarkdownHtmlInlineKind.keyboard
+                ? const ValueKey('ianvs-markdown-html-kbd')
                 : null,
             behavior: HitTestBehavior.opaque,
             onTap: () {},

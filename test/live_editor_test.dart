@@ -9688,6 +9688,28 @@ $$''');
     expect(controller.isDirty, isFalse);
   });
 
+  testWidgets('HTML kbd keeps its rendered control on normal click', (
+    tester,
+  ) async {
+    const source = 'Before\n\nAlpha <kbd>bravo</kbd> omega\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('ianvs-markdown-html-kbd')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyQ);
+    await tester.pump();
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('inactive inline math keeps list source prefixes collapsed', (
     tester,
   ) async {

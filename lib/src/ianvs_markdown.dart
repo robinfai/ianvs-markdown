@@ -233,6 +233,8 @@ class IanvsMarkdown extends StatelessWidget {
       ),
       'ianvs-html-kbd': IanvsMarkdownHtmlInlineBuilder(
         kind: IanvsMarkdownHtmlInlineKind.keyboard,
+        consumeTap:
+            obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing,
         theme: colors,
       ),
       'ianvs-html-mark': IanvsMarkdownHtmlInlineBuilder(
