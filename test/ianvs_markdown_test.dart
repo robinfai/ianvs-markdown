@@ -1313,6 +1313,25 @@ Unclosed <https://open.example/path tail.
     },
   );
 
+  testWidgets('editing view hides escaped-emphasis backslashes only', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(
+          data: r'Alpha \*bravo\* omega',
+          obsidianMetadataMode: IanvsMarkdownObsidianMetadataMode.editing,
+        ),
+      ),
+    );
+
+    expect(_renderedPlainTextContains(tester, 'Alpha *bravo* omega'), isTrue);
+    expect(
+      _renderedPlainTextContains(tester, r'Alpha \*bravo\* omega'),
+      isFalse,
+    );
+  });
+
   testWidgets('reading view follows Obsidian HTML entity boundaries', (
     tester,
   ) async {

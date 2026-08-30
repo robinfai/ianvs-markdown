@@ -8516,6 +8516,44 @@ url: https://example.com/path
     },
   );
 
+  testWidgets('escaped emphasis clicks map through hidden backslashes', (
+    tester,
+  ) async {
+    const source = r'''Before
+
+Alpha \*bravo\* omega
+
+After''';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final preview = find.byWidgetPredicate(
+      (widget) =>
+          widget is SelectableText &&
+          (widget.data ?? widget.textSpan?.toPlainText() ?? '').contains(
+            'Alpha *bravo* omega',
+          ),
+    );
+    final editable = editableWithin(tester, preview);
+    final visible = editable.text!.toPlainText();
+    final target = editable.localToGlobal(
+      editable
+          .getLocalRectForCaret(
+            TextPosition(offset: visible.indexOf('bravo') + 2),
+          )
+          .center,
+    );
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(
+      controller.selection,
+      TextSelection.collapsed(offset: source.indexOf('bravo') + 2),
+    );
+  });
+
   testWidgets('quote multi-click restores its raw marker line', (tester) async {
     const source = 'Before\n\n> Alpha bravo\n> Charlie delta\n\nAfter';
     final controller = IanvsMarkdownController(text: source);

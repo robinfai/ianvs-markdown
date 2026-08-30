@@ -2975,7 +2975,10 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         selectionKind,
       );
       final resolvedSelection = selectionKind == _RenderedTapSelection.caret
-          ? _hardBreakCaretSelection(localSelection, block.source)
+          ? _escapedEmphasisCaretSelection(
+              _hardBreakCaretSelection(localSelection, block.source),
+              block.source,
+            )
           : localSelection;
       if (selectionKind == _RenderedTapSelection.caret &&
           resolvedSelection.isCollapsed) {
@@ -3003,6 +3006,24 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       );
     }
     return selection;
+  }
+
+  TextSelection _escapedEmphasisCaretSelection(
+    TextSelection selection,
+    String source,
+  ) {
+    if (!selection.isCollapsed) return selection;
+    final caret = selection.extentOffset;
+    var hiddenBackslashes = 0;
+    for (final match in RegExp(r'\\[*_]').allMatches(source)) {
+      if (match.start >= caret) break;
+      hiddenBackslashes += 1;
+    }
+    if (hiddenBackslashes == 0) return selection;
+    return TextSelection.collapsed(
+      offset: (caret + hiddenBackslashes).clamp(0, source.length),
+      affinity: TextAffinity.downstream,
+    );
   }
 
   TextSelection _selectionAtEditablePoint(
