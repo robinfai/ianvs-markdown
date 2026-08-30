@@ -239,6 +239,8 @@ class IanvsMarkdown extends StatelessWidget {
       ),
       'ianvs-html-mark': IanvsMarkdownHtmlInlineBuilder(
         kind: IanvsMarkdownHtmlInlineKind.mark,
+        consumeTap:
+            obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing,
         theme: colors,
       ),
       'ianvs-html-span': IanvsMarkdownHtmlInlineBuilder(
