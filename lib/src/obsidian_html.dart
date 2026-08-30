@@ -111,7 +111,7 @@ final class _IanvsMarkdownPairedHtmlSyntax extends md.InlineSyntax {
         element = md.Element('em', children);
       case 's':
       case 'del':
-        element = md.Element('del', children);
+        element = md.Element('ianvs-html-s', children);
       case 'code':
         element = md.Element('ianvs-inline-code', children);
       case 'sup':
@@ -256,6 +256,7 @@ String? _htmlAttribute(String source, String name) {
 
 enum IanvsMarkdownHtmlInlineKind {
   underline,
+  strikethrough,
   superscript,
   subscript,
   keyboard,
@@ -289,6 +290,9 @@ class IanvsMarkdownHtmlInlineBuilder extends MarkdownElementBuilder {
       IanvsMarkdownHtmlInlineKind.underline => base.copyWith(
         decoration: TextDecoration.underline,
       ),
+      IanvsMarkdownHtmlInlineKind.strikethrough => base.copyWith(
+        decoration: TextDecoration.lineThrough,
+      ),
       IanvsMarkdownHtmlInlineKind.superscript => base.copyWith(
         fontSize: (base.fontSize ?? 14) * .78,
         fontFeatures: const <FontFeature>[FontFeature.enable('sups')],
@@ -321,6 +325,8 @@ class IanvsMarkdownHtmlInlineBuilder extends MarkdownElementBuilder {
         ? GestureDetector(
             key: kind == IanvsMarkdownHtmlInlineKind.subscript
                 ? const ValueKey('ianvs-markdown-html-subscript')
+                : kind == IanvsMarkdownHtmlInlineKind.strikethrough
+                ? const ValueKey('ianvs-markdown-html-s')
                 : kind == IanvsMarkdownHtmlInlineKind.superscript
                 ? const ValueKey('ianvs-markdown-html-sup')
                 : kind == IanvsMarkdownHtmlInlineKind.keyboard

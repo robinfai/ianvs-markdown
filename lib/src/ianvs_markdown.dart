@@ -225,6 +225,12 @@ class IanvsMarkdown extends StatelessWidget {
         kind: IanvsMarkdownHtmlInlineKind.underline,
         theme: colors,
       ),
+      'ianvs-html-s': IanvsMarkdownHtmlInlineBuilder(
+        kind: IanvsMarkdownHtmlInlineKind.strikethrough,
+        consumeTap:
+            obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing,
+        theme: colors,
+      ),
       'ianvs-html-sup': IanvsMarkdownHtmlInlineBuilder(
         kind: IanvsMarkdownHtmlInlineKind.superscript,
         consumeTap:
