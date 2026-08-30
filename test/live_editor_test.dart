@@ -9903,6 +9903,30 @@ $$''');
     expect(controller.isDirty, isFalse);
   });
 
+  testWidgets('HTML center enters its exact block source on normal click', (
+    tester,
+  ) async {
+    const center = '<center>\nAlpha bravo\nCharlie delta\n</center>';
+    final controller = IanvsMarkdownController(
+      text: 'Before\n\n$center\n\nAfter',
+    );
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.textContaining('Alpha bravo Charlie delta'));
+    await tester.pumpAndSettle();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    expect(active, findsOneWidget);
+    final field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, center);
+    expect(controller.text, 'Before\n\n$center\n\nAfter');
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets(
     'HTML horizontal rule keeps its projection until edit requested',
     (tester) async {

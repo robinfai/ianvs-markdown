@@ -1183,6 +1183,22 @@ Escaped \\<span>literal \\</span> after.
     );
   });
 
+  testWidgets('renders Obsidian HTML center blocks as folded centered text', (
+    tester,
+  ) async {
+    const source =
+        'Before\n\n<center>\nAlpha bravo\nCharlie delta\n</center>\n\nAfter';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    final center = find.byKey(const ValueKey('ianvs-markdown-html-center'));
+    expect(center, findsOneWidget);
+    expect(find.textContaining('Alpha bravo Charlie delta'), findsOneWidget);
+    expect(find.text('Before'), findsOneWidget);
+    expect(find.text('After'), findsOneWidget);
+    expect(_renderedPlainTextContains(tester, '<center>'), isFalse);
+    expect(tester.widget<Center>(center).alignment, Alignment.center);
+  });
+
   testWidgets('renders Obsidian HTML horizontal rules', (tester) async {
     await tester.pumpWidget(
       app(const IanvsMarkdown(data: 'Before\n\n<hr>\n\nAfter')),

@@ -13,6 +13,7 @@ import 'front_matter_card.dart';
 import 'heading_folding.dart';
 import 'highlight.dart';
 import 'html_blockquote.dart';
+import 'html_center.dart';
 import 'html_details.dart';
 import 'html_definition_list.dart';
 import 'html_figure.dart';
@@ -317,6 +318,10 @@ class IanvsMarkdown extends StatelessWidget {
           colors,
         ),
       ),
+      'ianvs-html-center': IanvsMarkdownHtmlCenterBuilder(
+        bodyBuilder: (context, source) =>
+            _buildHtmlFigureBody(context, source, effectiveStyleSheet, colors),
+      ),
       'ianvs-html-hr': IanvsMarkdownHtmlHorizontalRuleBuilder(
         decoration: effectiveStyleSheet.horizontalRuleDecoration,
       ),
@@ -382,6 +387,7 @@ class IanvsMarkdown extends StatelessWidget {
       const IanvsMarkdownHtmlHorizontalRuleSyntax(),
       const IanvsMarkdownHtmlPreSyntax(),
       const IanvsMarkdownHtmlBlockquoteSyntax(),
+      const IanvsMarkdownHtmlCenterSyntax(),
       const IanvsMarkdownHtmlDefinitionListSyntax(),
       const IanvsMarkdownHtmlFigureSyntax(),
       const IanvsMarkdownHtmlTableSyntax(),
