@@ -5114,43 +5114,59 @@ class _LivePreviewIndentedCode extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final radius = colors.smallRadius / 2;
+    final patternColor = (dark ? Colors.white : Colors.black).withValues(
+      alpha: .12,
+    );
     final style = TextStyle(
-      color: colors.accentDark,
+      color: colors.codeForeground,
       fontFamily: colors.monoFontFamily,
       fontFamilyFallback: colors.monoFontFamilyFallback,
-      fontSize: 13,
-      height: 1.55,
+      fontSize: 14,
+      height: 1.5,
     );
     final lines = source.split('\n');
-    return Column(
+    return Container(
       key: const ValueKey('ianvs-markdown-live-indented-code'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (var index = 0; index < lines.length; index += 1)
-          GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: onTap,
-            child: Container(
-              key: ValueKey('ianvs-markdown-indented-code-line-$index'),
-              constraints: const BoxConstraints(minHeight: 20),
-              padding: const EdgeInsets.only(left: 10),
-              decoration: BoxDecoration(
-                border: Border(
-                  left: BorderSide(
-                    color: colors.borderSoft.withValues(alpha: .86),
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+      foregroundDecoration: IanvsMarkdownDashedBorderDecoration(
+        color: colors.borderSoft,
+        radius: radius,
+      ),
+      child: CustomPaint(
+        key: const ValueKey('ianvs-markdown-live-indented-code-pattern'),
+        painter: IanvsMarkdownCodePatternPainter(color: patternColor),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var index = 0; index < lines.length; index += 1)
+                GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: onTap,
+                  child: Container(
+                    key: ValueKey('ianvs-markdown-indented-code-line-$index'),
+                    constraints: const BoxConstraints(minHeight: 21),
+                    child: lines[index].isEmpty
+                        ? const SizedBox(height: 21)
+                        : SelectableText(
+                            _indentedCodeContentLine(lines[index]),
+                            style: style,
+                            onTap: onTap,
+                          ),
                   ),
                 ),
-              ),
-              child: lines[index].isEmpty
-                  ? const SizedBox(height: 20)
-                  : SelectableText(
-                      _indentedCodeContentLine(lines[index]),
-                      style: style,
-                      onTap: onTap,
-                    ),
-            ),
+            ],
           ),
-      ],
+        ),
+      ),
     );
   }
 }

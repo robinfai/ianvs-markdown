@@ -10835,58 +10835,63 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     expect(controller.text, source);
   });
 
-  testWidgets(
-    'live preview indented code uses line rails without fenced chrome',
-    (tester) async {
-      const source =
-          'Before.\n\n'
-          '    const first = %%inside%%; ^inside-id ^[inline] [^standard]\n'
-          '\n'
-          '\treturn %%tab%% first; ^tab-id\n\n'
-          'After.';
-      final controller = IanvsMarkdownController(text: source);
-      addTearDown(controller.dispose);
+  testWidgets('live preview indented code shares the unlabeled code surface', (
+    tester,
+  ) async {
+    const source =
+        'Before.\n\n'
+        '    const first = %%inside%%; ^inside-id ^[inline] [^standard]\n'
+        '\n'
+        '\treturn %%tab%% first; ^tab-id\n\n'
+        'After.';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
 
-      await tester.pumpWidget(app(controller));
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
 
-      expect(
-        find.byKey(const ValueKey('ianvs-markdown-live-indented-code')),
-        findsOneWidget,
-      );
-      expect(find.byType(IanvsMarkdownCodeBlock), findsNothing);
-      expect(find.byTooltip('复制'), findsNothing);
-      expect(
-        find.text('const first = %%inside%%; ^inside-id ^[inline] [^standard]'),
-        findsOneWidget,
-      );
-      expect(find.text('return %%tab%% first; ^tab-id'), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('ianvs-markdown-indented-code-line-1')),
-        findsOneWidget,
-      );
-      final firstLine = tester.widget<Container>(
-        find.byKey(const ValueKey('ianvs-markdown-indented-code-line-0')),
-      );
-      final lineDecoration = firstLine.decoration! as BoxDecoration;
-      expect((lineDecoration.border! as Border).left.width, 1);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-live-indented-code')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-live-indented-code-pattern')),
+      findsOneWidget,
+    );
+    expect(find.byTooltip('复制'), findsNothing);
+    expect(
+      find.text('const first = %%inside%%; ^inside-id ^[inline] [^standard]'),
+      findsOneWidget,
+    );
+    expect(find.text('return %%tab%% first; ^tab-id'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-indented-code-line-1')),
+      findsOneWidget,
+    );
+    final surface = tester.widget<Container>(
+      find.byKey(const ValueKey('ianvs-markdown-live-indented-code')),
+    );
+    expect((surface.decoration! as BoxDecoration).color, isNotNull);
+    expect(
+      surface.foregroundDecoration,
+      isA<IanvsMarkdownDashedBorderDecoration>(),
+    );
 
-      await tester.tap(
-        find.text('const first = %%inside%%; ^inside-id ^[inline] [^standard]'),
-      );
-      await tester.pumpAndSettle();
-      final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
-      final field = tester.widget<TextField>(
-        find.descendant(of: active, matching: find.byType(TextField)),
-      );
-      expect(
-        field.controller?.text,
-        '    const first = %%inside%%; ^inside-id ^[inline] [^standard]\n\n'
-        '\treturn %%tab%% first; ^tab-id',
-      );
-      expect(controller.text, source);
-    },
-  );
+    await tester.tap(
+      find.text('const first = %%inside%%; ^inside-id ^[inline] [^standard]'),
+    );
+    await tester.pumpAndSettle();
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    final field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(
+      field.controller?.text,
+      '    const first = %%inside%%; ^inside-id ^[inline] [^standard]\n\n'
+      '\treturn %%tab%% first; ^tab-id',
+    );
+    expect(controller.text, source);
+  });
 
   testWidgets('indented code taps map dedented visual text to exact source', (
     tester,

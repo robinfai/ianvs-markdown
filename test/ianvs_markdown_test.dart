@@ -2528,37 +2528,44 @@ widget := unknown_token(42)
     expect(copied, inner);
   });
 
-  testWidgets('indented code stays plain and dedented without fenced chrome', (
-    tester,
-  ) async {
-    const markdown = '    const first = 1;\n\n\treturn first;';
-    const code = 'const first = 1;\n\nreturn first;';
+  testWidgets(
+    'indented code shares the unlabeled code surface and copy control',
+    (tester) async {
+      const markdown = '    const first = 1;\n\n\treturn first;';
+      const code = 'const first = 1;\n\nreturn first;';
+      String? copied;
 
-    await tester.pumpWidget(
-      app(
-        const IanvsMarkdown(
-          data: markdown,
-          obsidianMetadataMode: IanvsMarkdownObsidianMetadataMode.editing,
+      await tester.pumpWidget(
+        app(
+          IanvsMarkdown(
+            data: markdown,
+            obsidianMetadataMode: IanvsMarkdownObsidianMetadataMode.editing,
+            onCopyCode: (value) => copied = value,
+          ),
+          theme: ThemeData(platform: TargetPlatform.android),
         ),
-        theme: ThemeData(platform: TargetPlatform.android),
-      ),
-    );
+      );
 
-    expect(find.byType(IanvsMarkdownCodeBlock), findsNothing);
-    expect(find.byType(IanvsMarkdownIndentedCodeBlock), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('ianvs-markdown-code-language-badge')),
-      findsNothing,
-    );
-    expect(find.byTooltip('复制'), findsNothing);
-    final rendered = tester.widget<SelectableText>(
-      find.descendant(
-        of: find.byType(IanvsMarkdownIndentedCodeBlock),
-        matching: find.byType(SelectableText),
-      ),
-    );
-    expect(rendered.data, code);
-  });
+      expect(find.byType(IanvsMarkdownCodeBlock), findsOneWidget);
+      expect(find.byType(IanvsMarkdownIndentedCodeBlock), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('ianvs-markdown-code-language-badge')),
+        findsNothing,
+      );
+      expect(find.byTooltip('复制'), findsOneWidget);
+      final rendered = tester.widget<SelectableText>(
+        find.descendant(
+          of: find.byType(IanvsMarkdownIndentedCodeBlock),
+          matching: find.byType(SelectableText),
+        ),
+      );
+      expect(rendered.textSpan?.toPlainText(), code);
+
+      await tester.tap(find.byTooltip('复制'));
+      await tester.pump();
+      expect(copied, code);
+    },
+  );
 
   testWidgets('reading keeps Obsidian comments literal in indented code', (
     tester,
@@ -2586,7 +2593,7 @@ widget := unknown_token(42)
       ),
     );
     expect(
-      rendered.data,
+      rendered.textSpan?.toPlainText(),
       'code %%inside%% tail\n'
       'more %%tab%% code\n'
       'partial %%partial-tab%% code',
@@ -3988,7 +3995,10 @@ fenced ^fence-id
         matching: find.byType(SelectableText),
       ),
     );
-    expect(rendered.data, 'code ^indented-id\n| ^indented-cell |');
+    expect(
+      rendered.textSpan?.toPlainText(),
+      'code ^indented-id\n| ^indented-cell |',
+    );
   });
 
   test('block IDs only consume a Markdown block-ending marker', () {
@@ -4602,7 +4612,7 @@ Outside[^standard].
         matching: find.byType(SelectableText),
       ),
     );
-    expect(rendered.data, 'code ^[inside] and [^standard]');
+    expect(rendered.textSpan?.toPlainText(), 'code ^[inside] and [^standard]');
     expect(find.text('[1]'), findsOneWidget);
     expect(find.textContaining('Body.'), findsOneWidget);
   });

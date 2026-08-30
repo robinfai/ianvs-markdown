@@ -104,6 +104,10 @@ class IanvsMarkdownCodeBlockBuilder extends MarkdownElementBuilder {
         source: source,
         theme: theme,
         maxWidth: maxWidth,
+        onCopyCode: onCopyCode,
+        onTap: onTap,
+        presentation: presentation,
+        collapseLongBlocks: collapseLongBlocks,
       );
     }
     final language = markdownCodeLanguage(code);
@@ -131,34 +135,32 @@ class IanvsMarkdownIndentedCodeBlock extends StatelessWidget {
     required this.source,
     this.theme,
     this.maxWidth,
+    this.onCopyCode,
+    this.onTap,
+    this.presentation = IanvsMarkdownCodeBlockPresentation.reading,
+    this.collapseLongBlocks = false,
   });
 
   final String source;
   final IanvsMarkdownThemeData? theme;
   final double? maxWidth;
+  final IanvsMarkdownCodeCopyHandler? onCopyCode;
+  final VoidCallback? onTap;
+  final IanvsMarkdownCodeBlockPresentation presentation;
+  final bool collapseLongBlocks;
 
   @override
   Widget build(BuildContext context) {
-    final colors = IanvsMarkdownThemeData.resolve(context, theme);
-    return Container(
+    return SizedBox(
       key: const ValueKey('ianvs-markdown-indented-code-block'),
-      width: maxWidth ?? double.infinity,
-      constraints: BoxConstraints(
-        minHeight: 24,
-        maxWidth: maxWidth ?? double.infinity,
-      ),
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      padding: const EdgeInsets.fromLTRB(10, 2, 0, 2),
-      child: SelectableText(
-        markdownCodeExpandTabs(source),
-        style: TextStyle(
-          color: colors.accentDark,
-          fontFamily: colors.monoFontFamily,
-          fontFamilyFallback: colors.monoFontFamilyFallback,
-          fontSize: 13,
-          height: 1.55,
-          letterSpacing: 0,
-        ),
+      child: IanvsMarkdownCodeBlock(
+        source: source,
+        theme: theme,
+        maxWidth: maxWidth,
+        onCopyCode: onCopyCode,
+        onTap: onTap,
+        presentation: presentation,
+        collapseLongBlocks: collapseLongBlocks,
       ),
     );
   }
