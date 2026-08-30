@@ -17,7 +17,7 @@ class IanvsMarkdownHtmlDetailsSyntax extends md.BlockSyntax {
   const IanvsMarkdownHtmlDetailsSyntax();
 
   static final RegExp _open = RegExp(
-    r'^ {0,3}<details(?:\s[^>\n]*)?>[ \t]*$',
+    r'^ {0,3}<details\b([^>\n]*)>[ \t]*$',
     caseSensitive: false,
   );
   static final RegExp _close = RegExp(
@@ -46,6 +46,12 @@ class IanvsMarkdownHtmlDetailsSyntax extends md.BlockSyntax {
 
   @override
   md.Node parse(md.BlockParser parser) {
+    final openMatch = _open.firstMatch(parser.current.content)!;
+    final attributes = openMatch.group(1) ?? '';
+    final initiallyExpanded = RegExp(
+      r'(?:^|\s)open(?:\s|=|$)',
+      caseSensitive: false,
+    ).hasMatch(attributes);
     parser.advance();
     String? summary;
     final bodyLines = <String>[];
@@ -68,7 +74,8 @@ class IanvsMarkdownHtmlDetailsSyntax extends md.BlockSyntax {
     }
     return md.Element.empty('ianvs-html-details')
       ..attributes['data-summary'] = summary ?? ''
-      ..attributes['data-body'] = bodyLines.join('\n');
+      ..attributes['data-body'] = bodyLines.join('\n')
+      ..attributes['data-open'] = initiallyExpanded ? 'true' : 'false';
   }
 }
 
@@ -91,6 +98,7 @@ class IanvsMarkdownHtmlDetailsBuilder extends MarkdownElementBuilder {
     return IanvsMarkdownHtmlDetails(
       summary: element.attributes['data-summary'] ?? '',
       body: element.attributes['data-body'] ?? '',
+      initiallyExpanded: element.attributes['data-open'] == 'true',
       bodyBuilder: bodyBuilder,
       textStyle: parentStyle ?? preferredStyle,
       theme: theme,
@@ -104,6 +112,7 @@ class IanvsMarkdownHtmlDetails extends StatefulWidget {
     super.key,
     required this.summary,
     required this.body,
+    required this.initiallyExpanded,
     required this.bodyBuilder,
     this.textStyle,
     this.theme,
@@ -111,6 +120,7 @@ class IanvsMarkdownHtmlDetails extends StatefulWidget {
 
   final String summary;
   final String body;
+  final bool initiallyExpanded;
   final IanvsMarkdownHtmlDetailsBodyBuilder bodyBuilder;
   final TextStyle? textStyle;
   final IanvsMarkdownThemeData? theme;
@@ -121,13 +131,21 @@ class IanvsMarkdownHtmlDetails extends StatefulWidget {
 }
 
 class _IanvsMarkdownHtmlDetailsState extends State<IanvsMarkdownHtmlDetails> {
-  var _expanded = false;
+  late bool _expanded;
+
+  @override
+  void initState() {
+    super.initState();
+    _expanded = widget.initiallyExpanded;
+  }
 
   @override
   void didUpdateWidget(covariant IanvsMarkdownHtmlDetails oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.summary != widget.summary || oldWidget.body != widget.body) {
-      _expanded = false;
+    if (oldWidget.summary != widget.summary ||
+        oldWidget.body != widget.body ||
+        oldWidget.initiallyExpanded != widget.initiallyExpanded) {
+      _expanded = widget.initiallyExpanded;
     }
   }
 

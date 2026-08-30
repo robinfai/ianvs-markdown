@@ -1280,6 +1280,22 @@ Unclosed <https://open.example/path tail.
     expect(_renderedPlainTextContains(tester, 'Soft alpha soft beta'), isTrue);
   });
 
+  testWidgets('HTML details open attribute starts expanded', (tester) async {
+    const source =
+        '<details open>\n<summary>Alpha bravo</summary>\n\nCharlie delta\n</details>';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    expect(find.text('Alpha bravo'), findsOneWidget);
+    expect(find.text('Charlie delta'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('ianvs-markdown-html-details-toggle')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Charlie delta'), findsNothing);
+  });
+
   testWidgets('rendered paragraphs collapse internal spaces and tabs', (
     tester,
   ) async {

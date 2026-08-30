@@ -9827,6 +9827,31 @@ $$''');
     expect(controller.isDirty, isFalse);
   });
 
+  testWidgets('HTML details open starts expanded without entering source', (
+    tester,
+  ) async {
+    const source =
+        'Before\n\n<details open>\n<summary>Alpha bravo</summary>\n\nCharlie delta\n</details>\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Charlie delta'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const ValueKey('ianvs-markdown-html-details-toggle')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Charlie delta'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('HTML superscript keeps its rendered control on normal click', (
     tester,
   ) async {
