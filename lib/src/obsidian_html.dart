@@ -259,9 +259,14 @@ enum IanvsMarkdownHtmlInlineKind { underline, subscript, keyboard, mark, span }
 /// Returns Text.rich so flutter_markdown_plus can merge the styled span back
 /// into the surrounding RichText instead of splitting the paragraph's Wrap.
 class IanvsMarkdownHtmlInlineBuilder extends MarkdownElementBuilder {
-  IanvsMarkdownHtmlInlineBuilder({required this.kind, this.theme});
+  IanvsMarkdownHtmlInlineBuilder({
+    required this.kind,
+    this.consumeTap = false,
+    this.theme,
+  });
 
   final IanvsMarkdownHtmlInlineKind kind;
+  final bool consumeTap;
   final IanvsMarkdownThemeData? theme;
 
   @override
@@ -300,6 +305,16 @@ class IanvsMarkdownHtmlInlineBuilder extends MarkdownElementBuilder {
         ),
       ),
     };
-    return Text.rich(TextSpan(text: element.textContent, style: style));
+    final text = Text.rich(TextSpan(text: element.textContent, style: style));
+    return consumeTap
+        ? GestureDetector(
+            key: kind == IanvsMarkdownHtmlInlineKind.subscript
+                ? const ValueKey('ianvs-markdown-html-subscript')
+                : null,
+            behavior: HitTestBehavior.opaque,
+            onTap: () {},
+            child: text,
+          )
+        : text;
   }
 }
