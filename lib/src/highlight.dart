@@ -752,7 +752,7 @@ List<InlineSpan> _highlightSpans(
 
 TextStyle? _highlightElementStyle(String tag, IanvsMarkdownThemeData colors) {
   return switch (tag) {
-    'strong' => TextStyle(
+    'strong' || 'ianvs-html-strong' => TextStyle(
       color: colors.strongForeground,
       fontWeight: FontWeight.w600,
     ),

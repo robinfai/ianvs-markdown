@@ -194,6 +194,12 @@ class IanvsMarkdown extends StatelessWidget {
             obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing,
         theme: colors,
       ),
+      'ianvs-html-strong': IanvsMarkdownHtmlInlineBuilder(
+        kind: IanvsMarkdownHtmlInlineKind.strong,
+        consumeTap:
+            obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing,
+        theme: colors,
+      ),
       'sup': IanvsMarkdownFootnoteSuperscriptBuilder(
         onTapLink: onTapLink,
         superscriptFontFeatureTag:
