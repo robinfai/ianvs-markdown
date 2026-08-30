@@ -134,6 +134,8 @@ final class _IanvsMarkdownPairedHtmlSyntax extends md.InlineSyntax {
         element = md.Element('ianvs-html-sub', children);
       case 'kbd':
         element = md.Element('ianvs-html-kbd', children);
+      case 'small':
+        element = md.Element('ianvs-html-small', children);
       case 'span':
         final color = ianvsMarkdownSafeHtmlColor(attributes);
         if (color != null) {
@@ -272,6 +274,7 @@ enum IanvsMarkdownHtmlInlineKind {
   superscript,
   subscript,
   keyboard,
+  small,
   mark,
   span,
 }
@@ -328,6 +331,9 @@ class IanvsMarkdownHtmlInlineBuilder extends MarkdownElementBuilder {
         fontFamilyFallback: colors.monoFontFamilyFallback,
         fontSize: (base.fontSize ?? 14) * .84,
       ),
+      IanvsMarkdownHtmlInlineKind.small => base.copyWith(
+        fontSize: (base.fontSize ?? 14) * .8,
+      ),
       IanvsMarkdownHtmlInlineKind.mark => base.copyWith(
         color: colors.textPrimary,
         backgroundColor: Theme.of(context).brightness == Brightness.dark
@@ -355,6 +361,8 @@ class IanvsMarkdownHtmlInlineBuilder extends MarkdownElementBuilder {
                 ? const ValueKey('ianvs-markdown-html-sup')
                 : kind == IanvsMarkdownHtmlInlineKind.keyboard
                 ? const ValueKey('ianvs-markdown-html-kbd')
+                : kind == IanvsMarkdownHtmlInlineKind.small
+                ? const ValueKey('ianvs-markdown-html-small')
                 : kind == IanvsMarkdownHtmlInlineKind.mark
                 ? const ValueKey('ianvs-markdown-html-mark')
                 : kind == IanvsMarkdownHtmlInlineKind.span
