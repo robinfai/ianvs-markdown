@@ -1218,6 +1218,17 @@ Escaped \\<span>literal \\</span> after.
     expect(find.text('After'), findsOneWidget);
   });
 
+  testWidgets('renders a local Obsidian HTML button', (tester) async {
+    const source = 'Before\n\n<button>Alpha bravo</button>\n\nAfter';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-html-button')),
+      findsOneWidget,
+    );
+    expect(find.text('Alpha bravo'), findsOneWidget);
+    expect(_renderedPlainTextContains(tester, '<button>'), isFalse);
+  });
+
   testWidgets('renders stateful Obsidian HTML checkbox inputs', (tester) async {
     const source =
         'Before\n\n<input type="checkbox"> Alpha bravo\n<input type="checkbox" checked> Charlie delta\n\nAfter';

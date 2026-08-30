@@ -13,6 +13,7 @@ import 'front_matter_card.dart';
 import 'heading_folding.dart';
 import 'highlight.dart';
 import 'html_blockquote.dart';
+import 'html_button.dart';
 import 'html_center.dart';
 import 'html_checkbox.dart';
 import 'html_details.dart';
@@ -323,6 +324,7 @@ class IanvsMarkdown extends StatelessWidget {
           colors,
         ),
       ),
+      'ianvs-html-button': IanvsMarkdownHtmlButtonBuilder(theme: colors),
       'ianvs-html-center': IanvsMarkdownHtmlCenterBuilder(
         bodyBuilder: (context, source) =>
             _buildHtmlFigureBody(context, source, effectiveStyleSheet, colors),
@@ -401,6 +403,7 @@ class IanvsMarkdown extends StatelessWidget {
       ...?blockSyntaxes,
       const IanvsMarkdownIndentedCodeBlockSyntax(),
       const IanvsMarkdownHtmlHorizontalRuleSyntax(),
+      const IanvsMarkdownHtmlButtonSyntax(),
       const IanvsMarkdownHtmlCheckboxSyntax(),
       const IanvsMarkdownHtmlPreSyntax(),
       const IanvsMarkdownHtmlSelectSyntax(),

@@ -9903,6 +9903,24 @@ $$''');
     expect(controller.isDirty, isFalse);
   });
 
+  testWidgets('HTML button keeps its local projection on normal click', (
+    tester,
+  ) async {
+    const source = 'Before\n\n<button>Alpha bravo</button>\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('ianvs-markdown-html-button')));
+    await tester.pumpAndSettle();
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
+  });
+
   testWidgets('HTML center enters its exact block source on normal click', (
     tester,
   ) async {
