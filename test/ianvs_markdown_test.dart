@@ -1231,6 +1231,29 @@ Escaped \\<span>literal \\</span> after.
     expect(_renderedPlainTextContains(tester, '<table>'), isFalse);
   });
 
+  testWidgets('renders Obsidian HTML definition lists with inset definitions', (
+    tester,
+  ) async {
+    const source = '<dl>\n<dt>Alpha bravo</dt>\n<dd>Charlie delta</dd>\n</dl>';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-html-definition-list')),
+      findsOneWidget,
+    );
+    final term = tester.widget<Padding>(
+      find.byKey(const ValueKey('ianvs-markdown-html-definition-list-dt-0')),
+    );
+    final definition = tester.widget<Padding>(
+      find.byKey(const ValueKey('ianvs-markdown-html-definition-list-dd-1')),
+    );
+    expect(term.padding, EdgeInsets.zero);
+    expect(definition.padding, const EdgeInsets.only(left: 28));
+    expect(find.textContaining('Alpha bravo'), findsOneWidget);
+    expect(find.textContaining('Charlie delta'), findsOneWidget);
+    expect(_renderedTextIsBold(tester, 'Alpha bravo'), isFalse);
+  });
+
   testWidgets('renders Obsidian autolink boundaries and word-adjacent URLs', (
     tester,
   ) async {
