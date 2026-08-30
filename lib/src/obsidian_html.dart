@@ -138,6 +138,8 @@ final class _IanvsMarkdownPairedHtmlSyntax extends md.InlineSyntax {
         element = md.Element('ianvs-html-small', children);
       case 'q':
         element = md.Element('ianvs-html-q', children);
+      case 'abbr':
+        element = md.Element('ianvs-html-abbr', children);
       case 'span':
         final color = ianvsMarkdownSafeHtmlColor(attributes);
         if (color != null) {
@@ -278,6 +280,7 @@ enum IanvsMarkdownHtmlInlineKind {
   keyboard,
   small,
   quotation,
+  abbreviation,
   mark,
   span,
 }
@@ -338,6 +341,10 @@ class IanvsMarkdownHtmlInlineBuilder extends MarkdownElementBuilder {
         fontSize: (base.fontSize ?? 14) * .8,
       ),
       IanvsMarkdownHtmlInlineKind.quotation => base,
+      IanvsMarkdownHtmlInlineKind.abbreviation => base.copyWith(
+        decoration: TextDecoration.underline,
+        decorationStyle: TextDecorationStyle.dashed,
+      ),
       IanvsMarkdownHtmlInlineKind.mark => base.copyWith(
         color: colors.textPrimary,
         backgroundColor: Theme.of(context).brightness == Brightness.dark
@@ -369,6 +376,8 @@ class IanvsMarkdownHtmlInlineBuilder extends MarkdownElementBuilder {
                 ? const ValueKey('ianvs-markdown-html-small')
                 : kind == IanvsMarkdownHtmlInlineKind.quotation
                 ? const ValueKey('ianvs-markdown-html-q')
+                : kind == IanvsMarkdownHtmlInlineKind.abbreviation
+                ? const ValueKey('ianvs-markdown-html-abbr')
                 : kind == IanvsMarkdownHtmlInlineKind.mark
                 ? const ValueKey('ianvs-markdown-html-mark')
                 : kind == IanvsMarkdownHtmlInlineKind.span

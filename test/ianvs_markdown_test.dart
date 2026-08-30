@@ -1087,6 +1087,8 @@ Break first<br/>second; unknown <not-a-real-tag>body</not-a-real-tag>.
 
 Quote <q>quoted text</q> after.
 
+Abbreviation <abbr title="Bravo charlie title">bravo</abbr> after.
+
 Link <a href="https://example.com" onclick="bad()">example</a>; unsafe <a href="javascript:alert(1)">plain</a>.
 
 Comment before <!-- hidden --> after. Script before <script>window.bad = true</script> after.
@@ -1128,6 +1130,11 @@ Escaped \\<span>literal \\</span> after.
       _renderedPlainTextContains(tester, 'Quote “quoted text” after.'),
       isTrue,
     );
+    expect(
+      _renderedPlainTextContains(tester, 'Abbreviation bravo after.'),
+      isTrue,
+    );
+    expect(_renderedTextHasDashedUnderline(tester, 'bravo'), isTrue);
 
     await tester.tap(find.text('example'));
     await tester.pump();
@@ -5416,6 +5423,43 @@ bool _renderedTextHasDecoration(
           .any(
             (widget) =>
                 widget.textSpan != null && hasDecoration(widget.textSpan!),
+          );
+}
+
+bool _renderedTextHasDashedUnderline(WidgetTester tester, String text) {
+  bool hasDashedUnderline(
+    InlineSpan span, [
+    TextDecoration? inheritedDecoration,
+    TextDecorationStyle? inheritedDecorationStyle,
+  ]) {
+    if (span is! TextSpan) return false;
+    final decoration = span.style?.decoration ?? inheritedDecoration;
+    final decorationStyle =
+        span.style?.decorationStyle ?? inheritedDecorationStyle;
+    if ((span.text?.contains(text) ?? false) &&
+        (decoration?.contains(TextDecoration.underline) ?? false) &&
+        decorationStyle == TextDecorationStyle.dashed) {
+      return true;
+    }
+    return (span.children ?? const <InlineSpan>[]).any(
+      (child) => hasDashedUnderline(child, decoration, decorationStyle),
+    );
+  }
+
+  return tester
+          .widgetList<RichText>(find.byType(RichText))
+          .any((widget) => hasDashedUnderline(widget.text)) ||
+      tester
+          .widgetList<Text>(find.byType(Text))
+          .any(
+            (widget) =>
+                widget.textSpan != null && hasDashedUnderline(widget.textSpan!),
+          ) ||
+      tester
+          .widgetList<SelectableText>(find.byType(SelectableText))
+          .any(
+            (widget) =>
+                widget.textSpan != null && hasDashedUnderline(widget.textSpan!),
           );
 }
 

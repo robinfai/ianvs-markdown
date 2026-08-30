@@ -9824,6 +9824,31 @@ $$''');
     expect(controller.isDirty, isFalse);
   });
 
+  testWidgets('HTML abbr keeps its rendered control on normal click', (
+    tester,
+  ) async {
+    const source =
+        'Before\n\nAlpha <abbr title="Bravo charlie title">bravo</abbr> omega\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final abbreviation = find.byKey(const ValueKey('ianvs-markdown-html-abbr'));
+    expect(abbreviation, findsOneWidget);
+    await tester.tap(abbreviation);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyQ);
+    await tester.pump();
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('HTML details toggles without entering source editing', (
     tester,
   ) async {
