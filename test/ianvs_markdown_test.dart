@@ -1085,6 +1085,8 @@ Key <kbd>Ctrl K</kbd>; color <span style="color:red" onclick="bad()">red</span>.
 
 Break first<br/>second; unknown <not-a-real-tag>body</not-a-real-tag>.
 
+Quote <q>quoted text</q> after.
+
 Link <a href="https://example.com" onclick="bad()">example</a>; unsafe <a href="javascript:alert(1)">plain</a>.
 
 Comment before <!-- hidden --> after. Script before <script>window.bad = true</script> after.
@@ -1122,6 +1124,10 @@ Escaped \\<span>literal \\</span> after.
       isTrue,
     );
     expect(_renderedTextHasBackground(tester, 'Ctrl K'), isTrue);
+    expect(
+      _renderedPlainTextContains(tester, 'Quote “quoted text” after.'),
+      isTrue,
+    );
 
     await tester.tap(find.text('example'));
     await tester.pump();

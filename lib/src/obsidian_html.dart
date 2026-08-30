@@ -136,6 +136,8 @@ final class _IanvsMarkdownPairedHtmlSyntax extends md.InlineSyntax {
         element = md.Element('ianvs-html-kbd', children);
       case 'small':
         element = md.Element('ianvs-html-small', children);
+      case 'q':
+        element = md.Element('ianvs-html-q', children);
       case 'span':
         final color = ianvsMarkdownSafeHtmlColor(attributes);
         if (color != null) {
@@ -275,6 +277,7 @@ enum IanvsMarkdownHtmlInlineKind {
   subscript,
   keyboard,
   small,
+  quotation,
   mark,
   span,
 }
@@ -334,6 +337,7 @@ class IanvsMarkdownHtmlInlineBuilder extends MarkdownElementBuilder {
       IanvsMarkdownHtmlInlineKind.small => base.copyWith(
         fontSize: (base.fontSize ?? 14) * .8,
       ),
+      IanvsMarkdownHtmlInlineKind.quotation => base,
       IanvsMarkdownHtmlInlineKind.mark => base.copyWith(
         color: colors.textPrimary,
         backgroundColor: Theme.of(context).brightness == Brightness.dark
@@ -363,6 +367,8 @@ class IanvsMarkdownHtmlInlineBuilder extends MarkdownElementBuilder {
                 ? const ValueKey('ianvs-markdown-html-kbd')
                 : kind == IanvsMarkdownHtmlInlineKind.small
                 ? const ValueKey('ianvs-markdown-html-small')
+                : kind == IanvsMarkdownHtmlInlineKind.quotation
+                ? const ValueKey('ianvs-markdown-html-q')
                 : kind == IanvsMarkdownHtmlInlineKind.mark
                 ? const ValueKey('ianvs-markdown-html-mark')
                 : kind == IanvsMarkdownHtmlInlineKind.span
@@ -370,8 +376,14 @@ class IanvsMarkdownHtmlInlineBuilder extends MarkdownElementBuilder {
                 : null,
             behavior: HitTestBehavior.opaque,
             onTap: () {},
-            child: text,
+            child: kind == IanvsMarkdownHtmlInlineKind.quotation
+                ? Text.rich(
+                    TextSpan(text: '“${element.textContent}”', style: style),
+                  )
+                : text,
           )
+        : kind == IanvsMarkdownHtmlInlineKind.quotation
+        ? Text.rich(TextSpan(text: '“${element.textContent}”', style: style))
         : text;
   }
 }

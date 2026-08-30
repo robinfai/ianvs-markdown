@@ -9800,6 +9800,30 @@ $$''');
     expect(controller.isDirty, isFalse);
   });
 
+  testWidgets('HTML q keeps its rendered control on normal click', (
+    tester,
+  ) async {
+    const source = 'Before\n\nAlpha <q>bravo charlie</q> omega\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final quotation = find.byKey(const ValueKey('ianvs-markdown-html-q'));
+    expect(quotation, findsOneWidget);
+    await tester.tap(quotation);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyQ);
+    await tester.pump();
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('HTML details toggles without entering source editing', (
     tester,
   ) async {
