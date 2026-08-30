@@ -115,7 +115,7 @@ final class _IanvsMarkdownPairedHtmlSyntax extends md.InlineSyntax {
       case 'code':
         element = md.Element('ianvs-inline-code', children);
       case 'sup':
-        element = md.Element(tag, children);
+        element = md.Element('ianvs-html-sup', children);
       case 'mark':
         element = md.Element('ianvs-html-mark', children);
       case 'u':
@@ -254,7 +254,14 @@ String? _htmlAttribute(String source, String name) {
   return match?.group(1) ?? match?.group(2) ?? match?.group(3);
 }
 
-enum IanvsMarkdownHtmlInlineKind { underline, subscript, keyboard, mark, span }
+enum IanvsMarkdownHtmlInlineKind {
+  underline,
+  superscript,
+  subscript,
+  keyboard,
+  mark,
+  span,
+}
 
 /// Returns Text.rich so flutter_markdown_plus can merge the styled span back
 /// into the surrounding RichText instead of splitting the paragraph's Wrap.
@@ -281,6 +288,10 @@ class IanvsMarkdownHtmlInlineBuilder extends MarkdownElementBuilder {
     final style = switch (kind) {
       IanvsMarkdownHtmlInlineKind.underline => base.copyWith(
         decoration: TextDecoration.underline,
+      ),
+      IanvsMarkdownHtmlInlineKind.superscript => base.copyWith(
+        fontSize: (base.fontSize ?? 14) * .78,
+        fontFeatures: const <FontFeature>[FontFeature.enable('sups')],
       ),
       IanvsMarkdownHtmlInlineKind.subscript => base.copyWith(
         fontSize: (base.fontSize ?? 14) * .78,
@@ -310,6 +321,8 @@ class IanvsMarkdownHtmlInlineBuilder extends MarkdownElementBuilder {
         ? GestureDetector(
             key: kind == IanvsMarkdownHtmlInlineKind.subscript
                 ? const ValueKey('ianvs-markdown-html-subscript')
+                : kind == IanvsMarkdownHtmlInlineKind.superscript
+                ? const ValueKey('ianvs-markdown-html-sup')
                 : kind == IanvsMarkdownHtmlInlineKind.keyboard
                 ? const ValueKey('ianvs-markdown-html-kbd')
                 : kind == IanvsMarkdownHtmlInlineKind.mark
