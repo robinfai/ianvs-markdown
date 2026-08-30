@@ -10025,6 +10025,31 @@ $$''');
   });
 
   testWidgets(
+    'HTML unordered list enters its exact block source on item click',
+    (tester) async {
+      const list = '<ul>\n<li>Alpha bravo</li>\n<li>Charlie delta</li>\n</ul>';
+      final controller = IanvsMarkdownController(
+        text: 'Before\n\n$list\n\nAfter',
+      );
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.textContaining('Alpha bravo'));
+      await tester.pumpAndSettle();
+
+      final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+      expect(active, findsOneWidget);
+      final field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      expect(field.controller?.text, list);
+      expect(controller.text, 'Before\n\n$list\n\nAfter');
+      expect(controller.isDirty, isFalse);
+    },
+  );
+
+  testWidgets(
     'HTML definition list enters its exact block source on item click',
     (tester) async {
       const list = '<dl>\n<dt>Alpha bravo</dt>\n<dd>Charlie delta</dd>\n</dl>';
