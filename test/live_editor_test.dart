@@ -1246,6 +1246,34 @@ void main() {
     expect(controller.text, source);
   });
 
+  testWidgets('highlight clicks map through hidden delimiters', (tester) async {
+    const line = 'Alpha ==bravo charlie== omega';
+    const source = 'Before\n\n$line\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final highlight = tester.renderObject<RenderParagraph>(
+      find.text('bravo charlie'),
+    );
+    final caret = highlight.getOffsetForCaret(
+      const TextPosition(offset: 3),
+      Rect.zero,
+    );
+    final target = highlight.localToGlobal(
+      caret + Offset(.1, highlight.size.height / 2),
+    );
+
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(controller.selection.isCollapsed, isTrue);
+    expect(controller.selection.extentOffset, 19);
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('double click selects complete Obsidian strikethrough source', (
     tester,
   ) async {
