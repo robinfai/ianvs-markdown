@@ -8406,6 +8406,45 @@ url: https://example.com/path
     );
   });
 
+  testWidgets(
+    'ordered list number gutter clicks place the caret before markers',
+    (tester) async {
+      const source = 'Before\n\n1. Alpha bravo\n2. Charlie delta\n\nAfter';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      final blocks = find.bySemanticsLabel('Edit Markdown block');
+      expect(blocks, findsNWidgets(2));
+      final list = blocks.first;
+      final first = find.text('Alpha bravo');
+      await tester.tapAt(
+        Offset(tester.getRect(list).left + 10, tester.getRect(first).center.dy),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        controller.selection,
+        TextSelection.collapsed(offset: source.indexOf('1. Alpha bravo')),
+      );
+
+      await tester.tap(find.text('After'));
+      await tester.pumpAndSettle();
+      final second = find.text('Charlie delta');
+      await tester.tapAt(
+        Offset(
+          tester.getRect(list).left + 10,
+          tester.getRect(second).center.dy,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        controller.selection,
+        TextSelection.collapsed(offset: source.indexOf('2. Charlie delta')),
+      );
+    },
+  );
+
   testWidgets('quote multi-click restores its raw marker line', (tester) async {
     const source = 'Before\n\n> Alpha bravo\n> Charlie delta\n\nAfter';
     final controller = IanvsMarkdownController(text: source);
