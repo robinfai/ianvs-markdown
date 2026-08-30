@@ -1284,6 +1284,22 @@ Escaped \\<span>literal \\</span> after.
     expect(_renderedPlainTextContains(tester, '<li>'), isFalse);
   });
 
+  testWidgets('renders Obsidian HTML ordered lists through list projection', (
+    tester,
+  ) async {
+    const source = '<ol>\n<li>Alpha bravo</li>\n<li>Charlie delta</li>\n</ol>';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-html-ordered-list')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Alpha bravo'), findsOneWidget);
+    expect(find.textContaining('Charlie delta'), findsOneWidget);
+    expect(_renderedPlainTextContains(tester, '<ol>'), isFalse);
+    expect(_renderedPlainTextContains(tester, '<li>'), isFalse);
+  });
+
   testWidgets('renders Obsidian HTML definition lists with inset definitions', (
     tester,
   ) async {

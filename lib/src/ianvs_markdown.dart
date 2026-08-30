@@ -18,6 +18,7 @@ import 'html_details.dart';
 import 'html_definition_list.dart';
 import 'html_figure.dart';
 import 'html_hr.dart';
+import 'html_ordered_list.dart';
 import 'html_pre.dart';
 import 'html_table.dart';
 import 'html_unordered_list.dart';
@@ -339,6 +340,10 @@ class IanvsMarkdown extends StatelessWidget {
         bodyBuilder: (context, source) =>
             _buildHtmlTableBody(context, source, effectiveStyleSheet, colors),
       ),
+      'ianvs-html-ordered-list': IanvsMarkdownHtmlOrderedListBuilder(
+        bodyBuilder: (context, source) =>
+            _buildHtmlTableBody(context, source, effectiveStyleSheet, colors),
+      ),
       'ianvs-html-definition-list': IanvsMarkdownHtmlDefinitionListBuilder(
         itemBuilder: (context, source) => _buildHtmlDefinitionListItem(
           context,
@@ -397,6 +402,7 @@ class IanvsMarkdown extends StatelessWidget {
       const IanvsMarkdownHtmlFigureSyntax(),
       const IanvsMarkdownHtmlTableSyntax(),
       const IanvsMarkdownHtmlUnorderedListSyntax(),
+      const IanvsMarkdownHtmlOrderedListSyntax(),
       const IanvsMarkdownHtmlDetailsSyntax(),
       if (obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing)
         const IanvsMarkdownEditingCommentBlockSyntax(),
