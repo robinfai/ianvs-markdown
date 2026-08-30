@@ -31,19 +31,6 @@ class IanvsMarkdownEntitySyntax extends md.InlineSyntax {
   }
 }
 
-/// Keeps the source backslash visible while retaining its hard line break in
-/// Obsidian's live-preview presentation.
-class IanvsMarkdownEditingHardBreakSyntax extends md.InlineSyntax {
-  IanvsMarkdownEditingHardBreakSyntax() : super(r'\\\n', startCharacter: 0x5c);
-
-  @override
-  bool onMatch(md.InlineParser parser, Match match) {
-    parser.addNode(md.Text(r'\'));
-    parser.addNode(md.Element.empty('br'));
-    return true;
-  }
-}
-
 /// Collapses paragraph whitespace the same way Obsidian's rendered surfaces
 /// do while leaving trailing hard-break markers available to Markdown.
 ///

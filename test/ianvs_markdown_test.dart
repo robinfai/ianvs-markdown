@@ -1283,34 +1283,35 @@ Unclosed <https://open.example/path tail.
     expect(_renderedPlainTextContains(tester, 'beta\tgamma'), isFalse);
   });
 
-  testWidgets('editing view preserves entities and backslash hard breaks', (
-    tester,
-  ) async {
-    const source =
-        'Entities: &copy; &#169; &notanentity; &#xZZ; &copy without.\n\n'
-        'Backslash hard break\\\nnext line.';
-    await tester.pumpWidget(
-      app(
-        const IanvsMarkdown(
-          data: source,
-          obsidianMetadataMode: IanvsMarkdownObsidianMetadataMode.editing,
+  testWidgets(
+    'editing view preserves entities and hides backslash hard breaks',
+    (tester) async {
+      const source =
+          'Entities: &copy; &#169; &notanentity; &#xZZ; &copy without.\n\n'
+          'Backslash hard break\\\nnext line.';
+      await tester.pumpWidget(
+        app(
+          const IanvsMarkdown(
+            data: source,
+            obsidianMetadataMode: IanvsMarkdownObsidianMetadataMode.editing,
+          ),
         ),
-      ),
-    );
+      );
 
-    expect(
-      _renderedPlainTextContains(
-        tester,
-        'Entities: &copy; &#169; &notanentity; &#xZZ; &copy without.',
-      ),
-      isTrue,
-    );
-    expect(
-      _renderedPlainTextContains(tester, 'Backslash hard break\\\nnext line.'),
-      isTrue,
-    );
-    expect(find.byKey(const ValueKey('ianvs-markdown-tag')), findsNothing);
-  });
+      expect(
+        _renderedPlainTextContains(
+          tester,
+          'Entities: &copy; &#169; &notanentity; &#xZZ; &copy without.',
+        ),
+        isTrue,
+      );
+      expect(
+        _renderedPlainTextContains(tester, 'Backslash hard break\nnext line.'),
+        isTrue,
+      );
+      expect(find.byKey(const ValueKey('ianvs-markdown-tag')), findsNothing);
+    },
+  );
 
   testWidgets('reading view follows Obsidian HTML entity boundaries', (
     tester,

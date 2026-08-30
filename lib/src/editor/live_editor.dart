@@ -2991,7 +2991,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     String source,
   ) {
     if (!selection.isCollapsed) return selection;
-    for (final match in RegExp(r' {2,}\r?\n').allMatches(source)) {
+    for (final match in RegExp(r'(?: {2,}|\\)\r?\n').allMatches(source)) {
       if (selection.extentOffset != match.start) continue;
       final lineBreakStart =
           match.end >= 2 && source.codeUnitAt(match.end - 2) == 0x0d
