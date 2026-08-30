@@ -4433,9 +4433,10 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       widget.onTapLink!(text, href, title);
       return;
     }
-    // Obsidian keeps ordinary Markdown links in the editor on a normal click
-    // and reveals their source. Navigation remains available in Reading mode,
-    // while Wiki links use the host callback directly in Live Preview.
+    // Obsidian keeps ordinary Markdown links as rendered controls on a normal
+    // click. The inline-link builder consumes that interaction in Live
+    // Preview; navigation remains available in Reading mode, while Wiki links
+    // use the host callback directly in Live Preview.
     _activateRenderedBlock(block, tapCount: _pointerTapCount);
   }
 

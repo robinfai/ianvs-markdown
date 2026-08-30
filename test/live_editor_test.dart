@@ -1217,6 +1217,32 @@ void main() {
     expect(controller.text, source);
   });
 
+  testWidgets('strikethrough clicks map through hidden delimiters', (
+    tester,
+  ) async {
+    const line = 'Alpha ~~bravo charlie~~ omega';
+    const source = 'Before\n\n$line\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final paragraph = editableWithin(
+      tester,
+      selectableTextWithPlainText('Alpha bravo charlie omega'),
+    );
+    final caret = paragraph.getLocalRectForCaret(const TextPosition(offset: 9));
+    final target = paragraph.localToGlobal(caret.center);
+
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(controller.selection.isCollapsed, isTrue);
+    expect(controller.selection.extentOffset, 19);
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('direct triple click selects the complete source line', (
     tester,
   ) async {
