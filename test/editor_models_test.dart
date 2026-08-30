@@ -954,6 +954,22 @@ visible''';
     expect(sameDelimiter.single.source, '- one\n- two');
   });
 
+  test('details HTML remains one Live Preview block across blank body lines', () {
+    const source =
+        '<details>\n<summary>Alpha bravo</summary>\n\nCharlie delta\n</details>\n\nAfter';
+    final blocks = parseMarkdownBlocks(source);
+
+    expect(blocks.map((block) => block.type), <IanvsMarkdownBlockType>[
+      IanvsMarkdownBlockType.html,
+      IanvsMarkdownBlockType.paragraph,
+    ]);
+    expect(
+      blocks.first.source,
+      '<details>\n<summary>Alpha bravo</summary>\n\nCharlie delta\n</details>',
+    );
+    expect(blocks.last.source, 'After');
+  });
+
   test('marker-only lists retain visual-column Tab continuations', () {
     const source =
         '-\n'

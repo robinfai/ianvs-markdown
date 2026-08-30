@@ -685,6 +685,14 @@ final RegExp _htmlCdataStartPattern = RegExp(
   caseSensitive: false,
 );
 final RegExp _htmlCdataEndPattern = RegExp(r'\]\]>');
+final RegExp _htmlDetailsStartPattern = RegExp(
+  r'^ {0,3}<details(?:[ \t]|>|$)',
+  caseSensitive: false,
+);
+final RegExp _htmlDetailsEndPattern = RegExp(
+  r'</details\s*>',
+  caseSensitive: false,
+);
 final RegExp _htmlBlockTagStartPattern = RegExp(
   r'^ {0,3}</?(?:address|article|aside|base|basefont|blockquote|body|caption|center|'
   r'col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|'
@@ -713,6 +721,11 @@ _HtmlBlockStart? _htmlBlockStart(String text) {
   }
   if (_htmlCdataStartPattern.hasMatch(text)) {
     return _HtmlBlockStart(_htmlCdataEndPattern, canInterrupt: true);
+  }
+  // Obsidian keeps the full disclosure, including blank lines in its body,
+  // in one Live Preview HTML block until the matching close tag.
+  if (_htmlDetailsStartPattern.hasMatch(text)) {
+    return _HtmlBlockStart(_htmlDetailsEndPattern, canInterrupt: true);
   }
   if (_htmlBlockTagStartPattern.hasMatch(text)) {
     return const _HtmlBlockStart(null, canInterrupt: true);

@@ -1134,6 +1134,24 @@ Escaped \\<span>literal \\</span> after.
     expect(tappedHref, 'https://example.com');
   });
 
+  testWidgets('renders and toggles Obsidian HTML details blocks', (
+    tester,
+  ) async {
+    const source =
+        'Before\n\n<details>\n<summary>Alpha bravo</summary>\n\nCharlie delta\n</details>\n\nAfter';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    expect(find.text('Alpha bravo'), findsOneWidget);
+    expect(find.text('Charlie delta'), findsNothing);
+
+    await tester.tap(
+      find.byKey(const ValueKey('ianvs-markdown-html-details-toggle')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Charlie delta'), findsOneWidget);
+  });
+
   testWidgets('renders Obsidian autolink boundaries and word-adjacent URLs', (
     tester,
   ) async {
