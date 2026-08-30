@@ -4196,6 +4196,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         styleSheet: renderedStyleSheet,
         onTapText: () =>
             _activateRenderedBlock(block, tapCount: _pointerTapCount),
+        onCalloutToggle: () =>
+            _activateRenderedBlock(block, tapCount: _pointerTapCount),
         onTapLink: (text, href, title) =>
             _handleRenderedLinkTap(block, text: text, href: href, title: title),
         imageBuilder: widget.imageBuilder,

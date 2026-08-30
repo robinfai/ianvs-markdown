@@ -117,11 +117,13 @@ class IanvsMarkdownCalloutBuilder extends MarkdownElementBuilder {
   IanvsMarkdownCalloutBuilder({
     required this.bodyBuilder,
     this.titleBuilder,
+    this.onToggle,
     this.theme,
   });
 
   final IanvsMarkdownCalloutBodyBuilder bodyBuilder;
   final IanvsMarkdownCalloutTitleBuilder? titleBuilder;
+  final VoidCallback? onToggle;
   final IanvsMarkdownThemeData? theme;
 
   @override
@@ -141,6 +143,7 @@ class IanvsMarkdownCalloutBuilder extends MarkdownElementBuilder {
       fold: element.attributes['data-fold'] ?? '',
       bodyBuilder: bodyBuilder,
       titleBuilder: titleBuilder,
+      onToggle: onToggle,
       theme: theme,
     );
   }
@@ -155,6 +158,7 @@ class IanvsMarkdownCallout extends StatefulWidget {
     required this.fold,
     required this.bodyBuilder,
     this.titleBuilder,
+    this.onToggle,
     this.theme,
   });
 
@@ -164,6 +168,9 @@ class IanvsMarkdownCallout extends StatefulWidget {
   final String fold;
   final IanvsMarkdownCalloutBodyBuilder bodyBuilder;
   final IanvsMarkdownCalloutTitleBuilder? titleBuilder;
+
+  /// Notifies a Live Preview host after a foldable callout arrow is pressed.
+  final VoidCallback? onToggle;
   final IanvsMarkdownThemeData? theme;
 
   @override
@@ -210,51 +217,53 @@ class _IanvsMarkdownCalloutState extends State<IanvsMarkdownCallout> {
         children: [
           Material(
             color: Colors.transparent,
-            child: InkWell(
-              key: ValueKey<String>(
-                'ianvs-markdown-callout-toggle-${widget.type}',
-              ),
-              onTap: _foldable
-                  ? () => setState(() => _expanded = !_expanded)
-                  : null,
-              borderRadius: BorderRadius.vertical(
-                top: Radius.circular(colors.smallRadius / 2),
-              ),
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(20, 11, 20, showBody ? 4 : 11),
-                child: Row(
-                  children: [
-                    Icon(_calloutIcon(widget.type), size: 15, color: accent),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child:
-                          widget.titleBuilder?.call(
-                            context,
-                            widget.title,
-                            accent,
-                          ) ??
-                          Text(
-                            widget.title,
-                            style: TextStyle(
-                              color: accent,
-                              fontSize: 14.5,
-                              height: 1.4,
-                              fontWeight: FontWeight.w700,
-                            ),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(20, 11, 20, showBody ? 4 : 11),
+              child: Row(
+                children: [
+                  Icon(_calloutIcon(widget.type), size: 15, color: accent),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child:
+                        widget.titleBuilder?.call(
+                          context,
+                          widget.title,
+                          accent,
+                        ) ??
+                        Text(
+                          widget.title,
+                          style: TextStyle(
+                            color: accent,
+                            fontSize: 14.5,
+                            height: 1.4,
+                            fontWeight: FontWeight.w700,
                           ),
-                    ),
-                    if (_foldable)
-                      AnimatedRotation(
-                        turns: _expanded ? .25 : 0,
-                        duration: const Duration(milliseconds: 150),
-                        child: Icon(
-                          Icons.chevron_right_rounded,
-                          size: 17,
-                          color: accent,
+                        ),
+                  ),
+                  if (_foldable)
+                    InkWell(
+                      key: ValueKey<String>(
+                        'ianvs-markdown-callout-toggle-${widget.type}',
+                      ),
+                      onTap: () {
+                        setState(() => _expanded = !_expanded);
+                        widget.onToggle?.call();
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: AnimatedRotation(
+                          turns: _expanded ? .25 : 0,
+                          duration: const Duration(milliseconds: 150),
+                          child: Icon(
+                            Icons.chevron_right_rounded,
+                            size: 17,
+                            color: accent,
+                          ),
                         ),
                       ),
-                  ],
-                ),
+                    ),
+                ],
               ),
             ),
           ),

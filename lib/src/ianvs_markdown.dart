@@ -54,6 +54,7 @@ class IanvsMarkdown extends StatelessWidget {
     this.onSelectionChanged,
     this.onTapLink,
     this.onTapText,
+    this.onCalloutToggle,
     this.blockSyntaxes,
     this.inlineSyntaxes,
     this.extensionSet,
@@ -89,6 +90,12 @@ class IanvsMarkdown extends StatelessWidget {
   final MarkdownOnSelectionChangedCallback? onSelectionChanged;
   final MarkdownTapLinkCallback? onTapLink;
   final VoidCallback? onTapText;
+
+  /// Called when a foldable callout's arrow is pressed.
+  ///
+  /// Live Preview hosts can use this to enter the exact source surface after
+  /// the same arrow gesture that changes the callout's expansion state.
+  final VoidCallback? onCalloutToggle;
   final List<md.BlockSyntax>? blockSyntaxes;
   final List<md.InlineSyntax>? inlineSyntaxes;
   final md.ExtensionSet? extensionSet;
@@ -236,6 +243,7 @@ class IanvsMarkdown extends StatelessWidget {
       ),
       'ianvs-callout': IanvsMarkdownCalloutBuilder(
         theme: colors,
+        onToggle: onCalloutToggle,
         titleBuilder: (context, source, accent) => _buildCalloutTitle(
           context,
           source,

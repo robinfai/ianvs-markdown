@@ -3463,6 +3463,39 @@ Before ==highlighted **bold**== after.
     expect(find.textContaining('Hidden body line.'), findsOneWidget);
   });
 
+  testWidgets('foldable callouts toggle only from their arrow control', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(
+          data: '''
+> [!warning]- Folded warning
+> Hidden body line.
+''',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final toggle = find.byKey(
+      const ValueKey('ianvs-markdown-callout-toggle-warning'),
+    );
+    expect(find.textContaining('Hidden body line.'), findsNothing);
+
+    await tester.tap(find.text('Folded warning'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Hidden body line.'), findsNothing);
+
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Hidden body line.'), findsOneWidget);
+
+    await tester.tap(find.text('Folded warning'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Hidden body line.'), findsOneWidget);
+  });
+
   testWidgets('Border callout cards keep Obsidian color and spacing rhythm', (
     tester,
   ) async {
