@@ -14,6 +14,7 @@ import 'heading_folding.dart';
 import 'highlight.dart';
 import 'html_blockquote.dart';
 import 'html_details.dart';
+import 'html_hr.dart';
 import 'inline_code.dart';
 import 'inline_link.dart';
 import 'list_guide.dart';
@@ -312,6 +313,9 @@ class IanvsMarkdown extends StatelessWidget {
           colors,
         ),
       ),
+      'ianvs-html-hr': IanvsMarkdownHtmlHorizontalRuleBuilder(
+        decoration: effectiveStyleSheet.horizontalRuleDecoration,
+      ),
       'ianvs-callout': IanvsMarkdownCalloutBuilder(
         theme: colors,
         onToggle: onCalloutToggle,
@@ -354,6 +358,7 @@ class IanvsMarkdown extends StatelessWidget {
     final effectiveBlockSyntaxes = <md.BlockSyntax>[
       ...?blockSyntaxes,
       const IanvsMarkdownIndentedCodeBlockSyntax(),
+      const IanvsMarkdownHtmlHorizontalRuleSyntax(),
       const IanvsMarkdownHtmlBlockquoteSyntax(),
       const IanvsMarkdownHtmlDetailsSyntax(),
       if (obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing)

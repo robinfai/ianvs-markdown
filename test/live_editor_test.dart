@@ -9903,6 +9903,31 @@ $$''');
     expect(controller.isDirty, isFalse);
   });
 
+  testWidgets(
+    'HTML horizontal rule keeps its projection until edit requested',
+    (tester) async {
+      const source = 'Before\n\n<hr>\n\nAfter';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      final rule = find.byKey(const ValueKey('ianvs-markdown-html-hr'));
+      expect(rule, findsOneWidget);
+      await tester.tap(rule);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('ianvs-markdown-active-block')),
+        findsNothing,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyQ);
+      await tester.pump();
+      expect(controller.text, source);
+      expect(controller.isDirty, isFalse);
+    },
+  );
+
   testWidgets('HTML details open starts expanded without entering source', (
     tester,
   ) async {

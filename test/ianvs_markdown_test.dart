@@ -1183,6 +1183,22 @@ Escaped \\<span>literal \\</span> after.
     );
   });
 
+  testWidgets('renders Obsidian HTML horizontal rules', (tester) async {
+    await tester.pumpWidget(
+      app(const IanvsMarkdown(data: 'Before\n\n<hr>\n\nAfter')),
+    );
+
+    final rule = find.byKey(const ValueKey('ianvs-markdown-html-hr'));
+    expect(rule, findsOneWidget);
+    final line = tester.widget<Container>(
+      find.descendant(of: rule, matching: find.byType(Container)),
+    );
+    expect(line.constraints?.maxHeight, 2);
+    expect(line.decoration, isNotNull);
+    expect(find.text('Before'), findsOneWidget);
+    expect(find.text('After'), findsOneWidget);
+  });
+
   testWidgets('renders Obsidian autolink boundaries and word-adjacent URLs', (
     tester,
   ) async {
