@@ -2912,6 +2912,17 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         ?.findRenderObject();
     final selectThematicSource =
         block.type == IanvsMarkdownBlockType.thematicBreak;
+    final quoteMarkerTapOffset =
+        block.type == IanvsMarkdownBlockType.blockquote &&
+            parseIanvsMarkdownCalloutHeader(block.source) == null &&
+            pendingGlobal != null &&
+            renderObject is RenderBox
+        ? _quoteMarkerCaretOffsetForTap(
+            block,
+            renderObject.globalToLocal(pendingGlobal),
+            renderObject.size,
+          )
+        : null;
     final tapOffset =
         block.type == IanvsMarkdownBlockType.blockquote &&
             pendingGlobal != null &&
@@ -2928,9 +2939,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     _activateBlock(
       block,
       selectWholeSource: selectThematicSource,
-      documentOffset: projectedTapOffset ?? tapOffset,
+      documentOffset: quoteMarkerTapOffset ?? projectedTapOffset ?? tapOffset,
     );
-    if (projectedTapOffset != null) {
+    if (projectedTapOffset != null && quoteMarkerTapOffset == null) {
       _projectedRenderedTapBlockStart = block.start;
       _projectedRenderedTapLocalOffset = projectedTapOffset - block.start;
     }
@@ -3093,6 +3104,30 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       lines.length - 1,
     );
     return block.start + lines[index].line.end;
+  }
+
+  int? _quoteMarkerCaretOffsetForTap(
+    IanvsMarkdownBlock block,
+    Offset position,
+    Size size,
+  ) {
+    // The rendered quote reserves ten outer pixels plus its 27 px rail and
+    // inset. Obsidian treats a click in that marker gutter as the position
+    // immediately before the raw `>` on the corresponding physical line.
+    const markerGutterWidth = 37.0;
+    if (position.dx < 0 ||
+        position.dx > markerGutterWidth ||
+        size.height <= 0) {
+      return null;
+    }
+    final lines = _quoteLineLayouts(block.source);
+    if (lines.isEmpty) return null;
+    final normalizedY = position.dy.clamp(0.0, size.height);
+    final index = ((normalizedY / size.height) * lines.length).floor().clamp(
+      0,
+      lines.length - 1,
+    );
+    return block.start + lines[index].line.start;
   }
 
   void _activateGapLine(

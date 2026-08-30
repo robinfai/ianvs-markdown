@@ -8302,6 +8302,36 @@ url: https://example.com/path
     expect(controller.isDirty, isFalse);
   });
 
+  testWidgets('quote marker clicks place the caret before the marker', (
+    tester,
+  ) async {
+    const source = 'Before\n\n> Alpha bravo\n> Charlie delta\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final preview = find.byWidgetPredicate(
+      (widget) =>
+          widget is SelectableText &&
+          (widget.data ?? widget.textSpan?.toPlainText() ?? '').contains(
+            'Alpha bravo',
+          ),
+    );
+    final quote = find.ancestor(
+      of: preview,
+      matching: find.bySemanticsLabel('Edit Markdown block'),
+    );
+    final rect = tester.getRect(quote);
+    await tester.tapAt(Offset(rect.left + 10, rect.top + 12));
+    await tester.pumpAndSettle();
+
+    expect(
+      controller.selection,
+      TextSelection.collapsed(offset: source.indexOf('> Alpha bravo')),
+    );
+  });
+
   testWidgets('quote multi-click restores its raw marker line', (tester) async {
     const source = 'Before\n\n> Alpha bravo\n> Charlie delta\n\nAfter';
     final controller = IanvsMarkdownController(text: source);
