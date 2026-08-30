@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:ianvs_markdown/src/code_surface.dart';
+import 'package:ianvs_markdown/src/html_checkbox.dart';
 import 'package:ianvs_markdown/src/list_guide.dart';
 import 'package:markdown/markdown.dart' as md;
 
@@ -1213,6 +1214,26 @@ Escaped \\<span>literal \\</span> after.
     expect(line.decoration, isNotNull);
     expect(find.text('Before'), findsOneWidget);
     expect(find.text('After'), findsOneWidget);
+  });
+
+  testWidgets('renders stateful Obsidian HTML checkbox inputs', (tester) async {
+    const source =
+        'Before\n\n<input type="checkbox"> Alpha bravo\n<input type="checkbox" checked> Charlie delta\n\nAfter';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    final controls = find.byType(IanvsMarkdownHtmlCheckbox);
+    expect(controls, findsNWidgets(2));
+    expect(
+      tester.widget<IanvsMarkdownHtmlCheckbox>(controls.first).checked,
+      isFalse,
+    );
+    expect(
+      tester.widget<IanvsMarkdownHtmlCheckbox>(controls.last).checked,
+      isTrue,
+    );
+    expect(find.text('Alpha bravo'), findsOneWidget);
+    expect(find.text('Charlie delta'), findsOneWidget);
+    expect(_renderedPlainTextContains(tester, '<input'), isFalse);
   });
 
   testWidgets('renders Obsidian HTML pre blocks as dashed literal regions', (

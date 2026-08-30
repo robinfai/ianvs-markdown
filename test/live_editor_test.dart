@@ -9952,6 +9952,35 @@ $$''');
     },
   );
 
+  testWidgets('HTML checkboxes toggle without rewriting their source', (
+    tester,
+  ) async {
+    const source =
+        'Before\n\n<input type="checkbox"> Alpha bravo\n<input type="checkbox" checked> Charlie delta\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final firstCheckbox = find.byType(IanvsMarkdownTaskCheckbox).first;
+    await tester.tap(firstCheckbox);
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<IanvsMarkdownTaskCheckbox>(firstCheckbox).value,
+      isTrue,
+    );
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+
+    await tester.tap(find.text('Alpha bravo'));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
+  });
+
   testWidgets('HTML pre enters its exact block source on normal click', (
     tester,
   ) async {
