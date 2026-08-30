@@ -1199,6 +1199,22 @@ Escaped \\<span>literal \\</span> after.
     expect(find.text('After'), findsOneWidget);
   });
 
+  testWidgets('renders inset Obsidian HTML figures without caption styling', (
+    tester,
+  ) async {
+    const source =
+        '<figure>\nAlpha bravo\n<figcaption>Charlie delta</figcaption>\n</figure>';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    final figure = find.byKey(const ValueKey('ianvs-markdown-html-figure'));
+    expect(figure, findsOneWidget);
+    final padding = tester.widget<Padding>(figure);
+    expect(padding.padding, const EdgeInsets.only(left: 25));
+    expect(find.textContaining('Alpha bravo'), findsOneWidget);
+    expect(find.textContaining('Charlie delta'), findsOneWidget);
+    expect(_renderedPlainTextContains(tester, 'figcaption'), isFalse);
+  });
+
   testWidgets('renders Obsidian autolink boundaries and word-adjacent URLs', (
     tester,
   ) async {

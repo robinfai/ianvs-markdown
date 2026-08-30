@@ -9928,6 +9928,31 @@ $$''');
     },
   );
 
+  testWidgets('HTML figure enters its exact block source on normal click', (
+    tester,
+  ) async {
+    const figure =
+        '<figure>\nAlpha bravo\n<figcaption>Charlie delta</figcaption>\n</figure>';
+    final controller = IanvsMarkdownController(
+      text: 'Before\n\n$figure\n\nAfter',
+    );
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.textContaining('Alpha bravo'));
+    await tester.pumpAndSettle();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    expect(active, findsOneWidget);
+    final field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, figure);
+    expect(controller.text, 'Before\n\n$figure\n\nAfter');
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('HTML details open starts expanded without entering source', (
     tester,
   ) async {
