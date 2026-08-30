@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:ianvs_markdown/src/code_surface.dart';
 import 'package:ianvs_markdown/src/html_checkbox.dart';
+import 'package:ianvs_markdown/src/html_textarea.dart';
 import 'package:ianvs_markdown/src/list_guide.dart';
 import 'package:markdown/markdown.dart' as md;
 
@@ -1234,6 +1235,23 @@ Escaped \\<span>literal \\</span> after.
     expect(find.text('Alpha bravo'), findsOneWidget);
     expect(find.text('Charlie delta'), findsOneWidget);
     expect(_renderedPlainTextContains(tester, '<input'), isFalse);
+  });
+
+  testWidgets('renders view-local Obsidian HTML textarea inputs', (
+    tester,
+  ) async {
+    const source = 'Before\n\n<textarea>Alpha bravo</textarea>\n\nAfter';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    final textarea = find.byType(IanvsMarkdownHtmlTextarea);
+    expect(textarea, findsOneWidget);
+    final field = tester.widget<TextField>(
+      find.descendant(of: textarea, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, 'Alpha bravo');
+    expect(find.text('Before'), findsOneWidget);
+    expect(find.text('After'), findsOneWidget);
+    expect(_renderedPlainTextContains(tester, '<textarea>'), isFalse);
   });
 
   testWidgets('renders Obsidian HTML pre blocks as dashed literal regions', (

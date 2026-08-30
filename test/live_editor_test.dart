@@ -9981,6 +9981,32 @@ $$''');
     );
   });
 
+  testWidgets('HTML textarea edits locally without rewriting its source', (
+    tester,
+  ) async {
+    const source = 'Before\n\n<textarea>Alpha bravo</textarea>\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final field = find.descendant(
+      of: find.byKey(const ValueKey('ianvs-markdown-html-textarea')),
+      matching: find.byType(TextField),
+    );
+    await tester.tap(field);
+    await tester.enterText(field, 'Alpha bravoQ');
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<TextField>(field).controller?.text, 'Alpha bravoQ');
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
+  });
+
   testWidgets('HTML pre enters its exact block source on normal click', (
     tester,
   ) async {

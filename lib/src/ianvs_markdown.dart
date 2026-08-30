@@ -22,6 +22,7 @@ import 'html_hr.dart';
 import 'html_ordered_list.dart';
 import 'html_pre.dart';
 import 'html_table.dart';
+import 'html_textarea.dart';
 import 'html_unordered_list.dart';
 import 'inline_code.dart';
 import 'inline_link.dart';
@@ -338,6 +339,7 @@ class IanvsMarkdown extends StatelessWidget {
         bodyBuilder: (context, source) =>
             _buildHtmlTableBody(context, source, effectiveStyleSheet, colors),
       ),
+      'ianvs-html-textarea': IanvsMarkdownHtmlTextareaBuilder(theme: colors),
       'ianvs-html-unordered-list': IanvsMarkdownHtmlUnorderedListBuilder(
         bodyBuilder: (context, source) =>
             _buildHtmlTableBody(context, source, effectiveStyleSheet, colors),
@@ -399,6 +401,7 @@ class IanvsMarkdown extends StatelessWidget {
       const IanvsMarkdownHtmlHorizontalRuleSyntax(),
       const IanvsMarkdownHtmlCheckboxSyntax(),
       const IanvsMarkdownHtmlPreSyntax(),
+      const IanvsMarkdownHtmlTextareaSyntax(),
       const IanvsMarkdownHtmlBlockquoteSyntax(),
       const IanvsMarkdownHtmlCenterSyntax(),
       const IanvsMarkdownHtmlDefinitionListSyntax(),
