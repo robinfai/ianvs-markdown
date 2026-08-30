@@ -314,6 +314,8 @@ class IanvsMarkdownHtmlInlineBuilder extends MarkdownElementBuilder {
                 ? const ValueKey('ianvs-markdown-html-kbd')
                 : kind == IanvsMarkdownHtmlInlineKind.mark
                 ? const ValueKey('ianvs-markdown-html-mark')
+                : kind == IanvsMarkdownHtmlInlineKind.span
+                ? const ValueKey('ianvs-markdown-html-span')
                 : null,
             behavior: HitTestBehavior.opaque,
             onTap: () {},
