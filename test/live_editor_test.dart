@@ -10007,6 +10007,23 @@ $$''');
     );
   });
 
+  testWidgets('HTML select changes locally without rewriting its source', (
+    tester,
+  ) async {
+    const source =
+        'Before\n\n<select><option>Alpha bravo</option><option selected>Charlie delta</option></select>\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('ianvs-markdown-html-select')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Alpha bravo').last);
+    await tester.pumpAndSettle();
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('HTML pre enters its exact block source on normal click', (
     tester,
   ) async {

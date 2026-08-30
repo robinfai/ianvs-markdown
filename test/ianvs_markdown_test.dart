@@ -8,6 +8,7 @@ import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:ianvs_markdown/src/code_surface.dart';
 import 'package:ianvs_markdown/src/html_checkbox.dart';
 import 'package:ianvs_markdown/src/html_textarea.dart';
+import 'package:ianvs_markdown/src/html_select.dart';
 import 'package:ianvs_markdown/src/list_guide.dart';
 import 'package:markdown/markdown.dart' as md;
 
@@ -1252,6 +1253,16 @@ Escaped \\<span>literal \\</span> after.
     expect(find.text('Before'), findsOneWidget);
     expect(find.text('After'), findsOneWidget);
     expect(_renderedPlainTextContains(tester, '<textarea>'), isFalse);
+  });
+
+  testWidgets('renders stateful Obsidian HTML select inputs', (tester) async {
+    const source =
+        'Before\n\n<select><option>Alpha bravo</option><option selected>Charlie delta</option></select>\n\nAfter';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+    final select = find.byType(IanvsMarkdownHtmlSelect);
+    expect(select, findsOneWidget);
+    expect(find.text('Charlie delta'), findsOneWidget);
+    expect(_renderedPlainTextContains(tester, '<select>'), isFalse);
   });
 
   testWidgets('renders Obsidian HTML pre blocks as dashed literal regions', (

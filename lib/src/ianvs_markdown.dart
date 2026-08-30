@@ -21,6 +21,7 @@ import 'html_figure.dart';
 import 'html_hr.dart';
 import 'html_ordered_list.dart';
 import 'html_pre.dart';
+import 'html_select.dart';
 import 'html_table.dart';
 import 'html_textarea.dart';
 import 'html_unordered_list.dart';
@@ -331,6 +332,7 @@ class IanvsMarkdown extends StatelessWidget {
         decoration: effectiveStyleSheet.horizontalRuleDecoration,
       ),
       'ianvs-html-pre': IanvsMarkdownHtmlPreBuilder(theme: colors),
+      'ianvs-html-select': IanvsMarkdownHtmlSelectBuilder(theme: colors),
       'ianvs-html-figure': IanvsMarkdownHtmlFigureBuilder(
         bodyBuilder: (context, source) =>
             _buildHtmlFigureBody(context, source, effectiveStyleSheet, colors),
@@ -401,6 +403,7 @@ class IanvsMarkdown extends StatelessWidget {
       const IanvsMarkdownHtmlHorizontalRuleSyntax(),
       const IanvsMarkdownHtmlCheckboxSyntax(),
       const IanvsMarkdownHtmlPreSyntax(),
+      const IanvsMarkdownHtmlSelectSyntax(),
       const IanvsMarkdownHtmlTextareaSyntax(),
       const IanvsMarkdownHtmlBlockquoteSyntax(),
       const IanvsMarkdownHtmlCenterSyntax(),
