@@ -1199,6 +1199,27 @@ Escaped \\<span>literal \\</span> after.
     expect(find.text('After'), findsOneWidget);
   });
 
+  testWidgets('renders Obsidian HTML pre blocks as dashed literal regions', (
+    tester,
+  ) async {
+    const source = 'Before\n\n<pre>Alpha bravo\nCharlie delta</pre>\n\nAfter';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    final pre = find.byKey(const ValueKey('ianvs-markdown-html-pre'));
+    expect(pre, findsOneWidget);
+    final preText = find.textContaining('Alpha bravo');
+    expect(preText, findsOneWidget);
+    expect(find.textContaining('Charlie delta'), findsOneWidget);
+    expect(find.text('After'), findsOneWidget);
+    expect(_renderedPlainTextContains(tester, '<pre>'), isFalse);
+    final text = tester.widget<Text>(preText);
+    expect(text.style?.fontFamily, IanvsMarkdownThemeData.light.monoFontFamily);
+    final padding = tester.widget<Padding>(
+      find.descendant(of: pre, matching: find.byType(Padding)),
+    );
+    expect(padding.padding, const EdgeInsets.all(10));
+  });
+
   testWidgets('renders inset Obsidian HTML figures without caption styling', (
     tester,
   ) async {

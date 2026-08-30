@@ -17,6 +17,7 @@ import 'html_details.dart';
 import 'html_definition_list.dart';
 import 'html_figure.dart';
 import 'html_hr.dart';
+import 'html_pre.dart';
 import 'html_table.dart';
 import 'inline_code.dart';
 import 'inline_link.dart';
@@ -319,6 +320,7 @@ class IanvsMarkdown extends StatelessWidget {
       'ianvs-html-hr': IanvsMarkdownHtmlHorizontalRuleBuilder(
         decoration: effectiveStyleSheet.horizontalRuleDecoration,
       ),
+      'ianvs-html-pre': IanvsMarkdownHtmlPreBuilder(theme: colors),
       'ianvs-html-figure': IanvsMarkdownHtmlFigureBuilder(
         bodyBuilder: (context, source) =>
             _buildHtmlFigureBody(context, source, effectiveStyleSheet, colors),
@@ -378,6 +380,7 @@ class IanvsMarkdown extends StatelessWidget {
       ...?blockSyntaxes,
       const IanvsMarkdownIndentedCodeBlockSyntax(),
       const IanvsMarkdownHtmlHorizontalRuleSyntax(),
+      const IanvsMarkdownHtmlPreSyntax(),
       const IanvsMarkdownHtmlBlockquoteSyntax(),
       const IanvsMarkdownHtmlDefinitionListSyntax(),
       const IanvsMarkdownHtmlFigureSyntax(),
