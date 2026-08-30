@@ -2974,13 +2974,35 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         globalPosition,
         selectionKind,
       );
+      final resolvedSelection = selectionKind == _RenderedTapSelection.caret
+          ? _hardBreakCaretSelection(localSelection, block.source)
+          : localSelection;
       if (selectionKind == _RenderedTapSelection.caret &&
-          localSelection.isCollapsed) {
+          resolvedSelection.isCollapsed) {
         _projectedRenderedTapBlockStart = block.start;
-        _projectedRenderedTapLocalOffset = localSelection.extentOffset;
+        _projectedRenderedTapLocalOffset = resolvedSelection.extentOffset;
       }
-      _setActiveSelection(localSelection);
+      _setActiveSelection(resolvedSelection);
     });
+  }
+
+  TextSelection _hardBreakCaretSelection(
+    TextSelection selection,
+    String source,
+  ) {
+    if (!selection.isCollapsed) return selection;
+    for (final match in RegExp(r' {2,}\r?\n').allMatches(source)) {
+      if (selection.extentOffset != match.start) continue;
+      final lineBreakStart =
+          match.end >= 2 && source.codeUnitAt(match.end - 2) == 0x0d
+          ? match.end - 2
+          : match.end - 1;
+      return TextSelection.collapsed(
+        offset: lineBreakStart,
+        affinity: TextAffinity.downstream,
+      );
+    }
+    return selection;
   }
 
   TextSelection _selectionAtEditablePoint(

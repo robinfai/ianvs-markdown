@@ -8445,6 +8445,41 @@ url: https://example.com/path
     },
   );
 
+  testWidgets('two-space hard break clicks keep the trailing source spaces', (
+    tester,
+  ) async {
+    const source = 'Before\n\nAlpha bravo  \nCharlie delta\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final preview = find.byWidgetPredicate(
+      (widget) =>
+          widget is SelectableText &&
+          (widget.data ?? widget.textSpan?.toPlainText() ?? '').contains(
+            'Alpha bravo',
+          ),
+    );
+    final editable = editableWithin(tester, preview);
+    final target = editable.localToGlobal(
+      editable
+          .getLocalRectForCaret(
+            const TextPosition(offset: 'Alpha bravo'.length),
+          )
+          .center,
+    );
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(
+      controller.selection,
+      TextSelection.collapsed(
+        offset: source.indexOf('\n', source.indexOf('Alpha bravo')),
+      ),
+    );
+  });
+
   testWidgets('quote multi-click restores its raw marker line', (tester) async {
     const source = 'Before\n\n> Alpha bravo\n> Charlie delta\n\nAfter';
     final controller = IanvsMarkdownController(text: source);
