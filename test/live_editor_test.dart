@@ -261,6 +261,54 @@ void main() {
     expect(controller.text, source);
   });
 
+  testWidgets(
+    'tag clicks preserve Obsidian caret word and line selections in Live Preview',
+    (tester) async {
+      const source = 'Alpha #project/flutter omega #nested/sub.';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      final tag = find.text('#project/flutter');
+      final paragraph = tester.renderObject<RenderParagraph>(tag);
+      const tagOffset = 4;
+      final caret = paragraph.getOffsetForCaret(
+        const TextPosition(offset: tagOffset),
+        Rect.zero,
+      );
+      final target = paragraph.localToGlobal(
+        caret + Offset(.1, paragraph.size.height / 2),
+      );
+
+      await tester.tapAt(target);
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(controller.selection.isCollapsed, isTrue);
+      expect(
+        controller.selection.extentOffset,
+        source.indexOf('#project/flutter') + tagOffset,
+      );
+      final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+      final field = tester.widget<TextField>(
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      expect(field.controller?.text, source);
+
+      await tester.tapAt(target);
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(controller.selection.textInside(source), 'project');
+
+      await tester.tapAt(target);
+      await tester.pumpAndSettle();
+
+      expect(controller.selection.textInside(source), source);
+      expect(controller.text, source);
+      expect(controller.isDirty, isFalse);
+    },
+  );
+
   testWidgets('live preview hides surplus highlight runs until activation', (
     tester,
   ) async {
