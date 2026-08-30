@@ -3113,7 +3113,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   ) {
     // The rendered quote reserves ten outer pixels plus its 27 px rail and
     // inset. Obsidian treats a click in that marker gutter as the position
-    // immediately before the raw `>` on the corresponding physical line.
+    // immediately before the raw `>` on the corresponding physical line,
+    // including an inner marker for nested quote rails.
     const markerGutterWidth = 37.0;
     if (position.dx < 0 ||
         position.dx > markerGutterWidth ||
@@ -3127,7 +3128,14 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       0,
       lines.length - 1,
     );
-    return block.start + lines[index].line.start;
+    final markers = lines[index].markerRanges;
+    if (markers.isEmpty) return block.start + lines[index].line.start;
+    const firstRailX = 9.5;
+    const nestedRailSpacing = 19.0;
+    final markerIndex = ((position.dx - firstRailX) / nestedRailSpacing)
+        .round()
+        .clamp(0, markers.length - 1);
+    return block.start + markers[markerIndex].start;
   }
 
   void _activateGapLine(

@@ -8332,6 +8332,45 @@ url: https://example.com/path
     );
   });
 
+  testWidgets('nested quote rail clicks place the caret before that marker', (
+    tester,
+  ) async {
+    const source =
+        'Before\n\n> Outer alpha\n> > Inner bravo\n> Outer charlie\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final preview = find.byWidgetPredicate(
+      (widget) =>
+          widget is SelectableText &&
+          (widget.data ?? widget.textSpan?.toPlainText() ?? '').contains(
+            'Inner bravo',
+          ),
+    );
+    final editable = editableWithin(tester, preview);
+    final innerText = editable.text!.toPlainText();
+    final innerCaret = editable.localToGlobal(
+      editable
+          .getLocalRectForCaret(
+            TextPosition(offset: innerText.indexOf('Inner bravo')),
+          )
+          .center,
+    );
+    final quote = find.ancestor(
+      of: preview,
+      matching: find.bySemanticsLabel('Edit Markdown block'),
+    );
+    await tester.tapAt(Offset(tester.getRect(quote).left + 30, innerCaret.dy));
+    await tester.pumpAndSettle();
+
+    expect(
+      controller.selection,
+      TextSelection.collapsed(offset: source.indexOf('> > Inner bravo') + 2),
+    );
+  });
+
   testWidgets('quote multi-click restores its raw marker line', (tester) async {
     const source = 'Before\n\n> Alpha bravo\n> Charlie delta\n\nAfter';
     final controller = IanvsMarkdownController(text: source);
