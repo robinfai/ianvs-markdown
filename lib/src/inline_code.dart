@@ -28,8 +28,9 @@ TextStyle ianvsMarkdownInlineCodeStyle(
 /// Keeps inline code textual, selectable, and naturally wrappable while
 /// retaining styles supplied by outer emphasis, strike, or highlight nodes.
 class IanvsMarkdownInlineCodeBuilder extends MarkdownElementBuilder {
-  IanvsMarkdownInlineCodeBuilder({this.theme});
+  IanvsMarkdownInlineCodeBuilder({this.consumeTap = false, this.theme});
 
+  final bool consumeTap;
   final IanvsMarkdownThemeData? theme;
 
   @override
@@ -49,6 +50,14 @@ class IanvsMarkdownInlineCodeBuilder extends MarkdownElementBuilder {
       fontSize: code.fontSize,
       height: code.height,
     );
-    return Text.rich(TextSpan(text: element.textContent, style: style));
+    final text = Text.rich(TextSpan(text: element.textContent, style: style));
+    return consumeTap
+        ? GestureDetector(
+            key: const ValueKey('ianvs-markdown-html-code'),
+            behavior: HitTestBehavior.opaque,
+            onTap: () {},
+            child: text,
+          )
+        : text;
   }
 }

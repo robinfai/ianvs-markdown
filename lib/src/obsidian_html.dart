@@ -113,7 +113,7 @@ final class _IanvsMarkdownPairedHtmlSyntax extends md.InlineSyntax {
       case 'del':
         element = md.Element('ianvs-html-s', children);
       case 'code':
-        element = md.Element('ianvs-inline-code', children);
+        element = md.Element('ianvs-html-code', children);
       case 'sup':
         element = md.Element('ianvs-html-sup', children);
       case 'mark':

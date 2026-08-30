@@ -761,7 +761,9 @@ TextStyle? _highlightElementStyle(String tag, IanvsMarkdownThemeData colors) {
       fontStyle: FontStyle.italic,
     ),
     'del' => const TextStyle(decoration: TextDecoration.lineThrough),
-    'code' || 'ianvs-inline-code' => ianvsMarkdownInlineCodeStyle(colors),
+    'code' ||
+    'ianvs-inline-code' ||
+    'ianvs-html-code' => ianvsMarkdownInlineCodeStyle(colors),
     'a' => TextStyle(
       color: colors.accentDark,
       decoration: TextDecoration.underline,
