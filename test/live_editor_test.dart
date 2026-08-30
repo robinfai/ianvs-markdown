@@ -14,6 +14,7 @@ void main() {
   Widget app(
     IanvsMarkdownController controller, {
     bool showFrontMatter = true,
+    bool enableHeadingFolding = true,
   }) {
     return MaterialApp(
       home: Scaffold(
@@ -23,6 +24,7 @@ void main() {
           child: IanvsMarkdownLiveEditor(
             controller: controller,
             showFrontMatter: showFrontMatter,
+            enableHeadingFolding: enableHeadingFolding,
           ),
         ),
       ),
@@ -5651,6 +5653,40 @@ void main() {
       expect(controller.text, source);
     }
   });
+
+  testWidgets(
+    'heading folding is hidden by default in Live Preview and Reading',
+    (tester) async {
+      const source = '# Alpha bravo\n\nBody under alpha';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      final section = IanvsMarkdownHeadingFoldModel.parse(
+        source,
+      ).sections.single;
+
+      await tester.pumpWidget(app(controller, enableHeadingFolding: false));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Alpha bravo'), findsWidgets);
+      expect(find.text('Body under alpha'), findsOneWidget);
+      expect(
+        find.byKey(
+          ValueKey('ianvs-markdown-live-heading-fold-${section.identity}'),
+        ),
+        findsNothing,
+      );
+
+      controller.mode = IanvsMarkdownEditorMode.preview;
+      await tester.pumpAndSettle();
+
+      expect(find.text('Alpha bravo'), findsWidgets);
+      expect(find.text('Body under alpha'), findsOneWidget);
+      expect(
+        find.byKey(ValueKey('ianvs-markdown-heading-fold-${section.identity}')),
+        findsNothing,
+      );
+    },
+  );
 
   testWidgets('thematic break clicks select the complete marker source', (
     tester,

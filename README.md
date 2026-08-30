@@ -45,7 +45,8 @@ IanvsMarkdown(
 
 完整文档使用带滚动和大纲的组件。Obsidian 当前默认将 Properties
 隐藏在文档正文之外；若宿主要在正文上方显示可编辑属性卡，显式传入
-`showFrontMatter: true`。父级需要提供有限高度：
+`showFrontMatter: true`。当前 Obsidian 配置也不显示标题折叠控件；若
+宿主要开启该能力，显式传入 `enableHeadingFolding: true`。父级需要提供有限高度：
 
 ```dart
 Expanded(

@@ -102,7 +102,7 @@ class IanvsMarkdownLiveEditor extends StatefulWidget {
     this.showFrontMatter = false,
     this.compactFrontMatter = true,
     this.showDocumentTitle = false,
-    this.enableHeadingFolding = true,
+    this.enableHeadingFolding = false,
     this.padding = const EdgeInsets.fromLTRB(28, 20, 32, 44),
     this.onChanged,
     this.onModeChanged,
@@ -141,6 +141,10 @@ class IanvsMarkdownLiveEditor extends StatefulWidget {
   final bool showFrontMatter;
   final bool compactFrontMatter;
   final bool showDocumentTitle;
+
+  /// Whether heading fold controls are shown in Live Preview and Reading.
+  ///
+  /// Obsidian can hide these controls; that configuration is the default.
   final bool enableHeadingFolding;
   final EdgeInsetsGeometry padding;
   final ValueChanged<String>? onChanged;

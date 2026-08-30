@@ -708,7 +708,7 @@ class IanvsMarkdownView extends StatefulWidget {
     this.compactFrontMatter = true,
     this.showDocumentTitle = false,
     this.showOutline = true,
-    this.enableHeadingFolding = true,
+    this.enableHeadingFolding = false,
     this.headingFoldController,
     this.outlineBreakpoint = 560,
     this.outlineWidth = 180,
@@ -741,6 +741,11 @@ class IanvsMarkdownView extends StatefulWidget {
   final bool compactFrontMatter;
   final bool showDocumentTitle;
   final bool showOutline;
+
+  /// Whether Reading view exposes fold controls beside headings.
+  ///
+  /// Defaults to the Obsidian configuration where heading fold controls are
+  /// not shown.
   final bool enableHeadingFolding;
   final IanvsMarkdownHeadingFoldController? headingFoldController;
   final double outlineBreakpoint;
