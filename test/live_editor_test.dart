@@ -10638,6 +10638,33 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     },
   );
 
+  testWidgets('task text clicks map past the hidden Markdown marker', (
+    tester,
+  ) async {
+    const source =
+        'Before\n\n'
+        '- [ ] Alpha bravo\n'
+        '- [x] Charlie delta\n'
+        '- [-] Echo foxtrot\n\n'
+        'After';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final item = editableWithin(tester, find.text('Alpha bravo'));
+    final caret = item.getLocalRectForCaret(const TextPosition(offset: 6));
+    final target = item.localToGlobal(caret.center);
+
+    await tester.tapAt(target);
+    await tester.pumpAndSettle();
+
+    expect(controller.selection.isCollapsed, isTrue);
+    expect(controller.selection.extentOffset, 19);
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('active task checkbox preserves the editor caret focus', (
     tester,
   ) async {
