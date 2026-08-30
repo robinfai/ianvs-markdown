@@ -8554,6 +8554,47 @@ After''';
     );
   });
 
+  testWidgets('HTML entity clicks preserve their literal source offsets', (
+    tester,
+  ) async {
+    const source = 'Before\n\nAlpha &copy; bravo\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final preview = find.byWidgetPredicate(
+      (widget) =>
+          widget is SelectableText &&
+          (widget.data ?? widget.textSpan?.toPlainText() ?? '').contains(
+            'Alpha &copy; bravo',
+          ),
+    );
+    final editable = editableWithin(tester, preview);
+    final visible = editable.text!.toPlainText();
+    final entityTarget = editable.localToGlobal(
+      editable
+          .getLocalRectForCaret(TextPosition(offset: visible.indexOf('&copy;')))
+          .center,
+    );
+    final bravoTarget = editable.localToGlobal(
+      editable
+          .getLocalRectForCaret(
+            TextPosition(offset: visible.indexOf('bravo') + 2),
+          )
+          .center,
+    );
+    await tester.tapAt(entityTarget);
+    await tester.pumpAndSettle();
+    expect(controller.selection.extentOffset, source.indexOf('&copy;'));
+
+    await tester.tap(find.text('After'));
+    await tester.pumpAndSettle();
+    await tester.tapAt(bravoTarget);
+    await tester.pumpAndSettle();
+    expect(controller.selection.extentOffset, source.indexOf('bravo') + 2);
+  });
+
   testWidgets('quote multi-click restores its raw marker line', (tester) async {
     const source = 'Before\n\n> Alpha bravo\n> Charlie delta\n\nAfter';
     final controller = IanvsMarkdownController(text: source);
