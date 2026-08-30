@@ -1165,6 +1165,24 @@ Escaped \\<span>literal \\</span> after.
     expect(find.text('Charlie delta'), findsOneWidget);
   });
 
+  testWidgets('renders rail-free Obsidian HTML blockquotes', (tester) async {
+    const source = '<blockquote>\nAlpha bravo\nCharlie delta\n</blockquote>';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-html-blockquote')),
+      findsOneWidget,
+    );
+    expect(
+      _renderedPlainTextContains(tester, 'Alpha bravo Charlie delta'),
+      isTrue,
+    );
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-quote-rail')),
+      findsNothing,
+    );
+  });
+
   testWidgets('renders Obsidian autolink boundaries and word-adjacent URLs', (
     tester,
   ) async {

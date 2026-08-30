@@ -9876,6 +9876,33 @@ $$''');
     expect(controller.isDirty, isFalse);
   });
 
+  testWidgets('HTML blockquote keeps its rendered projection on normal click', (
+    tester,
+  ) async {
+    const source =
+        'Before\n\n<blockquote>\nAlpha bravo\nCharlie delta\n</blockquote>\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final blockquote = find.byKey(
+      const ValueKey('ianvs-markdown-html-blockquote'),
+    );
+    expect(blockquote, findsOneWidget);
+    await tester.tap(blockquote);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyQ);
+    await tester.pump();
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('HTML details open starts expanded without entering source', (
     tester,
   ) async {
