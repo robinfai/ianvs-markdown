@@ -113,7 +113,12 @@ final class _IanvsMarkdownPairedHtmlSyntax extends md.InlineSyntax {
         );
       case 'em':
       case 'i':
-        element = md.Element('em', children);
+        element = md.Element(
+          mode == IanvsMarkdownObsidianMetadataMode.editing
+              ? 'ianvs-html-em'
+              : 'em',
+          children,
+        );
       case 's':
       case 'del':
         element = md.Element('ianvs-html-s', children);
@@ -261,6 +266,7 @@ String? _htmlAttribute(String source, String name) {
 
 enum IanvsMarkdownHtmlInlineKind {
   strong,
+  emphasis,
   underline,
   strikethrough,
   superscript,
@@ -296,6 +302,10 @@ class IanvsMarkdownHtmlInlineBuilder extends MarkdownElementBuilder {
       IanvsMarkdownHtmlInlineKind.strong => base.copyWith(
         color: colors.strongForeground,
         fontWeight: FontWeight.w600,
+      ),
+      IanvsMarkdownHtmlInlineKind.emphasis => base.copyWith(
+        color: colors.emphasisForeground,
+        fontStyle: FontStyle.italic,
       ),
       IanvsMarkdownHtmlInlineKind.underline => base.copyWith(
         decoration: TextDecoration.underline,
@@ -335,6 +345,8 @@ class IanvsMarkdownHtmlInlineBuilder extends MarkdownElementBuilder {
         ? GestureDetector(
             key: kind == IanvsMarkdownHtmlInlineKind.strong
                 ? const ValueKey('ianvs-markdown-html-strong')
+                : kind == IanvsMarkdownHtmlInlineKind.emphasis
+                ? const ValueKey('ianvs-markdown-html-em')
                 : kind == IanvsMarkdownHtmlInlineKind.subscript
                 ? const ValueKey('ianvs-markdown-html-subscript')
                 : kind == IanvsMarkdownHtmlInlineKind.strikethrough

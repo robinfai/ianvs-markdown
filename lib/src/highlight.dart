@@ -756,7 +756,7 @@ TextStyle? _highlightElementStyle(String tag, IanvsMarkdownThemeData colors) {
       color: colors.strongForeground,
       fontWeight: FontWeight.w600,
     ),
-    'em' => TextStyle(
+    'em' || 'ianvs-html-em' => TextStyle(
       color: colors.emphasisForeground,
       fontStyle: FontStyle.italic,
     ),

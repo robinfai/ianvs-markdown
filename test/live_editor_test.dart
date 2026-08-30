@@ -9755,6 +9755,28 @@ $$''');
     expect(controller.isDirty, isFalse);
   });
 
+  testWidgets('HTML emphasis keeps its rendered control on normal click', (
+    tester,
+  ) async {
+    const source = 'Before\n\nAlpha <em>bravo charlie</em> omega\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('ianvs-markdown-html-em')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyQ);
+    await tester.pump();
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('HTML superscript keeps its rendered control on normal click', (
     tester,
   ) async {
