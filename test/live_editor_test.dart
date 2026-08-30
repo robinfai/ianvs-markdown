@@ -9953,6 +9953,31 @@ $$''');
     expect(controller.isDirty, isFalse);
   });
 
+  testWidgets('HTML table enters its exact block source on cell click', (
+    tester,
+  ) async {
+    const table =
+        '<table>\n<tr><th>Alpha</th><th>Bravo</th></tr>\n<tr><td>Charlie</td><td>Delta</td></tr>\n</table>';
+    final controller = IanvsMarkdownController(
+      text: 'Before\n\n$table\n\nAfter',
+    );
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.textContaining('Alpha'));
+    await tester.pumpAndSettle();
+
+    final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+    expect(active, findsOneWidget);
+    final field = tester.widget<TextField>(
+      find.descendant(of: active, matching: find.byType(TextField)),
+    );
+    expect(field.controller?.text, table);
+    expect(controller.text, 'Before\n\n$table\n\nAfter');
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('HTML details open starts expanded without entering source', (
     tester,
   ) async {

@@ -16,6 +16,7 @@ import 'html_blockquote.dart';
 import 'html_details.dart';
 import 'html_figure.dart';
 import 'html_hr.dart';
+import 'html_table.dart';
 import 'inline_code.dart';
 import 'inline_link.dart';
 import 'list_guide.dart';
@@ -321,6 +322,10 @@ class IanvsMarkdown extends StatelessWidget {
         bodyBuilder: (context, source) =>
             _buildHtmlFigureBody(context, source, effectiveStyleSheet, colors),
       ),
+      'ianvs-html-table': IanvsMarkdownHtmlTableBuilder(
+        bodyBuilder: (context, source) =>
+            _buildHtmlTableBody(context, source, effectiveStyleSheet, colors),
+      ),
       'ianvs-callout': IanvsMarkdownCalloutBuilder(
         theme: colors,
         onToggle: onCalloutToggle,
@@ -366,6 +371,7 @@ class IanvsMarkdown extends StatelessWidget {
       const IanvsMarkdownHtmlHorizontalRuleSyntax(),
       const IanvsMarkdownHtmlBlockquoteSyntax(),
       const IanvsMarkdownHtmlFigureSyntax(),
+      const IanvsMarkdownHtmlTableSyntax(),
       const IanvsMarkdownHtmlDetailsSyntax(),
       if (obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing)
         const IanvsMarkdownEditingCommentBlockSyntax(),
@@ -746,6 +752,51 @@ class IanvsMarkdown extends StatelessWidget {
       showListIndentationGuides: false,
       listNestingOffset: listNestingOffset,
       softLineBreak: true,
+      enableFileLinkChips: enableFileLinkChips,
+      obsidianMetadataMode: IanvsMarkdownObsidianMetadataMode.reading,
+      renderBudget: renderBudget,
+      fallbackBuilder: fallbackBuilder,
+      diagramBuilder: diagramBuilder,
+      mathBuilder: mathBuilder,
+      onCopyCode: onCopyCode,
+      wikiEmbedBuilder: wikiEmbedBuilder,
+      wikiLinkExists: wikiLinkExists,
+      theme: colors,
+    );
+  }
+
+  Widget _buildHtmlTableBody(
+    BuildContext context,
+    String source,
+    MarkdownStyleSheet effectiveStyleSheet,
+    IanvsMarkdownThemeData colors,
+  ) {
+    return IanvsMarkdown(
+      data: source,
+      selectable: selectable,
+      styleSheet: effectiveStyleSheet.copyWith(
+        blockSpacing: 0,
+        pPadding: EdgeInsets.zero,
+      ),
+      styleSheetTheme: styleSheetTheme,
+      onSelectionChanged: onSelectionChanged,
+      onTapLink: onTapLink,
+      onTapText: onTapText,
+      blockSyntaxes: blockSyntaxes,
+      inlineSyntaxes: inlineSyntaxes,
+      extensionSet: extensionSet,
+      imageBuilder: imageBuilder,
+      onImageResize: onImageResize,
+      onEditImage: onEditImage,
+      checkboxBuilder: checkboxBuilder,
+      bulletBuilder: bulletBuilder,
+      builders: builders,
+      paddingBuilders: paddingBuilders,
+      fitContent: true,
+      listItemCrossAxisAlignment: listItemCrossAxisAlignment,
+      showListIndentationGuides: false,
+      listNestingOffset: listNestingOffset,
+      softLineBreak: softLineBreak,
       enableFileLinkChips: enableFileLinkChips,
       obsidianMetadataMode: IanvsMarkdownObsidianMetadataMode.reading,
       renderBudget: renderBudget,

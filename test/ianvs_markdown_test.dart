@@ -1215,6 +1215,22 @@ Escaped \\<span>literal \\</span> after.
     expect(_renderedPlainTextContains(tester, 'figcaption'), isFalse);
   });
 
+  testWidgets('renders Obsidian HTML tables through the table projection', (
+    tester,
+  ) async {
+    const source =
+        '<table>\n<tr><th>Alpha</th><th>Bravo</th></tr>\n<tr><td>Charlie</td><td>Delta</td></tr>\n</table>';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    expect(find.byType(Table), findsOneWidget);
+    expect(find.textContaining('Alpha'), findsOneWidget);
+    expect(find.textContaining('Bravo'), findsOneWidget);
+    expect(find.textContaining('Charlie'), findsOneWidget);
+    expect(find.textContaining('Delta'), findsOneWidget);
+    expect(_renderedTextIsBold(tester, 'Alpha'), isTrue);
+    expect(_renderedPlainTextContains(tester, '<table>'), isFalse);
+  });
+
   testWidgets('renders Obsidian autolink boundaries and word-adjacent URLs', (
     tester,
   ) async {
