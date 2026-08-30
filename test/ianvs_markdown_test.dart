@@ -1217,6 +1217,22 @@ Escaped \\<span>literal \\</span> after.
     expect(find.text('Before'), findsOneWidget);
     expect(find.text('After'), findsOneWidget);
   });
+  testWidgets('renders Obsidian HTML progress without fallback text', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdown(
+          data: 'Before\n\n<progress value="2" max="5">2/5</progress>\n\nAfter',
+        ),
+      ),
+    );
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-html-progress')),
+      findsOneWidget,
+    );
+    expect(find.text('2/5'), findsNothing);
+  });
 
   testWidgets('renders a local Obsidian HTML button', (tester) async {
     const source = 'Before\n\n<button>Alpha bravo</button>\n\nAfter';

@@ -22,6 +22,7 @@ import 'html_figure.dart';
 import 'html_hr.dart';
 import 'html_ordered_list.dart';
 import 'html_pre.dart';
+import 'html_progress.dart';
 import 'html_select.dart';
 import 'html_table.dart';
 import 'html_textarea.dart';
@@ -334,6 +335,7 @@ class IanvsMarkdown extends StatelessWidget {
         decoration: effectiveStyleSheet.horizontalRuleDecoration,
       ),
       'ianvs-html-pre': IanvsMarkdownHtmlPreBuilder(theme: colors),
+      'ianvs-html-progress': IanvsMarkdownHtmlProgressBuilder(theme: colors),
       'ianvs-html-select': IanvsMarkdownHtmlSelectBuilder(theme: colors),
       'ianvs-html-figure': IanvsMarkdownHtmlFigureBuilder(
         bodyBuilder: (context, source) =>
@@ -406,6 +408,7 @@ class IanvsMarkdown extends StatelessWidget {
       const IanvsMarkdownHtmlButtonSyntax(),
       const IanvsMarkdownHtmlCheckboxSyntax(),
       const IanvsMarkdownHtmlPreSyntax(),
+      const IanvsMarkdownHtmlProgressSyntax(),
       const IanvsMarkdownHtmlSelectSyntax(),
       const IanvsMarkdownHtmlTextareaSyntax(),
       const IanvsMarkdownHtmlBlockquoteSyntax(),
