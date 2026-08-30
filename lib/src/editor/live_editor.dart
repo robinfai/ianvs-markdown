@@ -99,6 +99,7 @@ class IanvsMarkdownLiveEditor extends StatefulWidget {
     this.navigationBreakpoint = 900,
     this.navigationWidth = 292,
     this.contentMaxWidth = 840,
+    this.showFrontMatter = false,
     this.compactFrontMatter = true,
     this.showDocumentTitle = false,
     this.enableHeadingFolding = true,
@@ -131,6 +132,13 @@ class IanvsMarkdownLiveEditor extends StatefulWidget {
   final double navigationBreakpoint;
   final double navigationWidth;
   final double contentMaxWidth;
+
+  /// Whether to show YAML properties above the document body.
+  ///
+  /// Obsidian can keep Properties out of the document surface, which is the
+  /// default. Set this to true to render the package's editable properties
+  /// card in Live Preview and Reading view.
+  final bool showFrontMatter;
   final bool compactFrontMatter;
   final bool showDocumentTitle;
   final bool enableHeadingFolding;
@@ -3283,6 +3291,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
                   data: widget.controller.text,
                   controller: _scrollController,
                   padding: widget.padding,
+                  showFrontMatter: widget.showFrontMatter,
                   showOutline: widget.showOutlineInPreview && !showNavigation,
                   contentMaxWidth: widget.contentMaxWidth,
                   contentAlignment: Alignment.topLeft,
@@ -4137,7 +4146,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         onTapText: () =>
             _activateRenderedBlock(block, tapCount: _pointerTapCount),
       );
-    } else if (block.type == IanvsMarkdownBlockType.frontMatter) {
+    } else if (block.type == IanvsMarkdownBlockType.frontMatter &&
+        widget.showFrontMatter) {
       final document = parseMarkdownFrontMatter(block.source);
       if (!document.hasFrontMatter) {
         rendered = IanvsMarkdown(

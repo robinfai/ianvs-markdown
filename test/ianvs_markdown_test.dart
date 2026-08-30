@@ -4665,6 +4665,7 @@ $longBody
 Done.
 ''',
           onHeadingSelected: (heading) => selected = heading,
+          showFrontMatter: true,
         ),
       ),
     );
@@ -4700,6 +4701,33 @@ Done.
       find.byKey(const ValueKey('ianvs-markdown-scroll-view')),
     );
     expect(scroll.controller?.offset, greaterThan(0));
+  });
+
+  testWidgets('full view hides Properties by default while removing YAML', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        const IanvsMarkdownView(
+          data: '''
+---
+title: Hidden properties
+tags: [alpha, beta]
+---
+Before
+
+Body alpha bravo
+''',
+          showOutline: false,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Before'), findsOneWidget);
+    expect(find.text('Body alpha bravo'), findsOneWidget);
+    expect(find.text('Hidden properties'), findsNothing);
+    expect(find.byType(IanvsMarkdownFrontMatterCard), findsNothing);
   });
 
   testWidgets('uses a complete descending H1-H6 scale and outline', (

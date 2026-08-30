@@ -11,13 +11,19 @@ import 'package:ianvs_markdown/src/code_surface.dart';
 import 'package:ianvs_markdown/src/list_guide.dart';
 
 void main() {
-  Widget app(IanvsMarkdownController controller) {
+  Widget app(
+    IanvsMarkdownController controller, {
+    bool showFrontMatter = true,
+  }) {
     return MaterialApp(
       home: Scaffold(
         body: SizedBox(
           width: 1000,
           height: 720,
-          child: IanvsMarkdownLiveEditor(controller: controller),
+          child: IanvsMarkdownLiveEditor(
+            controller: controller,
+            showFrontMatter: showFrontMatter,
+          ),
         ),
       ),
     );
@@ -5986,6 +5992,41 @@ Omega body.
   );
 
   testWidgets(
+    'Obsidian-default hidden properties keep YAML out of Live Preview and Reading',
+    (tester) async {
+      const source = '''
+---
+title: Hidden properties
+tags: [alpha, beta]
+---
+Before
+
+Body alpha bravo
+''';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(app(controller, showFrontMatter: false));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Before'), findsOneWidget);
+      expect(find.text('Body alpha bravo'), findsOneWidget);
+      expect(find.text('Hidden properties'), findsNothing);
+      expect(find.byType(IanvsMarkdownFrontMatterCard), findsNothing);
+      expect(controller.text, source);
+
+      controller.mode = IanvsMarkdownEditorMode.preview;
+      await tester.pumpAndSettle();
+
+      expect(find.text('Before'), findsOneWidget);
+      expect(find.text('Body alpha bravo'), findsOneWidget);
+      expect(find.text('Hidden properties'), findsNothing);
+      expect(find.byType(IanvsMarkdownFrontMatterCard), findsNothing);
+      expect(controller.text, source);
+    },
+  );
+
+  testWidgets(
     'compact properties default expanded and activate exact YAML source',
     (tester) async {
       const source = '''
@@ -6437,6 +6478,7 @@ title: Beta
               child: IanvsMarkdownLiveEditor(
                 controller: controller,
                 onSaveRequested: saved.add,
+                showFrontMatter: true,
               ),
             ),
           ),
@@ -6492,6 +6534,7 @@ due: 2026-08-27
               child: IanvsMarkdownLiveEditor(
                 controller: controller,
                 onSaveRequested: saved.add,
+                showFrontMatter: true,
               ),
             ),
           ),
@@ -6543,7 +6586,10 @@ due: 2026-08-27
             body: SizedBox(
               width: 1000,
               height: 720,
-              child: IanvsMarkdownLiveEditor(controller: controller),
+              child: IanvsMarkdownLiveEditor(
+                controller: controller,
+                showFrontMatter: true,
+              ),
             ),
           ),
         ),
@@ -6593,7 +6639,10 @@ due: 2026-08-27
             body: SizedBox(
               width: 1000,
               height: 720,
-              child: IanvsMarkdownLiveEditor(controller: controller),
+              child: IanvsMarkdownLiveEditor(
+                controller: controller,
+                showFrontMatter: true,
+              ),
             ),
           ),
         ),
@@ -6650,7 +6699,10 @@ Label
             body: SizedBox(
               width: 1000,
               height: 720,
-              child: IanvsMarkdownLiveEditor(controller: controller),
+              child: IanvsMarkdownLiveEditor(
+                controller: controller,
+                showFrontMatter: true,
+              ),
             ),
           ),
         ),
@@ -6700,7 +6752,10 @@ title: Alpha
             body: SizedBox(
               width: 1000,
               height: 720,
-              child: IanvsMarkdownLiveEditor(controller: controller),
+              child: IanvsMarkdownLiveEditor(
+                controller: controller,
+                showFrontMatter: true,
+              ),
             ),
           ),
         ),
@@ -6748,7 +6803,10 @@ title: Alpha
             body: SizedBox(
               width: 1000,
               height: 720,
-              child: IanvsMarkdownLiveEditor(controller: controller),
+              child: IanvsMarkdownLiveEditor(
+                controller: controller,
+                showFrontMatter: true,
+              ),
             ),
           ),
         ),
@@ -7595,6 +7653,7 @@ url: https://example.com/path
             child: IanvsMarkdownLiveEditor(
               controller: controller,
               onTapLink: (text, href, title) => taps.add((text, href)),
+              showFrontMatter: true,
             ),
           ),
         ),

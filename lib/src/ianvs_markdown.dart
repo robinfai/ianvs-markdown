@@ -704,7 +704,7 @@ class IanvsMarkdownView extends StatefulWidget {
     required this.data,
     this.controller,
     this.padding = const EdgeInsets.fromLTRB(28, 24, 32, 44),
-    this.showFrontMatter = true,
+    this.showFrontMatter = false,
     this.compactFrontMatter = true,
     this.showDocumentTitle = false,
     this.showOutline = true,
@@ -826,10 +826,10 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
   }
 
   void _parseDocument() {
-    _document = IanvsMarkdownDocument.parse(
-      widget.data,
-      parseFrontMatter: widget.showFrontMatter,
-    );
+    // YAML is always removed from the Markdown body. [showFrontMatter]
+    // controls only the optional properties card, matching Obsidian's
+    // document-surface setting rather than leaking raw YAML into Reading view.
+    _document = IanvsMarkdownDocument.parse(widget.data);
     final budget = widget.renderBudget;
     final canRenderHeadings =
         budget == null ||
