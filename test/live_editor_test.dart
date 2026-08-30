@@ -5652,7 +5652,7 @@ void main() {
     }
   });
 
-  testWidgets('thematic break clicks select the marker only near its source', (
+  testWidgets('thematic break clicks select the complete marker source', (
     tester,
   ) async {
     const source = 'Paragraph before.\n\n- - -\n\nParagraph after.';
@@ -5690,15 +5690,49 @@ void main() {
     await tester.tapAt(Offset(ruleRect.center.dx, ruleRect.center.dy));
     await tester.pump();
 
-    expect(controller.selection, TextSelection.collapsed(offset: start + 5));
+    expect(
+      controller.selection,
+      TextSelection(baseOffset: start, extentOffset: start + 5),
+    );
     final collapsedField = tester.widget<TextField>(
       find.descendant(of: active, matching: find.byType(TextField)),
     );
     expect(collapsedField.controller?.text, '- - -');
     expect(
       collapsedField.controller?.selection,
-      const TextSelection.collapsed(offset: 5),
+      const TextSelection(baseOffset: 0, extentOffset: 5),
     );
+  });
+
+  testWidgets('canonical thematic break markers replace as a selected source', (
+    tester,
+  ) async {
+    for (final marker in <String>['---', '***', '___']) {
+      final source = 'Before\n\n$marker\n\nAfter';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      final start = source.indexOf(marker);
+      await tester.tap(
+        find.byKey(ValueKey('ianvs-markdown-block-$start-thematicBreak')),
+      );
+      await tester.pump();
+
+      expect(
+        controller.selection,
+        TextSelection(baseOffset: start, extentOffset: start + marker.length),
+        reason: marker,
+      );
+      final field = find.descendant(
+        of: find.byKey(const ValueKey('ianvs-markdown-active-block')),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(field, 'Q');
+      await tester.pumpAndSettle();
+      expect(controller.text, 'Before\n\nQ\n\nAfter', reason: marker);
+    }
   });
 
   testWidgets('marker-only ATX prefixes stay literal and use paragraph UI', (

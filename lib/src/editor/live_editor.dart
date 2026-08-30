@@ -2898,12 +2898,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     _pendingRenderedTapGlobal = null;
     final renderObject = _renderedBlockTapKeys[block.start]?.currentContext
         ?.findRenderObject();
-    final localTap = pendingGlobal != null && renderObject is RenderBox
-        ? renderObject.globalToLocal(pendingGlobal)
-        : null;
     final selectThematicSource =
-        block.type == IanvsMarkdownBlockType.thematicBreak &&
-        (localTap == null || localTap.dx <= 48);
+        block.type == IanvsMarkdownBlockType.thematicBreak;
     final tapOffset =
         block.type == IanvsMarkdownBlockType.blockquote &&
             pendingGlobal != null &&
@@ -2920,11 +2916,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     _activateBlock(
       block,
       selectWholeSource: selectThematicSource,
-      documentOffset:
-          block.type == IanvsMarkdownBlockType.thematicBreak &&
-              !selectThematicSource
-          ? block.end
-          : projectedTapOffset ?? tapOffset,
+      documentOffset: projectedTapOffset ?? tapOffset,
     );
     if (projectedTapOffset != null) {
       _projectedRenderedTapBlockStart = block.start;
