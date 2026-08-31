@@ -1,4 +1,4 @@
-## Unreleased
+## 0.2.0
 
 - Start a new source list block when an unordered bullet changes between
   `-`, `*`, and `+`, or an ordered delimiter changes between `.` and `)`,
