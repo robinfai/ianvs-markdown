@@ -26,6 +26,7 @@ import '../markdown_document.dart';
 import '../obsidian_image.dart';
 import '../obsidian_metadata.dart';
 import '../render_budget.dart';
+import '../rich_clipboard.dart';
 import '../task_checkbox.dart';
 import '../task_syntax.dart';
 import '../theme.dart';
@@ -105,6 +106,7 @@ class IanvsMarkdownLiveEditor extends StatefulWidget {
     this.enableHeadingFolding = false,
     this.padding = const EdgeInsets.fromLTRB(28, 20, 32, 44),
     this.onChanged,
+    this.onSelectionChanged,
     this.onModeChanged,
     this.onSaveRequested,
     this.onTapLink,
@@ -120,6 +122,7 @@ class IanvsMarkdownLiveEditor extends StatefulWidget {
     this.softLineBreak = true,
     this.enableFileLinkChips = false,
     this.normalizeTablesOnEdit = true,
+    this.clipboardWriter = writeIanvsMarkdownClipboard,
     this.theme,
   });
 
@@ -149,6 +152,7 @@ class IanvsMarkdownLiveEditor extends StatefulWidget {
   final bool enableHeadingFolding;
   final EdgeInsetsGeometry padding;
   final ValueChanged<String>? onChanged;
+  final MarkdownOnSelectionChangedCallback? onSelectionChanged;
   final ValueChanged<IanvsMarkdownEditorMode>? onModeChanged;
   final IanvsMarkdownSaveCallback? onSaveRequested;
   final MarkdownTapLinkCallback? onTapLink;
@@ -170,6 +174,9 @@ class IanvsMarkdownLiveEditor extends StatefulWidget {
   /// widths after a cell edit. Set this to false when a host must preserve
   /// each table's original whitespace while typing.
   final bool normalizeTablesOnEdit;
+
+  /// Writes the plain Markdown and rich HTML copied in Reading mode.
+  final IanvsMarkdownClipboardWriter clipboardWriter;
   final IanvsMarkdownThemeData? theme;
 
   @override
@@ -3390,6 +3397,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
                   enableHeadingFolding: widget.enableHeadingFolding,
                   headingFoldController: _headingFoldController,
                   styleSheet: widget.styleSheet,
+                  onSelectionChanged: widget.onSelectionChanged,
                   onTapLink: widget.onTapLink,
                   imageBuilder: widget.imageBuilder,
                   builders: widget.builders,
@@ -3401,6 +3409,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
                   wikiEmbedBuilder: widget.wikiEmbedBuilder,
                   wikiLinkExists: widget.wikiLinkExists,
                   enableFileLinkChips: widget.enableFileLinkChips,
+                  clipboardWriter: widget.clipboardWriter,
                   theme: colors,
                 ),
               },
@@ -4052,6 +4061,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           IanvsMarkdown(
             data: block.source,
             selectable: true,
+            documentSelection: false,
             styleSheet: widget.styleSheet,
             imageBuilder: widget.imageBuilder,
             builders: widget.builders,
@@ -4078,6 +4088,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             child: IanvsMarkdown(
               data: block.source,
               selectable: true,
+              documentSelection: false,
               styleSheet: widget.styleSheet,
               onTapLink: widget.onTapLink,
               imageBuilder: widget.imageBuilder,
@@ -4242,6 +4253,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       if (!document.hasFrontMatter) {
         rendered = IanvsMarkdown(
           data: block.source,
+          documentSelection: false,
           softLineBreak: widget.softLineBreak,
           renderBudget: widget.renderBudget,
           theme: colors,
@@ -4293,6 +4305,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       rendered = IanvsMarkdown(
         data: _renderedBlockSource(block),
         selectable: true,
+        documentSelection: false,
         styleSheet: renderedStyleSheet,
         onTapText: () =>
             _activateRenderedBlock(block, tapCount: _pointerTapCount),
@@ -4404,6 +4417,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           IanvsMarkdown(
             data: _referenceDefinitionProjectionSource(definition),
             selectable: true,
+            documentSelection: false,
             styleSheet: styleSheet.copyWith(
               blockSpacing: 0,
               pPadding: EdgeInsets.zero,

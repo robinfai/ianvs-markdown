@@ -16,6 +16,10 @@ void main() {
     bool showFrontMatter = true,
     bool enableHeadingFolding = true,
     bool normalizeTablesOnEdit = false,
+    bool showToolbar = true,
+    bool showNavigationPane = false,
+    IanvsMarkdownClipboardWriter clipboardWriter = writeIanvsMarkdownClipboard,
+    MarkdownOnSelectionChangedCallback? onSelectionChanged,
   }) {
     return MaterialApp(
       home: Scaffold(
@@ -24,9 +28,13 @@ void main() {
           height: 720,
           child: IanvsMarkdownLiveEditor(
             controller: controller,
+            showToolbar: showToolbar,
+            showNavigationPane: showNavigationPane,
             showFrontMatter: showFrontMatter,
             enableHeadingFolding: enableHeadingFolding,
             normalizeTablesOnEdit: normalizeTablesOnEdit,
+            clipboardWriter: clipboardWriter,
+            onSelectionChanged: onSelectionChanged,
           ),
         ),
       ),
@@ -2418,6 +2426,90 @@ void main() {
     controller.undo();
     await tester.pumpAndSettle();
     expect(controller.text, source);
+  });
+
+  testWidgets('reading mode exposes one document-wide selection area', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    const source = '# Heading\n\nFirst paragraph.\n\nSecond **paragraph**.';
+    final controller = IanvsMarkdownController(
+      text: source,
+      mode: IanvsMarkdownEditorMode.preview,
+    );
+    IanvsMarkdownClipboardData? copied;
+    var copyCount = 0;
+    String? selectedText;
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      app(
+        controller,
+        showToolbar: false,
+        showNavigationPane: true,
+        clipboardWriter: (data) async {
+          copyCount += 1;
+          copied = data;
+        },
+        onSelectionChanged: (text, _, _) => selectedText = text,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SelectionArea), findsOneWidget);
+    expect(find.text('First paragraph.'), findsOneWidget);
+    expect(find.text('Second paragraph.'), findsOneWidget);
+
+    await tester.tap(find.text('First paragraph.'));
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await tester.pump();
+    expect(selectedText, contains('First paragraph.'));
+    expect(selectedText, contains('Second paragraph.'));
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await tester.pump();
+    expect(copyCount, 1);
+    expect(copied?.markdown, source);
+    expect(copied?.html, contains('<strong>paragraph</strong>'));
+
+    await tester.tap(find.text('First paragraph.'));
+    await tester.pump();
+    selectedText = null;
+    copied = null;
+    copyCount = 0;
+
+    final gesture = await tester.startGesture(
+      tester.getTopLeft(find.text('First paragraph.')) + const Offset(1, 8),
+      kind: PointerDeviceKind.mouse,
+    );
+    await tester.pump();
+    await gesture.moveTo(
+      tester.getBottomRight(find.text('Second paragraph.')) -
+          const Offset(1, 8),
+    );
+    await tester.pump();
+    await gesture.up();
+    await tester.pump();
+
+    expect(selectedText, contains('First paragraph.'));
+    expect(selectedText, contains('Second paragraph.'));
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await tester.pump();
+
+    expect(copyCount, 1);
+    expect(copied?.markdown, contains('First paragraph.'));
+    expect(copied?.markdown, contains('Second **paragraph**.'));
+    expect(copied?.html, contains('First paragraph.'));
+    expect(copied?.html, contains('Second '));
+    expect(copied?.html, contains('<strong>paragraph</strong>'));
+    debugDefaultTargetPlatformOverride = null;
   });
 
   testWidgets('Command+A keeps leading blank lines in the active selection', (

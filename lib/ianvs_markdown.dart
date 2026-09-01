@@ -37,6 +37,7 @@ export 'src/obsidian_inline.dart';
 export 'src/obsidian_image.dart';
 export 'src/obsidian_metadata.dart';
 export 'src/render_budget.dart';
+export 'src/rich_clipboard.dart';
 export 'src/strikethrough.dart';
 export 'src/task_checkbox.dart';
 export 'src/theme.dart';

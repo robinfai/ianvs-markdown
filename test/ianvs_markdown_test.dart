@@ -1,8 +1,10 @@
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:ianvs_markdown/src/code_surface.dart';
@@ -57,6 +59,22 @@ void main() {
         .5,
       ),
     );
+  });
+
+  test('rich clipboard HTML keeps formatting and removes unsafe content', () {
+    final html = ianvsMarkdownClipboardHtml('''
+# Heading
+
+**Bold** [unsafe](javascript:evil) ![Remote](https://example.com/image.png)
+
+<script>alert('no')</script>
+''');
+
+    expect(html, contains('<h1>Heading</h1>'));
+    expect(html, contains('<strong>Bold</strong>'));
+    expect(html, isNot(contains('href="javascript:evil"')));
+    expect(html, isNot(contains('<img')));
+    expect(html, isNot(contains('<script')));
   });
 
   test('Border list guide colors are exact and interpolate', () {
@@ -5013,6 +5031,172 @@ Done.
       find.byKey(const ValueKey('ianvs-markdown-scroll-view')),
     );
     expect(scroll.controller?.offset, greaterThan(0));
+  });
+
+  testWidgets('Reading view Cmd+A copies Markdown and rich HTML', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    try {
+      const source = '# Heading\n\nBody with **bold** text.';
+      IanvsMarkdownClipboardData? copied;
+      String? selectedText;
+
+      await tester.pumpWidget(
+        app(
+          IanvsMarkdownView(
+            data: source,
+            showOutline: false,
+            clipboardWriter: (data) async => copied = data,
+            onSelectionChanged: (text, _, _) => selectedText = text,
+          ),
+          theme: ThemeData(platform: TargetPlatform.macOS),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SelectionArea), findsOneWidget);
+      expect(find.byType(SelectableText), findsNothing);
+
+      await tester.tap(find.textContaining('Body with'));
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pump();
+
+      expect(selectedText, isNotNull);
+      expect(selectedText, contains('Heading'));
+      expect(selectedText, contains('Body with bold text.'));
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pump();
+
+      expect(copied?.markdown, source);
+      expect(copied?.html, contains('<h1>Heading</h1>'));
+      expect(copied?.html, contains('<strong>bold</strong>'));
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('standalone renderer Cmd+A copies the complete document', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    try {
+      const source = '# Heading\n\nFirst block.\n\nSecond **bold** block.';
+      IanvsMarkdownClipboardData? copied;
+      String? selectedText;
+
+      await tester.pumpWidget(
+        app(
+          IanvsMarkdown(
+            data: source,
+            clipboardWriter: (data) async => copied = data,
+            onSelectionChanged: (text, _, _) => selectedText = text,
+          ),
+          theme: ThemeData(platform: TargetPlatform.macOS),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SelectionArea), findsOneWidget);
+      expect(find.text('First block.'), findsOneWidget);
+      expect(find.textContaining('Second bold block.'), findsOneWidget);
+
+      await tester.tap(find.text('First block.'));
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pump();
+
+      expect(selectedText, contains('Heading'));
+      expect(selectedText, contains('First block.'));
+      expect(selectedText, contains('Second bold block.'));
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pump();
+
+      expect(copied?.markdown, source);
+      expect(copied?.html, contains('<h1>Heading</h1>'));
+      expect(copied?.html, contains('<strong>bold</strong>'));
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('standalone renderer mouse selection crosses blocks', (
+    tester,
+  ) async {
+    String? selectedText;
+    await tester.pumpWidget(
+      app(
+        IanvsMarkdown(
+          data: 'First paragraph.\n\nSecond paragraph.',
+          onSelectionChanged: (text, _, _) => selectedText = text,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final first = find.text('First paragraph.');
+    final second = find.text('Second paragraph.');
+    final gesture = await tester.startGesture(
+      tester.getTopLeft(first) + const Offset(1, 8),
+      kind: PointerDeviceKind.mouse,
+    );
+    await gesture.moveTo(tester.getBottomRight(second) - const Offset(1, 8));
+    await gesture.up();
+    await tester.pump();
+
+    expect(selectedText, contains('First paragraph.'));
+    expect(selectedText, contains('Second paragraph.'));
+  });
+
+  testWidgets('reading view mouse selection crosses scrollable blocks', (
+    tester,
+  ) async {
+    String? selectedText;
+    final controller = IanvsMarkdownController(
+      text:
+          '# Heading\n\nFirst paragraph.\n\n> Quote block.\n\n## Section\n\nSecond paragraph.',
+      mode: IanvsMarkdownEditorMode.preview,
+    );
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      app(
+        IanvsMarkdownEditorShortcuts(
+          controller: controller,
+          child: IanvsMarkdownView(
+            data: controller.text,
+            enableHeadingFolding: true,
+            onSelectionChanged: (text, _, _) => selectedText = text,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final first = find.text('First paragraph.');
+    final second = find.text('Second paragraph.');
+    final gesture = await tester.startGesture(
+      tester.getTopLeft(first) + const Offset(1, 8),
+      kind: PointerDeviceKind.mouse,
+    );
+    await tester.pump();
+    await gesture.moveTo(tester.getBottomRight(second) - const Offset(1, 8));
+    await tester.pump();
+    await gesture.up();
+    await tester.pump();
+
+    expect(selectedText, contains('First paragraph.'));
+    expect(selectedText, contains('Quote block.'));
+    expect(selectedText, contains('Section'));
+    expect(selectedText, contains('Second paragraph.'));
   });
 
   testWidgets('full view hides Properties by default while removing YAML', (

@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show SelectedContent;
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
@@ -39,6 +43,7 @@ import 'obsidian_inline.dart';
 import 'obsidian_metadata.dart';
 import 'obsidian_image.dart';
 import 'render_budget.dart';
+import 'rich_clipboard.dart';
 import 'strikethrough.dart';
 import 'task_checkbox.dart';
 import 'task_syntax.dart';
@@ -64,6 +69,8 @@ class IanvsMarkdown extends StatelessWidget {
     super.key,
     required this.data,
     this.selectable = true,
+    this.documentSelection = true,
+    this.clipboardWriter = writeIanvsMarkdownClipboard,
     this.styleSheet,
     this.styleSheetTheme = MarkdownStyleSheetBaseTheme.material,
     this.onSelectionChanged,
@@ -100,6 +107,16 @@ class IanvsMarkdown extends StatelessWidget {
 
   final String data;
   final bool selectable;
+
+  /// Whether [selectable] uses one selection surface for the complete widget.
+  ///
+  /// This enables cross-block mouse selection and document-level Select All.
+  /// Source-aware hosts such as Live Preview set this to false and provide
+  /// their own selection coordination.
+  final bool documentSelection;
+
+  /// Writes the Markdown and rich HTML produced by a document-level Copy.
+  final IanvsMarkdownClipboardWriter clipboardWriter;
   final MarkdownStyleSheet? styleSheet;
   final MarkdownStyleSheetBaseTheme styleSheetTheme;
   final MarkdownOnSelectionChangedCallback? onSelectionChanged;
@@ -153,13 +170,35 @@ class IanvsMarkdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) =>
-          _buildConstrained(context, constraints),
+    final insideDocumentSelection =
+        _IanvsMarkdownDocumentSelectionScope.maybeOf(context);
+    final useDocumentSelection =
+        selectable && documentSelection && !insideDocumentSelection;
+    final useBlockSelection =
+        selectable && !documentSelection && !insideDocumentSelection;
+    final content = LayoutBuilder(
+      builder: (context, constraints) => _buildConstrained(
+        context,
+        constraints,
+        blockSelectable: useBlockSelection,
+      ),
+    );
+    if (!useDocumentSelection) return content;
+    return _IanvsMarkdownReadingSelection(
+      enabled: true,
+      markdown: data,
+      richMarkdown: data,
+      clipboardWriter: clipboardWriter,
+      onSelectionChanged: onSelectionChanged,
+      child: content,
     );
   }
 
-  Widget _buildConstrained(BuildContext context, BoxConstraints constraints) {
+  Widget _buildConstrained(
+    BuildContext context,
+    BoxConstraints constraints, {
+    required bool blockSelectable,
+  }) {
     final colors = IanvsMarkdownThemeData.resolve(context, theme);
     final budget = renderBudget;
     final decision = budget == null
@@ -171,16 +210,23 @@ class IanvsMarkdown extends StatelessWidget {
           )
         : scanMarkdownForRendering(data, budget: budget);
     if (!decision.useMarkdown) {
+      final style = TextStyle(
+        color: colors.textPrimary,
+        fontSize: 14,
+        height: 1.55,
+      );
       return fallbackBuilder?.call(context, decision) ??
-          SelectableText(
-            decision.text,
-            key: const ValueKey('ianvs-markdown-plain-fallback'),
-            style: TextStyle(
-              color: colors.textPrimary,
-              fontSize: 14,
-              height: 1.55,
-            ),
-          );
+          (blockSelectable
+              ? SelectableText(
+                  decision.text,
+                  key: const ValueKey('ianvs-markdown-plain-fallback'),
+                  style: style,
+                )
+              : Text(
+                  decision.text,
+                  key: const ValueKey('ianvs-markdown-plain-fallback'),
+                  style: style,
+                ));
     }
 
     final effectiveStyleSheet =
@@ -191,6 +237,7 @@ class IanvsMarkdown extends StatelessWidget {
           'h$level': _IanvsMarkdownStandaloneHeadingBuilder(
             level: level,
             colors: colors,
+            selectable: blockSelectable,
           ),
       'pre': IanvsMarkdownCodeBlockBuilder(
         theme: colors,
@@ -513,10 +560,10 @@ class IanvsMarkdown extends StatelessWidget {
       // flutter_markdown_plus only reparses when data or styles change, so
       // changing this option must remount its state to rebuild line spans.
       data: taskProjection.data,
-      selectable: selectable,
+      selectable: blockSelectable,
       styleSheet: effectiveStyleSheet,
       styleSheetTheme: styleSheetTheme,
-      onSelectionChanged: onSelectionChanged,
+      onSelectionChanged: blockSelectable ? onSelectionChanged : null,
       onTapLink: onTapLink,
       onTapText: onTapText,
       blockSyntaxes: effectiveBlockSyntaxes,
@@ -640,6 +687,7 @@ class IanvsMarkdown extends StatelessWidget {
     return IanvsMarkdown(
       data: source,
       selectable: selectable,
+      documentSelection: documentSelection,
       styleSheet: effectiveStyleSheet.copyWith(
         blockSpacing: 12,
         pPadding: EdgeInsets.zero,
@@ -685,6 +733,7 @@ class IanvsMarkdown extends StatelessWidget {
     return IanvsMarkdown(
       data: source,
       selectable: selectable,
+      documentSelection: documentSelection,
       styleSheet: effectiveStyleSheet.copyWith(
         blockSpacing: 8,
         pPadding: EdgeInsets.zero,
@@ -730,6 +779,7 @@ class IanvsMarkdown extends StatelessWidget {
     return IanvsMarkdown(
       data: source,
       selectable: selectable,
+      documentSelection: documentSelection,
       styleSheet: effectiveStyleSheet.copyWith(
         blockSpacing: 0,
         pPadding: EdgeInsets.zero,
@@ -775,6 +825,7 @@ class IanvsMarkdown extends StatelessWidget {
     return IanvsMarkdown(
       data: source,
       selectable: selectable,
+      documentSelection: documentSelection,
       styleSheet: effectiveStyleSheet.copyWith(
         blockSpacing: 0,
         pPadding: EdgeInsets.zero,
@@ -820,6 +871,7 @@ class IanvsMarkdown extends StatelessWidget {
     return IanvsMarkdown(
       data: source,
       selectable: selectable,
+      documentSelection: documentSelection,
       styleSheet: effectiveStyleSheet.copyWith(
         blockSpacing: 0,
         pPadding: EdgeInsets.zero,
@@ -865,6 +917,7 @@ class IanvsMarkdown extends StatelessWidget {
     return IanvsMarkdown(
       data: source,
       selectable: selectable,
+      documentSelection: documentSelection,
       styleSheet: effectiveStyleSheet.copyWith(
         blockSpacing: 0,
         pPadding: EdgeInsets.zero,
@@ -1090,6 +1143,7 @@ class IanvsMarkdownView extends StatefulWidget {
     this.wikiLinkExists,
     this.enableFileLinkChips = false,
     this.onHeadingSelected,
+    this.clipboardWriter = writeIanvsMarkdownClipboard,
     this.theme,
   });
 
@@ -1128,6 +1182,12 @@ class IanvsMarkdownView extends StatefulWidget {
   final IanvsMarkdownWikiLinkExists? wikiLinkExists;
   final bool enableFileLinkChips;
   final ValueChanged<IanvsMarkdownHeading>? onHeadingSelected;
+
+  /// Writes the plain Markdown and rich HTML representations created by Copy.
+  ///
+  /// The default publishes both formats to the system clipboard. Override this
+  /// only when the host owns clipboard policy or needs to observe copy events.
+  final IanvsMarkdownClipboardWriter clipboardWriter;
   final IanvsMarkdownThemeData? theme;
 
   @override
@@ -1248,6 +1308,7 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
       colors,
       foldingEnabled: widget.enableHeadingFolding,
       foldController: _headingFoldController,
+      selectable: false,
     );
     final headingBuilders = <String, MarkdownElementBuilder>{
       ...widget.builders,
@@ -1287,51 +1348,57 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
               VerticalDivider(width: 1, color: colors.border),
             ],
             Expanded(
-              child: SingleChildScrollView(
-                key: const ValueKey('ianvs-markdown-scroll-view'),
-                controller: _scrollController,
-                padding: widget.padding,
-                child: Align(
-                  alignment: widget.contentAlignment,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: widget.contentMaxWidth,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (widget.showFrontMatter &&
-                            _document.metadata.isNotEmpty) ...[
-                          IanvsMarkdownFrontMatterCard(
-                            entries: _document.metadata,
-                            theme: colors,
-                            compact: widget.compactFrontMatter,
-                            initiallyExpanded: true,
-                            showDocumentTitle: widget.showDocumentTitle,
+              child: _IanvsMarkdownReadingSelection(
+                enabled: widget.selectable,
+                markdown: widget.data,
+                richMarkdown: _document.body,
+                clipboardWriter: widget.clipboardWriter,
+                onSelectionChanged: widget.onSelectionChanged,
+                child: SingleChildScrollView(
+                  key: const ValueKey('ianvs-markdown-scroll-view'),
+                  controller: _scrollController,
+                  padding: widget.padding,
+                  child: Align(
+                    alignment: widget.contentAlignment,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: widget.contentMaxWidth,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (widget.showFrontMatter &&
+                              _document.metadata.isNotEmpty) ...[
+                            IanvsMarkdownFrontMatterCard(
+                              entries: _document.metadata,
+                              theme: colors,
+                              compact: widget.compactFrontMatter,
+                              initiallyExpanded: true,
+                              showDocumentTitle: widget.showDocumentTitle,
+                              onTapLink: widget.onTapLink,
+                            ),
+                            const SizedBox(height: 18),
+                          ],
+                          IanvsMarkdown(
+                            data: foldProjection.source,
+                            selectable: false,
+                            softLineBreak: widget.softLineBreak,
+                            styleSheet: widget.styleSheet,
                             onTapLink: widget.onTapLink,
+                            imageBuilder: widget.imageBuilder,
+                            builders: headingBuilders,
+                            renderBudget: widget.renderBudget,
+                            fallbackBuilder: widget.fallbackBuilder,
+                            diagramBuilder: widget.diagramBuilder,
+                            mathBuilder: widget.mathBuilder,
+                            onCopyCode: widget.onCopyCode,
+                            wikiEmbedBuilder: widget.wikiEmbedBuilder,
+                            wikiLinkExists: widget.wikiLinkExists,
+                            enableFileLinkChips: widget.enableFileLinkChips,
+                            theme: colors,
                           ),
-                          const SizedBox(height: 18),
                         ],
-                        IanvsMarkdown(
-                          data: foldProjection.source,
-                          selectable: widget.selectable,
-                          softLineBreak: widget.softLineBreak,
-                          styleSheet: widget.styleSheet,
-                          onSelectionChanged: widget.onSelectionChanged,
-                          onTapLink: widget.onTapLink,
-                          imageBuilder: widget.imageBuilder,
-                          builders: headingBuilders,
-                          renderBudget: widget.renderBudget,
-                          fallbackBuilder: widget.fallbackBuilder,
-                          diagramBuilder: widget.diagramBuilder,
-                          mathBuilder: widget.mathBuilder,
-                          onCopyCode: widget.onCopyCode,
-                          wikiEmbedBuilder: widget.wikiEmbedBuilder,
-                          wikiLinkExists: widget.wikiLinkExists,
-                          enableFileLinkChips: widget.enableFileLinkChips,
-                          theme: colors,
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
@@ -1372,6 +1439,237 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
       alignment: .04,
     );
   }
+}
+
+class _IanvsMarkdownReadingSelection extends StatefulWidget {
+  const _IanvsMarkdownReadingSelection({
+    required this.enabled,
+    required this.markdown,
+    required this.richMarkdown,
+    required this.clipboardWriter,
+    required this.onSelectionChanged,
+    required this.child,
+  });
+
+  final bool enabled;
+  final String markdown;
+  final String richMarkdown;
+  final IanvsMarkdownClipboardWriter clipboardWriter;
+  final MarkdownOnSelectionChangedCallback? onSelectionChanged;
+  final Widget child;
+
+  @override
+  State<_IanvsMarkdownReadingSelection> createState() =>
+      _IanvsMarkdownReadingSelectionState();
+}
+
+class _IanvsMarkdownReadingSelectionState
+    extends State<_IanvsMarkdownReadingSelection> {
+  final GlobalKey<SelectionAreaState> _selectionAreaKey =
+      GlobalKey<SelectionAreaState>();
+  final FocusNode _focusNode = FocusNode(
+    debugLabel: 'Ianvs Markdown document selection',
+  );
+  final SelectionListenerNotifier _selectionNotifier =
+      SelectionListenerNotifier();
+  SelectedContent? _selectedContent;
+  SelectionChangedCause? _selectionCause;
+  var _wholeDocumentSelected = false;
+  var _hardwareCopyHandled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_handleHardwareKey);
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
+    _selectionNotifier.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  bool _handleHardwareKey(KeyEvent event) {
+    if (!widget.enabled || !_focusNode.hasFocus || event is! KeyDownEvent) {
+      return false;
+    }
+    final keyboard = HardwareKeyboard.instance;
+    final commandOrControl =
+        keyboard.isMetaPressed || keyboard.isControlPressed;
+    if (!commandOrControl || keyboard.isAltPressed || keyboard.isShiftPressed) {
+      return false;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.keyA) {
+      _selectAll(SelectionChangedCause.keyboard);
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.keyC &&
+        _selectedContent?.plainText.isNotEmpty == true) {
+      _hardwareCopyHandled = true;
+      unawaited(_copySelection());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _hardwareCopyHandled = false;
+      });
+      return true;
+    }
+    return false;
+  }
+
+  @override
+  void didUpdateWidget(covariant _IanvsMarkdownReadingSelection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.markdown != widget.markdown ||
+        oldWidget.enabled != widget.enabled) {
+      _selectedContent = null;
+      _wholeDocumentSelected = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.enabled) return widget.child;
+    return Shortcuts(
+      shortcuts: const <ShortcutActivator, Intent>{
+        SingleActivator(LogicalKeyboardKey.keyA, meta: true):
+            SelectAllTextIntent(SelectionChangedCause.keyboard),
+        SingleActivator(LogicalKeyboardKey.keyA, control: true):
+            SelectAllTextIntent(SelectionChangedCause.keyboard),
+        SingleActivator(LogicalKeyboardKey.keyC, meta: true):
+            CopySelectionTextIntent.copy,
+        SingleActivator(LogicalKeyboardKey.keyC, control: true):
+            CopySelectionTextIntent.copy,
+      },
+      child: Actions(
+        actions: <Type, Action<Intent>>{
+          SelectAllTextIntent: CallbackAction<SelectAllTextIntent>(
+            onInvoke: (intent) {
+              _selectAll(intent.cause);
+              return null;
+            },
+          ),
+          CopySelectionTextIntent: CallbackAction<CopySelectionTextIntent>(
+            onInvoke: (_) {
+              if (_hardwareCopyHandled) {
+                _hardwareCopyHandled = false;
+                return null;
+              }
+              unawaited(_copySelection());
+              return null;
+            },
+          ),
+        },
+        child: SelectionArea(
+          key: _selectionAreaKey,
+          focusNode: _focusNode,
+          onSelectionChanged: _handleSelectionChanged,
+          contextMenuBuilder: _buildContextMenu,
+          child: SelectionListener(
+            selectionNotifier: _selectionNotifier,
+            child: Listener(
+              behavior: HitTestBehavior.translucent,
+              onPointerDown: (_) {
+                _wholeDocumentSelected = false;
+                _focusNode.requestFocus();
+              },
+              child: _IanvsMarkdownDocumentSelectionScope(child: widget.child),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContextMenu(BuildContext context, SelectableRegionState region) {
+    final items = region.contextMenuButtonItems
+        .map((item) {
+          return switch (item.type) {
+            ContextMenuButtonType.copy => item.copyWith(
+              onPressed: () {
+                unawaited(_copySelection());
+                region.hideToolbar();
+              },
+            ),
+            ContextMenuButtonType.selectAll => item.copyWith(
+              onPressed: () => _selectAll(SelectionChangedCause.toolbar),
+            ),
+            _ => item,
+          };
+        })
+        .toList(growable: false);
+    return AdaptiveTextSelectionToolbar.buttonItems(
+      anchors: region.contextMenuAnchors,
+      buttonItems: items,
+    );
+  }
+
+  void _selectAll(SelectionChangedCause cause) {
+    final region = _selectionAreaKey.currentState?.selectableRegion;
+    if (region == null) return;
+    _selectionCause = cause;
+    _wholeDocumentSelected = true;
+    region.selectAll(cause);
+    _selectionCause = null;
+  }
+
+  void _handleSelectionChanged(SelectedContent? content) {
+    _selectedContent = content;
+    final callback = widget.onSelectionChanged;
+    if (callback == null) return;
+    final length = content?.plainText.length ?? 0;
+    callback(
+      content?.plainText,
+      content == null
+          ? const TextSelection.collapsed(offset: -1)
+          : TextSelection(baseOffset: 0, extentOffset: length),
+      _selectionCause,
+    );
+  }
+
+  Future<void> _copySelection() async {
+    final selectedText = _selectedContent?.plainText;
+    if (selectedText == null || selectedText.isEmpty) return;
+    final wholeDocument = _wholeDocumentSelected;
+    final range = _selectionNotifier.registered
+        ? _selectionNotifier.selection.range
+        : null;
+    final preferredStart = range == null
+        ? null
+        : range.startOffset < range.endOffset
+        ? range.startOffset
+        : range.endOffset;
+    final partial = wholeDocument
+        ? null
+        : ianvsMarkdownSelectionClipboardData(
+            widget.richMarkdown,
+            selectedText,
+            preferredStart: preferredStart,
+          );
+    await widget.clipboardWriter(
+      IanvsMarkdownClipboardData(
+        markdown: wholeDocument ? widget.markdown : partial!.markdown,
+        html: wholeDocument
+            ? ianvsMarkdownClipboardHtml(widget.richMarkdown)
+            : partial!.html,
+      ),
+    );
+  }
+}
+
+class _IanvsMarkdownDocumentSelectionScope extends InheritedWidget {
+  const _IanvsMarkdownDocumentSelectionScope({required super.child});
+
+  static bool maybeOf(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<
+            _IanvsMarkdownDocumentSelectionScope
+          >() !=
+      null;
+
+  @override
+  bool updateShouldNotify(_IanvsMarkdownDocumentSelectionScope oldWidget) =>
+      false;
 }
 
 class _MarkdownOutline extends StatelessWidget {
@@ -1523,12 +1821,14 @@ class _MarkdownHeadingBuilder extends MarkdownElementBuilder {
     this.colors, {
     required this.foldingEnabled,
     required this.foldController,
+    required this.selectable,
   });
 
   final List<_MarkdownHeadingPresentation> headings;
   final IanvsMarkdownThemeData colors;
   final bool foldingEnabled;
   final IanvsMarkdownHeadingFoldController foldController;
+  final bool selectable;
   var _index = 0;
 
   @override
@@ -1559,6 +1859,7 @@ class _MarkdownHeadingBuilder extends MarkdownElementBuilder {
       foldable: foldingEnabled && section.canFold,
       collapsed: foldController.isCollapsed(section.identity),
       onToggle: () => foldController.toggleIdentity(section.identity),
+      selectable: selectable,
     );
   }
 }
@@ -1574,6 +1875,7 @@ class _FoldableViewHeading extends StatefulWidget {
     required this.foldable,
     required this.collapsed,
     required this.onToggle,
+    required this.selectable,
   });
 
   final String identity;
@@ -1584,6 +1886,7 @@ class _FoldableViewHeading extends StatefulWidget {
   final bool foldable;
   final bool collapsed;
   final VoidCallback onToggle;
+  final bool selectable;
 
   @override
   State<_FoldableViewHeading> createState() => _FoldableViewHeadingState();
@@ -1648,7 +1951,9 @@ class _FoldableViewHeadingState extends State<_FoldableViewHeading> {
                   children: [
                     Flexible(
                       fit: FlexFit.loose,
-                      child: SelectableText(widget.text, style: widget.style),
+                      child: widget.selectable
+                          ? SelectableText(widget.text, style: widget.style)
+                          : Text(widget.text, style: widget.style),
                     ),
                   ],
                 ),
@@ -1665,10 +1970,12 @@ class _IanvsMarkdownStandaloneHeadingBuilder extends MarkdownElementBuilder {
   _IanvsMarkdownStandaloneHeadingBuilder({
     required this.level,
     required this.colors,
+    required this.selectable,
   });
 
   final int level;
   final IanvsMarkdownThemeData colors;
+  final bool selectable;
 
   @override
   bool isBlockElement() => true;
@@ -1692,7 +1999,9 @@ class _IanvsMarkdownStandaloneHeadingBuilder extends MarkdownElementBuilder {
           ),
         ),
         padding: const EdgeInsets.only(left: 8),
-        child: SelectableText(text, style: preferredStyle ?? parentStyle),
+        child: selectable
+            ? SelectableText(text, style: preferredStyle ?? parentStyle)
+            : Text(text, style: preferredStyle ?? parentStyle),
       ),
     );
   }

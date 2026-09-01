@@ -1,5 +1,11 @@
 ## 0.2.0
 
+- Let both the standalone renderer and Reading view select across the complete
+  document and handle `Cmd+A` / `Ctrl+A`; copying a whole-document selection
+  now publishes exact Markdown as `text/plain` and sanitized semantic HTML as
+  `text/html`.
+- Preserve block and inline Markdown semantics, together with matching rich
+  HTML, when a partial Reading-mode mouse selection crosses rendered blocks.
 - Start a new source list block when an unordered bullet changes between
   `-`, `*`, and `+`, or an ordered delimiter changes between `.` and `)`,
   while keeping same-delimiter siblings grouped.

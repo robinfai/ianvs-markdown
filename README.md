@@ -62,6 +62,16 @@ Expanded(
 )
 ```
 
+`IanvsMarkdown` 与 `IanvsMarkdownView` 默认都使用单一文档选择区域，允许跨标题、
+段落和列表连续选择。阅读态按
+`Cmd+A`（macOS/iOS）或 `Ctrl+A`（其他平台）会选中整篇文档；随后复制会在
+同一个剪贴板项目中写入两种表示：`text/plain` 是未经改写的原始 Markdown，
+`text/html` 是经过安全过滤的语义富文本，因此 Markdown 编辑器和富文本编辑器
+可以各取所需。普通鼠标拖选也会从实际选中的语义片段生成 Markdown 与富文本，跨区块
+选择时仍会保留标题、粗体、斜体、链接、引用和列表等结构。设置
+`selectable: false` 可关闭这套阅读态选择能力；只有需要自行协调源码选区的宿主才应
+设置 `documentSelection: false`，退回逐区块选择。
+
 默认图片 builder 只显示安全占位，不会自动访问网络或文件系统。宿主注入 `imageBuilder` 后，应自行完成路径授权、大小限制、解码预算和远端加载确认。标准图片支持 Obsidian 的 `![替代文本|250](image.png)`、`![替代文本|100x145](image.png)` 和外部图片简写 `![250](https://example.com/image.png)`；有效尺寸会从传给宿主的 `alt` 中移除，并以逻辑像素约束宿主返回的图片组件。无效尺寸保持为普通替代文本。
 
 无显式别名的 Wiki 锚点在 Live Preview 中保留 `[[Note#Heading]]` 的 `Note#Heading` 标签，阅读态显示为 `Note > Heading`；本地 `[[#Heading]]` 在两种模式下都只显示 `Heading`。宿主可同步提供 `wikiLinkExists`，让缺失目标使用 Obsidian 风格的紫色无下划线样式：
