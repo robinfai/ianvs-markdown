@@ -9636,11 +9636,9 @@ $$''');
       offset: source.length,
     );
     await tester.pump();
-    var delimiters = _textSpanLeaves(
-      span(),
-    ).where((leaf) => leaf.text == r'$').toList();
-    expect(delimiters, hasLength(2));
-    expect(delimiters.every((leaf) => leaf.style?.fontSize == 0), isTrue);
+    final projected = span();
+    expect(_widgetSpanLeaves(projected), hasLength(1));
+    expect(projected.toPlainText().length, source.length);
     expect(find.text('formula:E = mc^2'), findsOneWidget);
 
     field.controller!.selection = TextSelection.collapsed(
@@ -9648,12 +9646,76 @@ $$''');
     );
     await tester.pump();
     expect(find.text('formula:E = mc^2'), findsNothing);
-    delimiters = _textSpanLeaves(
+    expect(_widgetSpanLeaves(span()), isEmpty);
+    final delimiters = _textSpanLeaves(
       span(),
     ).where((leaf) => leaf.text == r'$').toList();
+    expect(delimiters, hasLength(2));
     expect(delimiters.every((leaf) => leaf.style?.fontSize != .01), isTrue);
     expect(controller.text, source);
   });
+
+  testWidgets(
+    'active inline display math participates in editable layout at full width',
+    (tester) async {
+      const source = r'Before $$x^2 + 1$$.';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 500,
+              height: 300,
+              child: IanvsMarkdownLiveEditor(
+                controller: controller,
+                mathBuilder: (context, expression, {required displayMode}) =>
+                    SizedBox(
+                      width: 96,
+                      height: 24,
+                      child: Text(
+                        '${displayMode ? 'display' : 'text'}:$expression',
+                      ),
+                    ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.textContaining('Before').first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('display:x^2 + 1'), findsOneWidget);
+      final formula = find.byKey(
+        ValueKey('ianvs-markdown-active-inline-math-${source.indexOf(r'$$')}'),
+      );
+      expect(formula, findsOneWidget);
+      expect(tester.getSize(formula).width, closeTo(96, .01));
+
+      final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+      final fieldFinder = find.descendant(
+        of: active,
+        matching: find.byType(TextField),
+      );
+      final editable = editableWithin(tester, fieldFinder);
+      final mathEnd = source.lastIndexOf(r'$$') + 2;
+      final afterFormula = editable.localToGlobal(
+        editable.getLocalRectForCaret(TextPosition(offset: mathEnd)).topLeft,
+      );
+      expect(afterFormula.dx, closeTo(tester.getRect(formula).right, 1));
+
+      await tester.tapAt(tester.getCenter(formula));
+      await tester.pumpAndSettle();
+      expect(
+        controller.selection.extentOffset,
+        inInclusiveRange(source.indexOf(r'$$'), mathEnd - 1),
+      );
+      expect(formula, findsNothing);
+      expect(controller.text, source);
+    },
+  );
 
   testWidgets('inline math clicks preserve Obsidian source selections', (
     tester,
@@ -16358,6 +16420,17 @@ Iterable<TextSpan> _textSpanLeaves(TextSpan span) sync* {
   if (span.text != null) yield span;
   for (final child in span.children ?? const <InlineSpan>[]) {
     if (child is TextSpan) yield* _textSpanLeaves(child);
+  }
+}
+
+Iterable<WidgetSpan> _widgetSpanLeaves(InlineSpan span) sync* {
+  if (span is WidgetSpan) {
+    yield span;
+    return;
+  }
+  if (span is! TextSpan) return;
+  for (final child in span.children ?? const <InlineSpan>[]) {
+    yield* _widgetSpanLeaves(child);
   }
 }
 

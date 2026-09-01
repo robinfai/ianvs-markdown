@@ -3648,7 +3648,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       ..revealLeadingMarker = false
       ..hiddenLeadingCharacters = 0
       ..collapsedLeadingCharacters = _activeGapPrefixLength
-      ..hiddenMarkerRanges = const <_HiddenMarkerSpan>[]
+      ..sourceProjections = const <_SourceProjection>[]
       ..highlightFencedCode = false;
     final style =
         (styleSheet.p ?? const TextStyle(fontSize: 14.5, height: 1.58))
@@ -3803,7 +3803,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     _blockController.hiddenLeadingCharacters = revealHiddenMarker
         ? 0
         : hiddenMarkerEnd;
-    final hiddenMarkerRanges = <_HiddenMarkerSpan>[
+    final sourceProjections = <_SourceProjection>[
       if (hiddenMarkerEnd > 0 && !revealHiddenMarker)
         _HiddenMarkerSpan(
           TextRange(start: 0, end: hiddenMarkerEnd),
@@ -3820,30 +3820,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           _collapsedGapPrefixStyle,
         ),
       ..._hiddenBlockIdCaretRanges(block.source),
-      for (final source in inactiveInlineMathSources) ...[
-        _HiddenMarkerSpan(
-          TextRange(
-            start: source.sourceRange.start,
-            end: source.contentRange.start,
-          ),
-          _collapsedGapPrefixStyle,
-        ),
-        _HiddenMarkerSpan(
-          source.contentRange,
-          _hiddenInlineMathContentStyle(colors),
-        ),
-        _HiddenMarkerSpan(
-          TextRange(
-            start: source.contentRange.end,
-            end: source.sourceRange.end,
-          ),
-          _collapsedGapPrefixStyle,
-        ),
-      ],
-    ]..sort((a, b) => a.range.start.compareTo(b.range.start));
-    _blockController.hiddenMarkerRanges = List<_HiddenMarkerSpan>.unmodifiable(
-      hiddenMarkerRanges,
-    );
+    ];
     var activeTextStyle = _isEmptyAtxHeadingSource(block.source)
         ? (styleSheet.p ?? const TextStyle(fontSize: 14.5, height: 1.58))
               .copyWith(color: colors.textPrimary)
@@ -3866,6 +3843,29 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         decorationColor: colors.taskDoneColor,
       );
     }
+    for (final source in inactiveInlineMathSources) {
+      sourceProjections.add(
+        _InlineMathProjection(
+          range: source.sourceRange,
+          contentRange: source.contentRange,
+          expression: source.expressionFrom(block.source),
+          displayMode: source.delimiterLength == 2,
+          mathBuilder: widget.mathBuilder,
+          textStyle: activeTextStyle,
+          colors: colors,
+          onTapOffset: (offset) {
+            _blockController.selection = TextSelection.collapsed(
+              offset: offset,
+            );
+            _focusNode.requestFocus();
+          },
+        ),
+      );
+    }
+    sourceProjections.sort((a, b) => a.range.start.compareTo(b.range.start));
+    _blockController.sourceProjections = List<_SourceProjection>.unmodifiable(
+      sourceProjections,
+    );
     final textEditor = TextField(
       key: _activeEditorKey,
       controller: _blockController,
@@ -3890,17 +3890,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         contentPadding: EdgeInsets.symmetric(vertical: 3),
       ),
     );
-    final Widget editor = inactiveInlineMathSources.isEmpty
-        ? textEditor
-        : _ActiveInlineMathPreview(
-            controller: _blockController,
-            sources: inactiveInlineMathSources,
-            sourceText: block.source,
-            textStyle: activeTextStyle,
-            colors: colors,
-            mathBuilder: widget.mathBuilder,
-            child: textEditor,
-          );
+    final Widget editor = textEditor;
     Widget activeListEditor(double markerExtent) {
       return Expanded(
         child: _ActiveTextLineRail(
@@ -5333,96 +5323,6 @@ class _LivePreviewIndentedCode extends StatelessWidget {
   }
 }
 
-class _ActiveInlineMathPreview extends StatelessWidget {
-  const _ActiveInlineMathPreview({
-    required this.controller,
-    required this.sources,
-    required this.sourceText,
-    required this.textStyle,
-    required this.colors,
-    required this.mathBuilder,
-    required this.child,
-  });
-
-  final TextEditingController controller;
-  final List<IanvsMarkdownInlineMathSource> sources;
-  final String sourceText;
-  final TextStyle textStyle;
-  final IanvsMarkdownThemeData colors;
-  final IanvsMarkdownMathBuilder? mathBuilder;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final editableWidth = constraints.maxWidth - 2.5;
-        final painter =
-            TextPainter(
-              text: controller.buildTextSpan(
-                context: context,
-                style: textStyle,
-                withComposing: false,
-              ),
-              textDirection: Directionality.of(context),
-              textScaler: MediaQuery.textScalerOf(context),
-              textWidthBasis: TextWidthBasis.parent,
-            )..layout(
-              maxWidth: constraints.hasBoundedWidth
-                  ? editableWidth.clamp(0, double.infinity)
-                  : MediaQuery.sizeOf(context).width,
-            );
-        final previews = <Widget>[];
-        for (final source in sources) {
-          final boxes = painter.getBoxesForSelection(
-            TextSelection(
-              baseOffset: source.contentRange.start,
-              extentOffset: source.contentRange.end,
-            ),
-            boxHeightStyle: BoxHeightStyle.tight,
-          );
-          if (boxes.isEmpty) continue;
-          final first = boxes.first;
-          final sameLine = boxes.where(
-            (box) => (box.top - first.top).abs() < .5,
-          );
-          final left = sameLine.map((box) => box.left).reduce(math.min);
-          final right = sameLine.map((box) => box.right).reduce(math.max);
-          final top = sameLine.map((box) => box.top).reduce(math.min);
-          final bottom = sameLine.map((box) => box.bottom).reduce(math.max);
-          previews.add(
-            Positioned(
-              key: ValueKey(
-                'ianvs-markdown-active-inline-math-'
-                '${source.sourceRange.start}',
-              ),
-              left: left,
-              top: 3 + top,
-              width: math.max(1, right - left),
-              height: math.max(painter.preferredLineHeight, bottom - top),
-              child: IgnorePointer(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: IanvsMarkdownMath(
-                    expression: source.expressionFrom(sourceText),
-                    displayMode: false,
-                    inline: true,
-                    mathBuilder: mathBuilder,
-                    textStyle: textStyle,
-                    theme: colors,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }
-        return Stack(clipBehavior: Clip.none, children: [child, ...previews]);
-      },
-    );
-  }
-}
-
 class _ActiveTextLineRail extends StatelessWidget {
   const _ActiveTextLineRail({
     required this.controller,
@@ -5440,59 +5340,213 @@ class _ActiveTextLineRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // RenderEditable reserves a one-pixel caret gap in addition to the
-        // 1.5px cursor width. Match that layout width so a wrapped caret and
-        // its active-line rail always resolve to the same visual line.
-        final editableWidth = constraints.maxWidth - 2.5;
-        final selection = controller.selection;
-        final caretOffset = selection.isValid
-            ? selection.extentOffset.clamp(0, controller.text.length)
-            : 0;
-        final painter =
-            TextPainter(
-              text: controller.buildTextSpan(
-                context: context,
-                style: textStyle,
-                withComposing: false,
-              ),
-              textDirection: Directionality.of(context),
-              textScaler: MediaQuery.textScalerOf(context),
-              textWidthBasis: TextWidthBasis.parent,
-            )..layout(
-              maxWidth: constraints.hasBoundedWidth
-                  ? editableWidth.clamp(0, double.infinity)
-                  : MediaQuery.sizeOf(context).width,
-            );
-        final lineHeight = painter.preferredLineHeight;
-        final caret = painter.getOffsetForCaret(
-          TextPosition(offset: caretOffset),
-          Rect.zero,
-        );
-
-        return Stack(
-          clipBehavior: Clip.none,
-          children: [
-            child,
-            PositionedDirectional(
-              key: const ValueKey('ianvs-markdown-active-line-rail'),
-              start: -logicalStartOffset,
-              top: 3 + caret.dy,
-              child: Container(
-                width: 2,
-                height: lineHeight.clamp(16.0, 26.0).toDouble(),
-                decoration: BoxDecoration(
-                  color: colors.accent,
-                  borderRadius: BorderRadius.circular(1),
-                ),
-              ),
+    final fallbackLineHeight =
+        ((textStyle.fontSize ?? 14.5) * (textStyle.height ?? 1.2))
+            .clamp(16.0, 26.0)
+            .toDouble();
+    return _ActiveTextLineRailLayout(
+      controller: controller,
+      textDirection: Directionality.of(context),
+      logicalStartOffset: logicalStartOffset,
+      fallbackLineHeight: fallbackLineHeight,
+      children: [
+        child,
+        IgnorePointer(
+          key: const ValueKey('ianvs-markdown-active-line-rail'),
+          child: Container(
+            decoration: BoxDecoration(
+              color: colors.accent,
+              borderRadius: BorderRadius.circular(1),
             ),
-          ],
-        );
-      },
+          ),
+        ),
+      ],
     );
   }
+}
+
+class _ActiveTextLineRailLayout extends MultiChildRenderObjectWidget {
+  const _ActiveTextLineRailLayout({
+    required this.controller,
+    required this.textDirection,
+    required this.logicalStartOffset,
+    required this.fallbackLineHeight,
+    required super.children,
+  });
+
+  final TextEditingController controller;
+  final TextDirection textDirection;
+  final double logicalStartOffset;
+  final double fallbackLineHeight;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderActiveTextLineRail(
+        controller,
+        textDirection,
+        logicalStartOffset,
+        fallbackLineHeight,
+      );
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    covariant _RenderActiveTextLineRail renderObject,
+  ) {
+    renderObject
+      ..controller = controller
+      ..textDirection = textDirection
+      ..logicalStartOffset = logicalStartOffset
+      ..fallbackLineHeight = fallbackLineHeight;
+  }
+}
+
+class _ActiveTextLineRailParentData extends ContainerBoxParentData<RenderBox> {}
+
+class _RenderActiveTextLineRail extends RenderBox
+    with
+        ContainerRenderObjectMixin<RenderBox, _ActiveTextLineRailParentData>,
+        RenderBoxContainerDefaultsMixin<
+          RenderBox,
+          _ActiveTextLineRailParentData
+        > {
+  _RenderActiveTextLineRail(
+    this._controller,
+    this._textDirection,
+    this._logicalStartOffset,
+    this._fallbackLineHeight,
+  );
+
+  TextEditingController _controller;
+  TextDirection _textDirection;
+  double _logicalStartOffset;
+  double _fallbackLineHeight;
+  double? _railTop;
+  double? _railHeight;
+  var _railGeometryUpdateScheduled = false;
+
+  TextEditingController get controller => _controller;
+  set controller(TextEditingController value) {
+    if (identical(value, _controller)) return;
+    if (attached) _controller.removeListener(markNeedsLayout);
+    _controller = value;
+    if (attached) _controller.addListener(markNeedsLayout);
+    markNeedsLayout();
+  }
+
+  TextDirection get textDirection => _textDirection;
+  set textDirection(TextDirection value) {
+    if (value == _textDirection) return;
+    _textDirection = value;
+    markNeedsLayout();
+  }
+
+  double get logicalStartOffset => _logicalStartOffset;
+  set logicalStartOffset(double value) {
+    if (value == _logicalStartOffset) return;
+    _logicalStartOffset = value;
+    markNeedsLayout();
+  }
+
+  double get fallbackLineHeight => _fallbackLineHeight;
+  set fallbackLineHeight(double value) {
+    if (value == _fallbackLineHeight) return;
+    _fallbackLineHeight = value;
+    markNeedsLayout();
+  }
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    _controller.addListener(markNeedsLayout);
+  }
+
+  @override
+  void detach() {
+    _controller.removeListener(markNeedsLayout);
+    super.detach();
+  }
+
+  @override
+  void setupParentData(RenderObject child) {
+    if (child.parentData is! _ActiveTextLineRailParentData) {
+      child.parentData = _ActiveTextLineRailParentData();
+    }
+  }
+
+  @override
+  void performLayout() {
+    final editor = firstChild;
+    final rail = editor == null ? null : childAfter(editor);
+    if (editor == null || rail == null) {
+      size = constraints.smallest;
+      return;
+    }
+
+    editor.layout(constraints, parentUsesSize: true);
+    size = constraints.constrain(editor.size);
+    final editorParentData =
+        editor.parentData! as _ActiveTextLineRailParentData;
+    editorParentData.offset = Offset.zero;
+
+    final selection = _controller.selection;
+    final caretOffset = selection.isValid
+        ? selection.extentOffset.clamp(0, _controller.text.length)
+        : 0;
+    final railTop = _railTop ?? 3.0;
+    final railHeight = _railHeight ?? _fallbackLineHeight;
+
+    rail.layout(
+      BoxConstraints.tightFor(width: 2, height: railHeight),
+      parentUsesSize: true,
+    );
+    final railParentData = rail.parentData! as _ActiveTextLineRailParentData;
+    final railLeft = switch (_textDirection) {
+      TextDirection.ltr => -_logicalStartOffset,
+      TextDirection.rtl => size.width + _logicalStartOffset - rail.size.width,
+    };
+    railParentData.offset = Offset(railLeft, railTop);
+    _scheduleRailGeometryUpdate(caretOffset);
+  }
+
+  void _scheduleRailGeometryUpdate(int caretOffset) {
+    if (_railGeometryUpdateScheduled) return;
+    _railGeometryUpdateScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _railGeometryUpdateScheduled = false;
+      if (!attached) return;
+      final editor = firstChild;
+      final editable = editor == null ? null : _findRenderEditable(editor);
+      if (editable == null || !editable.hasSize || !hasSize) return;
+      final caret = editable.getLocalRectForCaret(
+        TextPosition(offset: caretOffset),
+      );
+      final nextTop = editable.localToGlobal(caret.topLeft, ancestor: this).dy;
+      final nextHeight = caret.height.clamp(16.0, 26.0).toDouble();
+      if (_railTop == nextTop && _railHeight == nextHeight) return;
+      _railTop = nextTop;
+      _railHeight = nextHeight;
+      markNeedsLayout();
+    });
+  }
+
+  RenderEditable? _findRenderEditable(RenderObject root) {
+    if (root is RenderEditable) return root;
+    RenderEditable? result;
+    root.visitChildren((child) {
+      result ??= _findRenderEditable(child);
+    });
+    return result;
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    defaultPaint(context, offset);
+  }
+
+  @override
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) =>
+      defaultHitTestChildren(result, position: position);
 }
 
 class _ActiveIndentedCodeLineRail extends StatelessWidget {
@@ -7974,11 +8028,37 @@ final class _QuoteLineLayout {
   final int depth;
 }
 
-final class _HiddenMarkerSpan {
-  const _HiddenMarkerSpan(this.range, this.style);
+sealed class _SourceProjection {
+  const _SourceProjection(this.range);
 
   final TextRange range;
+}
+
+final class _HiddenMarkerSpan extends _SourceProjection {
+  const _HiddenMarkerSpan(super.range, this.style);
+
   final TextStyle style;
+}
+
+final class _InlineMathProjection extends _SourceProjection {
+  const _InlineMathProjection({
+    required TextRange range,
+    required this.contentRange,
+    required this.expression,
+    required this.displayMode,
+    required this.mathBuilder,
+    required this.textStyle,
+    required this.colors,
+    required this.onTapOffset,
+  }) : super(range);
+
+  final TextRange contentRange;
+  final String expression;
+  final bool displayMode;
+  final IanvsMarkdownMathBuilder? mathBuilder;
+  final TextStyle textStyle;
+  final IanvsMarkdownThemeData colors;
+  final ValueChanged<int> onTapOffset;
 }
 
 bool _selectionRevealsSourceRange(TextSelection selection, TextRange range) {
@@ -7989,13 +8069,6 @@ bool _selectionRevealsSourceRange(TextSelection selection, TextRange range) {
   }
   return selection.start < range.end && selection.end > range.start;
 }
-
-TextStyle _hiddenInlineMathContentStyle(IanvsMarkdownThemeData colors) =>
-    TextStyle(
-      color: Colors.transparent,
-      fontFamily: colors.monoFontFamily,
-      fontFamilyFallback: colors.monoFontFamilyFallback,
-    );
 
 List<_HiddenMarkerSpan> _hiddenBlockIdCaretRanges(String source) {
   final hidden = <_HiddenMarkerSpan>[];
@@ -8298,7 +8371,7 @@ class _BlockEditingController extends TextEditingController {
   bool revealLeadingMarker = false;
   int hiddenLeadingCharacters = 0;
   int collapsedLeadingCharacters = 0;
-  List<_HiddenMarkerSpan> hiddenMarkerRanges = const <_HiddenMarkerSpan>[];
+  List<_SourceProjection> sourceProjections = const <_SourceProjection>[];
 
   List<TextRange> get _localHighlightLiteralRanges =>
       documentHighlightLiteralRuns
@@ -8378,10 +8451,10 @@ class _BlockEditingController extends TextEditingController {
         ],
       );
     }
-    if (hiddenMarkerRanges.isNotEmpty) {
-      return _buildTextSpanWithHiddenRanges(
+    if (sourceProjections.isNotEmpty) {
+      return _buildTextSpanWithSourceProjections(
         value,
-        ranges: hiddenMarkerRanges,
+        projections: sourceProjections,
         style: style,
         syntaxTheme: syntax,
         withComposing: withComposing,
@@ -8435,9 +8508,9 @@ class _BlockEditingController extends TextEditingController {
   }
 }
 
-TextSpan _buildTextSpanWithHiddenRanges(
+TextSpan _buildTextSpanWithSourceProjections(
   TextEditingValue value, {
-  required List<_HiddenMarkerSpan> ranges,
+  required List<_SourceProjection> projections,
   required TextStyle? style,
   required IanvsMarkdownSyntaxTheme syntaxTheme,
   required bool withComposing,
@@ -8446,9 +8519,9 @@ TextSpan _buildTextSpanWithHiddenRanges(
 }) {
   final children = <InlineSpan>[];
   var cursor = 0;
-  for (final hidden in ranges) {
-    final start = hidden.range.start.clamp(cursor, value.text.length);
-    final end = hidden.range.end.clamp(start, value.text.length);
+  for (final projection in projections) {
+    final start = projection.range.start.clamp(cursor, value.text.length);
+    final end = projection.range.end.clamp(start, value.text.length);
     if (start > cursor) {
       children.add(
         _buildMarkdownSegmentSpan(
@@ -8464,9 +8537,21 @@ TextSpan _buildTextSpanWithHiddenRanges(
       );
     }
     if (end > start) {
-      children.add(
-        TextSpan(text: value.text.substring(start, end), style: hidden.style),
-      );
+      switch (projection) {
+        case _HiddenMarkerSpan(:final style):
+          children.add(
+            TextSpan(text: value.text.substring(start, end), style: style),
+          );
+        case _InlineMathProjection():
+          children.addAll(
+            _buildInlineMathProjectionSpans(
+              value.text,
+              start: start,
+              end: end,
+              projection: projection,
+            ),
+          );
+      }
     }
     cursor = end;
   }
@@ -8485,6 +8570,72 @@ TextSpan _buildTextSpanWithHiddenRanges(
     );
   }
   return TextSpan(style: style, children: children);
+}
+
+List<InlineSpan> _buildInlineMathProjectionSpans(
+  String source, {
+  required int start,
+  required int end,
+  required _InlineMathProjection projection,
+}) {
+  assert(end > start);
+  return <InlineSpan>[
+    WidgetSpan(
+      alignment: PlaceholderAlignment.baseline,
+      baseline: TextBaseline.alphabetic,
+      child: _InlineMathTapTarget(
+        contentRange: projection.contentRange,
+        onTapOffset: projection.onTapOffset,
+        child: IanvsMarkdownMath(
+          key: ValueKey('ianvs-markdown-active-inline-math-$start'),
+          expression: projection.expression,
+          displayMode: projection.displayMode,
+          inline: true,
+          mathBuilder: projection.mathBuilder,
+          textStyle: projection.textStyle,
+          theme: projection.colors,
+        ),
+      ),
+    ),
+    if (end - start > 1)
+      TextSpan(
+        text: source.substring(start + 1, end),
+        style: _collapsedGapPrefixStyle,
+      ),
+  ];
+}
+
+class _InlineMathTapTarget extends StatelessWidget {
+  const _InlineMathTapTarget({
+    required this.contentRange,
+    required this.onTapOffset,
+    required this.child,
+  });
+
+  final TextRange contentRange;
+  final ValueChanged<int> onTapOffset;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapUp: (details) {
+        final box = context.findRenderObject();
+        final width = box is RenderBox && box.hasSize ? box.size.width : 0.0;
+        final fraction = width <= 0
+            ? 0.0
+            : (details.localPosition.dx / width).clamp(0.0, 1.0);
+        final contentLength = contentRange.end - contentRange.start;
+        final relativeOffset = (fraction * contentLength)
+            .floor()
+            .clamp(0, math.max(0, contentLength - 1))
+            .toInt();
+        onTapOffset(contentRange.start + relativeOffset);
+      },
+      child: child,
+    );
+  }
 }
 
 TextSpan _buildMarkdownSegmentSpan(
