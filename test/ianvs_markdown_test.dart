@@ -1168,6 +1168,37 @@ Escaped \\<span>literal \\</span> after.
     expect(tappedHref, 'https://example.com');
   });
 
+  testWidgets('renders Obsidian ruby annotation above its base text', (
+    tester,
+  ) async {
+    const source = 'Alpha <ruby>漢<rt>かん</rt></ruby> omega';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    final ruby = find.byKey(const ValueKey('ianvs-markdown-html-ruby'));
+    final base = find.text('漢');
+    final annotation = find.text('かん');
+    expect(ruby, findsOneWidget);
+    expect(base, findsOneWidget);
+    expect(annotation, findsOneWidget);
+    expect(
+      tester.getCenter(annotation).dy,
+      lessThan(tester.getCenter(base).dy),
+    );
+    expect(
+      tester.widget<Text>(annotation).style?.fontSize,
+      lessThan(tester.widget<Text>(base).style?.fontSize ?? double.infinity),
+    );
+    expect(
+      tester.getSize(ruby).height,
+      greaterThan(tester.getSize(base).height),
+    );
+    final semanticsLabel = tester.getSemantics(ruby).label;
+    expect(semanticsLabel, contains('漢'));
+    expect(semanticsLabel, isNot(contains('かん')));
+    expect(_renderedPlainTextContains(tester, '<ruby>'), isFalse);
+    expect(_renderedPlainTextContains(tester, '<rt>'), isFalse);
+  });
+
   testWidgets('renders and toggles Obsidian HTML details blocks', (
     tester,
   ) async {

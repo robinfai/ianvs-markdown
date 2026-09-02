@@ -9835,6 +9835,39 @@ $$''');
     expect(controller.isDirty, isFalse);
   });
 
+  testWidgets('ruby source remains literal with exact base and rt offsets', (
+    tester,
+  ) async {
+    const line = 'Alpha <ruby>漢<rt>かん</rt></ruby> omega';
+    const source = 'Before\n\n$line\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    var rubySource = selectableTextWithPlainText(line);
+    expect(rubySource, findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-html-ruby')),
+      findsNothing,
+    );
+
+    await tapSelectableSubstring(tester, rubySource, '漢');
+    await tester.pumpAndSettle();
+    expect(controller.selection.isCollapsed, isTrue);
+    expect(controller.selection.extentOffset, 21);
+
+    await tester.tap(find.text('After'));
+    await tester.pumpAndSettle();
+    rubySource = selectableTextWithPlainText(line);
+    await tapSelectableSubstring(tester, rubySource, 'かん');
+    await tester.pumpAndSettle();
+    expect(controller.selection.isCollapsed, isTrue);
+    expect(controller.selection.extentOffset, 26);
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('HTML subscript keeps its rendered control on normal click', (
     tester,
   ) async {

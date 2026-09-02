@@ -28,6 +28,7 @@ import 'html_meter.dart';
 import 'html_ordered_list.dart';
 import 'html_pre.dart';
 import 'html_progress.dart';
+import 'html_ruby.dart';
 import 'html_select.dart';
 import 'html_table.dart';
 import 'html_textarea.dart';
@@ -386,6 +387,7 @@ class IanvsMarkdown extends StatelessWidget {
         'ianvs-html-meter': IanvsMarkdownHtmlMeterBuilder(theme: colors),
       'ianvs-html-pre': IanvsMarkdownHtmlPreBuilder(theme: colors),
       'ianvs-html-progress': IanvsMarkdownHtmlProgressBuilder(theme: colors),
+      'ianvs-html-ruby': IanvsMarkdownHtmlRubyBuilder(theme: colors),
       'ianvs-html-select': IanvsMarkdownHtmlSelectBuilder(theme: colors),
       'ianvs-html-figure': IanvsMarkdownHtmlFigureBuilder(
         bodyBuilder: (context, source) =>

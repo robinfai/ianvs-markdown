@@ -105,6 +105,38 @@ final class _IanvsMarkdownPairedHtmlSyntax extends md.InlineSyntax {
       parser.addNode(md.Text(source));
       return true;
     }
+    if (tag == 'ruby') {
+      if (mode == IanvsMarkdownObsidianMetadataMode.editing) {
+        parser.addNode(md.Text(source));
+        return true;
+      }
+      final annotationMatch = RegExp(
+        r'^(.*?)<rt(?:\s[^>\n]*)?>([\s\S]*?)</rt\s*>([\s\S]*)$',
+        caseSensitive: false,
+      ).firstMatch(content);
+      if (annotationMatch != null) {
+        final baseSource =
+            '${annotationMatch.group(1) ?? ''}'
+                    '${annotationMatch.group(3) ?? ''}'
+                .replaceAll(
+                  RegExp(
+                    r'<rp(?:\s[^>\n]*)?>[\s\S]*?</rp\s*>',
+                    caseSensitive: false,
+                  ),
+                  '',
+                );
+        final annotation = parser.document
+            .parseInline(annotationMatch.group(2) ?? '')
+            .map((node) => node.textContent)
+            .join();
+        final ruby = md.Element(
+          'ianvs-html-ruby',
+          parser.document.parseInline(baseSource),
+        )..attributes['data-annotation'] = annotation;
+        parser.addNode(ruby);
+        return true;
+      }
+    }
 
     final children = parser.document.parseInline(content);
     md.Element? element;

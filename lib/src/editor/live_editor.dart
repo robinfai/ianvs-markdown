@@ -2657,6 +2657,11 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     IanvsMarkdownBlock block,
     Offset globalPosition,
   ) {
+    final literalOffset = _literalProjectionDocumentOffsetAtRenderedPoint(
+      block,
+      globalPosition,
+    );
+    if (literalOffset != null) return literalOffset;
     if (block.type == IanvsMarkdownBlockType.indentedCode) {
       return _indentedCodeDocumentOffsetAtRenderedPoint(block, globalPosition);
     }
@@ -2698,6 +2703,44 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       if (localSourceOffset != null) {
         return block.start + localSourceOffset;
       }
+    }
+    return null;
+  }
+
+  int? _literalProjectionDocumentOffsetAtRenderedPoint(
+    IanvsMarkdownBlock block,
+    Offset globalPosition,
+  ) {
+    // Exact literal projection is needed for raw HTML that Obsidian leaves
+    // visible in Live Preview. Plain paragraphs keep the native activation
+    // path so their deferred caret and keyboard-selection ordering is intact.
+    if (!block.source.contains('<') || !block.source.contains('>')) {
+      return null;
+    }
+    final root = _renderedBlockTapKeys[block.start]?.currentContext
+        ?.findRenderObject();
+    if (root == null || !root.attached) return null;
+    final editables = <RenderEditable>[];
+    void collect(RenderObject child) {
+      if (child is RenderEditable && child.readOnly) {
+        editables.add(child);
+        return;
+      }
+      child.visitChildren(collect);
+    }
+
+    root.visitChildren(collect);
+    for (final editable in editables) {
+      if (!editable.attached || !editable.hasSize) continue;
+      final visibleText = editable.text?.toPlainText() ?? '';
+      if (visibleText != block.source) continue;
+      final local = editable.globalToLocal(globalPosition);
+      if (local.dy < -1 || local.dy > editable.size.height + 1) continue;
+      final visibleOffset = editable
+          .getPositionForPoint(globalPosition)
+          .offset
+          .clamp(0, visibleText.length);
+      return block.start + visibleOffset;
     }
     return null;
   }
