@@ -10092,6 +10092,27 @@ $$''');
     );
   });
 
+  testWidgets('HTML meter remains exact source in Live Preview', (
+    tester,
+  ) async {
+    const meter =
+        '<meter min="0" max="5" low="1" high="4" optimum="5" value="2">2/5</meter>';
+    final controller = IanvsMarkdownController(
+      text: 'Before\n\n$meter\n\nAfter',
+    );
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    expect(selectableTextWithPlainText(meter), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-html-meter')),
+      findsNothing,
+    );
+    expect(controller.text, 'Before\n\n$meter\n\nAfter');
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('HTML center enters its exact block source on normal click', (
     tester,
   ) async {

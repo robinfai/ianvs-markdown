@@ -1252,6 +1252,29 @@ Escaped \\<span>literal \\</span> after.
     expect(find.text('2/5'), findsNothing);
   });
 
+  testWidgets('renders Obsidian HTML meter with native dimensions and value', (
+    tester,
+  ) async {
+    const source =
+        'Before\n\n<meter min="0" max="5" low="1" high="4" optimum="5" value="2">2/5</meter>\n\nAfter';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    final meter = find.byKey(const ValueKey('ianvs-markdown-html-meter'));
+    expect(meter, findsOneWidget);
+    expect(tester.getSize(meter), const Size(56, 6));
+    expect(find.text('2/5'), findsNothing);
+
+    final indicator = tester.widget<LinearProgressIndicator>(
+      find.descendant(
+        of: meter,
+        matching: find.byType(LinearProgressIndicator),
+      ),
+    );
+    expect(indicator.value, .4);
+    expect(indicator.color, IanvsMarkdownThemeData.light.taskStatusYellow);
+    expect(indicator.semanticsValue, '2');
+  });
+
   testWidgets('renders a local Obsidian HTML button', (tester) async {
     const source = 'Before\n\n<button>Alpha bravo</button>\n\nAfter';
     await tester.pumpWidget(app(const IanvsMarkdown(data: source)));

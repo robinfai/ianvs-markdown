@@ -99,6 +99,12 @@ final class _IanvsMarkdownPairedHtmlSyntax extends md.InlineSyntax {
       }
       return true;
     }
+    // Obsidian renders `<meter>` only in Reading view. Live Preview retains
+    // the entire source line, including its fallback text and both tags.
+    if (tag == 'meter' && mode == IanvsMarkdownObsidianMetadataMode.editing) {
+      parser.addNode(md.Text(source));
+      return true;
+    }
 
     final children = parser.document.parseInline(content);
     md.Element? element;

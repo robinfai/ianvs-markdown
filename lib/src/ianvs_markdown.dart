@@ -24,6 +24,7 @@ import 'html_details.dart';
 import 'html_definition_list.dart';
 import 'html_figure.dart';
 import 'html_hr.dart';
+import 'html_meter.dart';
 import 'html_ordered_list.dart';
 import 'html_pre.dart';
 import 'html_progress.dart';
@@ -381,6 +382,8 @@ class IanvsMarkdown extends StatelessWidget {
       'ianvs-html-hr': IanvsMarkdownHtmlHorizontalRuleBuilder(
         decoration: effectiveStyleSheet.horizontalRuleDecoration,
       ),
+      if (obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.reading)
+        'ianvs-html-meter': IanvsMarkdownHtmlMeterBuilder(theme: colors),
       'ianvs-html-pre': IanvsMarkdownHtmlPreBuilder(theme: colors),
       'ianvs-html-progress': IanvsMarkdownHtmlProgressBuilder(theme: colors),
       'ianvs-html-select': IanvsMarkdownHtmlSelectBuilder(theme: colors),
@@ -454,6 +457,8 @@ class IanvsMarkdown extends StatelessWidget {
       const IanvsMarkdownHtmlHorizontalRuleSyntax(),
       const IanvsMarkdownHtmlButtonSyntax(),
       const IanvsMarkdownHtmlCheckboxSyntax(),
+      if (obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.reading)
+        const IanvsMarkdownHtmlMeterSyntax(),
       const IanvsMarkdownHtmlPreSyntax(),
       const IanvsMarkdownHtmlProgressSyntax(),
       const IanvsMarkdownHtmlSelectSyntax(),
