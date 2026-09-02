@@ -22,6 +22,7 @@ import 'html_center.dart';
 import 'html_checkbox.dart';
 import 'html_details.dart';
 import 'html_definition_list.dart';
+import 'html_fieldset.dart';
 import 'html_figure.dart';
 import 'html_hr.dart';
 import 'html_meter.dart';
@@ -365,6 +366,16 @@ class IanvsMarkdown extends StatelessWidget {
         bodyBuilder: (context, source) =>
             _buildHtmlDetailsBody(context, source, effectiveStyleSheet, colors),
       ),
+      'ianvs-html-fieldset': IanvsMarkdownHtmlFieldsetBuilder(
+        presentation:
+            obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing
+            ? IanvsMarkdownHtmlFieldsetPresentation.editing
+            : IanvsMarkdownHtmlFieldsetPresentation.reading,
+        contentBuilder: (context, source) =>
+            _buildHtmlFigureBody(context, source, effectiveStyleSheet, colors),
+        onTap: onTapText,
+        theme: colors,
+      ),
       'ianvs-html-blockquote': IanvsMarkdownHtmlBlockquoteBuilder(
         theme: colors,
         bodyBuilder: (context, source) => _buildHtmlBlockquoteBody(
@@ -465,6 +476,7 @@ class IanvsMarkdown extends StatelessWidget {
       const IanvsMarkdownHtmlProgressSyntax(),
       const IanvsMarkdownHtmlSelectSyntax(),
       const IanvsMarkdownHtmlTextareaSyntax(),
+      const IanvsMarkdownHtmlFieldsetSyntax(),
       const IanvsMarkdownHtmlBlockquoteSyntax(),
       const IanvsMarkdownHtmlCenterSyntax(),
       const IanvsMarkdownHtmlDefinitionListSyntax(),

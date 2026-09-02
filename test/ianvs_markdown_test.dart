@@ -1251,6 +1251,32 @@ Escaped \\<span>literal \\</span> after.
     expect(tester.widget<Center>(center).alignment, Alignment.center);
   });
 
+  testWidgets('renders Obsidian HTML fieldset with an inset legend', (
+    tester,
+  ) async {
+    const source =
+        'Before\n\n<fieldset>\n<legend>Alpha bravo</legend>\nCharlie delta\n</fieldset>\n\nAfter';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    final fieldset = find.byKey(const ValueKey('ianvs-markdown-html-fieldset'));
+    final legend = find.text('Alpha bravo');
+    final body = find.text('Charlie delta');
+    expect(fieldset, findsOneWidget);
+    expect(legend, findsOneWidget);
+    expect(body, findsOneWidget);
+    expect(tester.getTopLeft(legend).dy, lessThan(tester.getTopLeft(body).dy));
+    final border = tester.widget<Container>(
+      find.byKey(const ValueKey('ianvs-markdown-html-fieldset-border')),
+    );
+    expect(border.decoration, isA<BoxDecoration>());
+    expect((border.decoration! as BoxDecoration).border, isNotNull);
+    final semanticsLabel = tester.getSemantics(fieldset).label;
+    expect(semanticsLabel, contains('Alpha bravo'));
+    expect(semanticsLabel, contains('Charlie delta'));
+    expect(_renderedPlainTextContains(tester, '<fieldset>'), isFalse);
+    expect(_renderedPlainTextContains(tester, '<legend>'), isFalse);
+  });
+
   testWidgets('renders Obsidian HTML horizontal rules', (tester) async {
     await tester.pumpWidget(
       app(const IanvsMarkdown(data: 'Before\n\n<hr>\n\nAfter')),

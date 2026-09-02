@@ -10146,6 +10146,40 @@ $$''');
     expect(controller.isDirty, isFalse);
   });
 
+  testWidgets('HTML fieldset source keeps exact legend and body offsets', (
+    tester,
+  ) async {
+    const fieldset =
+        '<fieldset>\n<legend>Alpha bravo</legend>\nCharlie delta\n</fieldset>';
+    const source = 'Before\n\n$fieldset\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    var raw = selectableTextWithPlainText(fieldset);
+    expect(raw, findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-html-fieldset')),
+      findsNothing,
+    );
+
+    await tapSelectableSubstring(tester, raw, 'Alpha bravo', offsetWithin: 8);
+    await tester.pumpAndSettle();
+    expect(controller.selection.isCollapsed, isTrue);
+    expect(controller.selection.extentOffset, 35);
+
+    await tester.tap(find.text('After'));
+    await tester.pumpAndSettle();
+    raw = selectableTextWithPlainText(fieldset);
+    await tapSelectableSubstring(tester, raw, 'Charlie delta', offsetWithin: 5);
+    await tester.pumpAndSettle();
+    expect(controller.selection.isCollapsed, isTrue);
+    expect(controller.selection.extentOffset, 53);
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('HTML center enters its exact block source on normal click', (
     tester,
   ) async {
