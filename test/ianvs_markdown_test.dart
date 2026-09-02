@@ -1363,6 +1363,35 @@ Escaped \\<span>literal \\</span> after.
     expect(_renderedPlainTextContains(tester, '<input'), isFalse);
   });
 
+  testWidgets('renders a mutually exclusive Obsidian HTML radio group', (
+    tester,
+  ) async {
+    const source =
+        'Before\n\n<input type="radio" name="probe" checked> Alpha bravo\n<input type="radio" name="probe"> Charlie delta\n\nAfter';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    final group = find.byWidgetPredicate((widget) => widget is RadioGroup<int>);
+    final controls = find.byType(Radio<int>);
+    expect(group, findsOneWidget);
+    expect(controls, findsNWidgets(2));
+    expect(tester.widget<RadioGroup<int>>(group).groupValue, 0);
+    expect(find.text('Alpha bravo'), findsOneWidget);
+    expect(find.text('Charlie delta'), findsOneWidget);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('ianvs-markdown-html-radio-0'))),
+      const Size(13, 13),
+    );
+    expect(_renderedPlainTextContains(tester, '<input'), isFalse);
+
+    await tester.tap(controls.at(1));
+    await tester.pumpAndSettle();
+    expect(tester.widget<RadioGroup<int>>(group).groupValue, 1);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+    expect(tester.widget<RadioGroup<int>>(group).groupValue, 0);
+  });
+
   testWidgets('renders a local Obsidian HTML range input', (tester) async {
     const source =
         'Before\n\n<input type="range" min="0" max="10" step="1" value="4">\n\nAfter';

@@ -29,6 +29,7 @@ import 'html_meter.dart';
 import 'html_ordered_list.dart';
 import 'html_pre.dart';
 import 'html_progress.dart';
+import 'html_radio_group.dart';
 import 'html_range_input.dart';
 import 'html_ruby.dart';
 import 'html_select.dart';
@@ -399,6 +400,13 @@ class IanvsMarkdown extends StatelessWidget {
         'ianvs-html-meter': IanvsMarkdownHtmlMeterBuilder(theme: colors),
       'ianvs-html-pre': IanvsMarkdownHtmlPreBuilder(theme: colors),
       'ianvs-html-progress': IanvsMarkdownHtmlProgressBuilder(theme: colors),
+      'ianvs-html-radio-group': IanvsMarkdownHtmlRadioGroupBuilder(
+        presentation:
+            obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing
+            ? IanvsMarkdownHtmlRadioGroupPresentation.editing
+            : IanvsMarkdownHtmlRadioGroupPresentation.reading,
+        theme: colors,
+      ),
       'ianvs-html-range-input': IanvsMarkdownHtmlRangeInputBuilder(
         presentation:
             obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing
@@ -483,6 +491,7 @@ class IanvsMarkdown extends StatelessWidget {
         const IanvsMarkdownHtmlMeterSyntax(),
       const IanvsMarkdownHtmlPreSyntax(),
       const IanvsMarkdownHtmlProgressSyntax(),
+      const IanvsMarkdownHtmlRadioGroupSyntax(),
       const IanvsMarkdownHtmlRangeInputSyntax(),
       const IanvsMarkdownHtmlSelectSyntax(),
       const IanvsMarkdownHtmlTextareaSyntax(),

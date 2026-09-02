@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:ianvs_markdown/src/code_surface.dart';
+import 'package:ianvs_markdown/src/html_radio_group.dart';
 import 'package:ianvs_markdown/src/list_guide.dart';
 
 void main() {
@@ -10257,6 +10258,46 @@ $$''');
       findsNothing,
     );
   });
+
+  testWidgets(
+    'HTML radio groups project local unselected state in Live Preview',
+    (tester) async {
+      const source =
+          'Before\n\n<input type="radio" name="probe" checked> Alpha bravo\n<input type="radio" name="probe"> Charlie delta\n\nAfter';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      final projected = find.byType(IanvsMarkdownHtmlRadioGroup);
+      final group = find.byWidgetPredicate(
+        (widget) => widget is RadioGroup<int>,
+      );
+      final controls = find.byType(Radio<int>);
+      expect(projected, findsOneWidget);
+      expect(group, findsOneWidget);
+      expect(controls, findsNWidgets(2));
+      expect(tester.widget<RadioGroup<int>>(group).groupValue, isNull);
+      expect(find.text('Alpha bravo'), findsOneWidget);
+      expect(find.text('Charlie delta'), findsOneWidget);
+      expect(selectableTextContainingPlainText('<input'), findsNothing);
+
+      await tester.tap(controls.at(1));
+      await tester.pumpAndSettle();
+      expect(tester.widget<RadioGroup<int>>(group).groupValue, 1);
+      expect(controller.text, source);
+      expect(controller.isDirty, isFalse);
+      expect(
+        find.byKey(const ValueKey('ianvs-markdown-active-block')),
+        findsNothing,
+      );
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pumpAndSettle();
+      expect(tester.widget<RadioGroup<int>>(group).groupValue, 0);
+      expect(controller.text, source);
+    },
+  );
 
   testWidgets('HTML range input stays exact source in Live Preview', (
     tester,
