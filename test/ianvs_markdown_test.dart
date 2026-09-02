@@ -12,6 +12,7 @@ import 'package:ianvs_markdown/src/html_checkbox.dart';
 import 'package:ianvs_markdown/src/html_number_input.dart';
 import 'package:ianvs_markdown/src/html_textarea.dart';
 import 'package:ianvs_markdown/src/html_select.dart';
+import 'package:ianvs_markdown/src/html_text_input.dart';
 import 'package:ianvs_markdown/src/list_guide.dart';
 import 'package:markdown/markdown.dart' as md;
 
@@ -1425,6 +1426,59 @@ Escaped \\<span>literal \\</span> after.
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
     await tester.pumpAndSettle();
     expect(tester.widget<TextField>(field).controller?.text, '9');
+  });
+
+  testWidgets('renders a persistent local Obsidian HTML text input', (
+    tester,
+  ) async {
+    const source =
+        'Before\n\n<input type="text" value="Alpha bravo" placeholder="Type here"> omega\n\nAfter';
+    var mode = IanvsMarkdownObsidianMetadataMode.reading;
+    late StateSetter setHostState;
+    await tester.pumpWidget(
+      app(
+        StatefulBuilder(
+          builder: (context, setState) {
+            setHostState = setState;
+            return IanvsMarkdown(data: source, obsidianMetadataMode: mode);
+          },
+        ),
+      ),
+    );
+
+    Finder input() => find.byType(IanvsMarkdownHtmlTextInput);
+    Finder field() =>
+        find.descendant(of: input(), matching: find.byType(TextField));
+    expect(input(), findsOneWidget);
+    expect(
+      tester.getSize(
+        find.byKey(const ValueKey('ianvs-markdown-html-text-input')),
+      ),
+      const Size(128, 20),
+    );
+    expect(tester.widget<TextField>(field()).controller?.text, 'Alpha bravo');
+    expect(tester.widget<TextField>(field()).decoration?.hintText, 'Type here');
+    expect(find.text('omega'), findsOneWidget);
+    expect(_renderedPlainTextContains(tester, '<input'), isFalse);
+
+    await tester.tap(field());
+    await tester.enterText(field(), 'Alpha bravoQ');
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(field()).controller?.text, 'Alpha bravoQ');
+
+    setHostState(() => mode = IanvsMarkdownObsidianMetadataMode.editing);
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(field()).controller?.text, 'Alpha bravoQ');
+
+    await tester.tap(field());
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await tester.pump();
+    expect(
+      tester.widget<TextField>(field()).controller?.selection,
+      const TextSelection(baseOffset: 0, extentOffset: 12),
+    );
   });
 
   testWidgets('renders a local Obsidian HTML range input', (tester) async {

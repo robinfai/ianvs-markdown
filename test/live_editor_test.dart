@@ -10,6 +10,7 @@ import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:ianvs_markdown/src/code_surface.dart';
 import 'package:ianvs_markdown/src/html_radio_group.dart';
 import 'package:ianvs_markdown/src/html_number_input.dart';
+import 'package:ianvs_markdown/src/html_text_input.dart';
 import 'package:ianvs_markdown/src/list_guide.dart';
 
 void main() {
@@ -10321,6 +10322,34 @@ $$''');
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
     await tester.pumpAndSettle();
     expect(tester.widget<TextField>(field).controller?.text, '7');
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('HTML text inputs edit locally in Live Preview', (tester) async {
+    const source =
+        'Before\n\n<input type="text" value="Alpha bravo" placeholder="Type here"> omega\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final input = find.byType(IanvsMarkdownHtmlTextInput);
+    final field = find.descendant(of: input, matching: find.byType(TextField));
+    expect(input, findsOneWidget);
+    expect(tester.widget<TextField>(field).controller?.text, 'Alpha bravo');
+    expect(tester.widget<TextField>(field).decoration?.hintText, 'Type here');
+    expect(find.text('omega'), findsOneWidget);
+    expect(selectableTextContainingPlainText('<input'), findsNothing);
+
+    await tester.tap(field);
+    await tester.enterText(field, 'Alpha bravoQ');
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(field).controller?.text, 'Alpha bravoQ');
     expect(controller.text, source);
     expect(controller.isDirty, isFalse);
     expect(
