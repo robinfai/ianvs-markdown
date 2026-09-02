@@ -20,6 +20,7 @@ import 'html_blockquote.dart';
 import 'html_button.dart';
 import 'html_center.dart';
 import 'html_checkbox.dart';
+import 'html_date_input.dart';
 import 'html_details.dart';
 import 'html_definition_list.dart';
 import 'html_fieldset.dart';
@@ -395,6 +396,7 @@ class IanvsMarkdown extends StatelessWidget {
             _buildHtmlFigureBody(context, source, effectiveStyleSheet, colors),
       ),
       'ianvs-html-checkbox': IanvsMarkdownHtmlCheckboxBuilder(theme: colors),
+      'ianvs-html-date-input': IanvsMarkdownHtmlDateInputBuilder(theme: colors),
       'ianvs-html-hr': IanvsMarkdownHtmlHorizontalRuleBuilder(
         decoration: effectiveStyleSheet.horizontalRuleDecoration,
       ),
@@ -493,6 +495,7 @@ class IanvsMarkdown extends StatelessWidget {
       const IanvsMarkdownHtmlHorizontalRuleSyntax(),
       const IanvsMarkdownHtmlButtonSyntax(),
       const IanvsMarkdownHtmlCheckboxSyntax(),
+      const IanvsMarkdownHtmlDateInputSyntax(),
       if (obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.reading)
         const IanvsMarkdownHtmlMeterSyntax(),
       const IanvsMarkdownHtmlNumberInputSyntax(),

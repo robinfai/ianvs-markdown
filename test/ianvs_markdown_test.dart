@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:ianvs_markdown/src/code_surface.dart';
 import 'package:ianvs_markdown/src/html_checkbox.dart';
+import 'package:ianvs_markdown/src/html_date_input.dart';
 import 'package:ianvs_markdown/src/html_number_input.dart';
 import 'package:ianvs_markdown/src/html_textarea.dart';
 import 'package:ianvs_markdown/src/html_select.dart';
@@ -1479,6 +1480,38 @@ Escaped \\<span>literal \\</span> after.
       tester.widget<TextField>(field()).controller?.selection,
       const TextSelection(baseOffset: 0, extentOffset: 12),
     );
+  });
+
+  testWidgets('renders a segmented local Obsidian HTML date input', (
+    tester,
+  ) async {
+    const source =
+        'Before\n\n<input type="date" value="2026-09-02" min="2026-09-01" max="2026-09-30"> omega\n\nAfter';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    final date = find.byType(IanvsMarkdownHtmlDateInput);
+    final control = find.byKey(
+      const ValueKey('ianvs-markdown-html-date-input'),
+    );
+    final day = find.byKey(const ValueKey('ianvs-markdown-html-date-day'));
+    expect(date, findsOneWidget);
+    expect(control, findsOneWidget);
+    expect(tester.getSize(control), const Size(82, 20));
+    expect(find.text('2026'), findsOneWidget);
+    expect(find.text('09'), findsOneWidget);
+    expect(find.text('02'), findsOneWidget);
+    expect(find.byIcon(Icons.calendar_month_outlined), findsOneWidget);
+    expect(find.text('omega'), findsOneWidget);
+    expect(_renderedPlainTextContains(tester, '<input'), isFalse);
+
+    await tester.tap(day);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+    expect(find.text('03'), findsOneWidget);
+    expect(find.text('02'), findsNothing);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    expect(find.text('02'), findsOneWidget);
   });
 
   testWidgets('renders a local Obsidian HTML range input', (tester) async {

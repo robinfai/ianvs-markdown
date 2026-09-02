@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:ianvs_markdown/src/code_surface.dart';
+import 'package:ianvs_markdown/src/html_date_input.dart';
 import 'package:ianvs_markdown/src/html_radio_group.dart';
 import 'package:ianvs_markdown/src/html_number_input.dart';
 import 'package:ianvs_markdown/src/html_text_input.dart';
@@ -10350,6 +10351,34 @@ $$''');
     await tester.enterText(field, 'Alpha bravoQ');
     await tester.pumpAndSettle();
     expect(tester.widget<TextField>(field).controller?.text, 'Alpha bravoQ');
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('HTML date inputs step locally in Live Preview', (tester) async {
+    const source =
+        'Before\n\n<input type="date" value="2026-09-02" min="2026-09-01" max="2026-09-30"> omega\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final date = find.byType(IanvsMarkdownHtmlDateInput);
+    final day = find.byKey(const ValueKey('ianvs-markdown-html-date-day'));
+    expect(date, findsOneWidget);
+    expect(find.text('2026'), findsOneWidget);
+    expect(find.text('09'), findsOneWidget);
+    expect(find.text('02'), findsOneWidget);
+    expect(selectableTextContainingPlainText('<input'), findsNothing);
+
+    await tester.tap(day);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+    expect(find.text('03'), findsOneWidget);
     expect(controller.text, source);
     expect(controller.isDirty, isFalse);
     expect(
