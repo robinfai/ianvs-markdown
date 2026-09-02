@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:ianvs_markdown/src/code_surface.dart';
 import 'package:ianvs_markdown/src/html_radio_group.dart';
+import 'package:ianvs_markdown/src/html_number_input.dart';
 import 'package:ianvs_markdown/src/list_guide.dart';
 
 void main() {
@@ -10298,6 +10299,35 @@ $$''');
       expect(controller.text, source);
     },
   );
+
+  testWidgets('HTML number inputs edit locally in Live Preview', (
+    tester,
+  ) async {
+    const source =
+        'Before\n\n<input type="number" min="1" max="9" step="2" value="5"> Alpha bravo\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final number = find.byType(IanvsMarkdownHtmlNumberInput);
+    final field = find.descendant(of: number, matching: find.byType(TextField));
+    expect(number, findsOneWidget);
+    expect(tester.widget<TextField>(field).controller?.text, '5');
+    expect(find.text('Alpha bravo'), findsOneWidget);
+    expect(selectableTextContainingPlainText('<input'), findsNothing);
+
+    await tester.tap(field);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(field).controller?.text, '7');
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
+  });
 
   testWidgets('HTML range input stays exact source in Live Preview', (
     tester,

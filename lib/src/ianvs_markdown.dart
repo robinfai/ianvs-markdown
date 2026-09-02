@@ -26,6 +26,7 @@ import 'html_fieldset.dart';
 import 'html_figure.dart';
 import 'html_hr.dart';
 import 'html_meter.dart';
+import 'html_number_input.dart';
 import 'html_ordered_list.dart';
 import 'html_pre.dart';
 import 'html_progress.dart';
@@ -398,6 +399,9 @@ class IanvsMarkdown extends StatelessWidget {
       ),
       if (obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.reading)
         'ianvs-html-meter': IanvsMarkdownHtmlMeterBuilder(theme: colors),
+      'ianvs-html-number-input': IanvsMarkdownHtmlNumberInputBuilder(
+        theme: colors,
+      ),
       'ianvs-html-pre': IanvsMarkdownHtmlPreBuilder(theme: colors),
       'ianvs-html-progress': IanvsMarkdownHtmlProgressBuilder(theme: colors),
       'ianvs-html-radio-group': IanvsMarkdownHtmlRadioGroupBuilder(
@@ -489,6 +493,7 @@ class IanvsMarkdown extends StatelessWidget {
       const IanvsMarkdownHtmlCheckboxSyntax(),
       if (obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.reading)
         const IanvsMarkdownHtmlMeterSyntax(),
+      const IanvsMarkdownHtmlNumberInputSyntax(),
       const IanvsMarkdownHtmlPreSyntax(),
       const IanvsMarkdownHtmlProgressSyntax(),
       const IanvsMarkdownHtmlRadioGroupSyntax(),

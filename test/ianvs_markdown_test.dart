@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:ianvs_markdown/src/code_surface.dart';
 import 'package:ianvs_markdown/src/html_checkbox.dart';
+import 'package:ianvs_markdown/src/html_number_input.dart';
 import 'package:ianvs_markdown/src/html_textarea.dart';
 import 'package:ianvs_markdown/src/html_select.dart';
 import 'package:ianvs_markdown/src/list_guide.dart';
@@ -1390,6 +1391,40 @@ Escaped \\<span>literal \\</span> after.
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
     await tester.pumpAndSettle();
     expect(tester.widget<RadioGroup<int>>(group).groupValue, 0);
+  });
+
+  testWidgets('renders a local Obsidian HTML number stepper', (tester) async {
+    const source =
+        'Before\n\n<input type="number" min="1" max="9" step="2" value="5"> Alpha bravo\n\nAfter';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    final number = find.byType(IanvsMarkdownHtmlNumberInput);
+    final control = find.byKey(
+      const ValueKey('ianvs-markdown-html-number-input'),
+    );
+    final field = find.descendant(
+      of: control,
+      matching: find.byType(TextField),
+    );
+    expect(number, findsOneWidget);
+    expect(control, findsOneWidget);
+    expect(tester.getSize(control), const Size(35, 20));
+    expect(tester.widget<TextField>(field).controller?.text, '5');
+    expect(find.text('Alpha bravo'), findsOneWidget);
+    expect(_renderedPlainTextContains(tester, '<input'), isFalse);
+
+    await tester.tap(field);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(field).controller?.text, '7');
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(field).controller?.text, '5');
+
+    await tester.enterText(field, '8');
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(field).controller?.text, '9');
   });
 
   testWidgets('renders a local Obsidian HTML range input', (tester) async {
