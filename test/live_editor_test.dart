@@ -10387,6 +10387,30 @@ $$''');
     );
   });
 
+  testWidgets('HTML password inputs stay literal in Live Preview', (
+    tester,
+  ) async {
+    const source =
+        'Before\n\n<input type="password" value="alpha123" placeholder="Passphrase"> omega\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    expect(
+      selectableTextContainingPlainText(
+        'input type="password" value="alpha123" '
+        'placeholder="Passphrase" omega',
+      ),
+      findsOneWidget,
+    );
+    expect(selectableTextContainingPlainText('<input'), findsNothing);
+    expect(selectableTextContainingPlainText('Passphrase">'), findsNothing);
+    expect(find.byType(TextField), findsNothing);
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('HTML range input stays exact source in Live Preview', (
     tester,
   ) async {

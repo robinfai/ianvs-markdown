@@ -1514,6 +1514,28 @@ Escaped \\<span>literal \\</span> after.
     expect(find.text('02'), findsOneWidget);
   });
 
+  testWidgets('keeps unsupported HTML password inputs as literal projection', (
+    tester,
+  ) async {
+    const source =
+        'Before\n\n<input type="password" value="alpha123" placeholder="Passphrase"> omega\n\nAfter';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    expect(
+      _renderedPlainTextContains(
+        tester,
+        'input type="password" value="alpha123" '
+        'placeholder="Passphrase" omega',
+      ),
+      isTrue,
+    );
+    expect(_renderedPlainTextContains(tester, '<input'), isFalse);
+    expect(_renderedPlainTextContains(tester, 'Passphrase">'), isFalse);
+    expect(_renderedPlainTextContains(tester, 'alpha123'), isTrue);
+    expect(find.byType(TextField), findsNothing);
+    expect(find.text('omega'), findsNothing);
+  });
+
   testWidgets('renders a local Obsidian HTML range input', (tester) async {
     const source =
         'Before\n\n<input type="range" min="0" max="10" step="1" value="4">\n\nAfter';

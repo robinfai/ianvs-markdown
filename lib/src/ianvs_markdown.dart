@@ -29,6 +29,7 @@ import 'html_hr.dart';
 import 'html_meter.dart';
 import 'html_number_input.dart';
 import 'html_ordered_list.dart';
+import 'html_password_input.dart';
 import 'html_pre.dart';
 import 'html_progress.dart';
 import 'html_radio_group.dart';
@@ -499,6 +500,7 @@ class IanvsMarkdown extends StatelessWidget {
       if (obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.reading)
         const IanvsMarkdownHtmlMeterSyntax(),
       const IanvsMarkdownHtmlNumberInputSyntax(),
+      const IanvsMarkdownHtmlPasswordInputSyntax(),
       const IanvsMarkdownHtmlPreSyntax(),
       const IanvsMarkdownHtmlProgressSyntax(),
       const IanvsMarkdownHtmlRadioGroupSyntax(),
