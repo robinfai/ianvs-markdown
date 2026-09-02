@@ -841,14 +841,15 @@ final class IanvsMarkdownEditingMetadataBuilder extends MarkdownElementBuilder {
       height: 1.45,
     );
     final blockIdCaret = kind == 'block-id' ? content.indexOf('^') : -1;
-    final text = blockIdCaret < 0
-        ? Text(
-            content,
-            semanticsLabel: 'Obsidian $kind editing metadata',
-            style: style,
-          )
-        : Text.rich(
-            TextSpan(
+    // Keep every inline metadata element span-backed. flutter_markdown_plus can
+    // then merge it with the text on both sides into one RichText. A Text(data)
+    // is treated as a separate Wrap child; when the following child ends in a
+    // soft line break, center alignment shifts that text to the previous visual
+    // line and makes the paragraph baselines visibly diverge.
+    final text = Text.rich(
+      blockIdCaret < 0
+          ? TextSpan(text: content, style: style)
+          : TextSpan(
               children: <InlineSpan>[
                 if (blockIdCaret > 0)
                   TextSpan(
@@ -863,8 +864,8 @@ final class IanvsMarkdownEditingMetadataBuilder extends MarkdownElementBuilder {
                   ),
               ],
             ),
-            semanticsLabel: 'Obsidian $kind editing metadata',
-          );
+      semanticsLabel: 'Obsidian $kind editing metadata',
+    );
     return block ? Align(alignment: Alignment.centerLeft, child: text) : text;
   }
 }

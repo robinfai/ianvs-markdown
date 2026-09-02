@@ -3999,16 +3999,19 @@ Standard[^standard] and inline ^[inline footnote body].
       ),
     );
 
-    expect(find.text('%%inline secret%%'), findsOneWidget);
-    expect(find.text('%%second secret%%'), findsOneWidget);
+    expect(_renderedPlainTextContains(tester, '%%inline secret%%'), isTrue);
+    expect(_renderedPlainTextContains(tester, '%%second secret%%'), isTrue);
     expect(_renderedPlainTextContains(tester, ' ^probe-block'), isTrue);
-    expect(find.text('[^standard]'), findsOneWidget);
-    expect(find.text('^[inline footnote body]'), findsOneWidget);
+    expect(_renderedPlainTextContains(tester, '[^standard]'), isTrue);
+    expect(
+      _renderedPlainTextContains(tester, '^[inline footnote body]'),
+      isTrue,
+    );
     expect(find.text('[^standard]: Definition source.'), findsOneWidget);
 
-    final comment = tester.widget<Text>(find.text('%%inline secret%%'));
-    expect(comment.style?.fontFamily, isNotNull);
-    expect(comment.style?.color, isNotNull);
+    final commentStyle = _renderedTextStyle(tester, '%%inline secret%%');
+    expect(commentStyle?.fontFamily, isNotNull);
+    expect(commentStyle?.color, isNotNull);
   });
 
   testWidgets('editing metadata preserves empty and nested inline footnotes', (
@@ -4023,8 +4026,8 @@ Standard[^standard] and inline ^[inline footnote body].
       ),
     );
 
-    expect(find.text('^[]'), findsOneWidget);
-    expect(find.text('^[outer ^[inner]]'), findsOneWidget);
+    expect(_renderedPlainTextContains(tester, '^[]'), isTrue);
+    expect(_renderedPlainTextContains(tester, '^[outer ^[inner]]'), isTrue);
   });
 
   testWidgets('reading mode renders empty and nested inline footnotes', (
@@ -4181,7 +4184,7 @@ visible''';
       ),
     );
 
-    expect(find.text('%%secret%%'), findsOneWidget);
+    expect(_renderedPlainTextContains(tester, '%%secret%%'), isTrue);
     expect(find.textContaining('%%literal%%'), findsOneWidget);
     expect(find.textContaining(r'unclosed %% tail'), findsOneWidget);
   });

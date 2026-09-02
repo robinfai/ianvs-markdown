@@ -77,6 +77,23 @@ void main() {
             ),
       );
 
+  Future<void> tapSelectableSubstring(
+    WidgetTester tester,
+    Finder finder,
+    String substring, {
+    int offsetWithin = 1,
+  }) async {
+    final widget = tester.widget<SelectableText>(finder);
+    final plainText = widget.data ?? widget.textSpan?.toPlainText() ?? '';
+    final substringStart = plainText.indexOf(substring);
+    expect(substringStart, isNonNegative);
+    final editable = editableWithin(tester, finder);
+    final caret = editable.getLocalRectForCaret(
+      TextPosition(offset: substringStart + offsetWithin),
+    );
+    await tester.tapAt(editable.localToGlobal(caret.center));
+  }
+
   testWidgets('clicking a rendered block edits its exact source in place', (
     tester,
   ) async {
@@ -10516,15 +10533,19 @@ Standard[^note] and inline ^[inline body].
     await tester.pumpWidget(app(controller));
     await tester.pumpAndSettle();
 
-    expect(find.text('%%secret%%'), findsOneWidget);
+    expect(selectableTextContainingPlainText('%%secret%%'), findsOneWidget);
     expect(selectableTextContainingPlainText('^block-id'), findsOneWidget);
-    expect(find.text('[^note]'), findsOneWidget);
-    expect(find.text('^[inline body]'), findsOneWidget);
+    expect(selectableTextContainingPlainText('[^note]'), findsOneWidget);
+    expect(selectableTextContainingPlainText('^[inline body]'), findsOneWidget);
     expect(find.text('1.'), findsNothing);
     expect(find.textContaining('Definition with'), findsOneWidget);
     expect(find.textContaining('[^note]:'), findsNothing);
 
-    await tester.tap(find.text('[^note]'));
+    await tapSelectableSubstring(
+      tester,
+      selectableTextContainingPlainText('[^note]'),
+      '[^note]',
+    );
     await tester.pump();
     var active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
     var field = tester.widget<TextField>(
@@ -10536,13 +10557,55 @@ Standard[^note] and inline ^[inline body].
     );
     expect(controller.text, source);
 
-    await tester.tap(find.text('%%secret%%'));
+    await tapSelectableSubstring(
+      tester,
+      selectableTextContainingPlainText('%%secret%%'),
+      '%%secret%%',
+    );
     await tester.pump();
     active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
     field = tester.widget<TextField>(
       find.descendant(of: active, matching: find.byType(TextField)),
     );
     expect(field.controller?.text, 'Visible %%secret%% after. ^block-id');
+  });
+
+  testWidgets('inactive footnote metadata keeps paragraph baselines aligned', (
+    tester,
+  ) async {
+    const paragraph =
+        'Standard footnotes[^standard] and inline notes\n'
+        '^[Inline footnotes join the same numbered footer.] share one sequence.';
+    final controller = IanvsMarkdownController(
+      text:
+          '''
+Before
+
+$paragraph
+
+[^standard]: Standard footnote body.
+''',
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final rendered = selectableTextWithPlainText(paragraph);
+    expect(rendered, findsOneWidget);
+    final editable = editableWithin(tester, rendered);
+    final leading = editable.getLocalRectForCaret(
+      const TextPosition(offset: 0),
+    );
+    final trailing = editable.getLocalRectForCaret(
+      TextPosition(offset: paragraph.indexOf('and inline notes')),
+    );
+    final nextLine = editable.getLocalRectForCaret(
+      TextPosition(offset: paragraph.indexOf('^[Inline')),
+    );
+
+    expect(trailing.top, closeTo(leading.top, .01));
+    expect(nextLine.top, greaterThan(leading.top));
   });
 
   testWidgets(
@@ -10566,8 +10629,11 @@ After
       await tester.pumpWidget(app(controller));
       await tester.pumpAndSettle();
 
-      expect(find.text('[^note]'), findsOneWidget);
-      expect(find.text('^[secret bravo]'), findsOneWidget);
+      expect(selectableTextContainingPlainText('[^note]'), findsOneWidget);
+      expect(
+        selectableTextContainingPlainText('^[secret bravo]'),
+        findsOneWidget,
+      );
       expect(find.textContaining('[^note]:'), findsNothing);
       expect(find.textContaining('note First line'), findsOneWidget);
       expect(find.textContaining('Continuation line'), findsOneWidget);
@@ -10607,18 +10673,13 @@ After
     await tester.pumpWidget(app(controller));
     await tester.pumpAndSettle();
 
-    final marker = find.text('[^note]');
-    final paragraph = tester.renderObject<RenderParagraph>(
-      find.descendant(of: marker, matching: find.byType(RichText)),
-    );
+    final marker = selectableTextContainingPlainText('[^note]');
+    final paragraph = editableWithin(tester, marker);
     const markerOffset = 4;
-    final caret = paragraph.getOffsetForCaret(
-      const TextPosition(offset: markerOffset),
-      Rect.zero,
+    final caret = paragraph.getLocalRectForCaret(
+      TextPosition(offset: source.indexOf('[^note]') + markerOffset),
     );
-    final target = paragraph.localToGlobal(
-      caret + Offset(.1, paragraph.size.height / 2),
-    );
+    final target = paragraph.localToGlobal(caret.center);
     await tester.tapAt(target);
     await tester.pump(const Duration(milliseconds: 100));
 
@@ -10650,18 +10711,13 @@ After
       await tester.pumpWidget(app(controller));
       await tester.pumpAndSettle();
 
-      final marker = find.text('^[secret bravo]');
-      final paragraph = tester.renderObject<RenderParagraph>(
-        find.descendant(of: marker, matching: find.byType(RichText)),
-      );
+      final marker = selectableTextContainingPlainText('^[secret bravo]');
+      final paragraph = editableWithin(tester, marker);
       const markerOffset = 7;
-      final caret = paragraph.getOffsetForCaret(
-        const TextPosition(offset: markerOffset),
-        Rect.zero,
+      final caret = paragraph.getLocalRectForCaret(
+        TextPosition(offset: source.indexOf('^[secret bravo]') + markerOffset),
       );
-      final target = paragraph.localToGlobal(
-        caret + Offset(.1, paragraph.size.height / 2),
-      );
+      final target = paragraph.localToGlobal(caret.center);
 
       await tester.tapAt(target);
       await tester.pump(const Duration(milliseconds: 100));
@@ -10846,8 +10902,9 @@ After
     await tester.pumpWidget(app(controller));
     await tester.pumpAndSettle();
 
-    expect(find.text(comment), findsOneWidget);
-    await tester.tap(find.text(comment));
+    final rendered = selectableTextContainingPlainText(comment);
+    expect(rendered, findsOneWidget);
+    await tapSelectableSubstring(tester, rendered, comment);
     await tester.pump();
 
     final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
@@ -11004,19 +11061,14 @@ After
     await tester.pumpWidget(app(controller));
     await tester.pumpAndSettle();
 
-    final metadata = find.text(comment);
-    RenderParagraph renderedComment() => tester.renderObject<RenderParagraph>(
-      find.descendant(of: metadata, matching: find.byType(RichText)),
-    );
+    final metadata = selectableTextContainingPlainText(comment);
+    RenderEditable renderedComment() => editableWithin(tester, metadata);
     var paragraph = renderedComment();
     const bodyOffset = 12;
-    var caret = paragraph.getOffsetForCaret(
-      const TextPosition(offset: bodyOffset),
-      Rect.zero,
+    var caret = paragraph.getLocalRectForCaret(
+      TextPosition(offset: 'Alpha '.length + bodyOffset),
     );
-    var target = paragraph.localToGlobal(
-      caret + Offset(.1, paragraph.size.height / 2),
-    );
+    var target = paragraph.localToGlobal(caret.center);
     await tester.tapAt(target);
     await tester.pump(const Duration(milliseconds: 100));
 
@@ -11039,13 +11091,10 @@ After
     await tester.tap(find.text('After'));
     await tester.pumpAndSettle();
     paragraph = renderedComment();
-    caret = paragraph.getOffsetForCaret(
-      const TextPosition(offset: 1),
-      Rect.zero,
+    caret = paragraph.getLocalRectForCaret(
+      TextPosition(offset: 'Alpha '.length + 1),
     );
-    target = paragraph.localToGlobal(
-      caret + Offset(.1, paragraph.size.height / 2),
-    );
+    target = paragraph.localToGlobal(caret.center);
     await tester.tapAt(target);
     await tester.pumpAndSettle();
 
@@ -11096,17 +11145,23 @@ Inline ^[first], missing[^missing], standard[^a], repeated[^a], empty ^[], and s
     await tester.pumpWidget(app(controller));
     await tester.pumpAndSettle();
 
-    expect(find.text('^[first]'), findsOneWidget);
-    expect(find.text('[^missing]'), findsOneWidget);
-    expect(find.text('[^a]'), findsNWidgets(2));
-    expect(find.text('^[]'), findsOneWidget);
-    expect(find.text('[^b]'), findsOneWidget);
+    final rendered = selectableTextContainingPlainText('Inline ^[first]');
+    expect(rendered, findsOneWidget);
+    final renderedText = tester
+        .widget<SelectableText>(rendered)
+        .textSpan!
+        .toPlainText();
+    expect(renderedText, contains('^[first]'));
+    expect(renderedText, contains('[^missing]'));
+    expect(RegExp(r'\[\^a\]').allMatches(renderedText), hasLength(2));
+    expect(renderedText, contains('^[]'));
+    expect(renderedText, contains('[^b]'));
     expect(find.text('2.'), findsNothing);
     expect(find.text('4.'), findsNothing);
     expect(find.textContaining('Alpha.'), findsOneWidget);
     expect(find.textContaining('Beta.'), findsOneWidget);
 
-    await tester.tap(find.text('^[first]'));
+    await tapSelectableSubstring(tester, rendered, '^[first]');
     await tester.pump();
     final field = tester.widget<TextField>(
       find.descendant(
@@ -11135,7 +11190,7 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     await tester.pumpWidget(app(controller));
     await tester.pumpAndSettle();
 
-    expect(find.text('^[bold body]'), findsOneWidget);
+    expect(selectableTextContainingPlainText('^[bold body]'), findsOneWidget);
     final visibleSegments = <String>[
       ...tester
           .widgetList<SelectableText>(find.byType(SelectableText))
@@ -11174,10 +11229,14 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
       return text.contains('^[not-footnote]');
     });
     expect(code, findsAtLeastNWidgets(1));
-    expect(find.text('[^a]'), findsOneWidget);
+    expect(selectableTextContainingPlainText('[^a]'), findsOneWidget);
     expect(find.text('1.'), findsNothing);
 
-    await tester.tap(find.text('[^a]'));
+    await tapSelectableSubstring(
+      tester,
+      selectableTextContainingPlainText('[^a]'),
+      '[^a]',
+    );
     await tester.pump();
     final field = tester.widget<TextField>(
       find.descendant(
