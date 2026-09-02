@@ -10258,6 +10258,25 @@ $$''');
     );
   });
 
+  testWidgets('HTML range input stays exact source in Live Preview', (
+    tester,
+  ) async {
+    const range = '<input type="range" min="0" max="10" step="1" value="4">';
+    const source = 'Before\n\n$range\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    expect(selectableTextWithPlainText(range), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-html-range-input')),
+      findsNothing,
+    );
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+  });
+
   testWidgets('HTML textarea edits locally without rewriting its source', (
     tester,
   ) async {

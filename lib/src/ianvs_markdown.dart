@@ -29,6 +29,7 @@ import 'html_meter.dart';
 import 'html_ordered_list.dart';
 import 'html_pre.dart';
 import 'html_progress.dart';
+import 'html_range_input.dart';
 import 'html_ruby.dart';
 import 'html_select.dart';
 import 'html_table.dart';
@@ -398,6 +399,14 @@ class IanvsMarkdown extends StatelessWidget {
         'ianvs-html-meter': IanvsMarkdownHtmlMeterBuilder(theme: colors),
       'ianvs-html-pre': IanvsMarkdownHtmlPreBuilder(theme: colors),
       'ianvs-html-progress': IanvsMarkdownHtmlProgressBuilder(theme: colors),
+      'ianvs-html-range-input': IanvsMarkdownHtmlRangeInputBuilder(
+        presentation:
+            obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing
+            ? IanvsMarkdownHtmlRangeInputPresentation.editing
+            : IanvsMarkdownHtmlRangeInputPresentation.reading,
+        onTap: onTapText,
+        theme: colors,
+      ),
       'ianvs-html-ruby': IanvsMarkdownHtmlRubyBuilder(theme: colors),
       'ianvs-html-select': IanvsMarkdownHtmlSelectBuilder(theme: colors),
       'ianvs-html-figure': IanvsMarkdownHtmlFigureBuilder(
@@ -474,6 +483,7 @@ class IanvsMarkdown extends StatelessWidget {
         const IanvsMarkdownHtmlMeterSyntax(),
       const IanvsMarkdownHtmlPreSyntax(),
       const IanvsMarkdownHtmlProgressSyntax(),
+      const IanvsMarkdownHtmlRangeInputSyntax(),
       const IanvsMarkdownHtmlSelectSyntax(),
       const IanvsMarkdownHtmlTextareaSyntax(),
       const IanvsMarkdownHtmlFieldsetSyntax(),

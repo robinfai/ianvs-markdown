@@ -1363,6 +1363,37 @@ Escaped \\<span>literal \\</span> after.
     expect(_renderedPlainTextContains(tester, '<input'), isFalse);
   });
 
+  testWidgets('renders a local Obsidian HTML range input', (tester) async {
+    const source =
+        'Before\n\n<input type="range" min="0" max="10" step="1" value="4">\n\nAfter';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    final range = find.byKey(const ValueKey('ianvs-markdown-html-range-input'));
+    final slider = find.descendant(of: range, matching: find.byType(Slider));
+    expect(range, findsOneWidget);
+    expect(tester.getSize(range), const Size(72, 10));
+    expect(tester.widget<Slider>(slider).value, 4);
+    expect(
+      tester.widget<Slider>(slider).semanticFormatterCallback?.call(4),
+      '4',
+    );
+    expect(_renderedPlainTextContains(tester, '<input'), isFalse);
+
+    await tester.tapAt(tester.getTopLeft(range) + const Offset(30, 5));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Slider>(slider).value, 4);
+    expect(
+      FocusManager.instance.primaryFocus?.debugLabel,
+      'Ianvs Markdown HTML range input',
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    expect(tester.widget<Slider>(slider).value, 5);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+    expect(tester.widget<Slider>(slider).value, 4);
+  });
+
   testWidgets('renders view-local Obsidian HTML textarea inputs', (
     tester,
   ) async {
