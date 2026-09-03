@@ -4989,6 +4989,14 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       value.selection,
     );
     if (selection == null || selection == widget.controller.selection) return;
+    // A table cell owns its own editor surface. Clear any previously active
+    // block before synchronizing the document selection so moving focus into
+    // a cell keeps the rendered table visible instead of replacing it with
+    // the raw block editor.
+    _activeBlockStart = null;
+    _activeGapLine = false;
+    _foldedSelectionBridge = null;
+    _blockController.revealLeadingMarker = false;
     widget.controller.selection = selection;
   }
 

@@ -14403,6 +14403,36 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     );
   });
 
+  testWidgets('table cells stay rendered when focus leaves an active block', (
+    tester,
+  ) async {
+    final controller = IanvsMarkdownController(
+      text: 'Paragraph\n\n| A | B |\n| --- | --- |\n| one | two |',
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Paragraph'));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsOneWidget,
+    );
+
+    final cell = find.byKey(const ValueKey('ianvs-markdown-table-1-0'));
+    await tester.tap(cell);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
+    expect(find.bySemanticsLabel('Editable Markdown table'), findsOneWidget);
+    expect(tester.widget<TextField>(cell).focusNode?.hasFocus, isTrue);
+  });
+
   testWidgets('table edits normalize complete source like Obsidian', (
     tester,
   ) async {
