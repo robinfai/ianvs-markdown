@@ -5826,7 +5826,7 @@ void main() {
     );
     expect(field.controller?.text, heading);
     expect(field.style?.fontSize, 21);
-    expect(find.text('H2'), findsOneWidget);
+    expect(find.text('H2'), findsNothing);
     expect(controller.text, '$heading\n\nAfter');
   });
 
