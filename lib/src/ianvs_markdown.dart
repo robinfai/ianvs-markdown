@@ -37,6 +37,7 @@ import 'html_range_input.dart';
 import 'html_ruby.dart';
 import 'html_select.dart';
 import 'html_table.dart';
+import 'html_temporal_input.dart';
 import 'html_text_input.dart';
 import 'html_time_input.dart';
 import 'html_textarea.dart';
@@ -434,6 +435,9 @@ class IanvsMarkdown extends StatelessWidget {
         bodyBuilder: (context, source) =>
             _buildHtmlTableBody(context, source, effectiveStyleSheet, colors),
       ),
+      'ianvs-html-temporal-input': IanvsMarkdownHtmlTemporalInputBuilder(
+        theme: colors,
+      ),
       'ianvs-html-text-input': IanvsMarkdownHtmlTextInputBuilder(theme: colors),
       'ianvs-html-time-input': IanvsMarkdownHtmlTimeInputBuilder(theme: colors),
       'ianvs-html-textarea': IanvsMarkdownHtmlTextareaBuilder(theme: colors),
@@ -515,6 +519,7 @@ class IanvsMarkdown extends StatelessWidget {
       const IanvsMarkdownHtmlDefinitionListSyntax(),
       const IanvsMarkdownHtmlFigureSyntax(),
       const IanvsMarkdownHtmlTableSyntax(),
+      const IanvsMarkdownHtmlTemporalInputSyntax(),
       const IanvsMarkdownHtmlTextInputSyntax(),
       const IanvsMarkdownHtmlTimeInputSyntax(),
       const IanvsMarkdownHtmlUnorderedListSyntax(),

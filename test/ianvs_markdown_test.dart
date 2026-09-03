@@ -13,6 +13,7 @@ import 'package:ianvs_markdown/src/html_date_input.dart';
 import 'package:ianvs_markdown/src/html_number_input.dart';
 import 'package:ianvs_markdown/src/html_textarea.dart';
 import 'package:ianvs_markdown/src/html_time_input.dart';
+import 'package:ianvs_markdown/src/html_temporal_input.dart';
 import 'package:ianvs_markdown/src/html_select.dart';
 import 'package:ianvs_markdown/src/html_text_input.dart';
 import 'package:ianvs_markdown/src/list_guide.dart';
@@ -1549,6 +1550,33 @@ Escaped \\<span>literal \\</span> after.
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
     await tester.pumpAndSettle();
     expect(find.text('46'), findsOneWidget);
+  });
+
+  testWidgets('renders Obsidian HTML temporal input types', (tester) async {
+    const source = '''
+<input type="month" value="2026-09"> month
+
+<input type="week" value="2026-W36"> week
+
+<input type="datetime-local" value="2026-09-03T13:45"> datetime
+''';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    final inputs = find.byType(IanvsMarkdownHtmlTemporalInput);
+    final fields = find.descendant(
+      of: inputs,
+      matching: find.byType(TextField),
+    );
+    expect(inputs, findsNWidgets(3));
+    expect(fields, findsNWidgets(3));
+    expect(tester.widget<TextField>(fields.at(0)).controller?.text, '2026-09');
+    expect(tester.widget<TextField>(fields.at(1)).controller?.text, '2026-W36');
+    expect(
+      tester.widget<TextField>(fields.at(2)).controller?.text,
+      '2026-09-03T13:45',
+    );
+    expect(find.byIcon(Icons.calendar_month_outlined), findsNWidgets(3));
+    expect(_renderedPlainTextContains(tester, '<input'), isFalse);
   });
 
   testWidgets('renders a segmented local Obsidian HTML date input', (

@@ -13,6 +13,7 @@ import 'package:ianvs_markdown/src/html_radio_group.dart';
 import 'package:ianvs_markdown/src/html_number_input.dart';
 import 'package:ianvs_markdown/src/html_text_input.dart';
 import 'package:ianvs_markdown/src/html_time_input.dart';
+import 'package:ianvs_markdown/src/html_temporal_input.dart';
 import 'package:ianvs_markdown/src/list_guide.dart';
 
 void main() {
@@ -10423,6 +10424,44 @@ After''';
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
     await tester.pumpAndSettle();
     expect(find.text('46'), findsOneWidget);
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('HTML temporal inputs stay local in Live Preview', (
+    tester,
+  ) async {
+    const source = '''Before
+
+<input type="month" value="2026-09"> month
+
+<input type="week" value="2026-W36"> week
+
+<input type="datetime-local" value="2026-09-03T13:45"> datetime
+
+After''';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final inputs = find.byType(IanvsMarkdownHtmlTemporalInput);
+    final fields = find.descendant(
+      of: inputs,
+      matching: find.byType(TextField),
+    );
+    expect(inputs, findsNWidgets(3));
+    expect(fields, findsNWidgets(3));
+    expect(selectableTextContainingPlainText('<input'), findsNothing);
+
+    await tester.tap(fields.first);
+    await tester.enterText(fields.first, '2026-10');
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(fields.first).controller?.text, '2026-10');
     expect(controller.text, source);
     expect(controller.isDirty, isFalse);
     expect(
