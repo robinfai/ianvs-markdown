@@ -50,8 +50,8 @@ class IanvsMarkdownRenderedWhitespaceSyntax extends md.InlineSyntax {
 enum IanvsMarkdownCodeSpanPresentation { editing, reading }
 
 /// Matches Obsidian's code-span behavior in both live preview and reading
-/// view. Live preview preserves the backtick delimiters, source whitespace,
-/// and soft line breaks; reading view hides the delimiters and normalizes
+/// view. Both projections hide the backtick delimiters. Live preview keeps
+/// source whitespace and soft line breaks, while reading view normalizes
 /// whitespace.
 class IanvsMarkdownCodeSpanSyntax extends md.InlineSyntax {
   static const _pattern = r'(`+(?!`))((?:.|\n)*?[^`])\1(?!`)';
@@ -81,9 +81,6 @@ class IanvsMarkdownCodeSpanSyntax extends md.InlineSyntax {
     }
     if (presentation == IanvsMarkdownCodeSpanPresentation.reading) {
       code = code.replaceAll(RegExp(r'[ \t\r\n]+'), ' ');
-    } else {
-      final marker = match.group(1)!;
-      code = '$marker$code$marker';
     }
     if (parser.encodeHtml) code = htmlEscape.convert(code);
     parser.addNode(md.Element.text('ianvs-inline-code', code));

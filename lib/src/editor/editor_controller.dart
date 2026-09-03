@@ -2298,7 +2298,8 @@ TextSpan buildMarkdownSourceTextSpan(
 /// This is kept out of the package export surface and shared with Live
 /// Preview so a desktop double click can select the same revealed source that
 /// Obsidian exposes. Inline code deliberately keeps native word selection
-/// because its backticks remain visible even outside the active span.
+/// so native word selection remains available when its hidden delimiters are
+/// revealed.
 TextRange? ianvsMarkdownInlineSourceRangeAt(
   String text,
   TextRange content, {
@@ -3289,10 +3290,15 @@ List<TextRange> _addInlineCodeSyntaxTokens(
           ? TextRange(start: closingLineStart, end: closingEnd)
           : revealRange;
       ranges.add(revealRange);
-      // Obsidian keeps code-span backticks visible in Live Preview, so these
-      // marker tokens do not participate in local reveal or double-click
-      // source expansion.
-      target.add(_SyntaxToken(openingStart, openingEnd, markerStyle));
+      target.add(
+        _SyntaxToken(
+          openingStart,
+          openingEnd,
+          markerStyle,
+          inlineMarkerRange: openingRevealRange,
+          selectsInlineSource: false,
+        ),
+      );
 
       final contentStart = openingEnd;
       final contentEnd = closingStart;
@@ -3328,7 +3334,15 @@ List<TextRange> _addInlineCodeSyntaxTokens(
       } else if (contentStart < contentEnd) {
         target.add(_SyntaxToken(contentStart, contentEnd, contentStyle));
       }
-      target.add(_SyntaxToken(closingStart, closingEnd, markerStyle));
+      target.add(
+        _SyntaxToken(
+          closingStart,
+          closingEnd,
+          markerStyle,
+          inlineMarkerRange: closingRevealRange,
+          selectsInlineSource: false,
+        ),
+      );
       index = closingEnd;
       matched = true;
       break;

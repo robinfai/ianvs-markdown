@@ -1223,11 +1223,12 @@ void main() {
     await tester.pumpWidget(app(controller));
     await tester.pumpAndSettle();
 
-    Finder paragraphFinder() => selectableTextWithPlainText(line);
+    Finder paragraphFinder() =>
+        selectableTextWithPlainText('Alpha bravo charlie omega');
     expect(paragraphFinder(), findsOneWidget);
     final paragraph = editableWithin(tester, paragraphFinder());
     final caret = paragraph.getLocalRectForCaret(
-      const TextPosition(offset: 11),
+      const TextPosition(offset: 10),
     );
     final target = paragraph.localToGlobal(caret.center);
 
@@ -9428,7 +9429,7 @@ $$''');
   });
 
   testWidgets(
-    'active inline code keeps compact mono styling and visible markers',
+    'active inline code reveals markers only while the caret is inside',
     (tester) async {
       const source = 'Before `inline code` after.';
       final controller = IanvsMarkdownController(text: source);
@@ -9472,15 +9473,7 @@ $$''');
       );
       var markers = leaves.where((leaf) => leaf.text == '`').toList();
       expect(markers, hasLength(2));
-      expect(markers.every((leaf) => leaf.style?.fontSize != .01), isTrue);
-      expect(
-        markers.every(
-          (leaf) =>
-              leaf.style?.color ==
-              IanvsMarkdownThemeData.light.inlineCodeForeground,
-        ),
-        isTrue,
-      );
+      expect(markers.every((leaf) => leaf.style?.fontSize == .01), isTrue);
 
       field.controller!.selection = TextSelection.collapsed(
         offset: source.indexOf('code'),

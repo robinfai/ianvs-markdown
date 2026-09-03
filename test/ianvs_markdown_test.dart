@@ -2070,10 +2070,10 @@ Literal:A``Z
         ),
       );
 
-      expect(_renderedPlainTextContains(tester, 'Internal:A`a   b`Z'), isTrue);
-      expect(_renderedPlainTextContains(tester, 'Edges:A` a `Z'), isTrue);
-      expect(_renderedPlainTextContains(tester, 'One:A` `Z'), isTrue);
-      expect(_renderedPlainTextContains(tester, 'Two:A`  `Z'), isTrue);
+      expect(_renderedPlainTextContains(tester, 'Internal:Aa   bZ'), isTrue);
+      expect(_renderedPlainTextContains(tester, 'Edges:A a Z'), isTrue);
+      expect(_renderedPlainTextContains(tester, 'One:A Z'), isTrue);
+      expect(_renderedPlainTextContains(tester, 'Two:A  Z'), isTrue);
       expect(_renderedPlainTextContains(tester, 'Literal:A``Z'), isTrue);
 
       await tester.pumpWidget(
