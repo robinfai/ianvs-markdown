@@ -10359,6 +10359,49 @@ $$''');
     );
   });
 
+  testWidgets('HTML text-like inputs remain local controls in Live Preview', (
+    tester,
+  ) async {
+    const source = '''Before
+
+<input type="email" value="alpha@example.com"> email
+
+<input type="url" value="https://example.com"> url
+
+<input type="tel" value="123-456"> tel
+
+<input type="search" value="needle"> search
+
+After''';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final inputs = find.byType(IanvsMarkdownHtmlTextInput);
+    final fields = find.descendant(
+      of: inputs,
+      matching: find.byType(TextField),
+    );
+    expect(inputs, findsNWidgets(4));
+    expect(fields, findsNWidgets(4));
+    expect(selectableTextContainingPlainText('<input'), findsNothing);
+
+    await tester.tap(fields.at(0));
+    await tester.enterText(fields.at(0), 'beta@example.com');
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<TextField>(fields.at(0)).controller?.text,
+      'beta@example.com',
+    );
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
+  });
+
   testWidgets('HTML date inputs step locally in Live Preview', (tester) async {
     const source =
         'Before\n\n<input type="date" value="2026-09-02" min="2026-09-01" max="2026-09-30"> omega\n\nAfter';

@@ -5,7 +5,7 @@ import 'package:markdown/markdown.dart' as md;
 
 import 'theme.dart';
 
-/// Parses a standalone HTML text input and its trailing visual label.
+/// Parses a standalone HTML text-like input and its trailing visual label.
 class IanvsMarkdownHtmlTextInputSyntax extends md.BlockSyntax {
   const IanvsMarkdownHtmlTextInputSyntax();
 
@@ -13,10 +13,13 @@ class IanvsMarkdownHtmlTextInputSyntax extends md.BlockSyntax {
     r'^ {0,3}<input\b([^>\n]*)/?>[ \t]*(.*)$',
     caseSensitive: false,
   );
-  static final RegExp _typeText = RegExp(
-    r'''\btype\s*=\s*(?:"text"|'text'|text)(?:\s|/|$)''',
-    caseSensitive: false,
-  );
+  static const Set<String> _supportedTypes = <String>{
+    'text',
+    'email',
+    'url',
+    'tel',
+    'search',
+  };
 
   @override
   RegExp get pattern => _line;
@@ -25,7 +28,9 @@ class IanvsMarkdownHtmlTextInputSyntax extends md.BlockSyntax {
   bool canParse(md.BlockParser parser) {
     if (!super.canParse(parser)) return false;
     final match = _line.firstMatch(parser.current.content);
-    return match != null && _typeText.hasMatch(match.group(1) ?? '');
+    if (match == null) return false;
+    final type = _attribute(match.group(1) ?? '', 'type')?.toLowerCase();
+    return type != null && _supportedTypes.contains(type);
   }
 
   @override
@@ -36,6 +41,7 @@ class IanvsMarkdownHtmlTextInputSyntax extends md.BlockSyntax {
     return md.Element.empty('ianvs-html-text-input')
       ..attributes.addAll({
         'data-label': match.group(2) ?? '',
+        'type': _attribute(attributes, 'type')?.toLowerCase() ?? 'text',
         'value': _attribute(attributes, 'value') ?? '',
         'placeholder': _attribute(attributes, 'placeholder') ?? '',
       });
@@ -65,6 +71,7 @@ class IanvsMarkdownHtmlTextInputBuilder extends MarkdownElementBuilder {
     TextStyle? preferredStyle,
     TextStyle? parentStyle,
   ) => IanvsMarkdownHtmlTextInput(
+    inputType: element.attributes['type'] ?? 'text',
     value: element.attributes['value'] ?? '',
     placeholder: element.attributes['placeholder'] ?? '',
     label: element.attributes['data-label'] ?? '',
@@ -76,12 +83,14 @@ class IanvsMarkdownHtmlTextInputBuilder extends MarkdownElementBuilder {
 class IanvsMarkdownHtmlTextInput extends StatefulWidget {
   const IanvsMarkdownHtmlTextInput({
     super.key,
+    this.inputType = 'text',
     required this.value,
     required this.placeholder,
     required this.label,
     this.theme,
   });
 
+  final String inputType;
   final String value;
   final String placeholder;
   final String label;
@@ -141,6 +150,10 @@ class _IanvsMarkdownHtmlTextInputState
             child: TextField(
               controller: _controller,
               focusNode: _focusNode,
+              keyboardType: _keyboardType,
+              textInputAction: widget.inputType == 'search'
+                  ? TextInputAction.search
+                  : TextInputAction.done,
               textAlignVertical: TextAlignVertical.center,
               style: TextStyle(
                 color: colors.textPrimary,
@@ -181,6 +194,13 @@ class _IanvsMarkdownHtmlTextInputState
     borderRadius: BorderRadius.circular(2),
     borderSide: BorderSide(color: color, width: 1),
   );
+
+  TextInputType get _keyboardType => switch (widget.inputType) {
+    'email' => TextInputType.emailAddress,
+    'url' => TextInputType.url,
+    'tel' => TextInputType.phone,
+    _ => TextInputType.text,
+  };
 
   void _selectAll() {
     _controller.selection = TextSelection(

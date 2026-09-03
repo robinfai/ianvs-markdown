@@ -1482,6 +1482,45 @@ Escaped \\<span>literal \\</span> after.
     );
   });
 
+  testWidgets('renders Obsidian HTML text-like input types', (tester) async {
+    const source = '''
+<input type="email" value="alpha@example.com"> email
+
+<input type="url" value="https://example.com"> url
+
+<input type="tel" value="123-456"> tel
+
+<input type="search" value="needle"> search
+''';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    final inputs = find.byType(IanvsMarkdownHtmlTextInput);
+    final fields = find.byType(TextField);
+    expect(inputs, findsNWidgets(4));
+    expect(fields, findsNWidgets(4));
+    expect(
+      tester.widget<TextField>(fields.at(0)).keyboardType,
+      TextInputType.emailAddress,
+    );
+    expect(
+      tester.widget<TextField>(fields.at(1)).keyboardType,
+      TextInputType.url,
+    );
+    expect(
+      tester.widget<TextField>(fields.at(2)).keyboardType,
+      TextInputType.phone,
+    );
+    expect(
+      tester.widget<TextField>(fields.at(3)).textInputAction,
+      TextInputAction.search,
+    );
+    expect(find.text('email'), findsOneWidget);
+    expect(find.text('url'), findsOneWidget);
+    expect(find.text('tel'), findsOneWidget);
+    expect(find.text('search'), findsOneWidget);
+    expect(_renderedPlainTextContains(tester, '<input'), isFalse);
+  });
+
   testWidgets('renders a segmented local Obsidian HTML date input', (
     tester,
   ) async {
