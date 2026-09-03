@@ -5778,9 +5778,8 @@ void main() {
       final badge = find.byKey(
         const ValueKey('ianvs-markdown-active-heading-level-badge'),
       );
-      expect(badge, findsOneWidget);
-      expect(tester.getSize(badge), const Size(17, 15));
-      expect(find.text('H2'), findsOneWidget);
+      expect(badge, findsNothing);
+      expect(find.text('H2'), findsNothing);
       expect(find.text('----------------'), findsNothing);
       final span = field.controller!.buildTextSpan(
         context: tester.element(
@@ -5902,7 +5901,7 @@ void main() {
     expect(controller.isDirty, isFalse);
   });
 
-  testWidgets('active ATX headings expose compact H1-H6 badges', (
+  testWidgets('active ATX headings omit non-Obsidian level badges', (
     tester,
   ) async {
     const labels = <String>['One', 'Two', 'Three', 'Four', 'Five', 'Six'];
@@ -5921,9 +5920,8 @@ void main() {
       final badge = find.byKey(
         const ValueKey('ianvs-markdown-active-heading-level-badge'),
       );
-      expect(badge, findsOneWidget);
-      expect(tester.getSize(badge), const Size(17, 15));
-      expect(find.text('H${index + 1}'), findsOneWidget);
+      expect(badge, findsNothing);
+      expect(find.text('H${index + 1}'), findsNothing);
       expect(controller.text, source);
     }
   });

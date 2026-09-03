@@ -4051,7 +4051,6 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         onToggle: headingSection == null
             ? null
             : () => _toggleHeadingFold(headingSection),
-        showLevelBadge: true,
         setextUnderline: setextUnderline,
         child: editor,
       );
@@ -5819,7 +5818,6 @@ class _IanvsHeadingRail extends StatelessWidget {
     this.collapsed = false,
     this.onToggle,
     this.setextUnderline,
-    this.showLevelBadge = false,
   });
 
   final int level;
@@ -5830,7 +5828,6 @@ class _IanvsHeadingRail extends StatelessWidget {
   final bool collapsed;
   final VoidCallback? onToggle;
   final String? setextUnderline;
-  final bool showLevelBadge;
 
   @override
   Widget build(BuildContext context) {
@@ -5853,45 +5850,7 @@ class _IanvsHeadingRail extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(
-                  width: 17,
-                  height: 19,
-                  child: showLevelBadge
-                      ? Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Container(
-                            key: const ValueKey(
-                              'ianvs-markdown-active-heading-level-badge',
-                            ),
-                            width: 17,
-                            height: 15,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color:
-                                  Theme.of(context).brightness ==
-                                      Brightness.dark
-                                  ? Colors.black.withValues(alpha: .42)
-                                  : colors.textPrimary.withValues(alpha: .78),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                            child: Text(
-                              'H$level',
-                              maxLines: 1,
-                              style: TextStyle(
-                                color:
-                                    Theme.of(context).brightness ==
-                                        Brightness.dark
-                                    ? colors.textSecondary
-                                    : colors.surface,
-                                fontSize: 8,
-                                height: 1,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        )
-                      : null,
-                ),
+                const SizedBox(width: 17, height: 19),
                 const SizedBox(width: 4),
                 Expanded(child: child),
               ],
