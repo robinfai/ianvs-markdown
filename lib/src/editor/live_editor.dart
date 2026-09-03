@@ -6713,9 +6713,8 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
 
   BoxDecoration? _tableCellDecoration(
     _EditableTableCell cell,
-    TextDirection direction, {
-    required bool focused,
-  }) {
+    TextDirection direction,
+  ) {
     final selected = cell.row == _selectedRow || cell.column == _selectedColumn;
     BorderSide? top;
     BorderSide? right;
@@ -6742,30 +6741,19 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
       }
     }
     if (!selected &&
-        !focused &&
         top == null &&
         right == null &&
         bottom == null &&
         left == null) {
       return null;
     }
-    final focusBorder = focused
-        ? BorderSide(
-            color: widget.colors.accent.withValues(alpha: .72),
-            width: 1,
-          )
-        : BorderSide.none;
     return BoxDecoration(
-      color: focused
-          ? widget.colors.accentMist.withValues(alpha: .56)
-          : selected
-          ? widget.colors.accentMist.withValues(alpha: .72)
-          : null,
+      color: selected ? widget.colors.accentMist.withValues(alpha: .72) : null,
       border: Border(
-        top: top ?? focusBorder,
-        right: right ?? focusBorder,
-        bottom: bottom ?? focusBorder,
-        left: left ?? focusBorder,
+        top: top ?? BorderSide.none,
+        right: right ?? BorderSide.none,
+        bottom: bottom ?? BorderSide.none,
+        left: left ?? BorderSide.none,
       ),
     );
   }
@@ -6958,7 +6946,6 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                                 decoration: _tableCellDecoration(
                                   cell,
                                   direction,
-                                  focused: focusNode.hasFocus,
                                 ),
                                 child: surface,
                               );

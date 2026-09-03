@@ -14664,7 +14664,7 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     );
   });
 
-  testWidgets('table cells expose a clear full-surface focus target', (
+  testWidgets('table surfaces focus their inner content editor', (
     tester,
   ) async {
     final controller = IanvsMarkdownController(
@@ -14685,18 +14685,11 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     await tester.tapAt(target);
     await tester.pump();
 
-    expect(tester.widget<TextField>(cell).focusNode?.hasFocus, isTrue);
-    final decoration = tester.widget<Container>(surface).decoration;
-    expect(decoration, isA<BoxDecoration>());
-    final boxDecoration = decoration! as BoxDecoration;
-    expect(
-      boxDecoration.color,
-      IanvsMarkdownThemeData.light.accentMist.withValues(alpha: .56),
-    );
-    expect(
-      boxDecoration.border?.bottom.color,
-      IanvsMarkdownThemeData.light.accent.withValues(alpha: .72),
-    );
+    final contentEditor = tester.widget<TextField>(cell);
+    expect(contentEditor.focusNode?.hasFocus, isTrue);
+    expect(contentEditor.controller?.selection.isCollapsed, isTrue);
+    expect(contentEditor.controller?.selection.extentOffset, 3);
+    expect(tester.widget<Container>(surface).decoration, isNull);
   });
 
   testWidgets('table semantics expose headers and inactive cells before edit', (
