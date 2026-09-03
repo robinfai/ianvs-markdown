@@ -14643,7 +14643,7 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
       tester.getSize(first).width,
       greaterThan(tester.getSize(right).width),
     );
-    expect(tester.getSize(center).height, 27);
+    expect(tester.getSize(center).height, 32);
 
     final table = tester.widget<Table>(find.byType(Table));
     expect(
@@ -14661,6 +14661,41 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     expect(
       (table.children.first.decoration! as BoxDecoration).color,
       IanvsMarkdownThemeData.light.surfaceMuted,
+    );
+  });
+
+  testWidgets('table cells expose a clear full-surface focus target', (
+    tester,
+  ) async {
+    final controller = IanvsMarkdownController(
+      text: '| A | B |\n| --- | --- |\n| one | two |',
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final cell = find.byKey(const ValueKey('ianvs-markdown-table-1-0'));
+    final surface = find.byKey(
+      const ValueKey('ianvs-markdown-table-cell-surface-1-0'),
+    );
+    expect(tester.getSize(surface).height, 32);
+
+    final target = tester.getBottomRight(surface) - const Offset(2, 2);
+    await tester.tapAt(target);
+    await tester.pump();
+
+    expect(tester.widget<TextField>(cell).focusNode?.hasFocus, isTrue);
+    final decoration = tester.widget<Container>(surface).decoration;
+    expect(decoration, isA<BoxDecoration>());
+    final boxDecoration = decoration! as BoxDecoration;
+    expect(
+      boxDecoration.color,
+      IanvsMarkdownThemeData.light.accentMist.withValues(alpha: .56),
+    );
+    expect(
+      boxDecoration.border?.bottom.color,
+      IanvsMarkdownThemeData.light.accent.withValues(alpha: .72),
     );
   });
 

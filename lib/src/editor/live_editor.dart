@@ -6172,6 +6172,7 @@ class _EditableMarkdownTable extends StatefulWidget {
 
 class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
   static const double _handleExtent = 16;
+  static const double _minimumCellHeight = 32;
 
   final GlobalKey _tableGeometryKey = GlobalKey(
     debugLabel: 'ianvs-markdown-table-geometry',
@@ -6712,8 +6713,9 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
 
   BoxDecoration? _tableCellDecoration(
     _EditableTableCell cell,
-    TextDirection direction,
-  ) {
+    TextDirection direction, {
+    required bool focused,
+  }) {
     final selected = cell.row == _selectedRow || cell.column == _selectedColumn;
     BorderSide? top;
     BorderSide? right;
@@ -6740,19 +6742,30 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
       }
     }
     if (!selected &&
+        !focused &&
         top == null &&
         right == null &&
         bottom == null &&
         left == null) {
       return null;
     }
+    final focusBorder = focused
+        ? BorderSide(
+            color: widget.colors.accent.withValues(alpha: .72),
+            width: 1,
+          )
+        : BorderSide.none;
     return BoxDecoration(
-      color: selected ? widget.colors.accentMist.withValues(alpha: .72) : null,
+      color: focused
+          ? widget.colors.accentMist.withValues(alpha: .56)
+          : selected
+          ? widget.colors.accentMist.withValues(alpha: .72)
+          : null,
       border: Border(
-        top: top ?? BorderSide.none,
-        right: right ?? BorderSide.none,
-        bottom: bottom ?? BorderSide.none,
-        left: left ?? BorderSide.none,
+        top: top ?? focusBorder,
+        right: right ?? focusBorder,
+        bottom: bottom ?? focusBorder,
+        left: left ?? focusBorder,
       ),
     );
   }
@@ -6896,6 +6909,9 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                                         enabledBorder: InputBorder.none,
                                         focusedBorder: InputBorder.none,
                                         isCollapsed: true,
+                                        constraints: BoxConstraints(
+                                          minHeight: _minimumCellHeight,
+                                        ),
                                         contentPadding: EdgeInsets.symmetric(
                                           horizontal: 10,
                                           vertical: 4.5,
@@ -6942,6 +6958,7 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                                 decoration: _tableCellDecoration(
                                   cell,
                                   direction,
+                                  focused: focusNode.hasFocus,
                                 ),
                                 child: surface,
                               );
