@@ -12,6 +12,7 @@ import 'package:ianvs_markdown/src/html_checkbox.dart';
 import 'package:ianvs_markdown/src/html_date_input.dart';
 import 'package:ianvs_markdown/src/html_number_input.dart';
 import 'package:ianvs_markdown/src/html_textarea.dart';
+import 'package:ianvs_markdown/src/html_time_input.dart';
 import 'package:ianvs_markdown/src/html_select.dart';
 import 'package:ianvs_markdown/src/html_text_input.dart';
 import 'package:ianvs_markdown/src/list_guide.dart';
@@ -1519,6 +1520,35 @@ Escaped \\<span>literal \\</span> after.
     expect(find.text('tel'), findsOneWidget);
     expect(find.text('search'), findsOneWidget);
     expect(_renderedPlainTextContains(tester, '<input'), isFalse);
+  });
+
+  testWidgets('renders a segmented local Obsidian HTML time input', (
+    tester,
+  ) async {
+    const source =
+        'Before\n\n<input type="time" value="13:45" min="09:00" max="17:00"> omega\n\nAfter';
+    await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
+
+    final time = find.byType(IanvsMarkdownHtmlTimeInput);
+    final control = find.byKey(
+      const ValueKey('ianvs-markdown-html-time-input'),
+    );
+    final minute = find.byKey(
+      const ValueKey('ianvs-markdown-html-time-minute'),
+    );
+    expect(time, findsOneWidget);
+    expect(control, findsOneWidget);
+    expect(tester.getSize(control), const Size(56, 20));
+    expect(find.text('13'), findsOneWidget);
+    expect(find.text('45'), findsOneWidget);
+    expect(find.byIcon(Icons.schedule_outlined), findsOneWidget);
+    expect(find.text('omega'), findsOneWidget);
+    expect(_renderedPlainTextContains(tester, '<input'), isFalse);
+
+    await tester.tap(minute);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+    expect(find.text('46'), findsOneWidget);
   });
 
   testWidgets('renders a segmented local Obsidian HTML date input', (

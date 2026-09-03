@@ -12,6 +12,7 @@ import 'package:ianvs_markdown/src/html_date_input.dart';
 import 'package:ianvs_markdown/src/html_radio_group.dart';
 import 'package:ianvs_markdown/src/html_number_input.dart';
 import 'package:ianvs_markdown/src/html_text_input.dart';
+import 'package:ianvs_markdown/src/html_time_input.dart';
 import 'package:ianvs_markdown/src/list_guide.dart';
 
 void main() {
@@ -10394,6 +10395,34 @@ After''';
       tester.widget<TextField>(fields.at(0)).controller?.text,
       'beta@example.com',
     );
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-block')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('HTML time inputs step locally in Live Preview', (tester) async {
+    const source = 'Before\n\n<input type="time" value="13:45"> omega\n\nAfter';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final time = find.byType(IanvsMarkdownHtmlTimeInput);
+    final minute = find.byKey(
+      const ValueKey('ianvs-markdown-html-time-minute'),
+    );
+    expect(time, findsOneWidget);
+    expect(find.text('13'), findsOneWidget);
+    expect(find.text('45'), findsOneWidget);
+    expect(selectableTextContainingPlainText('<input'), findsNothing);
+
+    await tester.tap(minute);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+    expect(find.text('46'), findsOneWidget);
     expect(controller.text, source);
     expect(controller.isDirty, isFalse);
     expect(

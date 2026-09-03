@@ -38,6 +38,7 @@ import 'html_ruby.dart';
 import 'html_select.dart';
 import 'html_table.dart';
 import 'html_text_input.dart';
+import 'html_time_input.dart';
 import 'html_textarea.dart';
 import 'html_unordered_list.dart';
 import 'inline_code.dart';
@@ -434,6 +435,7 @@ class IanvsMarkdown extends StatelessWidget {
             _buildHtmlTableBody(context, source, effectiveStyleSheet, colors),
       ),
       'ianvs-html-text-input': IanvsMarkdownHtmlTextInputBuilder(theme: colors),
+      'ianvs-html-time-input': IanvsMarkdownHtmlTimeInputBuilder(theme: colors),
       'ianvs-html-textarea': IanvsMarkdownHtmlTextareaBuilder(theme: colors),
       'ianvs-html-unordered-list': IanvsMarkdownHtmlUnorderedListBuilder(
         bodyBuilder: (context, source) =>
@@ -514,6 +516,7 @@ class IanvsMarkdown extends StatelessWidget {
       const IanvsMarkdownHtmlFigureSyntax(),
       const IanvsMarkdownHtmlTableSyntax(),
       const IanvsMarkdownHtmlTextInputSyntax(),
+      const IanvsMarkdownHtmlTimeInputSyntax(),
       const IanvsMarkdownHtmlUnorderedListSyntax(),
       const IanvsMarkdownHtmlOrderedListSyntax(),
       const IanvsMarkdownHtmlDetailsSyntax(),
