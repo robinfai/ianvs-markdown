@@ -3755,7 +3755,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     if (referenceDefinitions.isNotEmpty) {
       return Container(
         key: const ValueKey('ianvs-markdown-active-block'),
-        constraints: const BoxConstraints(minHeight: 36),
+        constraints: const BoxConstraints(minHeight: 24),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
         child: _buildReferenceDefinitionProjection(
           referenceDefinitions,
@@ -4183,7 +4183,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     final quoteBlock = quoteMarker != null;
     final activeBlockContainer = Container(
       key: const ValueKey('ianvs-markdown-active-block'),
-      constraints: const BoxConstraints(minHeight: 36),
+      constraints: BoxConstraints(
+        minHeight: fencedCode || quoteBlock ? 36 : 24,
+      ),
       clipBehavior: fencedCode || quoteBlock ? Clip.antiAlias : Clip.none,
       margin: fencedCode || quoteBlock
           ? const EdgeInsets.symmetric(horizontal: 10, vertical: 3)
@@ -4425,7 +4427,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 36),
+                constraints: const BoxConstraints(minHeight: 24),
                 child: rendered,
               ),
             ),

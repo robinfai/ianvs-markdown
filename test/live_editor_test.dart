@@ -100,6 +100,31 @@ void main() {
     await tester.tapAt(editable.localToGlobal(caret.center));
   }
 
+  testWidgets('basic list items stay compact across blur and focus', (
+    tester,
+  ) async {
+    const source = '- Alpha\n- Beta';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final firstBlock = find.byKey(
+      const ValueKey('ianvs-markdown-block-0-unorderedList'),
+    );
+    expect(firstBlock, findsOneWidget);
+    expect(tester.getSize(firstBlock).height, lessThanOrEqualTo(36));
+
+    await tester.tap(selectableTextContainingPlainText('Alpha'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .getSize(find.byKey(const ValueKey('ianvs-markdown-active-block')))
+          .height,
+      lessThanOrEqualTo(30),
+    );
+  });
+
   testWidgets('clicking a rendered block edits its exact source in place', (
     tester,
   ) async {
