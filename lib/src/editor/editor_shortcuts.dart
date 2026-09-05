@@ -19,11 +19,13 @@ class IanvsMarkdownEditorShortcuts extends StatelessWidget {
     super.key,
     required this.controller,
     required this.child,
+    this.enableModeShortcuts = true,
     this.onSaveRequested,
   });
 
   final IanvsMarkdownController controller;
   final Widget child;
+  final bool enableModeShortcuts;
   final IanvsMarkdownSaveCallback? onSaveRequested;
 
   @override
@@ -69,23 +71,30 @@ class IanvsMarkdownEditorShortcuts extends StatelessWidget {
             const _SaveIntent(),
         const SingleActivator(LogicalKeyboardKey.keyS, control: true):
             const _SaveIntent(),
-        const SingleActivator(LogicalKeyboardKey.keyE, meta: true):
-            const _ToggleModeIntent(),
-        if (!usesCommandModifier)
+        if (enableModeShortcuts)
+          const SingleActivator(LogicalKeyboardKey.keyE, meta: true):
+              const _ToggleModeIntent(),
+        if (enableModeShortcuts && !usesCommandModifier)
           const SingleActivator(LogicalKeyboardKey.keyE, control: true):
               const _ToggleModeIntent(),
-        const SingleActivator(LogicalKeyboardKey.digit1, meta: true):
-            const _SetModeIntent(IanvsMarkdownEditorMode.livePreview),
-        const SingleActivator(LogicalKeyboardKey.digit1, control: true):
-            const _SetModeIntent(IanvsMarkdownEditorMode.livePreview),
-        const SingleActivator(LogicalKeyboardKey.digit2, meta: true):
-            const _SetModeIntent(IanvsMarkdownEditorMode.source),
-        const SingleActivator(LogicalKeyboardKey.digit2, control: true):
-            const _SetModeIntent(IanvsMarkdownEditorMode.source),
-        const SingleActivator(LogicalKeyboardKey.digit3, meta: true):
-            const _SetModeIntent(IanvsMarkdownEditorMode.preview),
-        const SingleActivator(LogicalKeyboardKey.digit3, control: true):
-            const _SetModeIntent(IanvsMarkdownEditorMode.preview),
+        if (enableModeShortcuts)
+          const SingleActivator(LogicalKeyboardKey.digit1, meta: true):
+              const _SetModeIntent(IanvsMarkdownEditorMode.livePreview),
+        if (enableModeShortcuts)
+          const SingleActivator(LogicalKeyboardKey.digit1, control: true):
+              const _SetModeIntent(IanvsMarkdownEditorMode.livePreview),
+        if (enableModeShortcuts)
+          const SingleActivator(LogicalKeyboardKey.digit2, meta: true):
+              const _SetModeIntent(IanvsMarkdownEditorMode.source),
+        if (enableModeShortcuts)
+          const SingleActivator(LogicalKeyboardKey.digit2, control: true):
+              const _SetModeIntent(IanvsMarkdownEditorMode.source),
+        if (enableModeShortcuts)
+          const SingleActivator(LogicalKeyboardKey.digit3, meta: true):
+              const _SetModeIntent(IanvsMarkdownEditorMode.preview),
+        if (enableModeShortcuts)
+          const SingleActivator(LogicalKeyboardKey.digit3, control: true):
+              const _SetModeIntent(IanvsMarkdownEditorMode.preview),
         const SingleActivator(LogicalKeyboardKey.tab): const _IndentIntent(),
         const SingleActivator(LogicalKeyboardKey.tab, shift: true):
             const _OutdentIntent(),
@@ -182,7 +191,11 @@ class IanvsMarkdownEditorShortcuts extends StatelessWidget {
   Future<void> _save() async {
     final callback = onSaveRequested;
     if (callback == null) return;
-    await callback(controller.text);
+    try {
+      await callback(controller.text);
+    } on IanvsMarkdownSaveCancelledException {
+      return;
+    }
     controller.markSaved();
   }
 }

@@ -23,6 +23,7 @@ class IanvsMarkdownEditor extends StatefulWidget {
     this.scrollController,
     this.autofocus = false,
     this.showToolbar = true,
+    this.enableModeShortcuts = true,
     this.padding = const EdgeInsets.fromLTRB(20, 18, 20, 40),
     this.onChanged,
     this.onSaveRequested,
@@ -34,6 +35,9 @@ class IanvsMarkdownEditor extends StatefulWidget {
   final ScrollController? scrollController;
   final bool autofocus;
   final bool showToolbar;
+
+  /// Whether the editor binds its mode-switching shortcuts.
+  final bool enableModeShortcuts;
   final EdgeInsetsGeometry padding;
   final ValueChanged<String>? onChanged;
   final IanvsMarkdownSaveCallback? onSaveRequested;
@@ -474,6 +478,7 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
             ),
           Expanded(
             child: IanvsMarkdownEditorShortcuts(
+              enableModeShortcuts: widget.enableModeShortcuts,
               controller: widget.controller,
               onSaveRequested: widget.onSaveRequested,
               child: Stack(

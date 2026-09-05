@@ -1,81 +1,79 @@
-# Design QA — Editorial Navigator Sidebar Selection Refinement
+# Design QA — Ianvs Markdown Native macOS Editor Redesign
 
 ## Comparison target
 
-- Source visual truth: `/Users/robinfai/.codex/generated_images/01a0256c-cb60-7f53-a4ce-469f867b15bc/exec-42940529-fe16-452e-9d93-3350a4f0971a.png`, refined by the user's request to remove the large tinted selection surfaces and heavy accent rails.
-- Before-state evidence: `/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/codex-clipboard-8c736f73-95d3-44d9-aeb8-e00bdc817544.png`
-- Final implementation capture: `/Users/robinfai/flutter_projects/ianvs-markdown/.product-design/design-qa/implementation-sidebar-refined-preview.png`
-- Hover-state capture: `/Users/robinfai/flutter_projects/ianvs-markdown/.product-design/design-qa/implementation-hover-edit-final.png`
-- Active source-edit capture: `/Users/robinfai/flutter_projects/ianvs-markdown/.product-design/design-qa/implementation-active-block-final.png`
-- Full-view before/after comparison: `/Users/robinfai/flutter_projects/ianvs-markdown/.product-design/design-qa/comparison-sidebar-before-after.png`
-- Focused sidebar comparison: `/Users/robinfai/flutter_projects/ianvs-markdown/.product-design/design-qa/comparison-sidebar-focused.png`
+- Source visual truth: `/Users/robinfai/flutter_projects/ianvs-markdown/.product-design/redesign/visual-target-native-primary.png`
+- Drag/dirty interaction target: `/Users/robinfai/flutter_projects/ianvs-markdown/.product-design/redesign/visual-target-native-drag-unsaved.png`
+- Final native implementation capture: `/Users/robinfai/flutter_projects/ianvs-markdown/.product-design/redesign/implementation-native-final.jpeg`
+- Full-view comparison: `/Users/robinfai/flutter_projects/ianvs-markdown/.product-design/redesign/qa-reference-vs-implementation-final.png`
+- Focused chrome/document comparison: `/Users/robinfai/flutter_projects/ianvs-markdown/.product-design/redesign/qa-focused-chrome-and-document-final.png`
+- Annotated before/target comparison: `/Users/robinfai/flutter_projects/ianvs-markdown/.product-design/redesign/annotated-current-vs-native-target.png`
 
 ## Viewport and normalization
 
-- Original direction pixels: `1487 × 1058`.
-- Before-state pixels: `2360 × 1624` (`2×` density of the same desktop aspect ratio).
-- Implementation pixels: `1117 × 768`, captured from the native macOS window including chrome.
-- Native macOS window capture: `1117 × 768` points/pixels as reported by the capture surface. A browser CSS viewport and `deviceScaleFactor` do not apply to this Flutter macOS build.
-- Density normalization: the before-state capture was downsampled to `1117 × 768`; the implementation remained `1117 × 768`. Both were placed in the same `2234 × 768` comparison input. The focused comparison crops the identical `284 × 430` sidebar region from each normalized capture.
-- State: light theme, saved document, Preview selected, YAML front matter collapsed, first outline heading active.
+- Source pixels: `1536 × 1024`.
+- Native implementation pixels: `1225 × 768`, captured from the running Flutter macOS application including integrated window chrome.
+- Native viewport: `1225 × 768` capture surface; browser CSS size and `deviceScaleFactor` do not apply.
+- Normalization: the source was centered-cropped to the native implementation's `1225 × 768` aspect ratio and downsampled with Lanczos. Both normalized images were placed at equal size in the `2450 × 812` full-view comparison.
+- Focused comparison: identical `1225 × 390` top regions from the normalized source and implementation, combined into `2450 × 432`.
+- State: light theme, saved `Playground.md`, Preview selected, three visible tabs, first outline heading active, native title bar visible.
 
 ## Findings
 
 No actionable P0, P1, or P2 differences remain.
 
-- Fonts and typography: the implementation uses the macOS/Flutter system sans-serif and SF Mono fallback. Document-title, heading, body, and code hierarchy match the target after reducing Markdown heading scale and preserving the larger front-matter-derived title.
-- Spacing and layout rhythm: the mode rows now use a 42-point desktop control height and 6-point radius, removing the oversized capsule treatment. Outline rows use a tighter 34-point rhythm with a short 16-point locator rather than a full-height rail. No clipping or overflow is visible at the captured desktop size.
-- Colors and tokens: mode selection is now a neutral, low-opacity blend derived from the theme's text and sidebar surfaces; teal is limited to the selected mode icon and the outline locator. The two kinds of selection no longer share the same tinted-card treatment and remain legible with both light and dark theme tokens.
-- Image quality and asset fidelity: the target contains no raster product imagery. Icons use Flutter's Material icon library rather than approximated image assets. Mermaid remains a real generated SVG, not a placeholder.
-- Copy and content: mode labels, keyboard shortcuts, document title, YAML disclosure, Markdown body, table, and code sample match the selected direction. Settings, Help, and a drag handle were intentionally not fabricated because the existing product has no corresponding routes or reorder behavior.
-- Icons and interactions: Preview, Source, and Read remain full-row targets. The active mode uses neutral surface, icon color, and text weight; outline navigation uses a short locator and text weight without a filled card. Preview/Source switching and moving the active outline marker to Diagram injection were verified in the running app.
-- Accessibility and responsiveness: mode controls and rendered blocks expose semantic labels; keyboard shortcuts and visible focus/edit states are present; practical control heights are at least 40–46 points. The navigation pane collapses below its configured breakpoint and the content column remains constrained.
+- Fonts and typography: both directions use macOS system sans-serif with compact system labels and an editorial document hierarchy. The implementation's 31-point title, 21.5-point section heading, 15-point body, 1.62 body line height, and SF Mono-compatible code treatment preserve the reference hierarchy and wrapping. Native rasterization and the implementation's slightly stronger title weight are acceptable platform variation.
+- Spacing and layout rhythm: the 372-point navigation pane, 760-point document measure, 112/96-point horizontal document padding, 62-point toolbar, 44-point tabs, hairline separators, and 32-point status bar reproduce the reference region proportions at the native capture size. The navigation pane collapses below 1040 points. No overlap, clipping, or overflow is visible.
+- Colors and visual tokens: warm white content, cool neutral chrome, charcoal text, muted gray labels, and restrained `#167B82` teal accents align with the reference. Teal is limited to active indicators, links, and state feedback; selected rows do not use large tinted capsules.
+- Image quality and asset fidelity: the design contains no raster product imagery or decorative illustration. Controls use the project's existing Flutter icon library with consistent optical sizes; no inline SVG, emoji, CSS-art equivalent, gradient, or placeholder asset was introduced.
+- Copy and content: the standalone editor now opens with “Ianvs Markdown Playground,” a concise product introduction, and realistic Markdown examples. New/Open/Save/Saved, mode labels, drag instructions, word/character counts, line-ending metadata, and tab names are coherent in context.
+- Icons and controls: New, Open, Save/Saved, overflow, close, dirty-dot, mode, and file icons share a flat native-toolbar treatment. Filled tonal/pill actions were removed; hover and pressed feedback uses quiet neutral surfaces and six-point control radii.
+- Interaction states: multi-tab creation/selection/close, open, edit, dirty state, save/save-as, and close confirmation remain functional. The canvas-only drag target keeps the navigation pane visible, uses a thin dashed outline, and exposes explicit supported extensions. The drag overlay and dirty indicator have widget-test coverage.
+- Accessibility and responsiveness: buttons retain tooltips and semantic labels, keyboard shortcuts remain available, tab close controls appear for active/hovered tabs, and the navigation pane collapses before it can crowd the editor. Text and controls remain readable at the minimum window size.
 
 ## Comparison history
 
 ### Iteration 1 — blocked
 
-- [P1] The first implementation used a centered, effectively full-width document column, making the table and code block substantially wider than the reference.
-- [P1] Read mode reverted to the older expanded metadata card, breaking cross-mode information hierarchy.
-- [P2] The native title bar and Flutter app bar appeared as separate rows instead of the target's single integrated header.
+- [P2] Default expanded YAML properties pushed the first document heading substantially below the source's above-the-fold position.
+- [P2] The implementation sidebar and document inset were visibly narrower than the normalized source, weakening the intended editorial hierarchy.
 
 Fixes made:
 
-- Set the example reading column to 640 points and aligned it to the leading edge of the main canvas.
-- Passed compact front matter and document-title settings through Preview and Read modes.
-- Enabled a transparent, full-size macOS title bar and moved Saved/overflow into the integrated Flutter header.
-- Reduced Markdown heading/body scale to restore the target hierarchy and line wrapping.
+- Switched the default example to a clean document opening while retaining Markdown editing behavior.
+- Increased navigation width from 300 to 372 points, moved its collapse breakpoint from 860 to 1040 points, and increased document insets to 112/96 points.
+- Added the target's document title and introductory paragraph to realistic example content.
 
-### Iteration 2 — passed
+Evidence: `/Users/robinfai/flutter_projects/ianvs-markdown/.product-design/redesign/qa-reference-vs-implementation-iteration-1.png` and `/Users/robinfai/flutter_projects/ianvs-markdown/.product-design/redesign/implementation-native-iteration-1b.jpeg`.
 
-- Post-fix evidence: `comparison-live-final.png` and `comparison-hover-final.png`.
-- The sidebar/main-column proportions, title hierarchy, collapsed YAML row, hover edit treatment, table width, code block, and top-bar actions now preserve the source design intent.
-- Remaining variation is limited to expected native-font rasterization, the source mock's denser non-heading outline entries, and the deliberate omission of non-functional Settings/Help/reorder controls.
+### Iteration 2 — blocked
 
-### Iteration 3 — sidebar selection refinement, passed
+- [P1] Hiding the front-matter card while leaving the demo YAML source active exposed the metadata block as oversized editable source text, materially changing the first screen.
 
-- [P2] User feedback identified the mode selection as an oversized pale-teal capsule with a heavy right rail, and the outline selection repeated the same filled-card language with a heavy left rail.
+Fix made:
 
-Fixes made:
+- Removed the synthetic YAML header from the default playground document. Front-matter support remains in the package; the editor example now opens in the clean, reference-matched authoring state.
 
-- Replaced the mode's teal fill and 3-point edge rail with a neutral low-opacity selection surface, 6-point radius, compact vertical rhythm, and localized icon emphasis.
-- Removed the outline selection fill and full-height rail; the active heading now uses a 2 × 16 point locator plus text-weight change.
-- Added restrained neutral hover and focus treatments while preserving the full row hit target.
-- Post-fix evidence: `comparison-sidebar-before-after.png` and `comparison-sidebar-focused.png`.
-- The focused comparison shows distinct hierarchy without duplicated tinted cards; no actionable P0/P1/P2 issue remains.
+Evidence: `/Users/robinfai/flutter_projects/ianvs-markdown/.product-design/redesign/implementation-native-iteration-2.jpeg`.
+
+### Iteration 3 — passed
+
+- The final same-size full-view and focused comparisons show aligned sidebar/content proportions, first-screen content order, toolbar density, tabs, type hierarchy, canvas width, accent restraint, and status-bar placement.
+- Remaining differences are expected: the source includes a synthetic `README.md` tab/files group while the live capture shows two newly created untitled documents; the native implementation renders real system glyph/font metrics; Computer Use contributes a small purple focus indicator outside the product UI at the upper-left edge.
+- No actionable P0/P1/P2 issue remains.
 
 ## Verification
 
-- `flutter analyze`: passed with no issues.
-- Root `flutter test`: 22 tests passed.
-- Example `flutter test`: 3 tests passed.
-- Clean macOS build and launch: passed.
-- Primary interactions checked in the running app for this pass: Preview/Source switching and outline navigation to Diagram injection, followed by restoring the top Preview state. The prior full-flow checks for Read, block editing, YAML disclosure, Saved state, and Mermaid rendering remain covered by Iteration 2.
-- Runtime log check: no launch, layout, or interaction exceptions on the clean run. `flutter_svg` still reports non-fatal unsupported `<filter>` and `<marker>` elements from the generated Mermaid SVG; the diagram renders, and a browser/resvg-backed diagram surface remains optional follow-up fidelity work outside this selected-screen comparison.
+- Target and implementation images were opened and judged together in both full-view and focused same-size comparison inputs.
+- `flutter analyze example/lib/main.dart example/test/widget_test.dart`: passed with no issues.
+- Root test suite: 742 passed.
+- Example test suite: 5 passed, including open/tab/save, dirty-state, and drag-overlay coverage.
+- macOS debug build: passed and launched successfully.
+- Native interaction checks: created multiple tabs, returned to the first tab, and verified toolbar/tab/status/editor layout in the running app.
+- No browser console applies to this native Flutter build; no launch or layout exception was observed.
 
 ## Follow-up polish
 
-- [P3] If one-row task editing is desired, split contiguous GFM task lists into item-level editor projections while preserving the original source ranges.
-- [P3] Replace the example's `flutter_svg` Mermaid surface with a browser-capable or rasterized renderer when complete marker/filter parity is required.
+- [P3] A future native menu pass could mirror New/Open/Save actions in the macOS menu bar and expose recent files without changing the current visual system.
 
 final result: passed

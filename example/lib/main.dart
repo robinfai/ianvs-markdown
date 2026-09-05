@@ -19,17 +19,10 @@ class _ExampleAppState extends State<ExampleApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Ianvs Markdown Playground',
+      title: 'Ianvs Markdown Example',
       themeMode: _dark ? ThemeMode.dark : ThemeMode.light,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff167b82)),
-        scaffoldBackgroundColor: const Color(0xffffffff),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xffffffff),
-          foregroundColor: Color(0xff202526),
-          surfaceTintColor: Colors.transparent,
-          elevation: 0,
-        ),
         extensions: const <ThemeExtension<dynamic>>[
           IanvsMarkdownThemeData.light,
         ],
@@ -44,7 +37,7 @@ class _ExampleAppState extends State<ExampleApp> {
           IanvsMarkdownThemeData.dark,
         ],
       ),
-      home: MarkdownPlayground(
+      home: MarkdownExample(
         dark: _dark,
         onToggleTheme: () => setState(() => _dark = !_dark),
       ),
@@ -52,8 +45,8 @@ class _ExampleAppState extends State<ExampleApp> {
   }
 }
 
-class MarkdownPlayground extends StatefulWidget {
-  const MarkdownPlayground({
+class MarkdownExample extends StatefulWidget {
+  const MarkdownExample({
     super.key,
     required this.dark,
     required this.onToggleTheme,
@@ -63,10 +56,10 @@ class MarkdownPlayground extends StatefulWidget {
   final VoidCallback onToggleTheme;
 
   @override
-  State<MarkdownPlayground> createState() => _MarkdownPlaygroundState();
+  State<MarkdownExample> createState() => _MarkdownExampleState();
 }
 
-class _MarkdownPlaygroundState extends State<MarkdownPlayground> {
+class _MarkdownExampleState extends State<MarkdownExample> {
   late final IanvsMarkdownController _controller = IanvsMarkdownController(
     text: exampleMarkdown,
   );
@@ -82,106 +75,42 @@ class _MarkdownPlaygroundState extends State<MarkdownPlayground> {
     final colors = IanvsMarkdownThemeData.resolve(context);
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 56,
-        titleSpacing: 78,
         title: const Text(
-          'Ianvs Markdown Playground',
+          'ianvs_markdown example',
           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         ),
         shape: Border(bottom: BorderSide(color: colors.borderSoft)),
         actions: [
-          ValueListenableBuilder<bool>(
-            valueListenable: _controller.dirtyListenable,
-            builder: (context, dirty, _) => Tooltip(
-              message: dirty ? '保存' : '已保存',
-              child: TextButton.icon(
-                onPressed: dirty ? _saveFromHeader : null,
-                icon: Icon(
-                  dirty ? Icons.edit_outlined : Icons.check_circle_outline,
-                  size: 18,
-                ),
-                label: Text(dirty ? 'Unsaved' : 'Saved'),
-                style: TextButton.styleFrom(
-                  foregroundColor: colors.textSecondary,
-                  disabledForegroundColor: colors.textSecondary,
-                  minimumSize: const Size(88, 44),
-                  textStyle: const TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
+          IconButton(
+            tooltip: widget.dark ? 'Use light theme' : 'Use dark theme',
+            onPressed: widget.onToggleTheme,
+            icon: Icon(
+              widget.dark
+                  ? Icons.light_mode_outlined
+                  : Icons.dark_mode_outlined,
             ),
           ),
-          const SizedBox(width: 8),
-          PopupMenuButton<_PlaygroundAction>(
-            tooltip: 'More actions',
-            icon: const Icon(Icons.more_horiz_rounded),
-            onSelected: (action) {
-              switch (action) {
-                case _PlaygroundAction.reset:
-                  _reset();
-                case _PlaygroundAction.theme:
-                  widget.onToggleTheme();
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: _PlaygroundAction.reset,
-                child: ListTile(
-                  leading: Icon(Icons.restart_alt_rounded),
-                  title: Text('Reset example'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              PopupMenuItem(
-                value: _PlaygroundAction.theme,
-                child: ListTile(
-                  leading: Icon(
-                    widget.dark
-                        ? Icons.light_mode_outlined
-                        : Icons.dark_mode_outlined,
-                  ),
-                  title: Text(
-                    widget.dark ? 'Use light theme' : 'Use dark theme',
-                  ),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ],
+          IconButton(
+            tooltip: 'Reset example',
+            onPressed: _reset,
+            icon: const Icon(Icons.restart_alt_rounded),
           ),
-          const SizedBox(width: 14),
         ],
       ),
       body: IanvsMarkdownLiveEditor(
         controller: _controller,
-        showToolbar: false,
-        showNavigationPane: true,
-        navigationWidth: 300,
-        navigationBreakpoint: 860,
-        contentMaxWidth: 640,
-        padding: const EdgeInsets.fromLTRB(54, 32, 54, 64),
-        onChanged: (_) => setState(() {}),
-        onSaveRequested: _save,
-        onTapLink: _openLink,
-        diagramBuilder: (context, source) => _MermaidDemo(source: source),
-        wikiEmbedBuilder: _buildWikiEmbed,
-        wikiLinkExists: (target) => !target.startsWith('Missing Wiki Note'),
-      ),
-    );
-  }
-
-  Future<void> _saveFromHeader() async {
-    await _save(_controller.text);
-    _controller.markSaved();
-  }
-
-  Future<void> _save(String markdown) async {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Saved locally by the host app'),
-        duration: Duration(seconds: 1),
+        showToolbar: true,
+        showNavigationPane: false,
+        showFrontMatter: true,
+        enableHeadingFolding: true,
+        imageBuilder: buildExampleNetworkImage,
+        diagramBuilder: (context, source) => MermaidView(source: source),
+        onSaveRequested: (_) {
+          _controller.markSaved();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Host save callback invoked')),
+          );
+        },
       ),
     );
   }
@@ -195,166 +124,127 @@ class _MarkdownPlaygroundState extends State<MarkdownPlayground> {
       ..mode = IanvsMarkdownEditorMode.livePreview
       ..clearHistory()
       ..markSaved();
-    setState(() {});
-  }
-
-  void _openLink(String text, String? href, String title) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Host handles link: ${href ?? text}')),
-    );
-  }
-
-  Widget _buildWikiEmbed(
-    BuildContext context,
-    IanvsMarkdownWikiEmbedReference reference,
-  ) {
-    final source = switch (reference.subpath) {
-      '^next-step' => 'Connect the editor to a host-owned note repository.',
-      'Roadmap' =>
-        '''
-## Roadmap
-
-- Resolve notes in the host app
-- Keep Markdown as the source of truth
-
-Connect the editor to a host-owned note repository. ^next-step
-''',
-      _ => projectNotesMarkdown,
-    };
-    return IanvsMarkdown(data: source, fitContent: true, onTapLink: _openLink);
   }
 }
 
-enum _PlaygroundAction { reset, theme }
-
-class _MermaidDemo extends StatelessWidget {
-  const _MermaidDemo({required this.source});
-
-  final String source;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = IanvsMarkdownThemeData.resolve(context);
-    return Container(
-      key: const ValueKey('example-mermaid-renderer'),
-      height: 320,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: colors.surfaceRaised,
-        border: Border.all(color: colors.border),
-        borderRadius: BorderRadius.circular(colors.mediumRadius),
-      ),
-      child: MermaidView(
-        source: source,
-        semanticsLabel: 'Mermaid diagram',
-        loadingBuilder: (_) => const Center(
-          child: SizedBox.square(
-            dimension: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
-        errorBuilder: (context, error) => Center(
-          child: SelectableText(
-            'Mermaid render failed:\n$error',
-            style: TextStyle(color: colors.error, fontSize: 12),
-          ),
-        ),
-      ),
-    );
+Widget buildExampleNetworkImage(Uri uri, String? title, String? alt) {
+  if (uri.scheme != 'https' && uri.scheme != 'http') {
+    return Text(alt?.isNotEmpty == true ? alt! : uri.toString());
   }
+  return Image.network(
+    uri.toString(),
+    semanticLabel: alt,
+    fit: BoxFit.contain,
+    filterQuality: FilterQuality.medium,
+    loadingBuilder: (context, child, progress) {
+      if (progress == null) return child;
+      final total = progress.expectedTotalBytes;
+      return SizedBox(
+        height: 180,
+        child: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            value: total == null
+                ? null
+                : progress.cumulativeBytesLoaded / total,
+          ),
+        ),
+      );
+    },
+    errorBuilder: (context, error, stackTrace) => SizedBox(
+      height: 120,
+      child: Center(
+        child: Text(
+          alt?.isNotEmpty == true
+              ? 'Unable to load $alt'
+              : 'Unable to load image',
+          textAlign: TextAlign.center,
+        ),
+      ),
+    ),
+  );
 }
 
 const exampleMarkdown =
     '''
 ---
-title: Ianvs Markdown
+title: Ianvs Markdown Playground
 author: Ianvs
-tags: [Flutter, GFM, live-preview]
+tags: [Flutter, Markdown, live-preview]
 aliases: [Ianvs editor, Markdown playground]
 status: editable
 enabled: true
 archived: false
 score: 42
-due: 2026-08-24
-related: ["[[Project Notes]]", "[[Project Notes#Roadmap]]"]
+due: 2026-09-03
+related: ["[[Project Notes]]", "https://flutter.dev"]
 empty:
-settings: {owner: Ianvs}
+settings: {owner: Ianvs, autosave: true}
 ---
 # Render and edit together
 
-Click any rendered block to edit it **without leaving live preview**. Use the
-toolbar to switch between live preview, full source, and reading modes.
+Click any rendered block to edit its exact **Markdown source** without leaving
+Live Preview. Use the toolbar to switch between Live Preview, Source, and Read.
 
-> The Markdown string remains the only source of truth. The host application
-> decides how and when to save it.
+> Markdown remains the only source of truth. The host application decides how
+> files, links, images, and persistence are handled.
 
-## Everyday Markdown
+## Text and inline formatting
 
-- [x] GitHub-flavored Markdown
-- [ ] Click this task block and edit it
-- [ ] Try **bold**, *italic*, `inline code`, and [a link](docs/guide.md)
+A normal paragraph can contain **bold**, *italic*, ***bold italic***,
+~~strikethrough~~, ==highlighted text==, and `inline code`.
 
-Nested emphasis stays combined in ***bold italic*** text.
+Escaped characters stay literal: ${r'\*asterisks\*'}, ${r'\#hash'}, and
+${r'\[brackets\]'}.
+Two spaces at the end of this line create a hard break:${'  '}
+this sentence starts on the next visual line.
 
-Intraword underscores stay asymmetric: foo_single_word remains literal, while
-foo__double__word uses Obsidian's intraword strong form.
+Links support [relative destinations](docs/guide.md),
+[titles](https://example.com "Example title"), and bare URLs such as
+https://flutter.dev. Email addresses like hello@example.com remain readable.
 
-Select text before using ⌘B, ⌘I, or ⌘K. With no selection, link insertion
-starts as `[]()` and keeps the caret inside the label.
+Wiki links keep their source: [[Project Notes]], [[Project Notes#Roadmap]], and
+[[docs/roadmap|a custom label]]. Hierarchical tags render compactly:
+#flutter/markdown.
 
-Wiki links keep their Obsidian source: [[Project Notes]] or
-[[docs/roadmap|the roadmap]]. Tags render as compact chips: #flutter/markdown.
-External links keep their destination hidden and show an exit cue:
-[Flutter](https://flutter.dev).
+## Lists and tasks
 
-Link labels preserve nested formatting: [**bold link** with `inline code`](https://example.com/docs "Rich label").
+- Unordered item
+- A second item with nested content
+  - Nested bullet
+  - Another nested bullet
+    1. Ordered item at a deeper level
+    2. Another ordered item
+- Final parent item
 
-Bare links keep Obsidian punctuation boundaries: https://example.com/a_(b).,
-user@example.com and www.example.com.
+1. First ordered item
+2. Second ordered item
+3. Third ordered item
 
-Reading mode separates [[Project Notes#Roadmap]] with a chevron, while
-[[Missing Wiki Note]] uses the host-resolved missing-link style.
+- [x] Completed task
+- [ ] Open task
+- [ ] Task containing **formatted text** and a [link](https://dart.dev)
 
-A host-resolved heading embed keeps Obsidian's slim rail and open affordance:
+## Quotes and callouts
 
-![[Project Notes#Roadmap]]
-
-- Bullets stay visual while editing
-- Press Enter to continue the list
-- Split at the content start without discarding the empty marker
-
-1. Ordered markers stay visual
-2. Numbers continue automatically
-
-## Structure and depth
-
-> A quoted paragraph keeps a slim accent rail.
+> A blockquote can span multiple lines.
 >
-> A second paragraph remains in the same quote.
+> It can contain **formatting**, lists, and a second paragraph.
+> - Quoted list item
 
 > An outer quote keeps its first rail.
 >
-> > A nested quote adds a second rail.
-> > - Nested list markers stay readable.
->
-> The outer quote resumes without losing its depth.
+> > A nested quote adds another level.
 
-> A lazy quote continuation starts here.
-This unmarked source line remains inside the quote.
-> An explicit quoted tail finishes the block.
+> [!note] Live Preview
+> Callouts keep their title, accent, and Markdown **formatting**.
+
+> [!warning]- Collapsible detail
+> This warning starts folded and preserves its exact source.
 
 ---
 
-- Parent bullet
-  - Nested bullet
-    1. Nested ordered item
-- Following parent
-
-## Heading hierarchy
-
-# Heading level one
-
-## Heading level two
+## Headings
 
 ### Heading level three
 
@@ -370,150 +260,86 @@ Setext level one
 Setext level two
 ----------------
 
-## Highlights and callouts
+## Tables
 
-Inactive ==highlight markers disappear== until the caret enters their range.
-
-> [!note] **Live preview** with `inline code`
-> Callouts keep their icon, type color, title, and inline **formatting**.
-An unmarked lazy continuation remains inside the same callout.
-> The explicit quoted tail remains inside it too.
-> > [!tip] Nested callout
-> > Nested callouts keep their own card color, icon, and body.
-
-> [!warning]- **Folded** source-preserving detail
-> Expanding this card does not enter editing; clicking its body does.
-
-## Mathematics
-
-Inline math hides its delimiters: \$E = mc^2\$, and display-style math can
-remain in the same line: \$\$x^2 + 1\$\$.
-
-\$\$
-\\int_0^1 x^2\\,dx = \\frac{1}{3}
-\$\$
-
-## Comments, block IDs, and footnotes
-
-Rendered text keeps %%this editor-only comment%% out of the reading surface.
-
-This paragraph has an Obsidian block identifier. ^example-block
-
-Standard footnotes[^standard] and inline notes
-^[Inline footnotes join the same numbered footer.] share one sequence.
-
-[^standard]: Standard footnotes keep **Markdown formatting**.
-
-%%
-This multi-line comment stays subdued in Preview and disappears in Read.
-%%
-
-| Capability | Detail | Status |
+| Capability | Example | Supported |
 | :--- | :--- | ---: |
-| Block live preview | **Rendered + editable** | Yes |
-| Source-preserving edits | `Markdown` stays canonical | Yes |
-| Empty cells | | Supported |
-| Escaped pipe | A \\| B stays in one cell | Yes |
-| Sparse row | Missing cells stay editable |
-| Extra source cell | Retained instead of truncated | Yes | Obsidian |
-| Network image loading | Host-approved builders only | Off |
+| Inline styles | **Bold** and `code` | Yes |
+| Alignment | Left and right columns | Yes |
+| Empty cell | | Yes |
+| Escaped pipe | ${r'A \| B'} | Yes |
 
-## Line breaks and whitespace
+## Code
 
-Obsidian-style soft breaks keep each source line visible:
-first source line
-second source line
-
-Two trailing spaces also create a hard break:${'  '}
-the following line stays separate.
-
-Escaped \\*asterisks\\*, \\#hash, and \\[brackets\\] stay literal.
-
-Several     internal spaces collapse when the document is rendered.
-
-Inline code can cross a soft source break without losing its code style:
-`first inline row
-second inline row`.
-
-Code spans keep shorter delimiter runs literal: ``code with ` a tick``.
-Live Preview preserves `three   internal   spaces`, while Reading collapses
-them; `  one padded edge  ` removes one source-space pair in both modes.
-Outer formatting composes with code: **`strong code`**, *`italic code`*,
-~~`struck code`~~, and ==`highlighted code`==.
-
-## Code blocks
+Inline code preserves symbols such as `final value = <String>[];`.
 
 ```dart
-final controller = IanvsMarkdownController(text: source);
+final controller = IanvsMarkdownController(
+  text: '# Hello Markdown',
+);
 
 IanvsMarkdownLiveEditor(controller: controller);
 ```
 
-Code tabs follow four-column stops while copied Markdown keeps the original
-tab characters:
-
-```text
-root
-\tchild
-a\tb
-```
-
-Indented code stays plain and monospaced without fenced chrome:
+Indented code is also supported:
 
     const unfenced = true;
-
     print(unfenced);
 
-Only the first info token becomes the visible language label:
+## Mermaid diagram
 
-```python linenums="1"
-print("info suffix")
-```
-
-Unknown language labels preserve their source casing:
-
-```FoObAr
-widget := unknown_token(42)
-```
-
-Long fenced lines soft-wrap inside the available code canvas:
-
-```text
-This deliberately long code line keeps flowing inside the canvas instead of exposing a horizontal scrollbar at the bottom.
-```
-
-An empty fenced block shows an empty canvas until it is activated:
-
-```text
-
-```
-
-## Diagram injection
+The example app injects its Mermaid renderer through `diagramBuilder`.
 
 ```mermaid
-graph LR
-  Source --> Parse
+flowchart LR
+  Markdown --> Parse
   Parse --> Edit
   Edit --> Render
 ```
 
-## Safe images
+## Math
 
-Images are blocked until the host supplies an approved `imageBuilder`.
+Inline math uses delimiters such as ${r'$E = mc^2$'}.
 
-![Remote example](https://images.example.com/diagram.png)
-''';
+${r'$$'}
+${r'\int_0^1 x^2\,dx = \frac{1}{3}'}
+${r'$$'}
 
-const projectNotesMarkdown = '''
-# Project Notes
+## Images and embeds
 
-The host app supplies embedded Markdown without granting the renderer file
-system access.
+Standard image syntax remains host-controlled for safe loading:
 
-## Roadmap
+![Frame diff principle advantages](https://robinfai.github.io/ianvs-terminal/assets/images/frame-diff/principle-advantages.png "Frame diff principle advantages")
 
-- Resolve notes in the host app
-- Keep Markdown as the source of truth
+Obsidian-style embeds retain their exact source:
 
-Connect the editor to a host-owned note repository. ^next-step
+![[Project Notes#Roadmap]]
+
+## Footnotes, comments, and block IDs
+
+A statement can reference a standard footnote[^source] and an inline footnote
+^[Inline notes share the same reading-mode sequence.].
+
+[^source]: Footnote definitions can contain **Markdown formatting** and links.
+
+This text is visible, while %%this editor-only comment is hidden in Read mode%%.
+
+This paragraph has a reusable block identifier. ^example-block
+
+%%
+A multi-line Markdown comment remains editable in Live Preview and disappears
+from the reading surface.
+%%
+
+## Host integration
+
+| API | Responsibility |
+| --- | --- |
+| `IanvsMarkdownController` | source, selection, history, dirty state |
+| `IanvsMarkdownLiveEditor` | editing and rendering surfaces |
+| `diagramBuilder` | host-approved Mermaid rendering |
+| `onSaveRequested` | host-owned persistence callback |
+
+The reset button restores this entire document, so every supported element can
+be edited repeatedly without changing files on disk.
 ''';

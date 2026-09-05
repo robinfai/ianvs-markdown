@@ -184,9 +184,10 @@ IanvsMarkdownEditor(controller: controller)
 
 工具栏支持实时预览、源码和阅读模式切换，以及粗体、斜体、行内代码、链接、标题、列表、任务和代码块。编辑区支持 `Cmd/Ctrl+B`、`Cmd/Ctrl+I`、`Cmd/Ctrl+K`、`Cmd/Ctrl+S`、`Cmd/Ctrl+E`、撤销/重做和 Tab 缩进。
 
-## macOS 示例应用
+## 示例与桌面应用
 
-[example](example/) 是完整的 macOS Playground，覆盖实时编辑、三种模式、保存状态、主题、表格、代码块、基于 `merman` 的真实 Mermaid 注入和图片安全占位：
+[example](example/) 保持为最小的组件集成示例，展示 Controller、三种模式、
+保存回调、主题以及 Mermaid builder 注入，不读取或写入用户文件：
 
 ```sh
 cd example
@@ -194,7 +195,20 @@ flutter pub get --offline
 flutter run -d macos
 ```
 
-示例应用不会落盘；“保存”按钮用于展示宿主应用如何接管持久化。
+完整的文件优先桌面编辑器位于 [app](app/)。它保留 MarkText 式文件优先产品结构，
+并改用 Bear 熊掌记作为桌面视觉参考：全高深色导航栏、浅色笔记/文件列表、宽松正文
+画布、柔和卡片和克制的珊瑚红强调色。应用仍提供文件树、可排序标签页、悬浮大纲、
+打开/保存/另存为、文件拖放、外部变更提醒和崩溃恢复，并继续以原始 Markdown 作为
+唯一文档模型：
+
+```sh
+cd app
+flutter pub get
+flutter run -d macos
+```
+
+产品概念映射、Bear 视觉契约、依赖边界和恢复冲突规则见
+[app/ARCHITECTURE.md](app/ARCHITECTURE.md)。
 
 ## 主题
 

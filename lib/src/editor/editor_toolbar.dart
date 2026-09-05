@@ -8,6 +8,15 @@ import 'editor_models.dart';
 
 typedef IanvsMarkdownSaveCallback = FutureOr<void> Function(String markdown);
 
+/// Signals that a host-owned save flow was dismissed without writing.
+///
+/// Throw this from [IanvsMarkdownSaveCallback] when, for example, the user
+/// cancels a Save As dialog. The editor keeps the document dirty and does not
+/// report the cancellation as an error.
+class IanvsMarkdownSaveCancelledException implements Exception {
+  const IanvsMarkdownSaveCancelledException();
+}
+
 class IanvsMarkdownEditorToolbar extends StatelessWidget {
   const IanvsMarkdownEditorToolbar({
     super.key,
@@ -176,7 +185,11 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
   Future<void> _save() async {
     final callback = onSaveRequested;
     if (callback == null) return;
-    await callback(controller.text);
+    try {
+      await callback(controller.text);
+    } on IanvsMarkdownSaveCancelledException {
+      return;
+    }
     controller.markSaved();
   }
 }

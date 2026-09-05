@@ -6851,6 +6851,44 @@ title: Beta
   );
 
   testWidgets(
+    'cancelled Command+S keeps the document dirty',
+    (tester) async {
+      final controller = IanvsMarkdownController(
+        text: '# Original',
+        mode: IanvsMarkdownEditorMode.source,
+      );
+      addTearDown(controller.dispose);
+      controller.text = '# Changed';
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: IanvsMarkdownLiveEditor(
+              controller: controller,
+              autofocus: true,
+              onSaveRequested: (_) async {
+                throw const IanvsMarkdownSaveCancelledException();
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+
+      expect(controller.text, '# Changed');
+      expect(controller.isDirty, isTrue);
+    },
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.macOS,
+    }),
+  );
+
+  testWidgets(
     'date property Command+S commits pending input before saving',
     (tester) async {
       const source = '''

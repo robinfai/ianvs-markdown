@@ -95,6 +95,7 @@ class IanvsMarkdownLiveEditor extends StatefulWidget {
     this.scrollController,
     this.autofocus = false,
     this.showToolbar = true,
+    this.enableModeShortcuts = true,
     this.showOutlineInPreview = true,
     this.showNavigationPane = false,
     this.navigationBreakpoint = 900,
@@ -131,6 +132,10 @@ class IanvsMarkdownLiveEditor extends StatefulWidget {
   final ScrollController? scrollController;
   final bool autofocus;
   final bool showToolbar;
+
+  /// Allow a host app to reserve numeric shortcuts for document tabs.
+  /// When false, the editor does not bind mode-switching shortcuts.
+  final bool enableModeShortcuts;
   final bool showOutlineInPreview;
   final bool showNavigationPane;
   final double navigationBreakpoint;
@@ -3411,6 +3416,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           ),
         Expanded(
           child: IanvsMarkdownEditorShortcuts(
+            enableModeShortcuts: widget.enableModeShortcuts,
             controller: widget.controller,
             onSaveRequested: widget.onSaveRequested,
             child: ValueListenableBuilder<IanvsMarkdownEditorMode>(
@@ -3418,6 +3424,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
               builder: (context, mode, _) => switch (mode) {
                 IanvsMarkdownEditorMode.livePreview => _buildLiveMode(colors),
                 IanvsMarkdownEditorMode.source => IanvsMarkdownEditor(
+                  enableModeShortcuts: widget.enableModeShortcuts,
                   controller: widget.controller,
                   focusNode: _focusNode,
                   scrollController: _scrollController,

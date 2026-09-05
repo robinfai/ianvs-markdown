@@ -1,12 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
-
 import 'package:ianvs_markdown_example/main.dart';
 
 void main() {
-  testWidgets('playground demonstrates all three editor modes', (tester) async {
-    tester.view.physicalSize = const Size(1280, 900);
+  test('default document covers common Markdown elements', () {
+    expect(exampleMarkdown, contains('**bold**'));
+    expect(exampleMarkdown, contains('[[Project Notes]]'));
+    expect(exampleMarkdown, contains('- [x] Completed task'));
+    expect(exampleMarkdown, contains('| Capability | Example | Supported |'));
+    expect(exampleMarkdown, contains('```dart'));
+    expect(exampleMarkdown, contains('```mermaid'));
+    expect(exampleMarkdown, contains('> [!note] Live Preview'));
+    expect(exampleMarkdown, contains('[^source]'));
+    expect(
+      exampleMarkdown,
+      contains(
+        'https://robinfai.github.io/ianvs-terminal/assets/images/frame-diff/principle-advantages.png',
+      ),
+    );
+    expect(exampleMarkdown.split('\n').length, greaterThan(120));
+  });
+
+  test('example enables HTTP network images by default', () {
+    final image = buildExampleNetworkImage(
+      Uri.parse('https://example.com/image.png'),
+      null,
+      'Example',
+    );
+
+    expect(image, isA<Image>());
+    expect((image as Image).image, isA<NetworkImage>());
+    expect((image.image as NetworkImage).url, 'https://example.com/image.png');
+  });
+
+  testWidgets('example stays focused on package integration', (tester) async {
+    tester.view.physicalSize = const Size(1100, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -16,60 +45,22 @@ void main() {
 
     expect(find.byType(IanvsMarkdownLiveEditor), findsOneWidget);
     expect(find.text('Render and edit together'), findsWidgets);
-    expect(find.byTooltip('实时预览'), findsOneWidget);
-    expect(find.byTooltip('源码模式'), findsOneWidget);
-    expect(find.byTooltip('阅读模式'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('ianvs-markdown-navigation-pane')),
-      findsOneWidget,
-    );
-    expect(find.text('MODE'), findsOneWidget);
-    expect(find.text('Preview'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('ianvs-markdown-front-matter-toggle')),
-      findsOneWidget,
-    );
-    await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('example-mermaid-renderer')),
-      360,
-      scrollable: find
-          .descendant(
-            of: find.byKey(const ValueKey('ianvs-markdown-live-blocks')),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    );
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(const ValueKey('example-mermaid-renderer')),
-      findsOneWidget,
-    );
+    expect(find.byTooltip('新建 Markdown 文件'), findsNothing);
+
     await tester.tap(find.byTooltip('源码模式'));
     await tester.pumpAndSettle();
     expect(
       find.byKey(const ValueKey('ianvs-markdown-source-field')),
       findsOneWidget,
     );
-    expect(find.text('Source'), findsOneWidget);
 
     await tester.enterText(
       find.byKey(const ValueKey('ianvs-markdown-source-field')),
-      '# Edited in the example',
+      '# Changed',
     );
     await tester.pump();
-    expect(find.text('Unsaved'), findsOneWidget);
-
-    await tester.tap(find.byTooltip('实时预览'));
-    await tester.pumpAndSettle();
-    expect(find.text('Edited in the example'), findsWidgets);
-
     await tester.tap(find.byTooltip('保存'));
-    await tester.pump();
-    expect(find.text('Saved locally by the host app'), findsOneWidget);
-    expect(find.text('Saved'), findsOneWidget);
-
-    await tester.tap(find.byTooltip('阅读模式'));
     await tester.pumpAndSettle();
-    expect(find.text('Read'), findsOneWidget);
+    expect(find.text('Host save callback invoked'), findsOneWidget);
   });
 }

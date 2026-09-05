@@ -1578,7 +1578,6 @@ Escaped \\<span>literal \\</span> after.
     expect(find.byIcon(Icons.calendar_month_outlined), findsNWidgets(3));
     expect(_renderedPlainTextContains(tester, '<input'), isFalse);
   });
-
   testWidgets('renders a segmented local Obsidian HTML date input', (
     tester,
   ) async {
