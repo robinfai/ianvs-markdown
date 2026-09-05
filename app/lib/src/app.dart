@@ -6,17 +6,16 @@ import 'services/markdown_file_service.dart';
 import 'services/workspace_session_store.dart';
 import 'widgets/editor_shell.dart';
 
-class IanvsMarkdownDesktopApp extends StatefulWidget {
-  const IanvsMarkdownDesktopApp({super.key, this.workspaceController});
+class LinefoldApp extends StatefulWidget {
+  const LinefoldApp({super.key, this.workspaceController});
 
   final WorkspaceController? workspaceController;
 
   @override
-  State<IanvsMarkdownDesktopApp> createState() =>
-      _IanvsMarkdownDesktopAppState();
+  State<LinefoldApp> createState() => _LinefoldAppState();
 }
 
-class _IanvsMarkdownDesktopAppState extends State<IanvsMarkdownDesktopApp> {
+class _LinefoldAppState extends State<LinefoldApp> {
   late final WorkspaceController _workspace =
       widget.workspaceController ??
       WorkspaceController(
@@ -41,7 +40,7 @@ class _IanvsMarkdownDesktopAppState extends State<IanvsMarkdownDesktopApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Ianvs Markdown',
+      title: 'Linefold',
       themeMode: _dark ? ThemeMode.dark : ThemeMode.light,
       theme: desktopTheme(Brightness.light),
       darkTheme: desktopTheme(Brightness.dark),

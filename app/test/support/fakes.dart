@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:ianvs_markdown_app/src/services/markdown_file_service.dart';
-import 'package:ianvs_markdown_app/src/services/workspace_session_store.dart';
+import 'package:linefold/src/services/markdown_file_service.dart';
+import 'package:linefold/src/services/workspace_session_store.dart';
 
 class MemoryMarkdownFileService implements MarkdownFileService {
   final Map<String, String> files = <String, String>{};

@@ -62,7 +62,7 @@ class DesktopMenuBar extends StatelessWidget {
     return PlatformMenuBar(
       menus: [
         const PlatformMenu(
-          label: 'Ianvs Markdown',
+          label: 'Linefold',
           menus: [
             PlatformProvidedMenuItem(type: PlatformProvidedMenuItemType.about),
             PlatformMenuItemGroup(

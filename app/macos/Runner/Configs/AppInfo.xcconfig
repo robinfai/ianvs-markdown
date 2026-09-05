@@ -5,10 +5,10 @@
 // 'flutter create' template.
 
 // The application's name. By default this is also the title of the Flutter window.
-PRODUCT_NAME = Ianvs Markdown
+PRODUCT_NAME = Linefold
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.ianvs.markdown
+PRODUCT_BUNDLE_IDENTIFIER = work.ianvs.linefold
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 Ianvs. All rights reserved.

@@ -1,4 +1,4 @@
-# Ianvs Markdown Desktop
+# Linefold
 
 `app/` is the file-first desktop editor built on top of the reusable
 `ianvs_markdown` package. Its file-first product structure keeps the useful

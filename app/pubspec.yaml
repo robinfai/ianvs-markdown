@@ -1,4 +1,4 @@
-name: ianvs_markdown_app
+name: linefold
 description: A file-first desktop Markdown editor built with ianvs_markdown.
 publish_to: none
 version: 0.1.0+1

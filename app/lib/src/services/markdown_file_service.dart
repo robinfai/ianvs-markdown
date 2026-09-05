@@ -65,7 +65,7 @@ class DesktopMarkdownFileService implements MarkdownFileService {
   const DesktopMarkdownFileService();
 
   static const _fileAccessChannel = MethodChannel(
-    'com.ianvs.markdown/file_access',
+    'work.ianvs.linefold/file_access',
   );
 
   @override

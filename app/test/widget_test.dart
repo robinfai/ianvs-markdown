@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
-import 'package:ianvs_markdown_app/src/app.dart';
-import 'package:ianvs_markdown_app/src/controllers/workspace_controller.dart';
-import 'package:ianvs_markdown_app/src/services/markdown_file_service.dart';
-import 'package:ianvs_markdown_app/src/services/workspace_session_store.dart';
-import 'package:ianvs_markdown_app/src/widgets/floating_outline.dart';
-import 'package:ianvs_markdown_app/src/widgets/workspace_sidebar.dart';
+import 'package:linefold/src/app.dart';
+import 'package:linefold/src/controllers/workspace_controller.dart';
+import 'package:linefold/src/services/markdown_file_service.dart';
+import 'package:linefold/src/services/workspace_session_store.dart';
+import 'package:linefold/src/widgets/floating_outline.dart';
+import 'package:linefold/src/widgets/workspace_sidebar.dart';
 
 import 'support/fakes.dart';
 
@@ -37,7 +37,7 @@ void main() {
       addTearDown(workspace.dispose);
       addTearDown(files.dispose);
       await tester.pumpWidget(
-        IanvsMarkdownDesktopApp(workspaceController: workspace),
+        LinefoldApp(workspaceController: workspace),
       );
       await tester.pumpAndSettle();
       await workspace.chooseWorkspaceFolder();
@@ -169,7 +169,7 @@ void main() {
       addTearDown(workspace.dispose);
       addTearDown(files.dispose);
       await tester.pumpWidget(
-        IanvsMarkdownDesktopApp(workspaceController: workspace),
+        LinefoldApp(workspaceController: workspace),
       );
       await tester.pumpAndSettle();
       expect(find.byType(PlatformMenuBar), findsOneWidget);
@@ -231,7 +231,7 @@ void main() {
     addTearDown(files.dispose);
 
     await tester.pumpWidget(
-      IanvsMarkdownDesktopApp(workspaceController: workspace),
+      LinefoldApp(workspaceController: workspace),
     );
     await tester.pumpAndSettle();
 
@@ -338,7 +338,7 @@ void main() {
     addTearDown(files.dispose);
 
     await tester.pumpWidget(
-      IanvsMarkdownDesktopApp(workspaceController: workspace),
+        LinefoldApp(workspaceController: workspace),
     );
     await tester.pumpAndSettle();
 

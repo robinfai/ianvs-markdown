@@ -31,7 +31,7 @@ class MainFlutterWindow: NSWindow {
 
   private func registerFileAccessChannel(with controller: FlutterViewController) {
     let channel = FlutterMethodChannel(
-      name: "com.ianvs.markdown/file_access",
+      name: "work.ianvs.linefold/file_access",
       binaryMessenger: controller.engine.binaryMessenger)
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self else { return }

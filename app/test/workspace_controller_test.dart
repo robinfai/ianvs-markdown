@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ianvs_markdown_app/src/controllers/workspace_controller.dart';
-import 'package:ianvs_markdown_app/src/models/document_session.dart';
-import 'package:ianvs_markdown_app/src/services/workspace_session_store.dart';
+import 'package:linefold/src/controllers/workspace_controller.dart';
+import 'package:linefold/src/models/document_session.dart';
+import 'package:linefold/src/services/workspace_session_store.dart';
 
 import 'support/fakes.dart';
 

@@ -414,7 +414,7 @@ int _nextIdAfter(String id, int fallback) {
 String _lineEndingOf(String text) => text.contains('\r\n') ? 'CRLF' : 'LF';
 
 const welcomeMarkdown = '''
-# Welcome to Ianvs Markdown
+# Welcome to Linefold
 
 This is the full desktop app. It keeps your Markdown files at the center while
 adding a workspace, tabs, outline navigation, crash recovery, and file watching.
