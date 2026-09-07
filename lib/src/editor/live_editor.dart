@@ -3561,90 +3561,103 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       onPointerMove: _handleDocumentDragPointerMove,
       onPointerUp: _handleDocumentDragPointerUp,
       onPointerCancel: _handleDocumentDragPointerCancel,
-      child: IanvsMarkdownListGuideSurface(
-        key: const ValueKey('ianvs-markdown-live-list-guides'),
-        color: colors.listGuideColor,
-        indent: listIndentStep,
-        textDirection: Directionality.of(context),
-        child: ListView.builder(
-          key: const ValueKey('ianvs-markdown-live-blocks'),
-          controller: _scrollController,
-          padding: widget.padding,
-          itemCount: _blocks.length,
-          itemBuilder: (context, index) {
-            final block = _blocks[index];
-            final listNestingLevel = listNestingLevels[index];
-            if (hiddenBlockIndices.contains(index)) {
-              return KeyedSubtree(
-                key: _blockKeys[block.start],
-                child: const SizedBox.shrink(),
-              );
-            }
-            final headingSection = _headingFoldModel.sectionAtBlockIndex(index);
-            final coveredByActiveSelection =
-                _activeBlockStart != null &&
-                block.start != _activeBlockStart &&
-                block.start > _editingStart &&
-                block.start < _editingEnd;
-            if (coveredByActiveSelection) {
-              return KeyedSubtree(
-                key: _blockKeys[block.start],
-                child: const SizedBox.shrink(),
-              );
-            }
-            final next = index + 1 < _blocks.length ? _blocks[index + 1] : null;
-            final gapLines = markdownGapLineCount(
-              widget.controller.text,
-              block,
-              next,
-            );
-            final activeGapLine =
-                _activeBlockStart == block.start && _activeGapLine;
-            return KeyedSubtree(
-              key: _blockKeys[block.start],
-              child: Align(
-                alignment: Alignment.topLeft,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: widget.contentMaxWidth),
-                  child: Padding(
-                    padding: EdgeInsetsDirectional.only(
-                      start: listNestingLevel * listIndentStep,
-                    ),
-                    child: Column(
-                      key: ValueKey(
-                        'ianvs-markdown-block-${block.start}-${block.type.name}',
-                      ),
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (_activeBlockStart == block.start && !activeGapLine)
-                          _buildActiveBlock(
-                            block,
-                            colors,
-                            listNestingLevel: listNestingLevel,
-                            headingSection: headingSection,
-                          )
-                        else
-                          _buildRenderedBlock(
-                            block,
-                            colors,
-                            listNestingLevel: listNestingLevel,
-                            headingSection: headingSection,
+      child: CustomScrollView(
+        key: const ValueKey('ianvs-markdown-live-blocks'),
+        controller: _scrollController,
+        slivers: [
+          SliverPadding(
+            padding: widget.padding,
+            sliver: IanvsMarkdownSliverListGuideSurface(
+              key: const ValueKey('ianvs-markdown-live-list-guides'),
+              color: colors.listGuideColor,
+              indent: listIndentStep,
+              textDirection: Directionality.of(context),
+              child: SliverList.builder(
+                itemCount: _blocks.length,
+                itemBuilder: (context, index) {
+                  final block = _blocks[index];
+                  final listNestingLevel = listNestingLevels[index];
+                  if (hiddenBlockIndices.contains(index)) {
+                    return KeyedSubtree(
+                      key: _blockKeys[block.start],
+                      child: const SizedBox.shrink(),
+                    );
+                  }
+                  final headingSection = _headingFoldModel.sectionAtBlockIndex(
+                    index,
+                  );
+                  final coveredByActiveSelection =
+                      _activeBlockStart != null &&
+                      block.start != _activeBlockStart &&
+                      block.start > _editingStart &&
+                      block.start < _editingEnd;
+                  if (coveredByActiveSelection) {
+                    return KeyedSubtree(
+                      key: _blockKeys[block.start],
+                      child: const SizedBox.shrink(),
+                    );
+                  }
+                  final next = index + 1 < _blocks.length
+                      ? _blocks[index + 1]
+                      : null;
+                  final gapLines = markdownGapLineCount(
+                    widget.controller.text,
+                    block,
+                    next,
+                  );
+                  final activeGapLine =
+                      _activeBlockStart == block.start && _activeGapLine;
+                  return KeyedSubtree(
+                    key: _blockKeys[block.start],
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: widget.contentMaxWidth,
+                        ),
+                        child: Padding(
+                          padding: EdgeInsetsDirectional.only(
+                            start: listNestingLevel * listIndentStep,
                           ),
-                        if (activeGapLine)
-                          _buildActiveGapLine(colors)
-                        else if (_activeBlockStart == block.start &&
-                            _editingEnd > block.end)
-                          const SizedBox.shrink()
-                        else
-                          _buildBlockGap(block, gapLines: gapLines),
-                      ],
+                          child: Column(
+                            key: ValueKey(
+                              'ianvs-markdown-block-${block.start}-${block.type.name}',
+                            ),
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (_activeBlockStart == block.start &&
+                                  !activeGapLine)
+                                _buildActiveBlock(
+                                  block,
+                                  colors,
+                                  listNestingLevel: listNestingLevel,
+                                  headingSection: headingSection,
+                                )
+                              else
+                                _buildRenderedBlock(
+                                  block,
+                                  colors,
+                                  listNestingLevel: listNestingLevel,
+                                  headingSection: headingSection,
+                                ),
+                              if (activeGapLine)
+                                _buildActiveGapLine(colors)
+                              else if (_activeBlockStart == block.start &&
+                                  _editingEnd > block.end)
+                                const SizedBox.shrink()
+                              else
+                                _buildBlockGap(block, gapLines: gapLines),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
-            );
-          },
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -4050,6 +4063,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         level: headingLevel,
         colors: colors,
         foldIdentity: headingSection?.identity,
+        foldingEnabled: widget.enableHeadingFolding,
         foldable:
             widget.enableHeadingFolding && (headingSection?.canFold ?? false),
         collapsed:
@@ -4402,6 +4416,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         level: headingLevel,
         colors: colors,
         foldIdentity: headingSection?.identity,
+        foldingEnabled: widget.enableHeadingFolding,
         foldable:
             widget.enableHeadingFolding && (headingSection?.canFold ?? false),
         collapsed:
@@ -5829,6 +5844,7 @@ class _IanvsHeadingRail extends StatelessWidget {
     required this.colors,
     required this.child,
     this.foldIdentity,
+    this.foldingEnabled = false,
     this.foldable = false,
     this.collapsed = false,
     this.onToggle,
@@ -5839,6 +5855,7 @@ class _IanvsHeadingRail extends StatelessWidget {
   final IanvsMarkdownThemeData colors;
   final Widget child;
   final String? foldIdentity;
+  final bool foldingEnabled;
   final bool foldable;
   final bool collapsed;
   final VoidCallback? onToggle;
@@ -5849,6 +5866,7 @@ class _IanvsHeadingRail extends StatelessWidget {
     return _LiveHeadingFoldFrame(
       identity: foldIdentity,
       colors: colors,
+      foldingEnabled: foldingEnabled,
       foldable: foldable,
       collapsed: collapsed,
       onToggle: onToggle,
@@ -5900,6 +5918,7 @@ class _LiveHeadingFoldFrame extends StatefulWidget {
   const _LiveHeadingFoldFrame({
     required this.identity,
     required this.colors,
+    required this.foldingEnabled,
     required this.foldable,
     required this.collapsed,
     required this.onToggle,
@@ -5908,6 +5927,7 @@ class _LiveHeadingFoldFrame extends StatefulWidget {
 
   final String? identity;
   final IanvsMarkdownThemeData colors;
+  final bool foldingEnabled;
   final bool foldable;
   final bool collapsed;
   final VoidCallback? onToggle;
@@ -5958,6 +5978,9 @@ class _LiveHeadingFoldFrameState extends State<_LiveHeadingFoldFrame> {
                 ),
               ),
             ),
+          // Empty sections still share the same rail and text alignment.
+          if (widget.foldingEnabled && !widget.foldable)
+            const SizedBox(width: 22),
           Expanded(child: widget.child),
         ],
       ),

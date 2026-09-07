@@ -1915,6 +1915,7 @@ class _MarkdownHeadingBuilder extends MarkdownElementBuilder {
       text: text,
       style: preferredStyle ?? parentStyle,
       colors: colors,
+      foldingEnabled: foldingEnabled,
       foldable: foldingEnabled && section.canFold,
       collapsed: foldController.isCollapsed(section.identity),
       onToggle: () => foldController.toggleIdentity(section.identity),
@@ -1931,6 +1932,7 @@ class _FoldableViewHeading extends StatefulWidget {
     required this.text,
     required this.style,
     required this.colors,
+    required this.foldingEnabled,
     required this.foldable,
     required this.collapsed,
     required this.onToggle,
@@ -1942,6 +1944,7 @@ class _FoldableViewHeading extends StatefulWidget {
   final String text;
   final TextStyle? style;
   final IanvsMarkdownThemeData colors;
+  final bool foldingEnabled;
   final bool foldable;
   final bool collapsed;
   final VoidCallback onToggle;
@@ -1994,6 +1997,9 @@ class _FoldableViewHeadingState extends State<_FoldableViewHeading> {
                   ),
                 ),
               ),
+            // Match the fold-button gutter even for headings without a body.
+            if (widget.foldingEnabled && !widget.foldable)
+              const SizedBox(width: 22),
             Expanded(
               child: Container(
                 key: ValueKey('ianvs-markdown-heading-rail-${widget.level}'),

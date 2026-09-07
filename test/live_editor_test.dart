@@ -5800,6 +5800,75 @@ void main() {
     },
   );
 
+  for (final foldingEnabled in <bool>[true, false]) {
+    testWidgets('heading alignment is uniform with folding=$foldingEnabled', (
+      tester,
+    ) async {
+      const titles = <String>[
+        'First',
+        'Second',
+        'Third',
+        'Fourth',
+        'Fifth',
+        'Sixth',
+        'Setext one',
+        'Setext two',
+      ];
+      const source =
+          '# First\n\n## Second\n\n### Third\n\n#### Fourth\n\n'
+          '##### Fifth\n\n###### Sixth\n\nSetext one\n===\n\nSetext two\n---';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        app(
+          controller,
+          enableHeadingFolding: foldingEnabled,
+          showToolbar: false,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      for (final mode in <IanvsMarkdownEditorMode>[
+        IanvsMarkdownEditorMode.livePreview,
+        IanvsMarkdownEditorMode.preview,
+      ]) {
+        controller.mode = mode;
+        await tester.pumpAndSettle();
+        Finder headingText(String title) {
+          if (mode == IanvsMarkdownEditorMode.livePreview) {
+            return find.text(title);
+          }
+          final level = <int>[1, 2, 3, 4, 5, 6, 1, 2][titles.indexOf(title)];
+          return find.descendant(
+            of: find.byKey(ValueKey('ianvs-markdown-heading-rail-$level')),
+            matching: find.text(title),
+          );
+        }
+
+        final left = tester.getTopLeft(headingText(titles.first)).dx;
+        for (final title in titles) {
+          expect(
+            tester.getTopLeft(headingText(title)).dx,
+            closeTo(left, .01),
+            reason: '$mode: $title',
+          );
+        }
+        if (mode == IanvsMarkdownEditorMode.livePreview) {
+          await tester.tap(find.text('Sixth'));
+          await tester.pumpAndSettle();
+          expect(
+            editableWithin(
+              tester,
+              find.byType(TextField),
+            ).localToGlobal(Offset.zero).dx,
+            closeTo(left, .01),
+          );
+        }
+      }
+      expect(controller.text, source);
+    });
+  }
+
   testWidgets('multiline Setext headings activate as one exact source block', (
     tester,
   ) async {
@@ -8164,9 +8233,10 @@ url: https://example.com/path
       expect(centers[1].dx - centers[0].dx, closeTo(28, .01));
       expect(centers[2].dx, closeTo(centers[0].dx, .01));
 
-      final surface = tester.renderObject<IanvsMarkdownListGuideRenderBox>(
-        find.byKey(const ValueKey('ianvs-markdown-live-list-guides')),
-      );
+      final surface = tester
+          .renderObject<IanvsMarkdownSliverListGuideRenderObject>(
+            find.byKey(const ValueKey('ianvs-markdown-live-list-guides')),
+          );
       var segments = surface.debugGuideSegments();
       expect(segments, isNotEmpty);
       expect(

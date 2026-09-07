@@ -223,19 +223,166 @@ class IanvsMarkdownListGuideRenderBox extends RenderProxyBox {
 
   @visibleForTesting
   List<IanvsMarkdownListGuideSegment> debugGuideSegments() {
-    if (child == null || !hasSize || indent <= 0) {
+    if (!hasSize) return const <IanvsMarkdownListGuideSegment>[];
+    return _ListGuideGeometry(this, child, indent, textDirection).measure();
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = width
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.butt;
+    for (final segment in debugGuideSegments()) {
+      context.canvas.drawLine(
+        offset + segment.start,
+        offset + segment.end,
+        paint,
+      );
+    }
+    super.paint(context, offset);
+  }
+}
+
+/// A guide surface inside a scroll viewport, sharing the list sliver's layout,
+/// paint invalidation and clipping instead of tracking it from outside.
+class IanvsMarkdownSliverListGuideSurface
+    extends SingleChildRenderObjectWidget {
+  const IanvsMarkdownSliverListGuideSurface({
+    super.key,
+    required this.color,
+    required this.indent,
+    required this.textDirection,
+    this.width = 1,
+    required super.child,
+  });
+
+  final Color color;
+  final double indent;
+  final double width;
+  final TextDirection textDirection;
+
+  @override
+  IanvsMarkdownSliverListGuideRenderObject createRenderObject(
+    BuildContext context,
+  ) {
+    return IanvsMarkdownSliverListGuideRenderObject(
+      color,
+      indent,
+      width,
+      textDirection,
+    );
+  }
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    IanvsMarkdownSliverListGuideRenderObject renderObject,
+  ) {
+    renderObject.updateStyle(color, indent, width, textDirection);
+  }
+}
+
+class IanvsMarkdownSliverListGuideRenderObject extends RenderProxySliver {
+  IanvsMarkdownSliverListGuideRenderObject(
+    this._color,
+    this._indent,
+    this._width,
+    this._textDirection,
+  );
+
+  Color _color;
+  double _indent;
+  double _width;
+  TextDirection _textDirection;
+
+  void updateStyle(
+    Color color,
+    double indent,
+    double width,
+    TextDirection textDirection,
+  ) {
+    if (_color == color &&
+        _indent == indent &&
+        _width == width &&
+        _textDirection == textDirection) {
+      return;
+    }
+    _color = color;
+    _indent = indent;
+    _width = width;
+    _textDirection = textDirection;
+    markNeedsPaint();
+  }
+
+  @visibleForTesting
+  List<IanvsMarkdownListGuideSegment> debugGuideSegments() {
+    if (geometry == null) return const <IanvsMarkdownListGuideSegment>[];
+    return _ListGuideGeometry(this, child, _indent, _textDirection).measure();
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final paintExtent = geometry?.paintExtent ?? 0;
+    if (paintExtent <= 0) return;
+    final size = switch (constraints.axis) {
+      Axis.vertical => Size(constraints.crossAxisExtent, paintExtent),
+      Axis.horizontal => Size(paintExtent, constraints.crossAxisExtent),
+    };
+    final canvas = context.canvas;
+    canvas.save();
+    canvas.clipRect(offset & size);
+    final paint = Paint()
+      ..color = _color
+      ..strokeWidth = _width
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.butt;
+    for (final segment in debugGuideSegments()) {
+      canvas.drawLine(offset + segment.start, offset + segment.end, paint);
+    }
+    canvas.restore();
+    super.paint(context, offset);
+  }
+}
+
+final class _ListGuideGeometry {
+  const _ListGuideGeometry(
+    this.surface,
+    this.child,
+    this.indent,
+    this.textDirection,
+  );
+
+  final RenderObject surface;
+  final RenderObject? child;
+  final double indent;
+  final TextDirection textDirection;
+
+  List<IanvsMarkdownListGuideSegment> measure() {
+    if (child == null || indent <= 0) {
       return const <IanvsMarkdownListGuideSegment>[];
     }
     final anchors = <_MeasuredListGuideAnchor>[];
     void collect(RenderObject renderObject) {
+      // Retained editors outside the sliver's laid-out children have no
+      // current scroll coordinates and must not contribute guide anchors.
+      final parentData = renderObject.parentData;
+      if (parentData is SliverMultiBoxAdaptorParentData &&
+          parentData.keptAlive) {
+        return;
+      }
       // A host-supplied embed can contain its own IanvsMarkdown. Its guide
       // surface owns that document boundary and must not be painted twice or
       // connected to markers in the surrounding document.
-      if (renderObject is IanvsMarkdownListGuideRenderBox) return;
+      if (renderObject is IanvsMarkdownListGuideRenderBox ||
+          renderObject is IanvsMarkdownSliverListGuideRenderObject) {
+        return;
+      }
       if (renderObject is IanvsMarkdownListGuideAnchorRenderBox &&
           renderObject.hasSize) {
         final anchorRect = MatrixUtils.transformRect(
-          renderObject.getTransformTo(this),
+          renderObject.getTransformTo(surface),
           Offset.zero & renderObject.size,
         );
         anchors.add(
@@ -321,10 +468,10 @@ class IanvsMarkdownListGuideRenderBox extends RenderProxyBox {
 
   Rect? _listItemRect(IanvsMarkdownListGuideAnchorRenderBox anchor) {
     RenderObject? candidate = anchor.parent;
-    while (candidate != null && candidate != this) {
+    while (candidate != null && candidate != surface) {
       if (candidate is RenderFlex && candidate.direction == Axis.horizontal) {
         return MatrixUtils.transformRect(
-          candidate.getTransformTo(this),
+          candidate.getTransformTo(surface),
           Offset.zero & candidate.size,
         );
       }
@@ -381,23 +528,6 @@ class IanvsMarkdownListGuideRenderBox extends RenderProxyBox {
     }
     return merged;
   }
-
-  @override
-  void paint(PaintingContext context, Offset offset) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = width
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.butt;
-    for (final segment in debugGuideSegments()) {
-      context.canvas.drawLine(
-        offset + segment.start,
-        offset + segment.end,
-        paint,
-      );
-    }
-    super.paint(context, offset);
-  }
 }
 
 final class IanvsMarkdownListGuideAnchorRenderBox extends RenderProxyBox {
@@ -410,7 +540,8 @@ final class IanvsMarkdownListGuideAnchorRenderBox extends RenderProxyBox {
     _nestLevel = value;
     RenderObject? candidate = parent;
     while (candidate != null) {
-      if (candidate is IanvsMarkdownListGuideRenderBox) {
+      if (candidate is IanvsMarkdownListGuideRenderBox ||
+          candidate is IanvsMarkdownSliverListGuideRenderObject) {
         candidate.markNeedsPaint();
         break;
       }
