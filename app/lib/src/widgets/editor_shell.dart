@@ -175,6 +175,8 @@ class _EditorShellState extends State<EditorShell> {
                                             scrollController:
                                                 document.scrollController,
                                             showToolbar: false,
+                                            placeholder:
+                                                'Start writing Markdown…',
                                             enableModeShortcuts: false,
                                             showNavigationPane: false,
                                             showOutlineInPreview: false,

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show SelectedContent;
 import 'package:flutter/services.dart';
@@ -629,15 +630,25 @@ class IanvsMarkdown extends StatelessWidget {
       inlineSyntaxes: effectiveInlineSyntaxes,
       extensionSet: extensionSet ?? md.ExtensionSet.gitHubFlavored,
       imageBuilder: (uri, title, alt) {
-        final currentImageIndex = imageIndex;
-        imageIndex += 1;
+        var currentImageIndex = imageIndex;
         final dimensions = parseIanvsMarkdownImageDimensions(alt);
         imageReferenceLabels ??= _markdownReferenceLabels(renderedData);
-        final sourceImage = findIanvsMarkdownStandardImageSource(
+        var sourceImage = findIanvsMarkdownStandardImageSource(
           renderedData,
           imageIndex: currentImageIndex,
           linkReferenceLabels: imageReferenceLabels!,
         );
+        // MarkdownBody can traverse the same document again after inherited
+        // theme/style changes without receiving fresh callback instances.
+        if (sourceImage == null && currentImageIndex > 0) {
+          currentImageIndex = 0;
+          sourceImage = findIanvsMarkdownStandardImageSource(
+            renderedData,
+            imageIndex: 0,
+            linkReferenceLabels: imageReferenceLabels!,
+          );
+        }
+        imageIndex = currentImageIndex + 1;
         final builder = imageBuilder;
         if (builder == null) {
           return IanvsMarkdownBlockedImage(
@@ -689,6 +700,7 @@ class IanvsMarkdown extends StatelessWidget {
         return image;
       },
       checkboxBuilder: (checked) {
+        if (taskIndex >= taskProjection.tasks.length) taskIndex = 0;
         final task = taskIndex < taskProjection.tasks.length
             ? taskProjection.tasks[taskIndex]
             : IanvsMarkdownTaskSourceMarker(
@@ -1160,6 +1172,9 @@ class _IanvsMarkdownListMarker extends StatelessWidget {
       '${parameters.index + 1}.',
       key: ValueKey('ianvs-markdown-ordered-marker-$nestLevel'),
       textAlign: TextAlign.right,
+      maxLines: 1,
+      softWrap: false,
+      overflow: TextOverflow.visible,
       style: TextStyle(color: theme.textPrimary, fontSize: 14.5, height: 1.58),
     );
   }
@@ -1181,6 +1196,7 @@ class IanvsMarkdownView extends StatefulWidget {
     this.showOutline = true,
     this.enableHeadingFolding = false,
     this.headingFoldController,
+    this.headingNavigation,
     this.outlineBreakpoint = 560,
     this.outlineWidth = 180,
     this.contentMaxWidth = 840,
@@ -1220,6 +1236,9 @@ class IanvsMarkdownView extends StatefulWidget {
   /// not shown.
   final bool enableHeadingFolding;
   final IanvsMarkdownHeadingFoldController? headingFoldController;
+
+  /// Optional heading requests using offsets in [data], including front matter.
+  final ValueListenable<IanvsMarkdownHeadingNavigation?>? headingNavigation;
   final double outlineBreakpoint;
   final double outlineWidth;
   final double contentMaxWidth;
@@ -1273,11 +1292,16 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
         widget.headingFoldController ?? IanvsMarkdownHeadingFoldController();
     _parseDocument();
     _headingFoldController.addListener(_handleHeadingFoldsChanged);
+    widget.headingNavigation?.addListener(_handleHeadingNavigation);
   }
 
   @override
   void didUpdateWidget(covariant IanvsMarkdownView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.headingNavigation, widget.headingNavigation)) {
+      oldWidget.headingNavigation?.removeListener(_handleHeadingNavigation);
+      widget.headingNavigation?.addListener(_handleHeadingNavigation);
+    }
     if (!identical(oldWidget.controller, widget.controller)) {
       if (oldWidget.controller == null) _scrollController.dispose();
       _scrollController = widget.controller ?? ScrollController();
@@ -1328,8 +1352,22 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
     if (mounted) setState(() {});
   }
 
+  void _handleHeadingNavigation() {
+    final request = widget.headingNavigation?.value;
+    if (request == null) return;
+    final bodyOffset =
+        request.sourceOffset - (widget.data.length - _document.body.length);
+    final index = _headingFoldModel.sections.indexWhere(
+      (section) =>
+          _headingFoldModel.blocks[section.headingBlockIndex].start ==
+          bodyOffset,
+    );
+    if (index >= 0) unawaited(_scrollToHeading(index, request: request));
+  }
+
   @override
   void dispose() {
+    widget.headingNavigation?.removeListener(_handleHeadingNavigation);
     _headingFoldController.removeListener(_handleHeadingFoldsChanged);
     if (_ownsHeadingFoldController) _headingFoldController.dispose();
     if (_ownsController) _scrollController.dispose();
@@ -1469,7 +1507,10 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
     );
   }
 
-  Future<void> _scrollToHeading(int index) async {
+  Future<void> _scrollToHeading(
+    int index, {
+    IanvsMarkdownHeadingNavigation? request,
+  }) async {
     if (index < 0 || index >= _headings.length) return;
     final heading = _headings[index];
     setState(() => _activeHeadingIndex = index);
@@ -1488,7 +1529,11 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
         await WidgetsBinding.instance.endOfFrame;
       }
     }
-    if (!mounted) return;
+    if (!mounted ||
+        (request != null &&
+            !identical(widget.headingNavigation?.value, request))) {
+      return;
+    }
     final headingContext = heading.anchorKey.currentContext;
     if (headingContext == null || !headingContext.mounted) return;
     await Scrollable.ensureVisible(
@@ -1900,7 +1945,10 @@ class _MarkdownHeadingBuilder extends MarkdownElementBuilder {
     TextStyle? preferredStyle,
     TextStyle? parentStyle,
   ) {
-    if (_index >= headings.length) return null;
+    if (headings.isEmpty) return null;
+    // A theme update can make MarkdownBody perform another complete traversal
+    // with this builder. Keep source identities aligned on every pass.
+    if (_index >= headings.length) _index = 0;
     final presentation = headings[_index];
     final heading = presentation.heading;
     final level = int.tryParse(element.tag.substring(1));

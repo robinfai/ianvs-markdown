@@ -15,6 +15,17 @@ enum IanvsMarkdownEditorMode {
   preview,
 }
 
+/// A request to reveal a heading by its offset in the complete Markdown source.
+///
+/// Each request is distinct so an already-selected heading can be revealed
+/// again after the user scrolls away.
+@immutable
+final class IanvsMarkdownHeadingNavigation {
+  const IanvsMarkdownHeadingNavigation(this.sourceOffset);
+
+  final int sourceOffset;
+}
+
 enum IanvsMarkdownBlockType {
   frontMatter,
   heading,

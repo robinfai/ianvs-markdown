@@ -397,37 +397,41 @@ class IanvsMarkdownHtmlInlineBuilder extends MarkdownElementBuilder {
     };
     final text = Text.rich(TextSpan(text: element.textContent, style: style));
     return consumeTap
-        ? GestureDetector(
-            key: kind == IanvsMarkdownHtmlInlineKind.strong
-                ? const ValueKey('ianvs-markdown-html-strong')
-                : kind == IanvsMarkdownHtmlInlineKind.emphasis
-                ? const ValueKey('ianvs-markdown-html-em')
-                : kind == IanvsMarkdownHtmlInlineKind.subscript
-                ? const ValueKey('ianvs-markdown-html-subscript')
-                : kind == IanvsMarkdownHtmlInlineKind.strikethrough
-                ? const ValueKey('ianvs-markdown-html-s')
-                : kind == IanvsMarkdownHtmlInlineKind.superscript
-                ? const ValueKey('ianvs-markdown-html-sup')
-                : kind == IanvsMarkdownHtmlInlineKind.keyboard
-                ? const ValueKey('ianvs-markdown-html-kbd')
-                : kind == IanvsMarkdownHtmlInlineKind.small
-                ? const ValueKey('ianvs-markdown-html-small')
-                : kind == IanvsMarkdownHtmlInlineKind.quotation
-                ? const ValueKey('ianvs-markdown-html-q')
-                : kind == IanvsMarkdownHtmlInlineKind.abbreviation
-                ? const ValueKey('ianvs-markdown-html-abbr')
-                : kind == IanvsMarkdownHtmlInlineKind.mark
-                ? const ValueKey('ianvs-markdown-html-mark')
-                : kind == IanvsMarkdownHtmlInlineKind.span
-                ? const ValueKey('ianvs-markdown-html-span')
-                : null,
-            behavior: HitTestBehavior.opaque,
-            onTap: () {},
-            child: kind == IanvsMarkdownHtmlInlineKind.quotation
-                ? Text.rich(
-                    TextSpan(text: '“${element.textContent}”', style: style),
-                  )
-                : text,
+        // The diagnostic key identifies a kind, not a unique occurrence.
+        // Scope it below an unkeyed root so repeated controls can share a Wrap.
+        ? KeyedSubtree(
+            child: GestureDetector(
+              key: kind == IanvsMarkdownHtmlInlineKind.strong
+                  ? const ValueKey('ianvs-markdown-html-strong')
+                  : kind == IanvsMarkdownHtmlInlineKind.emphasis
+                  ? const ValueKey('ianvs-markdown-html-em')
+                  : kind == IanvsMarkdownHtmlInlineKind.subscript
+                  ? const ValueKey('ianvs-markdown-html-subscript')
+                  : kind == IanvsMarkdownHtmlInlineKind.strikethrough
+                  ? const ValueKey('ianvs-markdown-html-s')
+                  : kind == IanvsMarkdownHtmlInlineKind.superscript
+                  ? const ValueKey('ianvs-markdown-html-sup')
+                  : kind == IanvsMarkdownHtmlInlineKind.keyboard
+                  ? const ValueKey('ianvs-markdown-html-kbd')
+                  : kind == IanvsMarkdownHtmlInlineKind.small
+                  ? const ValueKey('ianvs-markdown-html-small')
+                  : kind == IanvsMarkdownHtmlInlineKind.quotation
+                  ? const ValueKey('ianvs-markdown-html-q')
+                  : kind == IanvsMarkdownHtmlInlineKind.abbreviation
+                  ? const ValueKey('ianvs-markdown-html-abbr')
+                  : kind == IanvsMarkdownHtmlInlineKind.mark
+                  ? const ValueKey('ianvs-markdown-html-mark')
+                  : kind == IanvsMarkdownHtmlInlineKind.span
+                  ? const ValueKey('ianvs-markdown-html-span')
+                  : null,
+              behavior: HitTestBehavior.opaque,
+              onTap: () {},
+              child: kind == IanvsMarkdownHtmlInlineKind.quotation
+                  ? Text.rich(
+                      TextSpan(text: '“${element.textContent}”', style: style),
+                    )
+                  : text,
+            ),
           )
         : kind == IanvsMarkdownHtmlInlineKind.quotation
         ? Text.rich(TextSpan(text: '“${element.textContent}”', style: style))

@@ -129,8 +129,23 @@ class TitleTabsBar extends StatelessWidget {
   }
 }
 
-double _tabWidth(DocumentSession document) =>
-    (document.name.runes.length * 7.0 + 42).clamp(92.0, 220.0);
+const _tabTextStyle = TextStyle(fontSize: 12, fontWeight: FontWeight.w400);
+
+double _tabWidth(BuildContext context, DocumentSession document) {
+  final painter = TextPainter(
+    text: TextSpan(
+      text: document.name,
+      style: DefaultTextStyle.of(context).style.merge(_tabTextStyle),
+    ),
+    textDirection: Directionality.of(context),
+    textScaler: MediaQuery.textScalerOf(context),
+    locale: Localizations.maybeLocaleOf(context),
+    maxLines: 1,
+  )..layout();
+  final width = (painter.width.ceilToDouble() + 42).clamp(92.0, 220.0);
+  painter.dispose();
+  return width;
+}
 
 class _DocumentTabs extends StatefulWidget {
   const _DocumentTabs({required this.workspace, required this.onClose});
@@ -143,10 +158,17 @@ class _DocumentTabs extends StatefulWidget {
 
 class _DocumentTabsState extends State<_DocumentTabs> {
   final _scrollController = ScrollController();
+  double? _viewportWidth;
 
   @override
   void initState() {
     super.initState();
+    _revealSelection();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     _revealSelection();
   }
 
@@ -163,8 +185,8 @@ class _DocumentTabsState extends State<_DocumentTabs> {
       if (workspace.activeDocument == null) return;
       final start = workspace.documents
           .take(workspace.activeIndex)
-          .fold(0.0, (sum, document) => sum + _tabWidth(document));
-      final end = start + _tabWidth(workspace.activeDocument!);
+          .fold(0.0, (sum, document) => sum + _tabWidth(context, document));
+      final end = start + _tabWidth(context, workspace.activeDocument!);
       final position = _scrollController.position;
       final offset = start < position.pixels
           ? start
@@ -182,23 +204,31 @@ class _DocumentTabsState extends State<_DocumentTabs> {
   }
 
   @override
-  Widget build(BuildContext context) => ReorderableListView.builder(
-    scrollController: _scrollController,
-    scrollDirection: Axis.horizontal,
-    buildDefaultDragHandles: false,
-    itemCount: widget.workspace.documents.length,
-    onReorderItem: widget.workspace.reorderDocument,
-    itemBuilder: (context, index) {
-      final document = widget.workspace.documents[index];
-      return ReorderableDragStartListener(
-        key: ValueKey(document.id),
-        index: index,
-        child: _DocumentTab(
-          document: document,
-          selected: index == widget.workspace.activeIndex,
-          onSelected: () => widget.workspace.selectDocument(index),
-          onClose: () => widget.onClose(document),
-        ),
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      if (_viewportWidth != constraints.maxWidth) {
+        _viewportWidth = constraints.maxWidth;
+        _revealSelection();
+      }
+      return ReorderableListView.builder(
+        scrollController: _scrollController,
+        scrollDirection: Axis.horizontal,
+        buildDefaultDragHandles: false,
+        itemCount: widget.workspace.documents.length,
+        onReorderItem: widget.workspace.reorderDocument,
+        itemBuilder: (context, index) {
+          final document = widget.workspace.documents[index];
+          return ReorderableDragStartListener(
+            key: ValueKey(document.id),
+            index: index,
+            child: _DocumentTab(
+              document: document,
+              selected: index == widget.workspace.activeIndex,
+              onSelected: () => widget.workspace.selectDocument(index),
+              onClose: () => widget.onClose(document),
+            ),
+          );
+        },
       );
     },
   );
@@ -229,7 +259,7 @@ class _DocumentTabState extends State<_DocumentTab> {
     final colors = IanvsMarkdownThemeData.resolve(context);
     final document = widget.document;
     final selected = widget.selected;
-    final width = _tabWidth(document);
+    final width = _tabWidth(context, document);
     return Tooltip(
       message: document.path ?? document.name,
       child: MouseRegion(
@@ -260,12 +290,10 @@ class _DocumentTabState extends State<_DocumentTab> {
                     child: Text(
                       document.name,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                      style: _tabTextStyle.copyWith(
                         color: selected
                             ? colors.textPrimary
                             : colors.textSecondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w400,
                       ),
                     ),
                   ),
@@ -273,14 +301,19 @@ class _DocumentTabState extends State<_DocumentTab> {
                     valueListenable: document.controller.dirtyListenable,
                     builder: (context, dirty, _) =>
                         dirty && !selected && !_hovered
-                        ? Container(
-                            key: const ValueKey('document-dirty-indicator'),
-                            width: 6,
-                            height: 6,
-                            margin: const EdgeInsets.symmetric(horizontal: 7),
-                            decoration: BoxDecoration(
-                              color: colors.accent,
-                              shape: BoxShape.circle,
+                        ? SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: Center(
+                              child: Container(
+                                key: const ValueKey('document-dirty-indicator'),
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: colors.accent,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
                             ),
                           )
                         : IconButton(
@@ -327,12 +360,31 @@ class _EditorModePicker extends StatelessWidget {
               children: [
                 for (final mode in IanvsMarkdownEditorMode.values)
                   Semantics(
+                    button: true,
                     selected: selected == mode,
+                    label: switch (mode) {
+                      IanvsMarkdownEditorMode.livePreview => 'Live Preview',
+                      IanvsMarkdownEditorMode.source => 'Source',
+                      IanvsMarkdownEditorMode.preview => 'Read',
+                    },
+                    hint: switch (mode) {
+                      IanvsMarkdownEditorMode.livePreview =>
+                        'Edit with inline formatting',
+                      IanvsMarkdownEditorMode.source => 'Edit Markdown source',
+                      IanvsMarkdownEditorMode.preview =>
+                        'Preview without editing',
+                    },
+                    onTap: () => workspace.setMode(mode),
+                    excludeSemantics: true,
                     child: Tooltip(
+                      excludeFromSemantics: true,
                       message: switch (mode) {
-                        IanvsMarkdownEditorMode.livePreview => 'Live Preview',
-                        IanvsMarkdownEditorMode.source => 'Source',
-                        IanvsMarkdownEditorMode.preview => 'Read',
+                        IanvsMarkdownEditorMode.livePreview =>
+                          'Live Preview: edit with inline formatting',
+                        IanvsMarkdownEditorMode.source =>
+                          'Source: edit Markdown source',
+                        IanvsMarkdownEditorMode.preview =>
+                          'Read: preview without editing',
                       },
                       child: Material(
                         color: selected == mode
@@ -342,7 +394,8 @@ class _EditorModePicker extends StatelessWidget {
                         child: InkWell(
                           borderRadius: BorderRadius.circular(4),
                           onTap: () => workspace.setMode(mode),
-                          child: Padding(
+                          child: Container(
+                            constraints: const BoxConstraints(minHeight: 28),
                             padding: const EdgeInsets.symmetric(
                               horizontal: 10,
                               vertical: 4,

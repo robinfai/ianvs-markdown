@@ -24,6 +24,7 @@ class IanvsMarkdownEditor extends StatefulWidget {
     this.autofocus = false,
     this.showToolbar = true,
     this.enableModeShortcuts = true,
+    this.placeholder,
     this.padding = const EdgeInsets.fromLTRB(20, 18, 20, 40),
     this.onChanged,
     this.onSaveRequested,
@@ -38,6 +39,9 @@ class IanvsMarkdownEditor extends StatefulWidget {
 
   /// Whether the editor binds its mode-switching shortcuts.
   final bool enableModeShortcuts;
+
+  /// Optional hint for an empty document; never becomes Markdown content.
+  final String? placeholder;
   final EdgeInsetsGeometry padding;
   final ValueChanged<String>? onChanged;
   final IanvsMarkdownSaveCallback? onSaveRequested;
@@ -456,6 +460,8 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
           style: textStyle,
           cursorColor: colors.accent,
           decoration: InputDecoration(
+            hintText: widget.placeholder,
+            hintStyle: textStyle.copyWith(color: colors.textTertiary),
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
             focusedBorder: InputBorder.none,

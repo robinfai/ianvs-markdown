@@ -719,16 +719,18 @@ class IanvsMarkdownHighlightBuilder extends MarkdownElementBuilder {
     final background = Theme.of(context).brightness == Brightness.dark
         ? const Color(0xff6b5b22)
         : const Color(0xffffe184);
-    return KeyedSubtree(
-      child: Text.rich(
-        TextSpan(
-          style: (parentStyle ?? preferredStyle ?? const TextStyle()).copyWith(
+    // Return the text directly so Markdown merges it with the surrounding
+    // paragraph. A wrapper makes the highlight a separate wrapping widget.
+    return Text.rich(
+      TextSpan(
+        children: _highlightSpans(
+          element.children,
+          colors,
+          (parentStyle ?? preferredStyle ?? const TextStyle()).copyWith(
             color: colors.textPrimary,
             backgroundColor: background,
           ),
-          children: _highlightSpans(element.children, colors),
         ),
-        key: const ValueKey('ianvs-markdown-highlight'),
       ),
     );
   }
@@ -737,15 +739,17 @@ class IanvsMarkdownHighlightBuilder extends MarkdownElementBuilder {
 List<InlineSpan> _highlightSpans(
   List<md.Node>? nodes,
   IanvsMarkdownThemeData colors,
+  TextStyle inheritedStyle,
 ) {
   return <InlineSpan>[
     for (final node in nodes ?? const <md.Node>[])
       if (node is md.Text)
-        TextSpan(text: node.text)
+        TextSpan(text: node.text, style: inheritedStyle)
       else if (node is md.Element)
-        TextSpan(
-          style: _highlightElementStyle(node.tag, colors),
-          children: _highlightSpans(node.children, colors),
+        ..._highlightSpans(
+          node.children,
+          colors,
+          inheritedStyle.merge(_highlightElementStyle(node.tag, colors)),
         ),
   ];
 }

@@ -291,6 +291,9 @@ class _IanvsMarkdownCodeBlockState extends State<IanvsMarkdownCodeBlock> {
           child: SelectableText.rich(
             span,
             style: baseStyle,
+            // Measure the highlighted runs themselves, as the live editor
+            // does when its fence markers occupy the existing card inset.
+            strutStyle: StrutStyle.disabled,
             textWidthBasis: TextWidthBasis.parent,
             onTap: widget.onTap,
           ),

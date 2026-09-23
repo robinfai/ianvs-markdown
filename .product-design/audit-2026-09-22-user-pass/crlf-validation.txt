@@ -1,0 +1,1 @@
+After Source edit and Cmd+S: CRLF=3; bare LF=0; Unicode text intact.

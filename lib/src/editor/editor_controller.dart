@@ -103,6 +103,8 @@ class IanvsMarkdownController extends TextEditingController {
   final ValueNotifier<IanvsMarkdownHistoryValue> _historyState =
       ValueNotifier<IanvsMarkdownHistoryValue>(IanvsMarkdownHistoryValue.empty);
   final ValueNotifier<bool> _dirty = ValueNotifier<bool>(false);
+  final ValueNotifier<IanvsMarkdownHeadingNavigation?> _headingNavigation =
+      ValueNotifier<IanvsMarkdownHeadingNavigation?>(null);
   final List<TextEditingValue> _history = <TextEditingValue>[];
 
   late TextEditingValue _lastObservedValue;
@@ -131,9 +133,20 @@ class IanvsMarkdownController extends TextEditingController {
   bool get canUndo => _historyIndex > 0;
   bool get canRedo => _historyIndex + 1 < _history.length;
 
-  void markSaved() {
-    _savedText = text;
-    _setDirty(false);
+  ValueListenable<IanvsMarkdownHeadingNavigation?> get headingNavigation =>
+      _headingNavigation;
+
+  /// Reveals a heading without changing the current editor mode or source.
+  void revealHeading(int sourceOffset) {
+    final offset = sourceOffset.clamp(0, text.length);
+    selection = TextSelection.collapsed(offset: offset);
+    _headingNavigation.value = IanvsMarkdownHeadingNavigation(offset);
+  }
+
+  /// Records the source actually persisted, preserving edits made during save.
+  void markSaved({String? savedText}) {
+    _savedText = savedText ?? text;
+    _setDirty(text != _savedText);
   }
 
   void undo() {
@@ -742,6 +755,7 @@ class IanvsMarkdownController extends TextEditingController {
     _mode.dispose();
     _historyState.dispose();
     _dirty.dispose();
+    _headingNavigation.dispose();
     super.dispose();
   }
 }
@@ -2367,6 +2381,25 @@ List<IanvsMarkdownInlineMathSource> ianvsMarkdownInlineMathSources(
   return List<IanvsMarkdownInlineMathSource>.unmodifiable(matches);
 }
 
+/// Link spans accepted by the source scanner, excluding literal code and
+/// images. Live Preview uses these ranges to retain the rendered link widget
+/// until the selection enters its editable source.
+List<TextRange> ianvsMarkdownInlineLinkSources(
+  String text, {
+  Set<String>? linkReferenceLabels,
+}) {
+  if (text.isEmpty) return const <TextRange>[];
+  final matches = <TextRange>[];
+  _markdownSyntaxTokens(
+    text,
+    _inlineRangeProbeTheme,
+    linkReferenceLabels:
+        linkReferenceLabels ?? MarkdownLinkReferenceContext.parse(text).labels,
+    inlineLinkSources: matches,
+  );
+  return List<TextRange>.unmodifiable(matches);
+}
+
 const _inlineRangeProbeTheme = IanvsMarkdownSyntaxTheme(
   heading: TextStyle(),
   marker: TextStyle(),
@@ -2489,6 +2522,7 @@ List<_SyntaxToken> _markdownSyntaxTokens(
   required Set<String> linkReferenceLabels,
   List<TextRange> highlightLiteralRanges = const <TextRange>[],
   List<IanvsMarkdownInlineMathSource>? inlineMathSources,
+  List<TextRange>? inlineLinkSources,
 }) {
   final tokens = <_SyntaxToken>[];
   final fencedRanges = <TextRange>[];
@@ -2667,6 +2701,7 @@ List<_SyntaxToken> _markdownSyntaxTokens(
       ...wikiLinkLiteralRanges,
     ],
     nestedLabelRanges: footnoteRanges,
+    sources: inlineLinkSources,
   );
   final referenceLinkLiteralRanges = _addReferenceLinkSyntaxTokens(
     tokens,
@@ -2686,6 +2721,7 @@ List<_SyntaxToken> _markdownSyntaxTokens(
       ...inlineLinkLiteralRanges,
     ],
     nestedLabelRanges: footnoteRanges,
+    sources: inlineLinkSources,
   );
   final explicitLinkLiteralRanges = <TextRange>[
     ...mathRanges,
@@ -3382,6 +3418,7 @@ List<TextRange> _addLinkSyntaxTokens(
   List<TextRange> excludedRanges, {
   List<TextRange> openingExcludedRanges = const <TextRange>[],
   List<TextRange> nestedLabelRanges = const <TextRange>[],
+  List<TextRange>? sources,
 }) {
   final literalRanges = <TextRange>[];
   var index = 0;
@@ -3430,6 +3467,7 @@ List<TextRange> _addLinkSyntaxTokens(
       continue;
     }
     final revealRange = TextRange(start: matchStart, end: matchEnd);
+    if (!isImage) sources?.add(revealRange);
     literalRanges
       ..add(TextRange(start: matchStart, end: labelStart))
       ..add(TextRange(start: labelEnd, end: matchEnd));
@@ -3465,6 +3503,7 @@ List<TextRange> _addReferenceLinkSyntaxTokens(
   List<TextRange> excludedRanges, {
   List<TextRange> openingExcludedRanges = const <TextRange>[],
   List<TextRange> nestedLabelRanges = const <TextRange>[],
+  List<TextRange>? sources,
 }) {
   if (definedLabels.isEmpty) return const <TextRange>[];
   final literalRanges = <TextRange>[];
@@ -3543,6 +3582,7 @@ List<TextRange> _addReferenceLinkSyntaxTokens(
       continue;
     }
     final revealRange = TextRange(start: matchStart, end: matchEnd);
+    if (!isImage) sources?.add(revealRange);
     literalRanges
       ..add(TextRange(start: matchStart, end: labelStart))
       ..add(TextRange(start: labelEnd, end: matchEnd));

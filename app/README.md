@@ -20,6 +20,20 @@ Implemented application-shell capabilities:
 - debounced crash recovery for open files and unsaved drafts
 - macOS security-scoped bookmarks for restoring user-approved files and folders
 
+Integration boundaries in the current desktop shell:
+
+- Link navigation, local/remote images, Wiki embed resolution, and Mermaid
+  rendering need host callbacks that this app has not yet connected. Links have
+  their rendered appearance, images show a blocked placeholder, Wiki embeds show
+  a reference, and Mermaid falls back to its source.
+- YAML is editable in Source and hidden in Live/Read. The package's optional
+  Properties editor and heading-fold controls are not enabled in this app.
+- Search filters filenames across the workspace; it is not a document-content
+  search. Find/replace, export, and an encoding or line-ending selector are not
+  currently exposed.
+- Open-document text, modes, and workspace visibility are recovered. Appearance,
+  caret positions, and scroll offsets are not serialized across app launches.
+
 Run from the repository root:
 
 ```sh

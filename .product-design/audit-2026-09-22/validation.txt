@@ -1,0 +1,64 @@
+Linefold verification — 2026-09-22
+
+Dart formatting: 118 files, 0 changed.
+Git diff --check: passed.
+
+Component tests
+00:32 +867: /Users/robinfai/flutter_projects/ianvs-markdown/test/live_editor_test.dart: source editor preserves word-adjacent backtick context
+00:32 +868: /Users/robinfai/flutter_projects/ianvs-markdown/test/live_editor_test.dart: source editor preserves in-word bracket context
+00:32 +869: /Users/robinfai/flutter_projects/ianvs-markdown/test/live_editor_test.dart: source editor completes a typed Wiki link pair
+00:32 +870: /Users/robinfai/flutter_projects/ianvs-markdown/test/live_editor_test.dart: source editor continues an indented list inside a quote
+00:32 +871: /Users/robinfai/flutter_projects/ianvs-markdown/test/live_editor_test.dart: source editor renumbers ordered siblings inserted with Enter
+00:32 +872: /Users/robinfai/flutter_projects/ianvs-markdown/test/live_editor_test.dart: source editor layers fenced code surfaces behind text
+00:32 +873: /Users/robinfai/flutter_projects/ianvs-markdown/test/live_editor_test.dart: source editor paints Border quote surfaces behind text
+00:32 +874: All tests passed!
+
+Actual macOS fonts
+00:09 +101: focus keeps geometry: multiline quote, width=320.0, scale=1.3 (variant: TargetPlatform.macOS)
+00:09 +102: focus keeps geometry: nested quote, width=320.0, scale=1.3 (variant: TargetPlatform.macOS)
+00:09 +103: focus keeps geometry: fenced code, width=320.0, scale=1.3 (variant: TargetPlatform.macOS)
+00:09 +104: focus keeps geometry: long fenced code, width=320.0, scale=1.3 (variant: TargetPlatform.macOS)
+00:09 +105: focus keeps geometry: indented code, width=320.0, scale=1.3 (variant: TargetPlatform.macOS)
+00:09 +106: focus keeps geometry: long indented code, width=320.0, scale=1.3 (variant: TargetPlatform.macOS)
+00:09 +107: (tearDownAll)
+00:09 +107: All tests passed!
+
+Desktop app tests
+00:04 +46: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:04 +47: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:04 +48: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:05 +49: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in source
+00:06 +50: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in preview
+00:07 +51: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline expands folded ancestors in livePreview
+00:07 +52: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline expands folded ancestors in preview
+00:07 +53: All tests passed!
+
+Example tests
+00:00 +0: loading /Users/robinfai/flutter_projects/ianvs-markdown/example/test/widget_test.dart
+00:00 +0: /Users/robinfai/flutter_projects/ianvs-markdown/example/test/widget_test.dart: default document covers common Markdown elements
+00:00 +1: /Users/robinfai/flutter_projects/ianvs-markdown/example/test/mermaid_renderer_test.dart: renders generated SVG in the Mermaid view
+00:00 +2: /Users/robinfai/flutter_projects/ianvs-markdown/example/test/mermaid_renderer_test.dart: renders generated SVG in the Mermaid view
+00:00 +3: /Users/robinfai/flutter_projects/ianvs-markdown/example/test/widget_test.dart: example stays focused on package integration
+00:00 +4: /Users/robinfai/flutter_projects/ianvs-markdown/example/test/widget_test.dart: example stays focused on package integration
+00:01 +5: All tests passed!
+
+Root analysis
+Analyzing ianvs-markdown...                                     
+No issues found! (ran in 2.7s)
+
+App analysis
+Analyzing app...                                                
+No issues found! (ran in 2.7s)
+
+Example analysis
+Waiting for another flutter command to release the startup lock...
+Analyzing example...                                            
+No issues found! (ran in 2.6s)
+
+macOS debug build
+The following plugins do not support Swift Package Manager for macos:
+  - irondash_engine_context
+  - super_native_extensions
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Building macOS application...                                   
+✓ Built build/macos/Build/Products/Debug/Linefold.app

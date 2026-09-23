@@ -96,6 +96,7 @@ class IanvsMarkdownLiveEditor extends StatefulWidget {
     this.autofocus = false,
     this.showToolbar = true,
     this.enableModeShortcuts = true,
+    this.placeholder,
     this.showOutlineInPreview = true,
     this.showNavigationPane = false,
     this.navigationBreakpoint = 900,
@@ -136,6 +137,10 @@ class IanvsMarkdownLiveEditor extends StatefulWidget {
   /// Allow a host app to reserve numeric shortcuts for document tabs.
   /// When false, the editor does not bind mode-switching shortcuts.
   final bool enableModeShortcuts;
+
+  /// Optional hint for an empty document in Live Preview and Source modes.
+  /// It is never shown in Reading mode or included in Markdown content.
+  final String? placeholder;
   final bool showOutlineInPreview;
   final bool showNavigationPane;
   final double navigationBreakpoint;
@@ -198,6 +203,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   );
 
   final GlobalKey _activeEditorKey = GlobalKey();
+  final GlobalKey _sourceEditorKey = GlobalKey();
   final _BlockEditingController _blockController = _BlockEditingController();
   final IanvsMarkdownEditingFormatter _editingFormatter =
       IanvsMarkdownEditingFormatter();
@@ -266,6 +272,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     _headingFoldController.addListener(_handleHeadingFoldsChanged);
     widget.controller.addListener(_handleDocumentChanged);
     widget.controller.modeListenable.addListener(_handleModeChanged);
+    widget.controller.headingNavigation.addListener(_handleHeadingNavigation);
     _blockController.addListener(_handleBlockChanged);
     if (widget.autofocus &&
         widget.controller.mode == IanvsMarkdownEditorMode.livePreview) {
@@ -282,6 +289,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       oldWidget.controller.commitHistoryGroup();
       oldWidget.controller.removeListener(_handleDocumentChanged);
       oldWidget.controller.modeListenable.removeListener(_handleModeChanged);
+      oldWidget.controller.headingNavigation.removeListener(
+        _handleHeadingNavigation,
+      );
       _lastText = widget.controller.text;
       _lastMode = widget.controller.mode;
       _refreshBlocks(_lastText);
@@ -291,6 +301,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       _blockController.revealLeadingMarker = false;
       widget.controller.addListener(_handleDocumentChanged);
       widget.controller.modeListenable.addListener(_handleModeChanged);
+      widget.controller.headingNavigation.addListener(_handleHeadingNavigation);
     }
     if (!identical(oldWidget.focusNode, widget.focusNode)) {
       if (oldWidget.focusNode == null) _focusNode.dispose();
@@ -324,6 +335,14 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       widget.onChanged?.call(source);
     }
     _refreshBlocks(source);
+    if (_activeBlockStart != null &&
+        widget.controller.mode == IanvsMarkdownEditorMode.livePreview) {
+      final selected = markdownBlockAtOffset(
+        _blocks,
+        _documentSelectionOffset(),
+      );
+      if (selected != null && _redirectHiddenFrontMatter(selected)) return;
+    }
     if (_activeBlockStart != null && _blocks.isNotEmpty) {
       final documentSelection = widget.controller.selection;
       final activeIndex = _blocks.indexWhere(
@@ -1546,7 +1565,10 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       index >= 0 && index < _blocks.length;
       index += forward ? 1 : -1
     ) {
-      if (!hiddenBlockIndices.contains(index)) return index;
+      if (!hiddenBlockIndices.contains(index) &&
+          !_isHiddenFrontMatter(_blocks[index])) {
+        return index;
+      }
     }
     return null;
   }
@@ -2100,8 +2122,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     return (caret.top - edge.top).abs() <= 1;
   }
 
-  RenderEditable? _activeRenderEditable() {
-    final root = _activeEditorKey.currentContext?.findRenderObject();
+  RenderEditable? _activeRenderEditable({GlobalKey? key}) {
+    final root = (key ?? _activeEditorKey).currentContext?.findRenderObject();
     if (root == null) return null;
     if (root is RenderEditable) return root;
     RenderEditable? result;
@@ -2158,6 +2180,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     required int lineEnd,
     int? caretOffset,
   }) {
+    if (_redirectHiddenFrontMatter(active)) return;
     _blockController.revealLeadingMarker = false;
     _activeGapLine = true;
     _activeGapPrefixLength = lineStart - active.start;
@@ -2218,6 +2241,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     IanvsMarkdownBlock block, {
     required int localOffset,
   }) {
+    if (_redirectHiddenFrontMatter(block)) return;
     _foldedSelectionBridge = null;
     _blockController.revealLeadingMarker = false;
     _activeGapLine = false;
@@ -2409,6 +2433,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     IanvsMarkdownBlock block, {
     required bool atStart,
   }) {
+    if (_redirectHiddenFrontMatter(block)) return;
     _blockController.revealLeadingMarker = false;
     _activeGapLine = false;
     final sourceLineStart = atStart
@@ -2465,6 +2490,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     bool selectWholeSource = false,
     int? documentOffset,
   }) {
+    if (_redirectHiddenFrontMatter(block)) return;
     _foldedSelectionBridge = null;
     _projectedRenderedTapBlockStart = null;
     _projectedRenderedTapLocalOffset = null;
@@ -2492,6 +2518,28 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusNode.requestFocus();
     });
+  }
+
+  bool _isHiddenFrontMatter(IanvsMarkdownBlock block) =>
+      !widget.showFrontMatter &&
+      block.type == IanvsMarkdownBlockType.frontMatter &&
+      parseMarkdownFrontMatter(block.source).hasFrontMatter;
+
+  bool _redirectHiddenFrontMatter(IanvsMarkdownBlock block) {
+    if (!_isHiddenFrontMatter(block)) return false;
+    final visible = _blocks.where(
+      (candidate) => !_isHiddenFrontMatter(candidate),
+    );
+    if (visible.isNotEmpty) {
+      final first = visible.first;
+      _activateBlock(first, documentOffset: first.start);
+    } else {
+      _activeBlockStart = null;
+      _activeGapLine = false;
+      _focusNode.unfocus();
+      if (mounted) setState(() {});
+    }
+    return true;
   }
 
   void _handleDocumentDragPointerDown(PointerDownEvent event) {
@@ -3345,6 +3393,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     widget.controller.commitHistoryGroup();
     widget.controller.removeListener(_handleDocumentChanged);
     widget.controller.modeListenable.removeListener(_handleModeChanged);
+    widget.controller.headingNavigation.removeListener(
+      _handleHeadingNavigation,
+    );
     _blockController
       ..removeListener(_handleBlockChanged)
       ..dispose();
@@ -3424,6 +3475,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
               builder: (context, mode, _) => switch (mode) {
                 IanvsMarkdownEditorMode.livePreview => _buildLiveMode(colors),
                 IanvsMarkdownEditorMode.source => IanvsMarkdownEditor(
+                  key: _sourceEditorKey,
+                  placeholder: widget.placeholder,
                   enableModeShortcuts: widget.enableModeShortcuts,
                   controller: widget.controller,
                   focusNode: _focusNode,
@@ -3436,6 +3489,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
                 ),
                 IanvsMarkdownEditorMode.preview => IanvsMarkdownView(
                   data: widget.controller.text,
+                  headingNavigation: widget.controller.headingNavigation,
                   controller: _scrollController,
                   padding: widget.padding,
                   showFrontMatter: widget.showFrontMatter,
@@ -3470,71 +3524,112 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     );
   }
 
-  Future<void> _scrollToNavigationHeading(
-    _EditorNavigationHeading heading,
-  ) async {
-    setState(() => _activeHeadingStart = heading.blockStart);
-    if (widget.controller.mode != IanvsMarkdownEditorMode.livePreview) {
-      widget.controller.mode = IanvsMarkdownEditorMode.livePreview;
-      await WidgetsBinding.instance.endOfFrame;
-    }
-    if (!mounted) return;
-    final targetIndex = _blocks.indexWhere(
-      (block) => block.start == heading.blockStart,
-    );
-    if (widget.enableHeadingFolding && targetIndex >= 0) {
-      final ancestors = _headingFoldModel
-          .collapsedAncestorIdentities(targetIndex, _headingFoldController)
-          .toList(growable: false);
-      if (ancestors.isNotEmpty) {
-        _headingFoldController.expandIdentities(ancestors);
-        await WidgetsBinding.instance.endOfFrame;
-      }
-    }
-    var blockContext = _blockKeys[heading.blockStart]?.currentContext;
-    if (blockContext == null && _scrollController.hasClients) {
-      if (targetIndex >= 0) {
-        final position = _scrollController.position;
-        final fraction = _blocks.length <= 1
-            ? 0.0
-            : targetIndex / (_blocks.length - 1);
-        await _scrollController.animateTo(
-          position.maxScrollExtent * fraction,
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-        );
-        await WidgetsBinding.instance.endOfFrame;
+  void _scrollToNavigationHeading(_EditorNavigationHeading heading) {
+    widget.controller.revealHeading(heading.blockStart);
+  }
 
-        // Block heights vary substantially (tables, diagrams, and code can be
-        // much taller than prose), so refine the proportional jump a viewport
-        // at a time until the lazily-built target obtains a context.
-        for (var attempt = 0; attempt < 12; attempt += 1) {
-          if (!mounted) return;
-          blockContext = _blockKeys[heading.blockStart]?.currentContext;
-          if (blockContext != null || !_scrollController.hasClients) break;
-          final visibleStarts = _blockKeys.entries
-              .where((entry) => entry.value.currentContext != null)
-              .map((entry) => entry.key)
-              .toList(growable: false);
-          if (visibleStarts.isEmpty) break;
-          final beforeVisible = heading.blockStart < visibleStarts.first;
-          final direction = beforeVisible ? -1.0 : 1.0;
-          final current = _scrollController.position;
-          final next =
-              (current.pixels + direction * current.viewportDimension * .8)
-                  .clamp(current.minScrollExtent, current.maxScrollExtent)
-                  .toDouble();
-          if ((next - current.pixels).abs() < 1) break;
-          await _scrollController.animateTo(
-            next,
-            duration: const Duration(milliseconds: 90),
-            curve: Curves.easeOutCubic,
-          );
-          await WidgetsBinding.instance.endOfFrame;
+  void _handleHeadingNavigation() {
+    final request = widget.controller.headingNavigation.value;
+    if (request == null ||
+        widget.controller.mode == IanvsMarkdownEditorMode.preview) {
+      return;
+    }
+    unawaited(_revealHeading(request));
+  }
+
+  Future<void> _revealHeading(IanvsMarkdownHeadingNavigation request) async {
+    final mode = widget.controller.mode;
+    bool isCurrent() =>
+        mounted &&
+        widget.controller.mode == mode &&
+        identical(widget.controller.headingNavigation.value, request);
+    final targetIndex = _blocks.indexWhere(
+      (block) =>
+          block.start == request.sourceOffset &&
+          block.type == IanvsMarkdownBlockType.heading,
+    );
+    if (targetIndex < 0) return;
+    setState(() => _activeHeadingStart = request.sourceOffset);
+    if (widget.enableHeadingFolding) {
+      _headingFoldController.expandIdentities(
+        _headingFoldModel.collapsedAncestorIdentities(
+          targetIndex,
+          _headingFoldController,
+        ),
+      );
+    }
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted || !isCurrent() || !_scrollController.hasClients) return;
+
+    if (mode == IanvsMarkdownEditorMode.source) {
+      final editable = _activeRenderEditable(key: _sourceEditorKey);
+      if (editable == null) return;
+      final caret = editable.getLocalRectForCaret(
+        TextPosition(offset: request.sourceOffset),
+      );
+      final position = _scrollController.position;
+      await _scrollController.animateTo(
+        (position.pixels + caret.top - position.viewportDimension * .08)
+            .clamp(position.minScrollExtent, position.maxScrollExtent)
+            .toDouble(),
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+      );
+      return;
+    }
+
+    var blockContext = _blockKeys[request.sourceOffset]?.currentContext;
+    if (blockContext == null) {
+      final position = _scrollController.position;
+      final fraction = _blocks.length <= 1
+          ? 0.0
+          : targetIndex / (_blocks.length - 1);
+      _scrollController.jumpTo(position.maxScrollExtent * fraction);
+      await WidgetsBinding.instance.endOfFrame;
+
+      // A proportional jump is only a starting point. Bound the target by the
+      // source order of visible blocks, then bisect until its lazy row exists.
+      // Unlike fixed viewport steps this also crosses very tall code blocks.
+      var lower = 0.0;
+      double? upper;
+      for (var attempt = 0; attempt < 32; attempt += 1) {
+        if (!mounted || !isCurrent() || !_scrollController.hasClients) return;
+        blockContext = _blockKeys[request.sourceOffset]?.currentContext;
+        if (blockContext != null) break;
+        final viewport = context.findRenderObject();
+        if (viewport is! RenderBox || !viewport.hasSize) break;
+        final top = viewport.localToGlobal(Offset.zero).dy;
+        final bottom = top + viewport.size.height;
+        final visibleStarts = <int>[];
+        for (final entry in _blockKeys.entries) {
+          final render = entry.value.currentContext?.findRenderObject();
+          if (render is! RenderBox || !render.hasSize || render.size.isEmpty) {
+            continue;
+          }
+          final blockTop = render.localToGlobal(Offset.zero).dy;
+          if (blockTop <= bottom && blockTop + render.size.height >= top) {
+            visibleStarts.add(entry.key);
+          }
         }
+        if (visibleStarts.isEmpty) break;
+        visibleStarts.sort();
+        final current = _scrollController.position;
+        if (request.sourceOffset < visibleStarts.first) {
+          upper = current.pixels;
+        } else {
+          lower = current.pixels;
+        }
+        final next =
+            (upper == null ? current.maxScrollExtent : (lower + upper) / 2)
+                .clamp(current.minScrollExtent, current.maxScrollExtent)
+                .toDouble();
+        if ((next - current.pixels).abs() < .5) break;
+        _scrollController.jumpTo(next);
+        await WidgetsBinding.instance.endOfFrame;
       }
     }
-    blockContext = _blockKeys[heading.blockStart]?.currentContext;
+    if (!mounted || !isCurrent()) return;
+    blockContext = _blockKeys[request.sourceOffset]?.currentContext;
     if (blockContext == null || !blockContext.mounted) return;
     await Scrollable.ensureVisible(
       blockContext,
@@ -3577,6 +3672,12 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
                 itemBuilder: (context, index) {
                   final block = _blocks[index];
                   final listNestingLevel = listNestingLevels[index];
+                  if (_isHiddenFrontMatter(block)) {
+                    return KeyedSubtree(
+                      key: _blockKeys[block.start],
+                      child: const SizedBox.shrink(),
+                    );
+                  }
                   if (hiddenBlockIndices.contains(index)) {
                     return KeyedSubtree(
                       key: _blockKeys[block.start],
@@ -3704,8 +3805,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   }
 
   Widget _buildActiveGapLine(IanvsMarkdownThemeData colors) {
-    final styleSheet =
-        widget.styleSheet ?? ianvsMarkdownStyleSheet(context, colors);
+    final styleSheet = MarkdownStyleSheet.fromTheme(
+      Theme.of(context),
+    ).merge(widget.styleSheet ?? ianvsMarkdownStyleSheet(context, colors));
     _blockController
       ..leadingMarkerCharacters = 0
       ..revealLeadingMarker = false
@@ -3783,8 +3885,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         ),
       );
     }
-    final styleSheet =
-        widget.styleSheet ?? ianvsMarkdownStyleSheet(context, colors);
+    final styleSheet = MarkdownStyleSheet.fromTheme(
+      Theme.of(context),
+    ).merge(widget.styleSheet ?? ianvsMarkdownStyleSheet(context, colors));
     final standardImages = <IanvsMarkdownStandardImageSource>[];
     if (widget.imageBuilder != null) {
       for (var imageIndex = 0; ; imageIndex += 1) {
@@ -3798,7 +3901,11 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       }
     }
     final fencedCode = block.type == IanvsMarkdownBlockType.fencedCode;
+    final blankCodeMinHeight = fencedCode
+        ? _blankFencedCodeMinHeight(block.source)
+        : null;
     final indentedCode = block.type == IanvsMarkdownBlockType.indentedCode;
+    final codeBlock = fencedCode || indentedCode;
     final displayMath = block.type == IanvsMarkdownBlockType.displayMath;
     final wikiEmbed = RegExp(
       r'^ {0,3}!\[\[[^\]\n]+\]\][ \t]*$',
@@ -3825,6 +3932,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     final quoteLines = quoteMarker == null
         ? const <_QuoteLineLayout>[]
         : _quoteLineLayouts(block.source);
+    final quoteDepth = quoteLines.isEmpty
+        ? 1
+        : quoteLines.map((line) => line.depth).reduce(math.min);
     final callout =
         quoteMarker != null &&
         parseIanvsMarkdownCalloutHeader(block.source) != null;
@@ -3870,10 +3980,10 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       if (hiddenMarkerEnd > 0 && !revealHiddenMarker)
         _HiddenMarkerSpan(
           TextRange(start: 0, end: hiddenMarkerEnd),
-          _hiddenTaskMarkerStyle,
+          _collapsedGapPrefixStyle,
         ),
       if (quoteMarker != null && !callout)
-        ..._hiddenQuoteMarkerRanges(quoteLines, activeSelection.extentOffset)
+        ..._hiddenQuoteMarkerRanges(quoteLines, quoteDepth)
       else if (setextUnderline != null)
         _HiddenMarkerSpan(
           TextRange(
@@ -3883,20 +3993,21 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           _collapsedGapPrefixStyle,
         ),
       ..._hiddenBlockIdCaretRanges(block.source),
+      if (headingLevel != null && setextUnderline == null)
+        ..._hiddenAtxHeadingMarkerRanges(block.source, activeSelection),
+      if (indentedCode) ..._hiddenIndentedCodeMarkerRanges(block.source),
     ];
     var activeTextStyle = _isEmptyAtxHeadingSource(block.source)
         ? (styleSheet.p ?? const TextStyle(fontSize: 14.5, height: 1.58))
               .copyWith(color: colors.textPrimary)
         : _activeBlockTextStyle(block, styleSheet, colors);
-    if (fencedCode) {
+    if (codeBlock) {
       activeTextStyle = activeTextStyle.copyWith(
         color: colors.codeForeground,
         fontSize: 14,
         height: 1.5,
+        letterSpacing: 0,
       );
-    }
-    if (indentedCode) {
-      activeTextStyle = activeTextStyle.copyWith(color: colors.accentDark);
     }
     if (taskMarker != null &&
         ianvsMarkdownTaskMarkerUsesDoneText(taskMarker.group(2)!)) {
@@ -3925,6 +4036,45 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         ),
       );
     }
+    final linkDocument = md.Document(
+      extensionSet: md.ExtensionSet.gitHubFlavored,
+    )..linkReferences.addAll(_linkReferences.references);
+    final linkBuilder = IanvsMarkdownInlineLinkBuilder(
+      onTapLink: widget.onTapLink,
+      enableFileLinkChips: widget.enableFileLinkChips,
+      editing: true,
+      wikiLinkExists: widget.wikiLinkExists,
+      theme: colors,
+    );
+    for (final range in ianvsMarkdownInlineLinkSources(
+      block.source,
+      linkReferenceLabels: _linkReferences.labels,
+    )) {
+      if (_selectionRevealsSourceRange(activeSelection, range) ||
+          sourceProjections.any(
+            (projection) =>
+                projection.range.start < range.end &&
+                projection.range.end > range.start,
+          )) {
+        continue;
+      }
+      final nodes = linkDocument.parseInline(range.textInside(block.source));
+      if (nodes.length != 1 || nodes.single is! md.Element) continue;
+      final element = nodes.single as md.Element;
+      if (element.tag != 'a') continue;
+      final link = linkBuilder.visitElementAfterWithContext(
+        context,
+        element,
+        styleSheet.a,
+        activeTextStyle,
+      );
+      if (link is! Text || link.textSpan is! TextSpan) continue;
+      final spans = (link.textSpan! as TextSpan).children;
+      if (spans?.length != 1 || spans!.single is! WidgetSpan) continue;
+      sourceProjections.add(
+        _InlineLinkProjection(range, spans.single as WidgetSpan),
+      );
+    }
     sourceProjections.sort((a, b) => a.range.start.compareTo(b.range.start));
     _blockController.sourceProjections = List<_SourceProjection>.unmodifiable(
       sourceProjections,
@@ -3943,14 +4093,31 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       enableSuggestions: false,
       inputFormatters: <TextInputFormatter>[_editingFormatter],
       style: activeTextStyle,
+      strutStyle: fencedCode
+          ? StrutStyle.fromTextStyle(
+              activeTextStyle.copyWith(
+                fontSize: _fenceMarkerFontSize(context),
+                height: 1.2,
+              ),
+              leading: 0,
+              forceStrutHeight: false,
+            )
+          : StrutStyle.fromTextStyle(
+              activeTextStyle,
+              leading: 0,
+              forceStrutHeight: !indentedCode,
+            ),
       cursorColor: colors.accent,
       cursorWidth: 1.5,
-      decoration: const InputDecoration(
+      decoration: InputDecoration(
+        hintText: widget.controller.text.isEmpty ? widget.placeholder : null,
+        hintStyle: activeTextStyle.copyWith(color: colors.textTertiary),
         border: InputBorder.none,
         enabledBorder: InputBorder.none,
         focusedBorder: InputBorder.none,
         isCollapsed: true,
-        contentPadding: EdgeInsets.symmetric(vertical: 3),
+        visualDensity: VisualDensity.standard,
+        contentPadding: EdgeInsets.zero,
       ),
     );
     final Widget editor = textEditor;
@@ -3975,8 +4142,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           IanvsMarkdownListGuideAnchor(
             nestLevel: listNestingLevel,
             child: SizedBox(
-              width: 28,
-              height: 30,
+              width: listIndentStep,
+              height: 24,
               child: Center(
                 child: IanvsMarkdownTaskCheckbox(
                   value: ianvsMarkdownTaskMarkerIsChecked(taskMarker.group(2)!),
@@ -3991,8 +4158,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
               ),
             ),
           ),
-          const SizedBox(width: 2),
-          activeListEditor(30),
+          activeListEditor(listIndentStep),
         ],
       );
     } else if (unorderedMarker != null && !revealHiddenMarker) {
@@ -4003,19 +4169,23 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             nestLevel: listNestingLevel,
             child: SizedBox(
               key: const ValueKey('ianvs-markdown-active-list-marker'),
-              width: 28,
-              child: Center(
-                child: IanvsMarkdownUnorderedListMarker(
-                  nestLevel: listNestingLevel,
-                  color: colors.textSecondary,
-                  fontSize: activeTextStyle.fontSize ?? 14.5,
-                  height: activeTextStyle.height ?? 1.58,
+              width: listIndentStep,
+              child: Padding(
+                padding:
+                    styleSheet.listBulletPadding ??
+                    const EdgeInsets.only(right: 4),
+                child: Center(
+                  child: IanvsMarkdownUnorderedListMarker(
+                    nestLevel: listNestingLevel,
+                    color: colors.textSecondary,
+                    fontSize: activeTextStyle.fontSize ?? 14.5,
+                    height: activeTextStyle.height ?? 1.58,
+                  ),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 2),
-          activeListEditor(30),
+          activeListEditor(listIndentStep),
         ],
       );
     } else if (orderedMarker != null && !revealHiddenMarker) {
@@ -4026,19 +4196,26 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             nestLevel: listNestingLevel,
             child: SizedBox(
               key: const ValueKey('ianvs-markdown-active-list-marker'),
-              width: 32,
-              child: Text(
-                '${orderedMarker.group(2)}${orderedMarker.group(3)}',
-                textAlign: TextAlign.right,
-                style: activeTextStyle.copyWith(
-                  color: colors.textSecondary,
-                  decoration: TextDecoration.none,
+              width: listIndentStep,
+              child: Padding(
+                padding:
+                    styleSheet.listBulletPadding ??
+                    const EdgeInsets.only(right: 4),
+                child: Text(
+                  '${orderedMarker.group(2)}${orderedMarker.group(3)}',
+                  textAlign: TextAlign.right,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.visible,
+                  style: activeTextStyle.copyWith(
+                    color: colors.textSecondary,
+                    decoration: TextDecoration.none,
+                  ),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 6),
-          activeListEditor(38),
+          activeListEditor(listIndentStep),
         ],
       );
     } else if (quoteMarker != null) {
@@ -4049,11 +4226,18 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           withComposing: false,
         ),
         lines: quoteLines,
+        activeSourceOffset: activeSelection.extentOffset,
+        insetDepth: quoteDepth,
         textDirection: Directionality.of(context),
         textScaler: MediaQuery.textScalerOf(context),
         colors: colors,
         child: Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(27, 8, 8, 8),
+          padding: EdgeInsetsDirectional.fromSTEB(
+            27.0 * quoteDepth,
+            8.0 * quoteDepth,
+            8.0 * quoteDepth,
+            8.0 * quoteDepth,
+          ),
           child: editor,
         ),
       );
@@ -4183,7 +4367,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
                 : 10 + listNestingLevel * listIndentStep,
             child: activeChild,
           );
-    final surfacedActiveChild = fencedCode
+    final surfacedActiveChild = codeBlock
         ? CustomPaint(
             key: const ValueKey('ianvs-markdown-active-code-pattern'),
             painter: IanvsMarkdownCodePatternPainter(
@@ -4204,13 +4388,21 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     final activeBlockContainer = Container(
       key: const ValueKey('ianvs-markdown-active-block'),
       constraints: BoxConstraints(
-        minHeight: fencedCode || quoteBlock ? 36 : 24,
+        minHeight:
+            blankCodeMinHeight ??
+            (codeBlock
+                ? 36
+                : quoteBlock
+                ? 0
+                : 30),
       ),
-      clipBehavior: fencedCode || quoteBlock ? Clip.antiAlias : Clip.none,
-      margin: fencedCode || quoteBlock
+      clipBehavior: codeBlock || quoteBlock ? Clip.antiAlias : Clip.none,
+      margin: codeBlock
+          ? const EdgeInsets.symmetric(horizontal: 10, vertical: 11)
+          : quoteBlock
           ? const EdgeInsets.symmetric(horizontal: 10, vertical: 3)
           : null,
-      decoration: fencedCode
+      decoration: codeBlock
           ? BoxDecoration(
               color: activeCodeCanvasColor,
               borderRadius: BorderRadius.circular(activeCodeRadius),
@@ -4221,17 +4413,24 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
               borderRadius: BorderRadius.circular(activeCodeRadius),
             )
           : null,
-      foregroundDecoration: fencedCode
+      foregroundDecoration: codeBlock
           ? IanvsMarkdownDashedBorderDecoration(
               color: colors.borderSoft,
               radius: activeCodeRadius,
             )
           : null,
-      padding: fencedCode
-          ? const EdgeInsets.symmetric(horizontal: 16)
+      padding: codeBlock
+          ? EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: indentedCode
+                  ? 12
+                  : blankCodeMinHeight != null
+                  ? 3
+                  : 0,
+            )
           : quoteBlock
           ? EdgeInsets.zero
-          : const EdgeInsets.symmetric(horizontal: 10),
+          : const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
       child: surfacedActiveChild,
     );
     final framedActiveBlock = fencedCode
@@ -4294,7 +4493,16 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     var renderedTaskIndex = 0;
     Widget rendered;
     if (block.source.trim().isEmpty) {
-      rendered = const SizedBox.shrink();
+      rendered = widget.controller.text.isEmpty && widget.placeholder != null
+          ? Text(
+              widget.placeholder!,
+              style:
+                  (widget.styleSheet ??
+                          ianvsMarkdownStyleSheet(context, colors))
+                      .p
+                      ?.copyWith(color: colors.textTertiary),
+            )
+          : const SizedBox.shrink();
     } else if (referenceDefinitions.isNotEmpty) {
       rendered = _buildReferenceDefinitionProjection(
         referenceDefinitions,
@@ -5194,6 +5402,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         block.source,
         styleSheet,
       ),
+      IanvsMarkdownBlockType.blockquote => styleSheet.blockquote,
       IanvsMarkdownBlockType.fencedCode ||
       IanvsMarkdownBlockType.indentedCode ||
       IanvsMarkdownBlockType.displayMath ||
@@ -5351,6 +5560,7 @@ class _LivePreviewIndentedCode extends StatelessWidget {
       fontFamilyFallback: colors.monoFontFamilyFallback,
       fontSize: 14,
       height: 1.5,
+      letterSpacing: 0,
     );
     final lines = source.split('\n');
     return Container(
@@ -5726,7 +5936,7 @@ class _ActiveIndentedCodeLineRail extends StatelessWidget {
   }
 }
 
-class _ActiveCodeLineRail extends StatelessWidget {
+class _ActiveCodeLineRail extends StatefulWidget {
   const _ActiveCodeLineRail({
     required this.controller,
     required this.textStyle,
@@ -5740,79 +5950,106 @@ class _ActiveCodeLineRail extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final selection = controller.selection;
-        final caretOffset = selection.isValid
-            ? selection.extentOffset.clamp(0, controller.text.length)
-            : 0;
-        final lineStart = caretOffset == 0
-            ? 0
-            : controller.text.lastIndexOf('\n', caretOffset - 1) + 1;
-        final nextBreak = controller.text.indexOf('\n', caretOffset);
-        final lineEnd = nextBreak < 0 ? controller.text.length : nextBreak;
-        // The active surface contributes 10px margins and 16px padding on
-        // both sides. RenderEditable then reserves its 1px caret gap and the
-        // 1.5px cursor width. Match all of those insets so a logical source
-        // line and its wrapped visual rows share identical geometry.
-        final editableWidth = constraints.maxWidth - 20 - 32 - 2.5;
-        final painter =
-            TextPainter(
-              text: controller.buildTextSpan(
-                context: context,
-                style: textStyle,
-                withComposing: false,
-              ),
-              textDirection: Directionality.of(context),
-              textScaler: MediaQuery.textScalerOf(context),
-              textWidthBasis: TextWidthBasis.parent,
-            )..layout(
-              maxWidth: constraints.hasBoundedWidth
-                  ? editableWidth.clamp(0, double.infinity)
-                  : MediaQuery.sizeOf(context).width,
-            );
-        final lineHeight = painter.preferredLineHeight;
-        final logicalStart = painter.getOffsetForCaret(
-          TextPosition(offset: lineStart),
-          Rect.zero,
-        );
-        final logicalEnd = painter.getOffsetForCaret(
-          TextPosition(offset: lineEnd),
-          Rect.zero,
-        );
-        final logicalLineHeight = (logicalEnd.dy - logicalStart.dy + lineHeight)
-            .clamp(lineHeight, double.infinity)
-            .toDouble();
-        const railInset = 3.0;
-        final railHeight = (logicalLineHeight - railInset * 2)
-            .clamp(1, double.infinity)
-            .toDouble();
-        // Surface top margin (3) + TextField top padding (3) + CSS rail inset.
-        final railTop = 6 + logicalStart.dy + railInset;
+  State<_ActiveCodeLineRail> createState() => _ActiveCodeLineRailState();
+}
 
-        return Stack(
-          clipBehavior: Clip.none,
-          children: [
-            child,
-            PositionedDirectional(
-              key: const ValueKey('ianvs-markdown-active-code-line-rail'),
-              // Equivalent to the old inner-content offset of -31px, now
-              // outside the clipped code surface so the gutter stays visible.
-              start: -5,
-              top: railTop,
-              child: Container(
-                width: 3,
-                height: railHeight,
-                decoration: BoxDecoration(
-                  color: colors.accent,
-                  borderRadius: BorderRadius.circular(1.5),
-                ),
-              ),
+class _ActiveCodeLineRailState extends State<_ActiveCodeLineRail> {
+  double _top = 14;
+  double _height = 15;
+  bool _scheduled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_scheduleMeasurement);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ActiveCodeLineRail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_scheduleMeasurement);
+      widget.controller.addListener(_scheduleMeasurement);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_scheduleMeasurement);
+    super.dispose();
+  }
+
+  void _scheduleMeasurement() {
+    if (_scheduled) return;
+    _scheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scheduled = false;
+      if (!mounted) return;
+      final root = context.findRenderObject();
+      if (root is! RenderBox || !root.hasSize) return;
+      RenderEditable? editable;
+      void visit(RenderObject object) {
+        if (object is RenderEditable) {
+          editable ??= object;
+        } else {
+          object.visitChildren(visit);
+        }
+      }
+
+      visit(root);
+      final input = editable;
+      if (input == null || !input.hasSize) return;
+      final source = widget.controller.text;
+      final selection = widget.controller.selection;
+      final offset = selection.isValid
+          ? selection.extentOffset.clamp(0, source.length)
+          : 0;
+      final start = offset == 0 ? 0 : source.lastIndexOf('\n', offset - 1) + 1;
+      final nextBreak = source.indexOf('\n', offset);
+      final end = nextBreak < 0 ? source.length : nextBreak;
+      final first = input.getLocalRectForCaret(TextPosition(offset: start));
+      final last = input.getLocalRectForCaret(TextPosition(offset: end));
+      final caret = input.getLocalRectForCaret(TextPosition(offset: offset));
+      // At a fence boundary Flutter can report different caret heights on
+      // the same row. Only count the endpoint delta for a genuine wrap.
+      final wrapped =
+          last.top - first.top >= math.min(first.height, last.height) / 2;
+      final logicalTop = wrapped ? first.top : caret.top;
+      final top =
+          input.localToGlobal(Offset(0, logicalTop), ancestor: root).dy + 3;
+      final height = math.max(
+        1.0,
+        (wrapped ? last.top - first.top : 0) + caret.height - 6,
+      );
+      if ((_top - top).abs() < .01 && (_height - height).abs() < .01) return;
+      setState(() {
+        _top = top;
+        _height = height;
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _scheduleMeasurement();
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        widget.child,
+        PositionedDirectional(
+          key: const ValueKey('ianvs-markdown-active-code-line-rail'),
+          start: -5,
+          top: _top,
+          child: Container(
+            width: 3,
+            height: _height,
+            decoration: BoxDecoration(
+              color: widget.colors.accent,
+              borderRadius: BorderRadius.circular(1.5),
             ),
-          ],
-        );
-      },
+          ),
+        ),
+      ],
     );
   }
 }
@@ -8107,6 +8344,12 @@ final class _InlineMathProjection extends _SourceProjection {
   final ValueChanged<int> onTapOffset;
 }
 
+final class _InlineLinkProjection extends _SourceProjection {
+  const _InlineLinkProjection(super.range, this.span);
+
+  final WidgetSpan span;
+}
+
 bool _selectionRevealsSourceRange(TextSelection selection, TextRange range) {
   if (!selection.isValid) return false;
   if (selection.isCollapsed) {
@@ -8129,6 +8372,45 @@ List<_HiddenMarkerSpan> _hiddenBlockIdCaretRanges(String source) {
     );
   }
   return List<_HiddenMarkerSpan>.unmodifiable(hidden);
+}
+
+List<_HiddenMarkerSpan> _hiddenAtxHeadingMarkerRanges(
+  String source,
+  TextSelection selection,
+) {
+  final opening = RegExp(r'^ {0,3}#{1,6}[ \t]+').firstMatch(source);
+  if (opening == null || (selection.isValid && selection.start < opening.end)) {
+    return const [];
+  }
+  final closing = RegExp(r'[ \t]+#+[ \t]*$').firstMatch(source);
+  return [
+    _HiddenMarkerSpan(
+      TextRange(start: 0, end: opening.end),
+      _collapsedGapPrefixStyle,
+    ),
+    if (closing != null &&
+        (!selection.isValid || selection.end <= closing.start))
+      _HiddenMarkerSpan(
+        TextRange(start: closing.start, end: source.length),
+        _collapsedGapPrefixStyle,
+      ),
+  ];
+}
+
+List<_HiddenMarkerSpan> _hiddenIndentedCodeMarkerRanges(String source) {
+  final spans = <_HiddenMarkerSpan>[];
+  for (final match in RegExp(
+    r'^(?: {4}|\t)',
+    multiLine: true,
+  ).allMatches(source)) {
+    spans.add(
+      _HiddenMarkerSpan(
+        TextRange(start: match.start, end: match.end),
+        _collapsedGapPrefixStyle,
+      ),
+    );
+  }
+  return spans;
 }
 
 List<_QuoteLineLayout> _quoteLineLayouts(String source) {
@@ -8169,24 +8451,23 @@ List<_QuoteLineLayout> _quoteLineLayouts(String source) {
 
 List<_HiddenMarkerSpan> _hiddenQuoteMarkerRanges(
   List<_QuoteLineLayout> lines,
-  int caretOffset,
+  int insetDepth,
 ) {
   if (lines.isEmpty) return const <_HiddenMarkerSpan>[];
-  var activeLine = lines.indexWhere(
-    (line) => caretOffset >= line.line.start && caretOffset <= line.line.end,
-  );
-  if (activeLine < 0) activeLine = lines.length - 1;
   final hidden = <_HiddenMarkerSpan>[];
   for (var index = 0; index < lines.length; index += 1) {
     final markers = lines[index].markerRanges;
     if (markers.isEmpty) continue;
-    // Obsidian exposes the complete marker run on the active physical line;
-    // surrounding lines remain visually normalized.
-    if (index == activeLine) continue;
-    hidden.add(_HiddenMarkerSpan(markers.first, _collapsedGapPrefixStyle));
+    // The active line's syntax is painted in its reserved gutter rather than
+    // occupying payload width and changing line wrapping on focus.
     hidden.addAll(
       markers
-          .skip(1)
+          .take(insetDepth)
+          .map((range) => _HiddenMarkerSpan(range, _collapsedGapPrefixStyle)),
+    );
+    hidden.addAll(
+      markers
+          .skip(insetDepth)
           .map((range) => _HiddenMarkerSpan(range, _hiddenQuoteMarkerStyle)),
     );
   }
@@ -8197,6 +8478,8 @@ class _ActiveQuoteBlock extends StatelessWidget {
   const _ActiveQuoteBlock({
     required this.textSpan,
     required this.lines,
+    required this.activeSourceOffset,
+    required this.insetDepth,
     required this.textDirection,
     required this.textScaler,
     required this.colors,
@@ -8205,6 +8488,8 @@ class _ActiveQuoteBlock extends StatelessWidget {
 
   final TextSpan textSpan;
   final List<_QuoteLineLayout> lines;
+  final int activeSourceOffset;
+  final int insetDepth;
   final TextDirection textDirection;
   final TextScaler textScaler;
   final IanvsMarkdownThemeData colors;
@@ -8223,6 +8508,9 @@ class _ActiveQuoteBlock extends StatelessWidget {
               textDirection: textDirection,
               textScaler: textScaler,
               color: colors.accent,
+              markerColor: colors.textTertiary,
+              activeSourceOffset: activeSourceOffset,
+              insetDepth: insetDepth,
             ),
           ),
         ),
@@ -8252,6 +8540,9 @@ class _ActiveQuoteRailsPainter extends CustomPainter {
     required this.textDirection,
     required this.textScaler,
     required this.color,
+    required this.markerColor,
+    required this.activeSourceOffset,
+    required this.insetDepth,
   });
 
   final TextSpan textSpan;
@@ -8259,15 +8550,21 @@ class _ActiveQuoteRailsPainter extends CustomPainter {
   final TextDirection textDirection;
   final TextScaler textScaler;
   final Color color;
+  final Color markerColor;
+  final int activeSourceOffset;
+  final int insetDepth;
 
   @override
   void paint(Canvas canvas, Size size) {
     if (lines.isEmpty || size.isEmpty) return;
-    final textPainter = TextPainter(
-      text: textSpan,
-      textDirection: textDirection,
-      textScaler: textScaler,
-    )..layout(maxWidth: (size.width - 35).clamp(0.0, double.infinity));
+    final textPainter =
+        TextPainter(
+          text: textSpan,
+          textDirection: textDirection,
+          textScaler: textScaler,
+        )..layout(
+          maxWidth: (size.width - 35 * insetDepth).clamp(0.0, double.infinity),
+        );
     final plainLength = textSpan.toPlainText().length;
     final fallbackHeight =
         (textSpan.style?.fontSize ?? 14.5) * (textSpan.style?.height ?? 1.58);
@@ -8284,19 +8581,42 @@ class _ActiveQuoteRailsPainter extends CustomPainter {
         boxHeightStyle: BoxHeightStyle.tight,
       );
       final top = boxes.isEmpty
-          ? 11 + index * fallbackHeight
-          : 11 + boxes.map((box) => box.top).reduce((a, b) => a < b ? a : b);
+          ? 8 * insetDepth + index * fallbackHeight
+          : 8 * insetDepth +
+                boxes.map((box) => box.top).reduce((a, b) => a < b ? a : b);
       final bottom = boxes.isEmpty
           ? top + fallbackHeight
-          : 11 + boxes.map((box) => box.bottom).reduce((a, b) => a > b ? a : b);
+          : 8 * insetDepth +
+                boxes.map((box) => box.bottom).reduce((a, b) => a > b ? a : b);
+      if (activeSourceOffset >= line.line.start &&
+          activeSourceOffset <= line.line.end &&
+          line.markerRanges.isNotEmpty) {
+        final marker = TextPainter(
+          text: TextSpan(
+            text: '>',
+            style: textSpan.style?.copyWith(color: markerColor),
+          ),
+          textDirection: textDirection,
+          textScaler: textScaler,
+        )..layout();
+        marker.paint(
+          canvas,
+          Offset(
+            textDirection == TextDirection.rtl ? size.width - 26 : 12,
+            top,
+          ),
+        );
+        marker.dispose();
+      }
       for (var depth = 1; depth < line.depth; depth += 1) {
-        final logicalX = 9.5 + depth * 19.0;
+        final logicalX = 9.5 + depth * 27.0;
         final x = textDirection == TextDirection.rtl
             ? size.width - logicalX
             : logicalX;
         canvas.drawLine(Offset(x, top), Offset(x, bottom), paint);
       }
     }
+    textPainter.dispose();
   }
 
   @override
@@ -8305,6 +8625,9 @@ class _ActiveQuoteRailsPainter extends CustomPainter {
         oldDelegate.lines != lines ||
         oldDelegate.textDirection != textDirection ||
         oldDelegate.textScaler != textScaler ||
+        oldDelegate.activeSourceOffset != activeSourceOffset ||
+        oldDelegate.insetDepth != insetDepth ||
+        oldDelegate.markerColor != markerColor ||
         oldDelegate.color != color;
   }
 }
@@ -8458,6 +8781,7 @@ class _BlockEditingController extends TextEditingController {
         style: style ?? const TextStyle(),
         syntaxTheme: syntax,
         dark: Theme.of(context).brightness == Brightness.dark,
+        fenceFontSize: _fenceMarkerFontSize(context),
       );
     }
     final collapsedCharacters = collapsedLeadingCharacters.clamp(
@@ -8586,7 +8910,19 @@ TextSpan _buildTextSpanWithSourceProjections(
       switch (projection) {
         case _HiddenMarkerSpan(:final style):
           children.add(
-            TextSpan(text: value.text.substring(start, end), style: style),
+            TextSpan(
+              text: style.fontSize == 0
+                  ? end == value.text.length
+                        // A terminal zero-size glyph has no caret anchor in
+                        // Flutter. Equal-length zero-width characters retain
+                        // source offsets without an empty glyph assertion.
+                        ? '\u200b' * (end - start)
+                        : value.text
+                              .substring(start, end)
+                              .replaceAll('\n', '\u200b')
+                  : value.text.substring(start, end),
+              style: style,
+            ),
           );
         case _InlineMathProjection():
           children.addAll(
@@ -8597,6 +8933,19 @@ TextSpan _buildTextSpanWithSourceProjections(
               projection: projection,
             ),
           );
+        case _InlineLinkProjection(:final span):
+          children.add(span);
+          if (end - start > 1) {
+            children.add(
+              TextSpan(
+                // Keep one display code unit per source code unit. The widget
+                // occupies the first; keyboard navigation can still enter the
+                // full source range and reveal its original delimiters/URL.
+                text: '\u200b' * (end - start - 1),
+                style: _collapsedGapPrefixStyle,
+              ),
+            );
+          }
       }
     }
     cursor = end;
@@ -8778,11 +9127,34 @@ List<TextRange> _sliceTextRanges(
     )
     .toList(growable: false);
 
+// Fence syntax lives in the code surface's existing 12px vertical inset.
+// Keep that inset fixed when the host scales document text.
+double _fenceMarkerFontSize(BuildContext context) =>
+    100 / MediaQuery.textScalerOf(context).scale(10);
+
+double? _blankFencedCodeMinHeight(String source) {
+  final nodes = md.Document(
+    extensionSet: md.ExtensionSet.gitHubFlavored,
+  ).parseLines(source.split('\n'));
+  if (nodes.length != 1 || nodes.single is! md.Element) return null;
+  final block = nodes.single as md.Element;
+  if (block.tag != 'pre') return null;
+  var payload = block.textContent;
+  if (payload.endsWith('\n')) {
+    payload = payload.substring(0, payload.length - 1);
+  }
+  if (payload.codeUnits.any((unit) => unit != 0x0a && unit != 0x0d)) {
+    return null;
+  }
+  return 58 + (markdownCodeLineCount(payload) - 1) * 20.0;
+}
+
 TextSpan _buildHighlightedFencedCodeSpan(
   String source, {
   required TextStyle style,
   required IanvsMarkdownSyntaxTheme syntaxTheme,
   required bool dark,
+  required double fenceFontSize,
 }) {
   final opening = RegExp(
     r'^ {0,3}((?:`{3,})|(?:~{3,}))(.*?)(?:\r?\n|$)',
@@ -8806,7 +9178,14 @@ TextSpan _buildHighlightedFencedCodeSpan(
   return TextSpan(
     style: style,
     children: [
-      TextSpan(text: source.substring(0, bodyStart), style: syntaxTheme.marker),
+      TextSpan(
+        text: source.substring(0, bodyStart),
+        style: syntaxTheme.marker.copyWith(
+          fontSize: fenceFontSize,
+          height: 1.2,
+          letterSpacing: 0,
+        ),
+      ),
       markdownHighlightedCodeSpan(
         source.substring(bodyStart, closingStart),
         language: language,
@@ -8816,7 +9195,11 @@ TextSpan _buildHighlightedFencedCodeSpan(
       if (closingStart < source.length)
         TextSpan(
           text: source.substring(closingStart),
-          style: syntaxTheme.marker,
+          style: syntaxTheme.marker.copyWith(
+            fontSize: fenceFontSize,
+            height: 1.2,
+            letterSpacing: 0,
+          ),
         ),
     ],
   );

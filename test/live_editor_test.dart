@@ -151,7 +151,11 @@ void main() {
     final headingField = tester.widget<TextField>(field);
     expect(headingField.controller?.text, '# Title');
     expect(headingField.style?.fontSize, 26);
-    expect(headingField.style?.fontFamily, isNull);
+    // Both surfaces resolve the same inherited theme font.
+    expect(
+      headingField.style?.fontFamily,
+      Theme.of(tester.element(field)).textTheme.headlineSmall?.fontFamily,
+    );
     expect(find.text('HEADING'), findsNothing);
     expect(find.text('Edit Markdown'), findsNothing);
 
@@ -196,7 +200,10 @@ void main() {
       find.descendant(of: active, matching: find.byType(TextField)),
     );
     expect(field.controller?.text, 'After');
-    expect(field.style?.fontFamily, isNull);
+    expect(
+      field.style?.fontFamily,
+      Theme.of(tester.element(active)).textTheme.bodyMedium?.fontFamily,
+    );
 
     final inlineController = IanvsMarkdownController(
       text: '<em>inline</em> continuation\nnext',
@@ -212,7 +219,10 @@ void main() {
       find.descendant(of: active, matching: find.byType(TextField)),
     );
     expect(field.controller?.text, '<em>inline</em> continuation\nnext');
-    expect(field.style?.fontFamily, isNull);
+    expect(
+      field.style?.fontFamily,
+      Theme.of(tester.element(active)).textTheme.bodyMedium?.fontFamily,
+    );
   });
 
   testWidgets('rendered text click places the caret at its visual character', (
@@ -386,12 +396,22 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.byKey(const ValueKey('ianvs-markdown-highlight')),
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is SelectableText &&
+            widget.textSpan != null &&
+            _spanHasHighlight(widget.textSpan!),
+      ),
       findsOneWidget,
     );
     expect(find.textContaining('='), findsNothing);
 
-    await tester.tap(find.text('x'));
+    await tapSelectableSubstring(
+      tester,
+      selectableTextWithPlainText('LxR'),
+      'x',
+      offsetWithin: 0,
+    );
     await tester.pumpAndSettle();
 
     final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
@@ -413,7 +433,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.byKey(const ValueKey('ianvs-markdown-highlight')),
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is SelectableText &&
+              widget.textSpan != null &&
+              _spanHasHighlight(widget.textSpan!),
+        ),
         findsNothing,
       );
       expect(find.textContaining('L==before'), findsOneWidget);
@@ -1337,16 +1362,14 @@ void main() {
     await tester.pumpWidget(app(controller));
     await tester.pumpAndSettle();
 
-    final highlight = tester.renderObject<RenderParagraph>(
-      find.text('bravo charlie'),
+    // The highlight now shares the surrounding selectable paragraph, while
+    // this remains a click three characters into the highlighted payload.
+    final highlight = editableWithin(
+      tester,
+      find.text('Alpha bravo charlie omega'),
     );
-    final caret = highlight.getOffsetForCaret(
-      const TextPosition(offset: 3),
-      Rect.zero,
-    );
-    final target = highlight.localToGlobal(
-      caret + Offset(.1, highlight.size.height / 2),
-    );
+    final caret = highlight.getLocalRectForCaret(const TextPosition(offset: 9));
+    final target = highlight.localToGlobal(caret.center);
 
     await tester.tapAt(target);
     await tester.pumpAndSettle();
@@ -5791,7 +5814,15 @@ void main() {
       );
       final hiddenUnderline = _textSpanLeaves(
         span,
-      ).where((leaf) => leaf.text?.contains('----------------') ?? false);
+      ).where((leaf) => leaf.style?.fontSize == 0);
+      // The hidden underline, including its newline, keeps source offsets
+      // without allocating another visual row or an empty terminal glyph.
+      expect(
+        hiddenUnderline
+            .map((leaf) => leaf.text!.length)
+            .fold<int>(0, (a, b) => a + b),
+        17,
+      );
       expect(hiddenUnderline, isNotEmpty);
       expect(
         hiddenUnderline.every((leaf) => leaf.style?.fontSize == 0),
@@ -8165,7 +8196,8 @@ url: https://example.com/path
     expect(activeSpan.toPlainText(), '- [ ] Open');
     final hiddenPrefix = activeSpan.children!.first as TextSpan;
     expect(hiddenPrefix.text, '- [ ] ');
-    expect(hiddenPrefix.style?.fontSize, 4);
+    // Structural markers occupy the reserved list gutter, not text width.
+    expect(hiddenPrefix.style?.fontSize, 0);
     expect(find.text('Done'), findsOneWidget);
     expect(find.text('Nested'), findsOneWidget);
   });
@@ -8455,7 +8487,8 @@ url: https://example.com/path
               span.text == '> ' && span.style?.color == Colors.transparent,
         )
         .toList();
-    expect(collapsedQuotePrefixes, hasLength(1));
+    // Every outer prefix stays in the gutter, including the active line.
+    expect(collapsedQuotePrefixes, hasLength(2));
     expect(
       collapsedQuotePrefixes.every((span) => span.style?.fontSize == 0),
       isTrue,
@@ -8538,9 +8571,9 @@ url: https://example.com/path
       final hiddenPrefixes = leaves
           .where((child) => child.text == '> ' && child.style?.color?.a == 0)
           .toList();
-      expect(hiddenPrefixes, hasLength(2));
+      expect(hiddenPrefixes, hasLength(4));
       expect(
-        hiddenPrefixes.every((child) => child.style?.fontSize == 0),
+        hiddenPrefixes.where((child) => child.style?.fontSize == 0).length == 3,
         isTrue,
       );
       final visibleNestedMarkerCharacters = leaves
@@ -8551,7 +8584,8 @@ url: https://example.com/path
             0,
             (count, child) => count + '>'.allMatches(child.text ?? '').length,
           );
-      expect(visibleNestedMarkerCharacters, 2);
+      // Active syntax is painted in the reserved quote gutter.
+      expect(visibleNestedMarkerCharacters, 0);
       final firstBreak = source.indexOf('\n');
       final nestedLineEnd = source.indexOf('\n', firstBreak + 1);
       expect(controller.selection.extentOffset, nestedLineEnd);
@@ -8608,7 +8642,7 @@ url: https://example.com/path
         controller.selection.extentOffset,
         greaterThan(source.lastIndexOf('> Outer tail')),
       );
-      expect(visibleMarkerCharacters, 1);
+      expect(visibleMarkerCharacters, 0);
     },
   );
 
@@ -11004,7 +11038,7 @@ After''';
       ),
     );
     final prefix = leaves.singleWhere((leaf) => leaf.text == '- ');
-    expect(prefix.style?.fontSize, 4);
+    expect(prefix.style?.fontSize, 0);
     expect(prefix.style?.color, Colors.transparent);
     expect(find.text('formula:x + y'), findsOneWidget);
     expect(controller.text, source);
@@ -12029,7 +12063,8 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     await tester.pumpAndSettle();
 
     expect(controller.selection.isCollapsed, isTrue);
-    expect(controller.selection.extentOffset, 19);
+    // The click is exactly at visible offset 6: the start of bravo.
+    expect(controller.selection.extentOffset, source.indexOf('bravo'));
     expect(controller.text, source);
     expect(controller.isDirty, isFalse);
   });
@@ -12306,7 +12341,10 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
       find.descendant(of: active, matching: find.byType(TextField)),
     );
     expect(field.controller?.text, invalid);
-    expect(field.style?.fontFamily, isNull);
+    expect(
+      field.style?.fontFamily,
+      Theme.of(tester.element(active)).textTheme.bodyMedium?.fontFamily,
+    );
     expect(
       find.byKey(const ValueKey('ianvs-markdown-active-code-pattern')),
       findsNothing,
@@ -12360,7 +12398,8 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     );
     expect(
       container.margin,
-      const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      // Match the rendered code card's 8px margin plus the block's 3px.
+      const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
     );
     expect(container.foregroundDecoration, isNotNull);
     expect(container.padding, const EdgeInsets.symmetric(horizontal: 16));
@@ -12390,7 +12429,19 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     expect(positionedRail.bottom, isNull);
     final rail = positionedRail.child as Container;
     expect(rail.constraints?.minWidth, 3);
-    expect(tester.getSize(codeLineRail).height, inInclusiveRange(14, 16));
+    {
+      final caretEditable = editableWithin(
+        tester,
+        find.descendant(of: active, matching: find.byType(TextField)),
+      );
+      final currentCaret = caretEditable.getLocalRectForCaret(
+        TextPosition(offset: controller.selection.extentOffset),
+      );
+      expect(
+        tester.getSize(codeLineRail).height,
+        closeTo(currentCaret.height - 6, .01),
+      );
+    }
     expect(
       tester.getRect(codeLineRail).left,
       lessThan(tester.getRect(active).left),
@@ -12627,14 +12678,39 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     );
     expect(rail, findsOneWidget);
     final emptyLineTop = tester.getTopLeft(rail).dy;
-    expect(tester.getSize(rail).height, inInclusiveRange(14, 16));
+    final caretEditable = editableWithin(
+      tester,
+      find.descendant(
+        of: find.byKey(const ValueKey('ianvs-markdown-active-block')),
+        matching: find.byType(TextField),
+      ),
+    );
+    final currentCaret = caretEditable.getLocalRectForCaret(
+      TextPosition(offset: controller.selection.extentOffset),
+    );
+    expect(tester.getSize(rail).height, closeTo(currentCaret.height - 6, .01));
 
     controller.selection = TextSelection.collapsed(
       offset: source.lastIndexOf('```') + 1,
     );
     await tester.pumpAndSettle();
     expect(tester.getTopLeft(rail).dy, greaterThan(emptyLineTop));
-    expect(tester.getSize(rail).height, inInclusiveRange(14, 16));
+    {
+      final caretEditable = editableWithin(
+        tester,
+        find.descendant(
+          of: find.byKey(const ValueKey('ianvs-markdown-active-block')),
+          matching: find.byType(TextField),
+        ),
+      );
+      final currentCaret = caretEditable.getLocalRectForCaret(
+        TextPosition(offset: controller.selection.extentOffset),
+      );
+      expect(
+        tester.getSize(rail).height,
+        closeTo(currentCaret.height - 6, .01),
+      );
+    }
     expect(controller.text, source);
 
     controller.mode = IanvsMarkdownEditorMode.preview;
@@ -12689,7 +12765,22 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
       findsNothing,
     );
     final firstTop = tester.getTopLeft(rail).dy;
-    expect(tester.getSize(rail).height, inInclusiveRange(14, 16));
+    {
+      final caretEditable = editableWithin(
+        tester,
+        find.descendant(
+          of: find.byKey(const ValueKey('ianvs-markdown-active-block')),
+          matching: find.byType(TextField),
+        ),
+      );
+      final currentCaret = caretEditable.getLocalRectForCaret(
+        TextPosition(offset: controller.selection.extentOffset),
+      );
+      expect(
+        tester.getSize(rail).height,
+        closeTo(currentCaret.height - 6, .01),
+      );
+    }
 
     controller.selection = TextSelection.collapsed(offset: firstBlank + 1);
     await tester.pumpAndSettle();
@@ -12697,7 +12788,22 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     final secondTop = tester.getTopLeft(rail).dy;
     expect(secondTop, greaterThan(firstTop));
     expect(secondTop - firstTop, inInclusiveRange(20, 22));
-    expect(tester.getSize(rail).height, inInclusiveRange(14, 16));
+    {
+      final caretEditable = editableWithin(
+        tester,
+        find.descendant(
+          of: find.byKey(const ValueKey('ianvs-markdown-active-block')),
+          matching: find.byType(TextField),
+        ),
+      );
+      final currentCaret = caretEditable.getLocalRectForCaret(
+        TextPosition(offset: controller.selection.extentOffset),
+      );
+      expect(
+        tester.getSize(rail).height,
+        closeTo(currentCaret.height - 6, .01),
+      );
+    }
     expect(rail, findsOneWidget);
     expect(controller.text, source);
   });
@@ -13054,7 +13160,11 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
       findsOneWidget,
     );
     final container = tester.widget<Container>(active);
-    expect(container.decoration, isNull);
+    // Indented code retains its rendered surface when activated.
+    expect(
+      (container.decoration! as BoxDecoration).color,
+      IanvsMarkdownThemeData.light.surface,
+    );
     final field = tester.widget<TextField>(
       find.descendant(of: active, matching: find.byType(TextField)),
     );
@@ -13063,7 +13173,7 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
       field.style?.fontFamily,
       IanvsMarkdownThemeData.light.monoFontFamily,
     );
-    expect(field.style?.color, IanvsMarkdownThemeData.light.accentDark);
+    expect(field.style?.color, IanvsMarkdownThemeData.light.codeForeground);
     expect(controller.text, source);
   });
 
@@ -13181,12 +13291,42 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     await tester.pumpAndSettle();
     final closingTop = tester.getTopLeft(rail).dy;
     expect(closingTop, greaterThan(firstRowY));
-    expect(tester.getSize(rail).height, inInclusiveRange(14, 16));
+    {
+      final caretEditable = editableWithin(
+        tester,
+        find.descendant(
+          of: find.byKey(const ValueKey('ianvs-markdown-active-block')),
+          matching: find.byType(TextField),
+        ),
+      );
+      final currentCaret = caretEditable.getLocalRectForCaret(
+        TextPosition(offset: controller.selection.extentOffset),
+      );
+      expect(
+        tester.getSize(rail).height,
+        closeTo(currentCaret.height - 6, .01),
+      );
+    }
 
     controller.selection = const TextSelection.collapsed(offset: 1);
     await tester.pumpAndSettle();
     expect(tester.getTopLeft(rail).dy, lessThan(firstRowY));
-    expect(tester.getSize(rail).height, inInclusiveRange(14, 16));
+    {
+      final caretEditable = editableWithin(
+        tester,
+        find.descendant(
+          of: find.byKey(const ValueKey('ianvs-markdown-active-block')),
+          matching: find.byType(TextField),
+        ),
+      );
+      final currentCaret = caretEditable.getLocalRectForCaret(
+        TextPosition(offset: controller.selection.extentOffset),
+      );
+      expect(
+        tester.getSize(rail).height,
+        closeTo(currentCaret.height - 6, .01),
+      );
+    }
     expect(controller.text, source);
   });
 
@@ -17087,4 +17227,10 @@ bool _spanContainsColor(
       inheritedColor: effectiveColor,
     ),
   );
+}
+
+bool _spanHasHighlight(InlineSpan span) {
+  if (span is! TextSpan) return false;
+  if (span.style?.backgroundColor == const Color(0xffffe184)) return true;
+  return span.children?.any(_spanHasHighlight) ?? false;
 }

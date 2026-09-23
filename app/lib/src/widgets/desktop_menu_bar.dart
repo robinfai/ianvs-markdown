@@ -38,6 +38,7 @@ class DesktopMenuBar extends StatelessWidget {
         null;
     if (inEditor) {
       final controller = workspace.activeDocument?.controller;
+      if (controller?.mode == IanvsMarkdownEditorMode.preview) return;
       if (redo) {
         controller?.redo();
       } else {

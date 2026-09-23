@@ -36,9 +36,7 @@ void main() {
       );
       addTearDown(workspace.dispose);
       addTearDown(files.dispose);
-      await tester.pumpWidget(
-        LinefoldApp(workspaceController: workspace),
-      );
+      await tester.pumpWidget(LinefoldApp(workspaceController: workspace));
       await tester.pumpAndSettle();
       await workspace.chooseWorkspaceFolder();
       final first = workspace.activeDocument!;
@@ -168,9 +166,7 @@ void main() {
       );
       addTearDown(workspace.dispose);
       addTearDown(files.dispose);
-      await tester.pumpWidget(
-        LinefoldApp(workspaceController: workspace),
-      );
+      await tester.pumpWidget(LinefoldApp(workspaceController: workspace));
       await tester.pumpAndSettle();
       expect(find.byType(PlatformMenuBar), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -230,9 +226,7 @@ void main() {
     addTearDown(workspace.dispose);
     addTearDown(files.dispose);
 
-    await tester.pumpWidget(
-      LinefoldApp(workspaceController: workspace),
-    );
+    await tester.pumpWidget(LinefoldApp(workspaceController: workspace));
     await tester.pumpAndSettle();
 
     expect(find.text('Welcome.md'), findsOneWidget);
@@ -263,14 +257,14 @@ void main() {
     expect(find.byTooltip('New document (⌘N)'), findsOneWidget);
     expect(find.byTooltip('Hide outline'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Source'));
+    await tester.tap(find.byTooltip('Source: edit Markdown source'));
     await tester.pumpAndSettle();
     expect(
       tester
           .widget<Semantics>(
             find
                 .ancestor(
-                  of: find.byTooltip('Source'),
+                  of: find.byTooltip('Source: edit Markdown source'),
                   matching: find.byType(Semantics),
                 )
                 .first,
@@ -279,7 +273,9 @@ void main() {
           .selected,
       isTrue,
     );
-    await tester.tap(find.byTooltip('Live Preview'));
+    await tester.tap(
+      find.byTooltip('Live Preview: edit with inline formatting'),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.byTooltip('Hide outline'));
@@ -337,9 +333,7 @@ void main() {
     addTearDown(workspace.dispose);
     addTearDown(files.dispose);
 
-    await tester.pumpWidget(
-        LinefoldApp(workspaceController: workspace),
-    );
+    await tester.pumpWidget(LinefoldApp(workspaceController: workspace));
     await tester.pumpAndSettle();
 
     final sidebar = find.byType(WorkspaceSidebar);

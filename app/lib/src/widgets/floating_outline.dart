@@ -94,7 +94,8 @@ class FloatingOutline extends StatelessWidget {
                         return _OutlineTile(
                           heading: heading,
                           selected: selected,
-                          onTap: () => _reveal(heading, value.text.length),
+                          onTap: () =>
+                              document.controller.revealHeading(heading.offset),
                         );
                       },
                     );
@@ -105,26 +106,6 @@ class FloatingOutline extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-
-  void _reveal(_OutlineHeading heading, int documentLength) {
-    document.controller
-      ..mode = IanvsMarkdownEditorMode.livePreview
-      ..selection = TextSelection.collapsed(offset: heading.offset);
-    final scroll = document.scrollController;
-    if (!scroll.hasClients || documentLength == 0) return;
-    final target =
-        scroll.position.maxScrollExtent * (heading.offset / documentLength);
-    scroll.animateTo(
-      target
-          .clamp(
-            scroll.position.minScrollExtent,
-            scroll.position.maxScrollExtent,
-          )
-          .toDouble(),
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOutCubic,
     );
   }
 }

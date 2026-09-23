@@ -103,13 +103,17 @@ class IanvsMarkdownEditorShortcuts extends StatelessWidget {
         actions: <Type, Action<Intent>>{
           _UndoIntent: CallbackAction<_UndoIntent>(
             onInvoke: (_) {
-              controller.undo();
+              if (controller.mode != IanvsMarkdownEditorMode.preview) {
+                controller.undo();
+              }
               return null;
             },
           ),
           _RedoIntent: CallbackAction<_RedoIntent>(
             onInvoke: (_) {
-              controller.redo();
+              if (controller.mode != IanvsMarkdownEditorMode.preview) {
+                controller.redo();
+              }
               return null;
             },
           ),
@@ -117,19 +121,25 @@ class IanvsMarkdownEditorShortcuts extends StatelessWidget {
           PasteTextIntent: _MarkdownPasteAction(controller),
           _BoldIntent: CallbackAction<_BoldIntent>(
             onInvoke: (_) {
-              controller.toggleInline('**');
+              if (controller.mode != IanvsMarkdownEditorMode.preview) {
+                controller.toggleInline('**');
+              }
               return null;
             },
           ),
           _ItalicIntent: CallbackAction<_ItalicIntent>(
             onInvoke: (_) {
-              controller.toggleInline('*');
+              if (controller.mode != IanvsMarkdownEditorMode.preview) {
+                controller.toggleInline('*');
+              }
               return null;
             },
           ),
           _LinkIntent: CallbackAction<_LinkIntent>(
             onInvoke: (_) {
-              controller.insertLink();
+              if (controller.mode != IanvsMarkdownEditorMode.preview) {
+                controller.insertLink();
+              }
               return null;
             },
           ),
@@ -156,7 +166,8 @@ class IanvsMarkdownEditorShortcuts extends StatelessWidget {
           ),
           _IndentIntent: CallbackAction<_IndentIntent>(
             onInvoke: (_) {
-              if (controller.canIndentSelection) {
+              if (controller.mode != IanvsMarkdownEditorMode.preview &&
+                  controller.canIndentSelection) {
                 controller.indentSelection();
               } else {
                 FocusScope.of(context).nextFocus();
@@ -166,7 +177,8 @@ class IanvsMarkdownEditorShortcuts extends StatelessWidget {
           ),
           _OutdentIntent: CallbackAction<_OutdentIntent>(
             onInvoke: (_) {
-              if (controller.canIndentSelection) {
+              if (controller.mode != IanvsMarkdownEditorMode.preview &&
+                  controller.canIndentSelection) {
                 controller.indentSelection(outdent: true);
               } else {
                 FocusScope.of(context).previousFocus();
@@ -191,12 +203,14 @@ class IanvsMarkdownEditorShortcuts extends StatelessWidget {
   Future<void> _save() async {
     final callback = onSaveRequested;
     if (callback == null) return;
+    final savedText = controller.text;
+    controller.commitHistoryGroup();
     try {
-      await callback(controller.text);
+      await callback(savedText);
     } on IanvsMarkdownSaveCancelledException {
       return;
     }
-    controller.markSaved();
+    controller.markSaved(savedText: savedText);
   }
 }
 
@@ -219,6 +233,7 @@ class _DeleteLineAction extends ContextAction<_DeleteLineIntent> {
 
   @override
   Object? invoke(_DeleteLineIntent intent, [BuildContext? context]) {
+    if (controller.mode == IanvsMarkdownEditorMode.preview) return null;
     controller.deleteSelectedLines(
       preferredCaretOffset: context == null
           ? null
@@ -236,7 +251,8 @@ class _MarkdownPasteAction extends ContextAction<PasteTextIntent> {
   @override
   Object? invoke(PasteTextIntent intent, [BuildContext? context]) {
     final defaultAction = callingAction;
-    if (_isInsideFrontMatterCard(context)) {
+    if (controller.mode == IanvsMarkdownEditorMode.preview ||
+        _isInsideFrontMatterCard(context)) {
       return defaultAction?.invoke(intent);
     }
     final selection = controller.selection;
@@ -252,6 +268,7 @@ class _MarkdownPasteAction extends ContextAction<PasteTextIntent> {
     Action<PasteTextIntent>? defaultAction,
   ) async {
     final data = await readPlainTextClipboardSafely();
+    if (controller.mode == IanvsMarkdownEditorMode.preview) return;
     final pastedText = data?.text;
     if (pastedText == null) return;
     final replacement = smartUrlPasteValue(controller.value, pastedText);
@@ -361,7 +378,8 @@ class _MarkdownWordDeletionAction
     DeleteToNextWordBoundaryIntent intent, [
     BuildContext? context,
   ]) {
-    if (_isInsideFrontMatterCard(context)) {
+    if (controller.mode == IanvsMarkdownEditorMode.preview ||
+        _isInsideFrontMatterCard(context)) {
       return callingAction?.invoke(intent);
     }
     if (controller.deleteMarkdownPunctuationSegment(forward: intent.forward)) {
@@ -382,7 +400,8 @@ class _MarkdownWordMovementAction
     ExtendSelectionToNextWordBoundaryIntent intent, [
     BuildContext? context,
   ]) {
-    if (_isInsideFrontMatterCard(context)) {
+    if (controller.mode == IanvsMarkdownEditorMode.preview ||
+        _isInsideFrontMatterCard(context)) {
       return callingAction?.invoke(intent);
     }
     if (controller.moveAcrossMarkdownPunctuation(
@@ -407,7 +426,8 @@ class _MarkdownWordSelectionAction
     ExtendSelectionToNextWordBoundaryOrCaretLocationIntent intent, [
     BuildContext? context,
   ]) {
-    if (_isInsideFrontMatterCard(context)) {
+    if (controller.mode == IanvsMarkdownEditorMode.preview ||
+        _isInsideFrontMatterCard(context)) {
       return callingAction?.invoke(intent);
     }
     if (controller.moveAcrossMarkdownPunctuation(

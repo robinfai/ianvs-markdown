@@ -52,11 +52,14 @@ class IanvsMarkdownInlineCodeBuilder extends MarkdownElementBuilder {
     );
     final text = Text.rich(TextSpan(text: element.textContent, style: style));
     return consumeTap
-        ? GestureDetector(
-            key: const ValueKey('ianvs-markdown-html-code'),
-            behavior: HitTestBehavior.opaque,
-            onTap: () {},
-            child: text,
+        // Repeated HTML code spans share the diagnostic key, not widget identity.
+        ? KeyedSubtree(
+            child: GestureDetector(
+              key: const ValueKey('ianvs-markdown-html-code'),
+              behavior: HitTestBehavior.opaque,
+              onTap: () {},
+              child: text,
+            ),
           )
         : text;
   }

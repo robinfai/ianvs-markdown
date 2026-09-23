@@ -185,12 +185,14 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
   Future<void> _save() async {
     final callback = onSaveRequested;
     if (callback == null) return;
+    final savedText = controller.text;
+    controller.commitHistoryGroup();
     try {
-      await callback(controller.text);
+      await callback(savedText);
     } on IanvsMarkdownSaveCancelledException {
       return;
     }
-    controller.markSaved();
+    controller.markSaved(savedText: savedText);
   }
 }
 

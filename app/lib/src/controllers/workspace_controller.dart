@@ -18,10 +18,12 @@ class WorkspaceController extends ChangeNotifier {
   final List<DocumentSession> _documents = <DocumentSession>[];
   final Map<String, StreamSubscription<FileSystemEvent>> _watchers =
       <String, StreamSubscription<FileSystemEvent>>{};
-  final Set<String> _savingPaths = <String>{};
+  final Map<String, Future<bool>> _pendingSaves = <String, Future<bool>>{};
   Timer? _persistTimer;
   var _activeIndex = 0;
   var _nextDocumentId = 1;
+  var _workspaceFilesRevision = 0;
+  var _saveRevision = 0;
   var _initialized = false;
   String? _workspaceRoot;
   String? _workspaceAccessToken;
@@ -33,6 +35,7 @@ class WorkspaceController extends ChangeNotifier {
       _documents.isEmpty ? null : _documents[_activeIndex];
   int get activeIndex => _activeIndex;
   String? get workspaceRoot => _workspaceRoot;
+  int get workspaceFilesRevision => _workspaceFilesRevision;
   bool get sidebarVisible => _sidebarVisible;
   bool get outlineVisible => _outlineVisible;
   bool get initialized => _initialized;
@@ -202,47 +205,67 @@ class WorkspaceController extends ChangeNotifier {
     return saveDocument(document, saveAs: saveAs);
   }
 
-  Future<bool> saveDocument(
-    DocumentSession document, {
-    bool saveAs = false,
+  Future<bool> saveDocument(DocumentSession document, {bool saveAs = false}) {
+    _saveRevision += 1;
+    final savedText = document.controller.text;
+    document.controller.commitHistoryGroup();
+    final previousSave = _pendingSaves[document.id];
+    late final Future<bool> saving;
+    saving = () async {
+      if (previousSave != null) {
+        try {
+          await previousSave;
+        } on Object {
+          // The previous caller receives its error; a later request can retry.
+        }
+      }
+      try {
+        return await _saveDocumentSnapshot(document, savedText, saveAs: saveAs);
+      } finally {
+        if (identical(_pendingSaves[document.id], saving)) {
+          _pendingSaves.remove(document.id);
+        }
+      }
+    }();
+    _pendingSaves[document.id] = saving;
+    return saving;
+  }
+
+  Future<bool> _saveDocumentSnapshot(
+    DocumentSession document,
+    String savedText, {
+    required bool saveAs,
   }) async {
     var path = saveAs ? null : document.path;
     path ??= await fileService.chooseSavePath(document.name);
     if (path == null) return false;
     final normalized = p.normalize(p.absolute(path));
-    _savingPaths.add(normalized);
-    try {
-      await fileService.writeMarkdownFileAtomic(
-        normalized,
-        document.controller.text,
-      );
-      final previousPath = document.path;
-      final needsAccessToken =
-          document.accessToken == null ||
-          previousPath == null ||
-          !p.equals(previousPath, normalized);
-      final accessToken = needsAccessToken
-          ? await fileService.createPersistentAccessToken(normalized)
-          : document.accessToken;
-      document
-        ..path = normalized
-        ..accessToken = accessToken ?? document.accessToken
-        ..name = p.basename(normalized)
-        ..encoding = 'UTF-8'
-        ..lineEnding = _lineEndingOf(document.controller.text)
-        ..markSaved();
-      if (previousPath == null || !p.equals(previousPath, normalized)) {
-        await _unwatch(document.id);
-        _watch(document);
-      }
-      notifyListeners();
-      await _persistNow();
-      return true;
-    } finally {
-      Timer(const Duration(milliseconds: 600), () {
-        _savingPaths.remove(normalized);
-      });
+    await fileService.writeMarkdownFileAtomic(normalized, savedText);
+    final previousPath = document.path;
+    final needsAccessToken =
+        document.accessToken == null ||
+        previousPath == null ||
+        !p.equals(previousPath, normalized);
+    final accessToken = needsAccessToken
+        ? await fileService.createPersistentAccessToken(normalized)
+        : document.accessToken;
+    document
+      ..path = normalized
+      ..accessToken = accessToken ?? document.accessToken
+      ..name = p.basename(normalized)
+      ..encoding = 'UTF-8'
+      ..lineEnding = _lineEndingOf(savedText)
+      ..markSaved(savedText: savedText);
+    if (previousPath == null || !p.equals(previousPath, normalized)) {
+      await _unwatch(document.id);
+      _watch(document);
     }
+    if (_workspaceRoot case final root?) {
+      if (p.isWithin(root, normalized)) _workspaceFilesRevision += 1;
+    }
+    notifyListeners();
+    await _persistNow();
+    return true;
   }
 
   Future<void> reloadFromDisk(DocumentSession document) async {
@@ -252,7 +275,7 @@ class WorkspaceController extends ChangeNotifier {
     document
       ..encoding = file.encoding
       ..lineEnding = file.lineEnding
-      ..replaceFromDisk(file.contents);
+      ..replaceFromDisk(file.contents, preserveHistory: true);
     notifyListeners();
     _schedulePersist();
   }
@@ -343,11 +366,8 @@ class WorkspaceController extends ChangeNotifier {
           .watchDirectory(directory)
           .listen(
             (event) {
-              if (_savingPaths.contains(path) || !p.equals(event.path, path)) {
-                return;
-              }
-              document.hasExternalChanges = true;
-              notifyListeners();
+              if (!p.equals(event.path, path)) return;
+              unawaited(_checkForExternalChanges(document, path));
             },
             onError: (Object error, StackTrace stackTrace) {
               debugPrint('File watcher failed for $path: $error');
@@ -355,6 +375,49 @@ class WorkspaceController extends ChangeNotifier {
           );
     } on Object catch (error) {
       debugPrint('Unable to watch $path: $error');
+    }
+  }
+
+  Future<void> _checkForExternalChanges(
+    DocumentSession document,
+    String path,
+  ) async {
+    bool isWatching() =>
+        _watchers.containsKey(document.id) &&
+        document.path != null &&
+        p.equals(document.path!, path);
+    while (isWatching()) {
+      final saveRevision = _saveRevision;
+      final pendingSave = _pendingSaves[document.id];
+      if (pendingSave != null) {
+        try {
+          // Compare only after markSaved has committed the written snapshot.
+          await pendingSave;
+        } on Object {
+          // The save caller handles the error; disk may still have changed.
+        }
+      }
+      if (!isWatching()) return;
+      final persistedText = document.persistedText;
+      var changed = true;
+      try {
+        final disk = await fileService.readMarkdownFile(path);
+        changed = disk.contents != persistedText;
+      } on Object catch (error) {
+        // Deletion or an unreadable replacement also needs the existing banner.
+        debugPrint('Unable to check watched file $path: $error');
+      }
+      if (!isWatching()) return;
+      if (saveRevision != _saveRevision ||
+          persistedText != document.persistedText) {
+        // A newer save/reload invalidated the asynchronous read. Check again.
+        continue;
+      }
+      if (changed && !document.hasExternalChanges) {
+        document.hasExternalChanges = true;
+        notifyListeners();
+      }
+      return;
     }
   }
 
@@ -397,6 +460,7 @@ class WorkspaceController extends ChangeNotifier {
     for (final watcher in _watchers.values) {
       unawaited(watcher.cancel());
     }
+    _watchers.clear();
     for (final document in _documents) {
       document.controller.removeListener(_handleDocumentChanged);
       document.dispose();

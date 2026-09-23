@@ -67,23 +67,29 @@ class DocumentSession {
     'lineEnding': lineEnding,
   };
 
-  void markSaved() {
-    persistedText = controller.text;
+  void markSaved({String? savedText}) {
+    persistedText = savedText ?? controller.text;
     hasExternalChanges = false;
-    controller.markSaved();
+    controller.markSaved(savedText: persistedText);
   }
 
-  void replaceFromDisk(String text) {
+  void replaceFromDisk(String text, {bool preserveHistory = false}) {
     final selection = controller.selection;
+    controller.commitHistoryGroup();
     controller.value = TextEditingValue(
       text: text,
       selection: TextSelection.collapsed(
         offset: selection.extentOffset.clamp(0, text.length),
       ),
     );
-    controller
-      ..clearHistory()
-      ..markSaved();
+    if (preserveHistory) {
+      // Reload is a single reversible edit. Undo recovers the local draft,
+      // while the saved baseline continues to describe the bytes on disk.
+      controller.commitHistoryGroup();
+    } else {
+      controller.clearHistory();
+    }
+    controller.markSaved(savedText: text);
     persistedText = text;
     hasExternalChanges = false;
   }

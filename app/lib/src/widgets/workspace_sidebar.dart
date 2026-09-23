@@ -37,9 +37,44 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
   var _searching = false;
   List<WorkspaceEntry> _results = const <WorkspaceEntry>[];
   Timer? _debounce;
+  var _searchGeneration = 0;
+  late int _filesRevision;
+  String? _root;
+
+  @override
+  void initState() {
+    super.initState();
+    _root = widget.workspace.workspaceRoot;
+    _filesRevision = widget.workspace.workspaceFilesRevision;
+    widget.workspace.addListener(_workspaceChanged);
+  }
+
+  @override
+  void didUpdateWidget(WorkspaceSidebar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.workspace != widget.workspace) {
+      oldWidget.workspace.removeListener(_workspaceChanged);
+      widget.workspace.addListener(_workspaceChanged);
+      _workspaceChanged();
+    }
+  }
+
+  void _workspaceChanged() {
+    final root = widget.workspace.workspaceRoot;
+    final revision = widget.workspace.workspaceFilesRevision;
+    final refreshSearch = root != _root || revision != _filesRevision;
+    setState(() {
+      _root = root;
+      _filesRevision = revision;
+    });
+    if (refreshSearch && _searchController.text.trim().isNotEmpty) {
+      _search(_searchController.text, showProgress: false);
+    }
+  }
 
   @override
   void dispose() {
+    widget.workspace.removeListener(_workspaceChanged);
     _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
@@ -83,6 +118,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
             path: root,
             depth: 0,
             service: widget.workspace.fileService,
+            revision: _filesRevision,
             selectedPath: widget.workspace.activeDocument?.path,
             onOpen: (path) => _run(() => widget.workspace.openPath(path)),
           );
@@ -149,22 +185,28 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
         Expanded(
           child: root == null
               ? _EmptyWorkspace()
-              : _searchController.text.trim().isEmpty
-              ? _buildFilesPanel(root)
-              : _SearchResults(
-                  searching: _searching,
-                  results: _results,
-                  root: root,
-                  onOpen: (path) => _run(() => widget.workspace.openPath(path)),
+              : IndexedStack(
+                  index: _searchController.text.trim().isEmpty ? 0 : 1,
+                  children: [
+                    _buildFilesPanel(root),
+                    _SearchResults(
+                      searching: _searching,
+                      results: _results,
+                      root: root,
+                      onOpen: (path) =>
+                          _run(() => widget.workspace.openPath(path)),
+                    ),
+                  ],
                 ),
         ),
       ],
     );
   }
 
-  void _search(String query) {
+  void _search(String query, {bool showProgress = true}) {
     setState(() {});
     _debounce?.cancel();
+    final generation = ++_searchGeneration;
     final root = widget.workspace.workspaceRoot;
     final normalized = query.trim().toLowerCase();
     if (root == null || normalized.isEmpty) {
@@ -175,11 +217,13 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
       return;
     }
     _debounce = Timer(const Duration(milliseconds: 180), () async {
-      if (!mounted) return;
-      setState(() => _searching = true);
+      if (!mounted || generation != _searchGeneration) return;
+      setState(() => _searching = showProgress);
       try {
         final results = await _findFiles(root, normalized);
         if (!mounted ||
+            generation != _searchGeneration ||
+            widget.workspace.workspaceRoot != root ||
             _searchController.text.trim().toLowerCase() != normalized) {
           return;
         }
@@ -188,20 +232,20 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
           _results = results;
         });
       } on Object catch (error) {
-        if (mounted) setState(() => _searching = false);
+        if (!mounted || generation != _searchGeneration) return;
+        setState(() => _searching = false);
         widget.onError(error.toString());
       }
     });
   }
 
   Future<List<WorkspaceEntry>> _findFiles(String root, String query) async {
+    final service = widget.workspace.fileService;
     final matches = <WorkspaceEntry>[];
     final pending = <String>[root];
     while (pending.isNotEmpty && matches.length < 200) {
       final directory = pending.removeLast();
-      for (final entry in await widget.workspace.fileService.listDirectory(
-        directory,
-      )) {
+      for (final entry in await service.listDirectory(directory)) {
         if (entry.isDirectory) {
           pending.add(entry.path);
         } else if (entry.name.toLowerCase().contains(query)) {
@@ -326,6 +370,7 @@ class _DirectoryBranch extends StatefulWidget {
     required this.path,
     required this.depth,
     required this.service,
+    required this.revision,
     required this.selectedPath,
     required this.onOpen,
   });
@@ -333,6 +378,7 @@ class _DirectoryBranch extends StatefulWidget {
   final String path;
   final int depth;
   final MarkdownFileService service;
+  final int revision;
   final String? selectedPath;
   final ValueChanged<String> onOpen;
 
@@ -341,8 +387,21 @@ class _DirectoryBranch extends StatefulWidget {
 }
 
 class _DirectoryBranchState extends State<_DirectoryBranch> {
-  late final Future<List<WorkspaceEntry>> _entries = widget.service
-      .listDirectory(widget.path);
+  late Future<List<WorkspaceEntry>> _entries = widget.service.listDirectory(
+    widget.path,
+  );
+
+  @override
+  void didUpdateWidget(_DirectoryBranch oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.path != widget.path ||
+        oldWidget.service != widget.service ||
+        oldWidget.revision != widget.revision) {
+      // FutureBuilder retains the current data while refreshing, so keyed
+      // directory children and the ListView keep their expansion and scroll.
+      _entries = widget.service.listDirectory(widget.path);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -377,6 +436,7 @@ class _DirectoryBranchState extends State<_DirectoryBranch> {
                 entry: entry,
                 depth: widget.depth,
                 service: widget.service,
+                revision: widget.revision,
                 selectedPath: widget.selectedPath,
                 onOpen: widget.onOpen,
               )
@@ -408,6 +468,7 @@ class _DirectoryTile extends StatefulWidget {
     required this.entry,
     required this.depth,
     required this.service,
+    required this.revision,
     required this.selectedPath,
     required this.onOpen,
   });
@@ -415,6 +476,7 @@ class _DirectoryTile extends StatefulWidget {
   final WorkspaceEntry entry;
   final int depth;
   final MarkdownFileService service;
+  final int revision;
   final String? selectedPath;
   final ValueChanged<String> onOpen;
 
@@ -503,6 +565,7 @@ class _DirectoryTileState extends State<_DirectoryTile> {
             path: entry.path,
             depth: widget.depth + 1,
             service: widget.service,
+            revision: widget.revision,
             selectedPath: widget.selectedPath,
             onOpen: widget.onOpen,
           ),

@@ -3925,10 +3925,8 @@ $$''';
 
     await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
 
-    expect(
-      find.byKey(const ValueKey('ianvs-markdown-highlight')),
-      findsNothing,
-    );
+    expect(_renderedTextHasBackground(tester, 'L==before'), isFalse);
+    expect(_renderedTextHasBackground(tester, 'after==R'), isFalse);
     expect(_renderedPlainTextContains(tester, 'L==before'), isTrue);
     expect(_renderedPlainTextContains(tester, 'after==R'), isTrue);
   });
@@ -3952,10 +3950,19 @@ $$''';
 
     await tester.pumpWidget(app(const IanvsMarkdown(data: source)));
 
-    expect(
-      find.byKey(const ValueKey('ianvs-markdown-highlight')),
-      findsNWidgets(8),
-    );
+    // Highlights remain inline spans so surrounding text wraps continuously.
+    for (final text in [
+      'basic',
+      'triple',
+      'quad',
+      'openR',
+      'closed-soft',
+      'open-soft',
+      'one',
+      'two',
+    ]) {
+      expect(_renderedTextHasBackground(tester, text), isTrue, reason: text);
+    }
     for (final visible in <String>[
       'L== leading==R',
       'L==trailing ==R',
@@ -3990,10 +3997,8 @@ $$''';
         ),
       );
 
-      expect(
-        find.byKey(const ValueKey('ianvs-markdown-highlight')),
-        findsNWidgets(2),
-      );
+      expect(_renderedTextHasBackground(tester, 'bold'), isTrue);
+      expect(_renderedTextHasBackground(tester, 'outside'), isTrue);
       expect(_renderedTextIsBold(tester, 'bold'), isTrue);
       expect(_renderedTextHasBackground(tester, 'link'), isTrue);
       expect(_renderedTextHasBackground(tester, 'wiki'), isTrue);
@@ -4156,10 +4161,6 @@ Before ==highlighted **bold**== after.
     expect(find.textContaining('Callout body with'), findsOneWidget);
     expect(find.text('Folded warning'), findsOneWidget);
     expect(find.textContaining('Hidden body line.'), findsNothing);
-    expect(
-      find.byKey(const ValueKey('ianvs-markdown-highlight')),
-      findsNWidgets(2),
-    );
     expect(_renderedTextHasBackground(tester, 'highlighted'), isTrue);
     expect(_renderedTextHasBackground(tester, 'marked text'), isTrue);
 
