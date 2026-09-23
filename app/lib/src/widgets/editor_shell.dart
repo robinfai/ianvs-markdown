@@ -7,6 +7,7 @@ import 'package:ianvs_markdown/ianvs_markdown.dart';
 
 import '../controllers/workspace_controller.dart';
 import '../models/document_session.dart';
+import '../desktop_typography.dart';
 import 'floating_outline.dart';
 import 'desktop_menu_bar.dart';
 import '../app_icons.dart';
@@ -305,7 +306,9 @@ class _ExternalChangeBanner extends StatelessWidget {
             Icon(AppIcons.info, size: 16, color: colors.accent),
             Text(
               '${document.name} changed on disk.',
-              style: TextStyle(fontSize: 12, color: colors.textSecondary),
+              style: DesktopTypography.body.copyWith(
+                color: colors.textSecondary,
+              ),
             ),
             OutlinedButton(
               onPressed: onKeepLocal,
@@ -335,19 +338,21 @@ class _DropOverlay extends StatelessWidget {
             border: Border.all(color: scheme.primary, width: 1.5),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: const Column(
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(AppIcons.document, size: 42),
-              SizedBox(height: 12),
+              const Icon(AppIcons.document, size: 42),
+              const SizedBox(height: 12),
               Text(
                 'Open Markdown Files',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                style: DesktopTypography.title3.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-              SizedBox(height: 6),
-              Text(
+              const SizedBox(height: 6),
+              const Text(
                 'Drop files here to open them in tabs.',
-                style: TextStyle(fontSize: 13),
+                style: DesktopTypography.body,
               ),
             ],
           ),
@@ -375,7 +380,9 @@ class _DocumentStatusBar extends StatelessWidget {
             border: Border(top: BorderSide(color: colors.borderSoft)),
           ),
           child: DefaultTextStyle(
-            style: TextStyle(color: colors.textTertiary, fontSize: 11),
+            style: DesktopTypography.subheadline.copyWith(
+              color: colors.textTertiary,
+            ),
             child: Row(
               children: [
                 Text('$words words'),

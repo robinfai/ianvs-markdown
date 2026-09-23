@@ -3,6 +3,7 @@ import 'package:ianvs_markdown/ianvs_markdown.dart';
 
 import '../models/document_session.dart';
 import '../desktop_theme.dart';
+import '../desktop_typography.dart';
 import '../app_icons.dart';
 
 class FloatingOutline extends StatelessWidget {
@@ -30,10 +31,8 @@ class FloatingOutline extends StatelessWidget {
                     Expanded(
                       child: Text(
                         'Outline',
-                        style: TextStyle(
+                        style: DesktopTypography.sectionLabel.copyWith(
                           color: colors.textPrimary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
@@ -60,19 +59,14 @@ class FloatingOutline extends StatelessWidget {
                               const SizedBox(height: 10),
                               Text(
                                 'No Headings',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: colors.textSecondary,
-                                ),
+                                style: DesktopTypography.emphasizedBody
+                                    .copyWith(color: colors.textSecondary),
                               ),
                               const SizedBox(height: 5),
                               Text(
                                 'Add headings to navigate your document.',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  height: 1.4,
+                                style: DesktopTypography.callout.copyWith(
                                   color: colors.textTertiary,
                                 ),
                               ),
@@ -178,11 +172,8 @@ class _OutlineTile extends StatelessWidget {
               heading.text,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
+              style: DesktopTypography.body.copyWith(
                 color: selected ? colors.textPrimary : colors.textSecondary,
-                fontSize: 12,
-                height: 1.3,
-                fontWeight: FontWeight.w400,
               ),
             ),
           ),

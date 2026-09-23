@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 
+import 'desktop_typography.dart';
+
 /// App chrome tokens. Document rendering inherits the same neutral palette.
 abstract final class DesktopMetrics {
   static const toolbarHeight = 44.0;
@@ -66,42 +68,21 @@ ThemeData desktopTheme(Brightness brightness) {
     minimumSize: const WidgetStatePropertyAll(Size(64, 28)),
     padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 12)),
     shape: WidgetStatePropertyAll(shape),
-    textStyle: const WidgetStatePropertyAll(
-      TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-    ),
+    textStyle: const WidgetStatePropertyAll(DesktopTypography.body),
     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
   );
   return ThemeData(
     useMaterial3: true,
     platform: TargetPlatform.macOS,
     brightness: brightness,
-    fontFamily: '.AppleSystemUIFont',
+    fontFamily: DesktopTypography.fontFamily,
     colorScheme: scheme,
     scaffoldBackgroundColor: surface,
     splashFactory: NoSplash.splashFactory,
     hoverColor: foreground.withValues(alpha: .06),
     focusColor: accent.withValues(alpha: .18),
     visualDensity: VisualDensity.compact,
-    textTheme: TextTheme(
-      bodyLarge: TextStyle(fontSize: 13, color: foreground),
-      bodyMedium: TextStyle(fontSize: 13, color: foreground),
-      bodySmall: TextStyle(fontSize: 11, color: secondary),
-      titleMedium: TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: foreground,
-      ),
-      titleLarge: TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w600,
-        color: foreground,
-      ),
-      labelLarge: TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w500,
-        color: foreground,
-      ),
-    ),
+    textTheme: DesktopTypography.textTheme(foreground, secondary),
     iconTheme: IconThemeData(size: 16, color: secondary),
     iconButtonTheme: IconButtonThemeData(
       style: ButtonStyle(
@@ -134,7 +115,7 @@ ThemeData desktopTheme(Brightness brightness) {
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(color: border),
       ),
-      textStyle: TextStyle(fontSize: 13, color: foreground),
+      textStyle: DesktopTypography.body.copyWith(color: foreground),
       menuPadding: const EdgeInsets.symmetric(vertical: 5),
     ),
     dialogTheme: DialogThemeData(
@@ -144,17 +125,16 @@ ThemeData desktopTheme(Brightness brightness) {
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: border),
       ),
-      titleTextStyle: TextStyle(
-        fontSize: 16,
+      titleTextStyle: DesktopTypography.title3.copyWith(
         fontWeight: FontWeight.w600,
         color: foreground,
       ),
-      contentTextStyle: TextStyle(fontSize: 13, height: 1.45, color: secondary),
+      contentTextStyle: DesktopTypography.body.copyWith(color: secondary),
       actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
     ),
     tooltipTheme: TooltipThemeData(
       waitDuration: const Duration(milliseconds: 600),
-      textStyle: TextStyle(fontSize: 11, color: foreground),
+      textStyle: DesktopTypography.subheadline.copyWith(color: foreground),
       decoration: BoxDecoration(
         color: colors.surfaceRaised,
         borderRadius: BorderRadius.circular(4),
@@ -176,8 +156,7 @@ ThemeData desktopTheme(Brightness brightness) {
       behavior: SnackBarBehavior.floating,
       backgroundColor: dark ? const Color(0xffe8e8eb) : const Color(0xff303134),
       shape: shape,
-      contentTextStyle: TextStyle(
-        fontSize: 13,
+      contentTextStyle: DesktopTypography.body.copyWith(
         color: dark ? Colors.black87 : Colors.white,
       ),
     ),

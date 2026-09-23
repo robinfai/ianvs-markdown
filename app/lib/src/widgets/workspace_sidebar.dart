@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 
 import '../controllers/workspace_controller.dart';
 import '../desktop_theme.dart';
+import '../desktop_typography.dart';
 import '../app_icons.dart';
 import '../services/markdown_file_service.dart';
 
@@ -139,7 +140,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                 autofocus: false,
                 onChanged: _search,
                 cursorColor: _sidebarAccent,
-                style: const TextStyle(color: _sidebarText, fontSize: 13),
+                style: DesktopTypography.body.copyWith(color: _sidebarText),
                 decoration: InputDecoration(
                   hintText: 'Search Files',
                   prefixIcon: const Icon(
@@ -278,11 +279,7 @@ class _SectionLabel extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(15, 19, 12, 7),
       child: Text(
         label,
-        style: const TextStyle(
-          color: _sidebarMuted,
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-        ),
+        style: DesktopTypography.sectionLabel.copyWith(color: _sidebarMuted),
       ),
     );
   }
@@ -312,11 +309,8 @@ class _ProjectTitle extends StatelessWidget {
               root == null ? 'No folder open' : p.basename(root!),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: DesktopTypography.emphasizedBody.copyWith(
                 color: _sidebarText,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                letterSpacing: -.1,
               ),
             ),
           ),
@@ -352,10 +346,10 @@ class _EmptyWorkspace extends StatelessWidget {
           children: [
             const Icon(AppIcons.openFolder, size: 32, color: _sidebarMuted),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Open a folder to browse Markdown files.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: _sidebarMuted, fontSize: 12),
+              style: DesktopTypography.callout.copyWith(color: _sidebarMuted),
             ),
           ],
         ),
@@ -415,7 +409,7 @@ class _DirectoryBranchState extends State<_DirectoryBranch> {
               child: Text(
                 'Unable to read folder: ${snapshot.error}',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: _sidebarMuted, fontSize: 12),
+                style: DesktopTypography.callout.copyWith(color: _sidebarMuted),
               ),
             ),
           );
@@ -543,11 +537,8 @@ class _DirectoryTileState extends State<_DirectoryTile> {
                               entry.name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: DesktopTypography.body.copyWith(
                                 color: _sidebarSecondary,
-                                fontSize: 12.5,
-                                height: 1,
-                                letterSpacing: -.1,
                               ),
                             ),
                           ),
@@ -640,11 +631,8 @@ class _FileTileState extends State<_FileTile> {
                           widget.entry.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
+                          style: DesktopTypography.body.copyWith(
                             color: selected ? Colors.white : _sidebarSecondary,
-                            fontSize: 12.5,
-                            height: 1,
-                            letterSpacing: -.1,
                           ),
                         ),
                       ),
@@ -681,10 +669,10 @@ class _SearchResults extends StatelessWidget {
       );
     }
     if (results.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           'No matching files',
-          style: TextStyle(color: _sidebarMuted, fontSize: 12),
+          style: DesktopTypography.callout.copyWith(color: _sidebarMuted),
         ),
       );
     }
@@ -701,13 +689,13 @@ class _SearchResults extends StatelessWidget {
           ),
           title: Text(
             result.name,
-            style: const TextStyle(color: _sidebarText, fontSize: 12.5),
+            style: DesktopTypography.body.copyWith(color: _sidebarText),
           ),
           subtitle: Text(
             p.relative(p.dirname(result.path), from: root),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: _sidebarMuted, fontSize: 10.5),
+            style: DesktopTypography.subheadline.copyWith(color: _sidebarMuted),
           ),
           onTap: () => onOpen(result.path),
         );

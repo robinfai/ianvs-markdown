@@ -6,6 +6,7 @@ import 'package:ianvs_markdown/ianvs_markdown.dart';
 import '../controllers/workspace_controller.dart';
 import '../models/document_session.dart';
 import '../desktop_theme.dart';
+import '../desktop_typography.dart';
 import '../app_icons.dart';
 
 class TitleTabsBar extends StatelessWidget {
@@ -108,9 +109,8 @@ class TitleTabsBar extends StatelessWidget {
                               const SizedBox(width: 16),
                               Text(
                                 '⌘${i + 1}',
-                                style: TextStyle(
+                                style: DesktopTypography.subheadline.copyWith(
                                   color: colors.textTertiary,
-                                  fontSize: 11,
                                 ),
                               ),
                             ],
@@ -129,7 +129,7 @@ class TitleTabsBar extends StatelessWidget {
   }
 }
 
-const _tabTextStyle = TextStyle(fontSize: 12, fontWeight: FontWeight.w400);
+final _tabTextStyle = DesktopTypography.callout;
 
 double _tabWidth(BuildContext context, DocumentSession document) {
   final painter = TextPainter(
@@ -406,8 +406,7 @@ class _EditorModePicker extends StatelessWidget {
                                 IanvsMarkdownEditorMode.source => 'Source',
                                 IanvsMarkdownEditorMode.preview => 'Read',
                               },
-                              style: TextStyle(
-                                fontSize: 11,
+                              style: DesktopTypography.body.copyWith(
                                 color: selected == mode
                                     ? colors.textPrimary
                                     : colors.textSecondary,

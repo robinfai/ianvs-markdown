@@ -34,6 +34,12 @@ Integration boundaries in the current desktop shell:
 - Open-document text, modes, and workspace visibility are recovered. Appearance,
   caret positions, and scroll offsets are not serialized across app launches.
 
+Desktop interface typography is defined in `lib/src/desktop_typography.dart`.
+It maps Apple's macOS text styles to system-font controls: 13/16 pt for primary
+interface text, 12/15 pt for tabs, and 11/14 pt for secondary information. Use
+these shared styles for app chrome so font family, leading, and tracking remain
+consistent. The Markdown canvas keeps its own reading and monospace styles.
+
 Run from the repository root:
 
 ```sh
