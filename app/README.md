@@ -40,6 +40,11 @@ interface text, 12/15 pt for tabs, and 11/14 pt for secondary information. Use
 these shared styles for app chrome so font family, leading, and tracking remain
 consistent. The Markdown canvas keeps its own reading and monospace styles.
 
+The app icon uses the folded-paper L mark. Its master artwork and generation
+prompt are in [design/linefold-icon-v1.md](design/linefold-icon-v1.md). Regenerate
+all macOS icon sizes from the repository root with
+`bash app/tool/generate_app_icons.sh`.
+
 The desktop app requires macOS 12 or later. From the repository root, run
 `make run-app`, or use Flutter directly:
 
