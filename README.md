@@ -223,6 +223,9 @@ IanvsMarkdownEditor(controller: controller)
 
 ## 示例与桌面应用
 
+示例与桌面应用要求 macOS 12 或更高版本。在仓库根目录运行 `make run`
+启动示例，运行 `make run-app` 启动完整桌面应用。
+
 [example](example/) 保持为最小的组件集成示例，展示 Controller、三种模式、
 保存回调、主题以及 Mermaid builder 注入，不读取或写入用户文件：
 
