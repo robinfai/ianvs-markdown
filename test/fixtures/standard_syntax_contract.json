@@ -1,0 +1,43 @@
+{
+  "contractVersion": 1,
+  "syntaxPreset": "standard",
+  "fixtures": [
+    {
+      "id": "obsidian-markers-stay-literal",
+      "source": "before %%keep this%% after ^block-id\n\n[[Wiki|Alias]] #project/tag ==highlight== $x$ ^[inline footnote]",
+      "contains": ["%%keep this%%", "^block-id", "[[Wiki|Alias]]", "#project/tag", "==highlight==", "$x$", "^[inline footnote]"]
+    },
+    {
+      "id": "callout-is-an-ordinary-quote",
+      "source": "> [!NOTE] Visible title\n> Visible body",
+      "contains": ["[!NOTE] Visible title", "Visible body"]
+    },
+    {
+      "id": "html-keeps-upstream-gfm-behavior",
+      "source": "<input type=\"text\" value=\"Visible input\">\n\n<button>Visible button</button>\n\n<script>keep_as_text()</script>",
+      "contains": ["<button>Visible button</button>"],
+      "doesNotContain": ["keep_as_text()"]
+    },
+    {
+      "id": "yaml-is-not-hidden-metadata",
+      "source": "---\ntitle: Visible metadata\n---\n\nVisible body",
+      "contains": ["title: Visible metadata", "Visible body"]
+    },
+    {
+      "id": "non-gfm-task-markers-stay-literal",
+      "source": "- [?] Question\n- [/] Progress\n- [>] Forwarded",
+      "contains": ["[?] Question", "[/] Progress", "[>] Forwarded"]
+    },
+    {
+      "id": "standard-emphasis-and-strikethrough",
+      "source": "****strong**** and ~~deleted~~ and `literal %%code%%`",
+      "contains": ["strong and deleted and literal %%code%%"],
+      "doesNotContain": ["**strong**", "~~deleted~~"]
+    },
+    {
+      "id": "gfm-table-and-nested-list",
+      "source": "| Name | Value |\n| --- | --- |\n| Alpha | Beta |\n\n- Parent\n  - Child",
+      "contains": ["Name", "Value", "Alpha", "Beta", "Parent", "Child"]
+    }
+  ]
+}

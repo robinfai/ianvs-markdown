@@ -57,6 +57,7 @@ import 'obsidian_image.dart';
 import 'render_budget.dart';
 import 'rich_clipboard.dart';
 import 'strikethrough.dart';
+import 'syntax_preset.dart';
 import 'task_checkbox.dart';
 import 'task_syntax.dart';
 import 'theme.dart';
@@ -106,6 +107,7 @@ class IanvsMarkdown extends StatelessWidget {
     this.listNestingOffset = 0,
     this.softLineBreak = true,
     this.enableFileLinkChips = false,
+    this.syntaxPreset = IanvsMarkdownSyntaxPreset.obsidian,
     this.obsidianMetadataMode = IanvsMarkdownObsidianMetadataMode.reading,
     this.renderBudget = const IanvsMarkdownRenderBudget(),
     this.fallbackBuilder,
@@ -168,6 +170,15 @@ class IanvsMarkdown extends StatelessWidget {
   final int listNestingOffset;
   final bool softLineBreak;
   final bool enableFileLinkChips;
+
+  /// Selects built-in syntax and source normalization independently of styling.
+  ///
+  /// [IanvsMarkdownSyntaxPreset.standard] uses GFM by default and leaves the
+  /// source untouched. It does not interpret Obsidian metadata, math, image
+  /// dimensions, or HTML controls. Host syntax and builders remain available.
+  final IanvsMarkdownSyntaxPreset syntaxPreset;
+
+  /// Controls Obsidian presentation; ignored by the standard syntax preset.
   final IanvsMarkdownObsidianMetadataMode obsidianMetadataMode;
 
   /// Set to null to disable the syntax rendering budget.
@@ -220,7 +231,11 @@ class IanvsMarkdown extends StatelessWidget {
             syntaxTokens: 0,
             truncated: false,
           )
-        : scanMarkdownForRendering(data, budget: budget);
+        : scanMarkdownForRendering(
+            data,
+            budget: budget,
+            syntaxPreset: syntaxPreset,
+          );
     if (!decision.useMarkdown) {
       final style = TextStyle(
         color: colors.textPrimary,
@@ -243,6 +258,15 @@ class IanvsMarkdown extends StatelessWidget {
 
     final effectiveStyleSheet =
         (styleSheet ?? ianvsMarkdownStyleSheet(context, colors)).copyWith();
+    if (syntaxPreset == IanvsMarkdownSyntaxPreset.standard) {
+      return _buildStandardMarkdown(
+        constraints,
+        decision.text,
+        effectiveStyleSheet,
+        colors,
+        blockSelectable: blockSelectable,
+      );
+    }
     final effectiveBuilders = <String, MarkdownElementBuilder>{
       if (obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.reading)
         for (var level = 1; level <= 6; level += 1)
@@ -792,6 +816,58 @@ class IanvsMarkdown extends StatelessWidget {
       wikiEmbedBuilder: wikiEmbedBuilder,
       wikiLinkExists: wikiLinkExists,
       theme: colors,
+    );
+  }
+
+  Widget _buildStandardMarkdown(
+    BoxConstraints constraints,
+    String source,
+    MarkdownStyleSheet effectiveStyleSheet,
+    IanvsMarkdownThemeData colors, {
+    required bool blockSelectable,
+  }) {
+    return MarkdownBody(
+      key: ValueKey((syntaxPreset, softLineBreak)),
+      data: source,
+      selectable: blockSelectable,
+      styleSheet: effectiveStyleSheet,
+      styleSheetTheme: styleSheetTheme,
+      onSelectionChanged: blockSelectable ? onSelectionChanged : null,
+      onTapLink: onTapLink,
+      onTapText: onTapText,
+      blockSyntaxes: blockSyntaxes,
+      inlineSyntaxes: inlineSyntaxes,
+      extensionSet: extensionSet ?? md.ExtensionSet.gitHubFlavored,
+      imageBuilder: (uri, title, alt) =>
+          imageBuilder?.call(uri, title, alt) ??
+          IanvsMarkdownBlockedImage(
+            uri: uri,
+            title: title,
+            alt: alt,
+            theme: colors,
+          ),
+      checkboxBuilder: checkboxBuilder,
+      bulletBuilder: bulletBuilder,
+      builders: <String, MarkdownElementBuilder>{
+        'pre': IanvsMarkdownCodeBlockBuilder(
+          theme: colors,
+          maxWidth: constraints.hasBoundedWidth ? constraints.maxWidth : null,
+          diagramBuilder: diagramBuilder,
+          onCopyCode: onCopyCode,
+          onTap: onTapText,
+        ),
+        if (enableFileLinkChips)
+          'a': IanvsMarkdownInlineLinkBuilder(
+            onTapLink: onTapLink,
+            enableFileLinkChips: true,
+            theme: colors,
+          ),
+        ...builders,
+      },
+      paddingBuilders: paddingBuilders,
+      fitContent: fitContent,
+      listItemCrossAxisAlignment: listItemCrossAxisAlignment,
+      softLineBreak: softLineBreak,
     );
   }
 

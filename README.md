@@ -29,7 +29,7 @@
 
 ```yaml
 dependencies:
-  ianvs_markdown: ^0.3.0
+  ianvs_markdown: ^0.3.1
 ```
 
 聊天消息或卡片内使用非滚动组件：
@@ -42,6 +42,43 @@ IanvsMarkdown(
   },
 )
 ```
+
+聊天消息如果需要保持标准 GFM 语义，可为独立 `IanvsMarkdown` 显式选择标准预设：
+
+```dart
+IanvsMarkdown(
+  data: message,
+  syntaxPreset: IanvsMarkdownSyntaxPreset.standard,
+  styleSheet: chatStyleSheet,
+  softLineBreak: false,
+  documentSelection: false, // 使用块级选择；默认 true 为当前组件内跨块选择。
+  onTapLink: openApprovedLink,
+  diagramBuilder: (context, source) => ApprovedDiagram(source: source),
+)
+```
+
+默认预设仍为 `IanvsMarkdownSyntaxPreset.obsidian`。标准预设使用 GFM 解析原始
+Markdown，不添加 Obsidian、数学、HTML 控件语法，也不执行元数据隐藏、任务状态、
+表格、链接或图片尺寸投影。例如 `%%注释%%`、`^block-id`、`[[Wiki]]`、`$x$`
+和非 GFM 任务状态会按普通 GFM 文本处理。原始 HTML 遵循 `MarkdownBody` 的
+GFM 行为；不支持的 HTML 块可能不显示，不会成为交互控件或触发资源加载。
+标准预设不应用 Obsidian 列表引导线和编辑交互；该选项仅提供给独立正文组件，
+`IanvsMarkdownView` 和编辑器继续使用既有文档语义。
+
+标准预设保留 `styleSheet`、`theme`、`imageBuilder`、`onTapLink`、`onCopyCode`、
+`clipboardWriter`、`blockSyntaxes`、`inlineSyntaxes` 和 `builders` 等扩展点。
+未提供图片 builder 时仍只显示安全占位；提供后会原样传递 `alt`（包括 `|250`）。
+自定义 `builders['pre']` 会替换默认代码 builder，此时需在自己的 builder 中路由
+Mermaid，单独传入 `diagramBuilder` 不会绕过该覆盖。宿主添加的自定义语法需要
+自行覆盖相应预算；调用公共预扫描时应传入与 renderer 相同的 `syntaxPreset`。
+
+流式宿主仍负责消息身份、增量合并、总量预算和异步图表的过期结果处理。
+更新 `data` 会重新解析，不提供增量 AST 保证；当前组件内的整文档选择状态会在源码
+变化时失效。`super_clipboard` 仍是包依赖，自定义纯文本 writer 不会移除原生构建依赖。
+跨项目可共用 [标准语法样例契约](test/fixtures/standard_syntax_contract.json)，并另行验证
+各宿主的选择范围、图片策略、图表后端和平台构建。
+从 0.3.1 起，`flutter_markdown_plus` 的依赖下限为 1.0.12；1.0.7 未通过既有
+链接布局和嵌套任务交互回归，不能作为已支持的解析组合。
 
 完整文档使用带滚动和大纲的组件。Obsidian 当前默认将 Properties
 隐藏在文档正文之外；若宿主要在正文上方显示可编辑属性卡，显式传入

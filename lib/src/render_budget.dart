@@ -1,3 +1,5 @@
+import 'syntax_preset.dart';
+
 /// Limits the amount of Markdown syntax parsed by a renderer.
 ///
 /// When the syntax token limit is exceeded, [scanMarkdownForRendering] returns
@@ -31,6 +33,7 @@ final class IanvsMarkdownRenderDecision {
 IanvsMarkdownRenderDecision scanMarkdownForRendering(
   String source, {
   required IanvsMarkdownRenderBudget budget,
+  IanvsMarkdownSyntaxPreset syntaxPreset = IanvsMarkdownSyntaxPreset.obsidian,
 }) {
   var tokens = 0;
   var syntaxExceeded = false;
@@ -54,7 +57,7 @@ IanvsMarkdownRenderDecision scanMarkdownForRendering(
     }
     if (!syntaxExceeded) {
       tokens += lineScanner.consume(codeUnit);
-      if (_isMarkdownSyntaxCodeUnit(codeUnit)) tokens += 1;
+      if (_isMarkdownSyntaxCodeUnit(codeUnit, syntaxPreset)) tokens += 1;
       if (tokens > budget.maxSyntaxTokens) syntaxExceeded = true;
     }
     if (syntaxExceeded && fallbackFull) break;
@@ -82,10 +85,13 @@ IanvsMarkdownRenderDecision scanMarkdownForRendering(
   );
 }
 
-bool _isMarkdownSyntaxCodeUnit(int codeUnit) {
+bool _isMarkdownSyntaxCodeUnit(
+  int codeUnit,
+  IanvsMarkdownSyntaxPreset syntaxPreset,
+) {
   return switch (codeUnit) {
+    0x24 => syntaxPreset == IanvsMarkdownSyntaxPreset.obsidian,
     0x21 ||
-    0x24 ||
     0x28 ||
     0x29 ||
     0x2a ||

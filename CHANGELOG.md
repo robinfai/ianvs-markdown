@@ -1,3 +1,22 @@
+## 0.3.1
+
+- Add opt-in `IanvsMarkdownSyntaxPreset.standard` to the standalone
+  `IanvsMarkdown` renderer for standard GFM messages. It skips Obsidian syntax,
+  math, HTML controls, and source projections while keeping the existing
+  Obsidian preset as the default.
+- Preserve host styles, selection, clipboard, link/image callbacks, custom
+  syntax and builders, and code/Mermaid hooks in the standard preset. Standard
+  image alt text is forwarded unchanged, and images remain blocked by default.
+- Add the same `syntaxPreset` option to `scanMarkdownForRendering`, so literal
+  dollar signs do not consume math syntax budget in the standard preset.
+- Include a versioned standard-syntax fixture contract and regression coverage
+  for literal metadata, GFM behavior, resource policy, host hooks, changing
+  source/presets, copy, and exact budget boundaries.
+- Exclude the app-dependent layout integration test from the library archive,
+  alongside the already-excluded standalone application.
+- Require `flutter_markdown_plus ^1.0.12`, the verified dependency baseline;
+  version 1.0.7 fails existing link layout and nested task interaction tests.
+
 ## 0.3.0
 
 - Let both the standalone renderer and Reading view select across the complete

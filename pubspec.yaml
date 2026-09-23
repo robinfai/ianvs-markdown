@@ -1,6 +1,6 @@
 name: ianvs_markdown
 description: Safe-by-default Markdown rendering and live-editing widgets for Flutter.
-version: 0.3.0
+version: 0.3.1
 homepage: https://github.com/robinfai/ianvs-markdown
 repository: https://github.com/robinfai/ianvs-markdown
 issue_tracker: https://github.com/robinfai/ianvs-markdown/issues
@@ -17,7 +17,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_markdown_plus: ^1.0.7
+  flutter_markdown_plus: ^1.0.12
   flutter_math_fork: ^0.7.4
   flutter_svg: ^2.3.0
   html: ^0.15.6
