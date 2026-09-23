@@ -25,11 +25,11 @@
 
 ## 使用
 
-在应用的 `pubspec.yaml` 中添加路径依赖：
+在应用的 `pubspec.yaml` 中添加依赖：
 
 ```yaml
 dependencies:
-  ianvs_markdown: ^0.1.0
+  ianvs_markdown: ^0.3.0
 ```
 
 聊天消息或卡片内使用非滚动组件：
@@ -195,7 +195,7 @@ flutter pub get --offline
 flutter run -d macos
 ```
 
-完整的文件优先桌面编辑器位于 [app](app/)。它保留 MarkText 式文件优先产品结构，
+完整的文件优先桌面编辑器位于 GitHub 仓库中的 [app](https://github.com/robinfai/ianvs-markdown/tree/main/app)，不包含在 pub.dev 包中。它保留 MarkText 式文件优先产品结构，
 使用 macOS 风格的工具栏、全高黑色工作区侧栏、中性亮暗配色和蓝色操作强调。
 应用提供文件树、可排序标签页、右侧停靠大纲、
 打开/保存/另存为、文件拖放、外部变更提醒和崩溃恢复，并继续以原始 Markdown 作为
@@ -208,7 +208,7 @@ flutter run -d macos
 ```
 
 产品概念映射、Bear 视觉契约、依赖边界和恢复冲突规则见
-[app/ARCHITECTURE.md](app/ARCHITECTURE.md)。
+[app/ARCHITECTURE.md](https://github.com/robinfai/ianvs-markdown/blob/main/app/ARCHITECTURE.md)。
 
 ## 主题
 

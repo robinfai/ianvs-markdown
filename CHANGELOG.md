@@ -1,4 +1,4 @@
-## 0.2.0
+## 0.3.0
 
 - Let both the standalone renderer and Reading view select across the complete
   document and handle `Cmd+A` / `Ctrl+A`; copying a whole-document selection
@@ -6,6 +6,28 @@
   `text/html`.
 - Preserve block and inline Markdown semantics, together with matching rich
   HTML, when a partial Reading-mode mouse selection crosses rendered blocks.
+- Render safe HTML meter indicators, ruby annotations, fieldsets, radio groups,
+  range sliders, and text, number, password, date, time, and temporal inputs
+  with Obsidian-compatible behavior.
+- Add controller-driven heading navigation across Reading, Live Preview, and
+  Source modes, including distant virtualized blocks and folded ancestors.
+- Let `markSaved(savedText: ...)` record the exact persisted snapshot so edits
+  made during an asynchronous save remain dirty.
+- Add optional placeholder text to Live Preview and Source editors, and prevent
+  editing shortcuts from modifying documents in Reading mode.
+- Keep tables rendered while editing cells and target cell content directly
+  when focusing or navigating between cells.
+- Improve heading, quote, list, code, inline math, and metadata alignment;
+  stabilize nested list guides during scrolling and hide inactive inline code
+  delimiters.
+- Preserve rendered links until their source is selected, correctly hide front
+  matter when disabled, and retain source identities across theme changes.
+- Avoid duplicate widget keys when a document repeats inline HTML controls.
+- Exclude the standalone Linefold desktop application from the published
+  library archive; its source remains available in the repository.
+
+## 0.2.0
+
 - Start a new source list block when an unordered bullet changes between
   `-`, `*`, and `+`, or an ordered delimiter changes between `.` and `)`,
   while keeping same-delimiter siblings grouped.

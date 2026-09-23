@@ -4,6 +4,7 @@
 .idea/
 .product-design/
 .vscode/
+app/
 build/
 coverage/
 design-qa.md
