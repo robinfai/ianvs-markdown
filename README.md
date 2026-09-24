@@ -224,7 +224,12 @@ IanvsMarkdownEditor(controller: controller)
 ## 示例与桌面应用
 
 示例与桌面应用要求 macOS 12 或更高版本。在仓库根目录运行 `make run`
-启动示例，运行 `make run-app` 启动完整桌面应用。
+默认启动完整桌面应用，运行 `make run example` 启动示例。
+`make run-app` 仍可用于启动完整桌面应用。
+
+运行 `make install` 构建当前 Mac 架构的 Release 版本并安装到 `/Applications/Linefold.app`，
+之后可从 Finder 的“应用程序”中启动。再次运行会更新已安装的应用。
+也可通过 `make install INSTALL_DIR="$HOME/Applications"` 安装到当前用户的应用程序目录。
 
 [example](example/) 保持为最小的组件集成示例，展示 Controller、三种模式、
 保存回调、主题以及 Mermaid builder 注入，不读取或写入用户文件：

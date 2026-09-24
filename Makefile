@@ -1,9 +1,10 @@
 FLUTTER ?= flutter
 DART ?= dart
+INSTALL_DIR ?= /Applications
 
 .DEFAULT_GOAL := help
 
-.PHONY: help deps format format-check analyze test test-example test-app check run run-app clean publish-dry-run
+.PHONY: help deps format format-check analyze test test-example test-app check run example run-app install clean publish-dry-run
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -35,11 +36,21 @@ test-app: ## Run desktop application tests
 
 check: format-check analyze test test-example test-app ## Run all validation checks
 
-run: ## Run the example application on macOS
-	cd example && $(FLUTTER) run -d macos
+run: ## Run the desktop app on macOS (make run example for the example)
+	cd $(if $(filter example,$(MAKECMDGOALS)),example,app) && $(FLUTTER) run -d macos
+
+# Accept example as a selector for make run.
+example:
+	@:
 
 run-app: ## Run the full desktop application on macOS
 	cd app && $(FLUTTER) run -d macos
+
+install: ## Build Linefold for macOS and install it (INSTALL_DIR=/Applications)
+	# Build for this Mac; preserve Rust proc-macro alignment on macOS 27.
+	cd app && FLUTTER_XCODE_ARCHS="$$(uname -m)" \
+		CARGO_PROFILE_RELEASE_STRIP=none $(FLUTTER) build macos --release
+	bash app/tool/install_macos_app.sh "$(INSTALL_DIR)"
 
 clean: ## Remove generated build artifacts
 	$(FLUTTER) clean

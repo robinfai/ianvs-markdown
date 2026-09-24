@@ -5,7 +5,7 @@ creates an `IanvsMarkdownController`, embeds `IanvsMarkdownLiveEditor`, handles
 the save callback, supplies a theme, and injects a Mermaid renderer.
 
 The macOS example requires macOS 12 or later. From the repository root, run
-`make run`, or use Flutter directly:
+`make run example`, or use Flutter directly:
 
 ```sh
 cd example

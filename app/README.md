@@ -46,13 +46,20 @@ all macOS icon sizes from the repository root with
 `bash app/tool/generate_app_icons.sh`.
 
 The desktop app requires macOS 12 or later. From the repository root, run
-`make run-app`, or use Flutter directly:
+`make run` (or `make run-app`), or use Flutter directly:
 
 ```sh
 cd app
 flutter pub get
 flutter run -d macos
 ```
+
+To build a Release version for your Mac's architecture and install it into
+`/Applications/Linefold.app`, run `make install` from the repository root.
+Run it again to update the installed app,
+then launch Linefold from Finder's Applications folder. To choose another
+destination, use `make install INSTALL_DIR="$HOME/Applications"`. Installation
+replaces the app bundle after verifying the new copy and preserves user data.
 
 `example/` remains the small package-integration example. Product features
 belong here instead of in the example application.
