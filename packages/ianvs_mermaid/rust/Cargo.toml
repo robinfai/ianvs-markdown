@@ -1,0 +1,16 @@
+[package]
+name = "ianvs_svg"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+usvg = "=0.45.1"
+roxmltree = "0.20"
+serde_json = "1"
+
+[profile.release]
+strip = "none"

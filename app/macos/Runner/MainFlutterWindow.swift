@@ -3,6 +3,9 @@ import FlutterMacOS
 
 class MainFlutterWindow: NSWindow {
   private var fileAccessChannel: FlutterMethodChannel?
+  private var fileAssociationChannel: FlutterMethodChannel?
+  private var incomingFilesChannel: FlutterMethodChannel?
+  private let fileAssociation = MarkdownFileAssociation()
   private var securityScopedURLs: [String: URL] = [:]
 
   override func awakeFromNib() {
@@ -25,8 +28,54 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
     registerFileAccessChannel(with: flutterViewController)
+    registerDesktopIntegration(with: flutterViewController)
 
     super.awakeFromNib()
+  }
+
+  private func registerDesktopIntegration(with controller: FlutterViewController) {
+    let preferences = FlutterMethodChannel(
+      name: "work.ianvs.linefold/file_association",
+      binaryMessenger: controller.engine.binaryMessenger)
+    preferences.setMethodCallHandler { [weak self] call, result in
+      guard let self else { return }
+      switch call.method {
+      case "getState":
+        result(self.fileAssociation.state())
+      case "setPreference":
+        guard let arguments = call.arguments as? [String: Any],
+              let preferLinefold = arguments["preferLinefold"] as? Bool else {
+          result(FlutterError(code: "invalid_arguments", message: "Missing preferLinefold", details: nil))
+          return
+        }
+        self.fileAssociation.setPreference(preferLinefold) { [weak self] error in
+          guard let self else { return }
+          if let error {
+            result(FlutterError(code: "association_failed", message: error.localizedDescription, details: nil))
+          } else {
+            result(self.fileAssociation.state())
+          }
+        }
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+    fileAssociationChannel = preferences
+
+    let incoming = FlutterMethodChannel(
+      name: "work.ianvs.linefold/open_files",
+      binaryMessenger: controller.engine.binaryMessenger)
+    incoming.setMethodCallHandler { call, result in
+      if call.method == "takePendingFiles" {
+        result(IncomingMarkdownFiles.shared.takePendingFiles())
+      } else {
+        result(FlutterMethodNotImplemented)
+      }
+    }
+    IncomingMarkdownFiles.shared.onFilesAvailable = { [weak incoming] in
+      incoming?.invokeMethod("filesAvailable", arguments: nil)
+    }
+    incomingFilesChannel = incoming
   }
 
   private func registerFileAccessChannel(with controller: FlutterViewController) {
@@ -45,6 +94,19 @@ class MainFlutterWindow: NSWindow {
 
       do {
         switch call.method {
+        case "openExternal":
+          guard let value = arguments["url"] as? String,
+                let url = URL(string: value),
+                let scheme = url.scheme?.lowercased(),
+                ["http", "https", "mailto", "file"].contains(scheme),
+                scheme != "file" || ["html", "htm", "pdf", "svg"].contains(url.pathExtension.lowercased()) else {
+            throw FileAccessError.missingValue("supported url")
+          }
+          if NSWorkspace.shared.open(url) {
+            result(nil)
+          } else {
+            result(FlutterError(code: "open_failed", message: "No application could open this link.", details: nil))
+          }
         case "createBookmark":
           guard let path = arguments["path"] as? String else {
             throw FileAccessError.missingValue("path")

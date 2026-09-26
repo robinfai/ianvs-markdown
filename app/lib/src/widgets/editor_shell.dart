@@ -1,12 +1,21 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
+import 'package:ianvs_mermaid/ianvs_mermaid.dart';
+import 'package:path/path.dart' as p;
 
 import '../controllers/workspace_controller.dart';
 import '../models/document_session.dart';
+import '../models/workspace_layout.dart';
+import '../services/document_link_service.dart';
+import '../services/markdown_file_service.dart';
+import 'local_document_image.dart';
+import 'document_diagram.dart';
+import '../desktop_theme.dart';
 import '../desktop_typography.dart';
 import 'floating_outline.dart';
 import 'desktop_menu_bar.dart';
@@ -14,6 +23,7 @@ import '../app_icons.dart';
 import '../tab_shortcuts.dart';
 import 'title_tabs_bar.dart';
 import 'workspace_sidebar.dart';
+import 'sidebar_resize_handle.dart';
 
 class EditorShell extends StatefulWidget {
   const EditorShell({
@@ -21,12 +31,14 @@ class EditorShell extends StatefulWidget {
     required this.workspace,
     required this.dark,
     required this.onToggleTheme,
+    this.onOpenSettings,
     this.enableFileDrop = true,
   });
 
   final WorkspaceController workspace;
   final bool dark;
   final VoidCallback onToggleTheme;
+  final VoidCallback? onOpenSettings;
   final bool enableFileDrop;
 
   @override
@@ -35,6 +47,46 @@ class EditorShell extends StatefulWidget {
 
 class _EditorShellState extends State<EditorShell> {
   var _draggingFiles = false;
+  final _mermaidRenderer = NativeMermanRenderer();
+
+  @override
+  void dispose() {
+    _mermaidRenderer.dispose();
+    super.dispose();
+  }
+
+  Future<void> _openImage(String path) => showDialog<void>(
+    context: context,
+    builder: (context) => Dialog(
+      child: SizedBox(
+        width: 1000,
+        height: 700,
+        child: Column(
+          children: [
+            ListTile(
+              title: Text(p.basename(path)),
+              trailing: IconButton(
+                tooltip: 'Close image',
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: LocalDocumentImage(
+                  path: path,
+                  onOpenExternal: () => _guard(
+                    () => DocumentLinkService.openExternalUri(Uri.file(path)),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -56,8 +108,11 @@ class _EditorShellState extends State<EditorShell> {
           onSaveAs: () => _guard(() => workspace.saveActive(saveAs: true)),
           onClose: () => _guard(() => _closeDocument(document)),
           onToggleTheme: widget.onToggleTheme,
+          onOpenSettings: widget.onOpenSettings,
           child: CallbackShortcuts(
             bindings: <ShortcutActivator, VoidCallback>{
+              const SingleActivator(LogicalKeyboardKey.comma, meta: true):
+                  ?widget.onOpenSettings,
               const SingleActivator(LogicalKeyboardKey.keyN, meta: true):
                   workspace.newDocument,
               const SingleActivator(LogicalKeyboardKey.keyN, control: true):
@@ -119,101 +174,157 @@ class _EditorShellState extends State<EditorShell> {
                     workspace.selectDocument(i),
             },
             child: Scaffold(
-              body: Row(
-                children: [
-                  if (workspace.sidebarVisible)
-                    WorkspaceSidebar(
-                      key: ValueKey(workspace.workspaceRoot),
-                      workspace: workspace,
-                      onError: _showError,
-                    ),
-                  Expanded(
-                    child: Column(
-                      children: [
-                        TitleTabsBar(
-                          workspace: workspace,
-                          onClose: _closeDocument,
-                        ),
-                        if (document.hasExternalChanges)
-                          _ExternalChangeBanner(
-                            document: document,
-                            onReload: () => _guard(
-                              () => workspace.reloadFromDisk(document),
-                            ),
-                            onKeepLocal: () =>
-                                workspace.keepLocalVersion(document),
-                          ),
-                        Expanded(
-                          child: DropTarget(
-                            enable: widget.enableFileDrop,
-                            onDragEntered: (_) =>
-                                setState(() => _draggingFiles = true),
-                            onDragExited: (_) =>
-                                setState(() => _draggingFiles = false),
-                            onDragDone: (details) {
-                              setState(() => _draggingFiles = false);
-                              _guard(
-                                () => workspace.openPaths(
-                                  details.files.map((file) => file.path),
+              body: LayoutBuilder(
+                builder: (context, constraints) {
+                  final inspectorWidth = workspace.outlineVisible
+                      ? DesktopMetrics.inspectorWidth
+                      : 0.0;
+                  final minContentWidth = math.max(
+                    inspectorWidth + WorkspaceLayout.minEditorWidth,
+                    WorkspaceLayout.minContentWidth,
+                  );
+                  final maxSidebarWidth =
+                      (constraints.maxWidth - minContentWidth).clamp(
+                        WorkspaceLayout.minSidebarWidth,
+                        WorkspaceLayout.maxSidebarWidth,
+                      );
+                  final sidebarWidth = workspace.sidebarWidth.clamp(
+                    WorkspaceLayout.minSidebarWidth,
+                    maxSidebarWidth,
+                  );
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (workspace.sidebarVisible)
+                        SizedBox(
+                          width: sidebarWidth,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              WorkspaceSidebar(
+                                key: ValueKey(workspace.workspaceRoot),
+                                workspace: workspace,
+                                width: sidebarWidth,
+                                onError: _showError,
+                              ),
+                              Positioned(
+                                top: 0,
+                                bottom: 0,
+                                right: 0,
+                                width: 6,
+                                child: SidebarResizeHandle(
+                                  key: const ValueKey('sidebar-resize-handle'),
+                                  width: sidebarWidth,
+                                  maxWidth: maxSidebarWidth,
+                                  onResize: workspace.setSidebarWidth,
                                 ),
-                              );
-                            },
-                            child: Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: LayoutBuilder(
-                                        builder: (context, constraints) {
-                                          final inset =
-                                              constraints.maxWidth < 500
-                                              ? 24.0
-                                              : 48.0;
-                                          return IanvsMarkdownLiveEditor(
-                                            key: ValueKey(document.id),
-                                            controller: document.controller,
-                                            scrollController:
-                                                document.scrollController,
-                                            showToolbar: false,
-                                            placeholder:
-                                                'Start writing Markdown…',
-                                            enableModeShortcuts: false,
-                                            showNavigationPane: false,
-                                            showOutlineInPreview: false,
-                                            showFrontMatter: false,
-                                            contentMaxWidth: 720,
-                                            padding: EdgeInsets.fromLTRB(
-                                              inset,
-                                              32,
-                                              inset,
-                                              56,
-                                            ),
-                                            onSaveRequested: (_) async {
-                                              final saved = await workspace
-                                                  .saveDocument(document);
-                                              if (!saved) {
-                                                throw const IanvsMarkdownSaveCancelledException();
-                                              }
-                                            },
-                                          );
-                                        },
-                                      ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            TitleTabsBar(
+                              workspace: workspace,
+                              onClose: _closeDocument,
+                            ),
+                            if (document.hasExternalChanges)
+                              _ExternalChangeBanner(
+                                document: document,
+                                onReload: () => _guard(
+                                  () => workspace.reloadFromDisk(document),
+                                ),
+                                onKeepLocal: () =>
+                                    workspace.keepLocalVersion(document),
+                              ),
+                            Expanded(
+                              child: DropTarget(
+                                enable: widget.enableFileDrop,
+                                onDragEntered: (_) =>
+                                    setState(() => _draggingFiles = true),
+                                onDragExited: (_) =>
+                                    setState(() => _draggingFiles = false),
+                                onDragDone: (details) {
+                                  setState(() => _draggingFiles = false);
+                                  _guard(
+                                    () => workspace.openPaths(
+                                      details.files.map((file) => file.path),
                                     ),
-                                    if (workspace.outlineVisible)
-                                      FloatingOutline(document: document),
+                                  );
+                                },
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: LayoutBuilder(
+                                            builder: (context, constraints) {
+                                              final inset =
+                                                  constraints.maxWidth < 500
+                                                  ? 24.0
+                                                  : 48.0;
+                                              return IanvsMarkdownLiveEditor(
+                                                key: ValueKey(document.id),
+                                                controller: document.controller,
+                                                onTapLink: (_, href, _) =>
+                                                    _guard(
+                                                      () => DocumentLinkService(
+                                                        workspace: workspace,
+                                                        openImage: _openImage,
+                                                      ).open(document, href),
+                                                    ),
+                                                diagramBuilder:
+                                                    (context, source) =>
+                                                        DocumentDiagram(
+                                                          source: source,
+                                                          renderer:
+                                                              _mermaidRenderer,
+                                                        ),
+                                                scrollController:
+                                                    document.scrollController,
+                                                showToolbar: false,
+                                                placeholder:
+                                                    'Start writing Markdown…',
+                                                enableModeShortcuts: false,
+                                                showNavigationPane: false,
+                                                showOutlineInPreview: false,
+                                                showFrontMatter: false,
+                                                contentMaxWidth: 720,
+                                                padding: EdgeInsets.fromLTRB(
+                                                  inset,
+                                                  32,
+                                                  inset,
+                                                  56,
+                                                ),
+                                                onSaveRequested: (_) async {
+                                                  final saved = await workspace
+                                                      .saveDocument(document);
+                                                  if (!saved) {
+                                                    throw const IanvsMarkdownSaveCancelledException();
+                                                  }
+                                                },
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                        if (workspace.outlineVisible)
+                                          FloatingOutline(document: document),
+                                      ],
+                                    ),
+                                    if (_draggingFiles) const _DropOverlay(),
                                   ],
                                 ),
-                                if (_draggingFiles) const _DropOverlay(),
-                              ],
+                              ),
                             ),
-                          ),
+                            _DocumentStatusBar(document: document),
+                          ],
                         ),
-                        _DocumentStatusBar(document: document),
-                      ],
-                    ),
-                  ),
-                ],
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ),
@@ -225,7 +336,7 @@ class _EditorShellState extends State<EditorShell> {
   void _guard(Future<dynamic> Function() action) {
     unawaited(
       action().catchError((Object error, StackTrace stackTrace) {
-        _showError(error.toString());
+        _showError(describeFileError(error));
       }),
     );
   }

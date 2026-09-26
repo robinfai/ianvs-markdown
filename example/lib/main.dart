@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 
-import 'mermaid/mermaid_view.dart';
+import 'package:ianvs_mermaid/ianvs_mermaid.dart';
 
 void main() => runApp(const ExampleApp());
 

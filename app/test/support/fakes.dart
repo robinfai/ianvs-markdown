@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
+import 'package:linefold/src/services/file_association_service.dart';
+import 'package:linefold/src/services/incoming_files_service.dart';
 import 'package:linefold/src/services/markdown_file_service.dart';
 import 'package:linefold/src/services/workspace_session_store.dart';
 
@@ -68,4 +71,52 @@ class MemoryWorkspaceSessionStore implements WorkspaceSessionStore {
   Future<void> save(WorkspaceSnapshot snapshot) async {
     this.snapshot = snapshot;
   }
+}
+
+class MemoryFileAssociationService implements FileAssociationService {
+  bool? preference;
+  bool isDefault = false;
+  bool rejectChange = false;
+  Completer<void>? pendingChange;
+  final changes = <bool>[];
+
+  @override
+  Future<FileAssociationState> load() async => FileAssociationState(
+    preferLinefold: preference,
+    isDefault: isDefault,
+    currentApplicationName: isDefault ? 'Linefold' : 'Other Editor',
+    previousApplicationName: isDefault ? 'Other Editor' : null,
+  );
+
+  @override
+  Future<FileAssociationState> setPreference(bool preferLinefold) async {
+    changes.add(preferLinefold);
+    preference = preferLinefold;
+    if (pendingChange case final pending?) await pending.future;
+    if (rejectChange) {
+      throw PlatformException(
+        code: 'association_failed',
+        message:
+            'Your preference was saved, but macOS did not change the default application.',
+      );
+    }
+    isDefault = preferLinefold;
+    return load();
+  }
+}
+
+class MemoryIncomingFilesService implements IncomingFilesService {
+  List<String> initialPaths = [];
+  OpenIncomingFiles? onOpen;
+
+  @override
+  Future<void> start(OpenIncomingFiles onOpen) async {
+    this.onOpen = onOpen;
+    if (initialPaths.isNotEmpty) await onOpen(initialPaths);
+  }
+
+  Future<void> deliver(List<String> paths) async => onOpen?.call(paths);
+
+  @override
+  void dispose() => onOpen = null;
 }

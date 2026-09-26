@@ -25,8 +25,8 @@ Exact sizes below are app design decisions, not Apple-mandated dimensions.
 | Shapes | 5–6-point list/control corners, 8-point menus, 12-point dialogs; hairline boundaries. |
 | Toolbar | 44 points; sidebar toggle, centered Live/Source/Read control, outline toggle. No repeated filename or overflow action menu. |
 | Tabs | 32 points; filename appears here once, selected background, dirty indicators, close controls, new-document button, horizontal scrolling and reordering. All Documents exposes overflow and shortcut hints; selection scrolls into view. |
-| Sidebar | 248 points; native traffic-light space, Workspace root, inline filename search, and file tree. No duplicate Notes/Search/Outline navigation or Appearance entry. |
-| File tree | 26-point rows plus 1-point vertical margins; 14-point hierarchy indents; separate disclosure and document/folder glyphs. |
+| Sidebar | 248 points by default, adjustable from its right edge within 180–560 points and available window space; width is recovered with the session. Native traffic-light space, Workspace root, inline filename search, and file tree. |
+| File tree | 26-point rows plus 1-point vertical margins; 14-point hierarchy indents; separate disclosure and document/folder glyphs. Directory paths stay on one line, preserving both ends with `...` in the middle; tooltips show full paths. |
 | Inspector | 224 points, right aligned, separator instead of a floating card; heading levels use indentation; empty state explains how to populate it. |
 | Document | Maximum 720-point measure, 24/48-point responsive horizontal padding, shared colors for Live/Source/Read. |
 | Status | 25-point bottom bar with word/character counts, Saved/Edited state, encoding, and line endings. |
@@ -49,6 +49,10 @@ Exact sizes below are app design decisions, not Apple-mandated dimensions.
   sidebar, view toggles/modes in the toolbar, new/close/switch in the tab strip.
   Open, Save, Save As and Appearance live in native File/View menus; native
   counterparts to direct controls remain for discoverability and keyboard use.
+- Linefold → Settings… (Command-,) owns the default Markdown application
+  preference. The startup question appears only while the choice is undecided;
+  Escape means keeping the current application. Settings distinguishes the saved
+  choice from the current macOS default and reports cancellation or failure.
 - File rows expose accessible names and selection; directories expose expanded
   state and an activation action. Do not exclude descendant semantics without
   restoring the corresponding action on the parent.
@@ -91,3 +95,16 @@ Screenshot inspection and widget semantics do not establish full VoiceOver
 compliance. App colors currently use a fixed blue accent; automatically reading
 the user's macOS accent color and active/inactive window treatment would require
 additional native integration. Icons use the existing Flutter icon library.
+
+## File association verification — 2026-09-23
+
+- 71 Flutter tests and 9 native scenarios pass; static analysis and the macOS
+  debug build pass.
+- An isolated app copy with its own bundle identifier displayed the first-run
+  question, remembered Keep Current App across an actual quit/relaunch, and
+  opened Settings using Command-, with the real system default shown.
+- Finder Open With delivered a temporary Markdown file into the running app and
+  launched the closed app with another file; both opened in the correct tabs.
+- Changes to the system association, restoration, cancellation, and rejection
+  are covered using a simulated native workspace and isolated UserDefaults.
+  The user's actual default Markdown application was left in place.

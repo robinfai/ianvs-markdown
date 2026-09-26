@@ -18,6 +18,7 @@ class DesktopMenuBar extends StatelessWidget {
     required this.onSaveAs,
     required this.onClose,
     required this.onToggleTheme,
+    this.onOpenSettings,
     required this.child,
   });
 
@@ -28,6 +29,7 @@ class DesktopMenuBar extends StatelessWidget {
   final VoidCallback onSaveAs;
   final VoidCallback onClose;
   final VoidCallback onToggleTheme;
+  final VoidCallback? onOpenSettings;
   final Widget child;
 
   void _undo({required bool redo}) {
@@ -62,18 +64,32 @@ class DesktopMenuBar extends StatelessWidget {
     }
     return PlatformMenuBar(
       menus: [
-        const PlatformMenu(
+        PlatformMenu(
           label: 'Linefold',
           menus: [
-            PlatformProvidedMenuItem(type: PlatformProvidedMenuItemType.about),
+            const PlatformProvidedMenuItem(
+              type: PlatformProvidedMenuItemType.about,
+            ),
             PlatformMenuItemGroup(
+              members: [
+                PlatformMenuItem(
+                  label: 'Settings…',
+                  shortcut: const SingleActivator(
+                    LogicalKeyboardKey.comma,
+                    meta: true,
+                  ),
+                  onSelected: onOpenSettings,
+                ),
+              ],
+            ),
+            const PlatformMenuItemGroup(
               members: [
                 PlatformProvidedMenuItem(
                   type: PlatformProvidedMenuItemType.servicesSubmenu,
                 ),
               ],
             ),
-            PlatformMenuItemGroup(
+            const PlatformMenuItemGroup(
               members: [
                 PlatformProvidedMenuItem(
                   type: PlatformProvidedMenuItemType.hide,
@@ -86,7 +102,9 @@ class DesktopMenuBar extends StatelessWidget {
                 ),
               ],
             ),
-            PlatformProvidedMenuItem(type: PlatformProvidedMenuItemType.quit),
+            const PlatformProvidedMenuItem(
+              type: PlatformProvidedMenuItemType.quit,
+            ),
           ],
         ),
         PlatformMenu(

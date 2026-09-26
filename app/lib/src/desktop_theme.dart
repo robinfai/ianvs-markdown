@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 
 import 'desktop_typography.dart';
+import 'models/workspace_layout.dart';
 
 /// App chrome tokens. Document rendering inherits the same neutral palette.
 abstract final class DesktopMetrics {
   static const toolbarHeight = 44.0;
   static const tabsHeight = 32.0;
-  static const sidebarWidth = 248.0;
+  static const sidebarWidth = WorkspaceLayout.defaultSidebarWidth;
   static const inspectorWidth = 224.0;
   static const controlRadius = 6.0;
 }

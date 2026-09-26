@@ -83,17 +83,24 @@ class IanvsMarkdownInlineLinkBuilder extends MarkdownElementBuilder {
       enableFileLinkChips: enableFileLinkChips,
       theme: theme,
     );
-    return Text.rich(
-      TextSpan(
-        children: <InlineSpan>[
-          WidgetSpan(
-            alignment: PlaceholderAlignment.baseline,
-            baseline: TextBaseline.alphabetic,
-            child: link,
-          ),
-        ],
-      ),
-    );
+    // Live Preview extracts these spans into its editable text projection.
+    if (editing) {
+      return Text.rich(
+        TextSpan(
+          children: [
+            WidgetSpan(
+              alignment: PlaceholderAlignment.baseline,
+              baseline: TextBaseline.alphabetic,
+              child: link,
+            ),
+          ],
+        ),
+      );
+    }
+    // Let Markdown's inline Wrap measure the entire control. Embedding a
+    // multiline link in Text.rich makes the parser's forced strut report only
+    // one line of height, so table rows clip the rest of the label.
+    return link;
   }
 }
 

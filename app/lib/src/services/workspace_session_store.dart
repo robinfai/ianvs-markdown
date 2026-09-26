@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../models/workspace_layout.dart';
+
 class WorkspaceSnapshot {
   const WorkspaceSnapshot({
     required this.documents,
@@ -12,6 +14,7 @@ class WorkspaceSnapshot {
     required this.workspaceAccessToken,
     required this.sidebarVisible,
     required this.outlineVisible,
+    this.sidebarWidth = WorkspaceLayout.defaultSidebarWidth,
   });
 
   factory WorkspaceSnapshot.fromJson(Map<String, Object?> json) {
@@ -28,6 +31,12 @@ class WorkspaceSnapshot {
       workspaceAccessToken: json['workspaceAccessToken'] as String?,
       sidebarVisible: json['sidebarVisible'] as bool? ?? true,
       outlineVisible: json['outlineVisible'] as bool? ?? true,
+      sidebarWidth: WorkspaceLayout.normalizeSidebarWidth(
+        switch (json['sidebarWidth']) {
+          final num width => width.toDouble(),
+          _ => WorkspaceLayout.defaultSidebarWidth,
+        },
+      ),
     );
   }
 
@@ -37,6 +46,7 @@ class WorkspaceSnapshot {
   final String? workspaceAccessToken;
   final bool sidebarVisible;
   final bool outlineVisible;
+  final double sidebarWidth;
 
   Map<String, Object?> toJson() => <String, Object?>{
     'documents': documents,
@@ -45,6 +55,7 @@ class WorkspaceSnapshot {
     'workspaceAccessToken': workspaceAccessToken,
     'sidebarVisible': sidebarVisible,
     'outlineVisible': outlineVisible,
+    'sidebarWidth': sidebarWidth,
   };
 }
 

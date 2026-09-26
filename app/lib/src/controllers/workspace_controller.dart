@@ -7,6 +7,7 @@ import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:path/path.dart' as p;
 
 import '../models/document_session.dart';
+import '../models/workspace_layout.dart';
 import '../services/markdown_file_service.dart';
 import '../services/workspace_session_store.dart';
 
@@ -28,6 +29,7 @@ class WorkspaceController extends ChangeNotifier {
   String? _workspaceRoot;
   String? _workspaceAccessToken;
   bool _sidebarVisible = true;
+  double _sidebarWidth = WorkspaceLayout.defaultSidebarWidth;
   bool _outlineVisible = true;
 
   List<DocumentSession> get documents => List.unmodifiable(_documents);
@@ -37,6 +39,7 @@ class WorkspaceController extends ChangeNotifier {
   String? get workspaceRoot => _workspaceRoot;
   int get workspaceFilesRevision => _workspaceFilesRevision;
   bool get sidebarVisible => _sidebarVisible;
+  double get sidebarWidth => _sidebarWidth;
   bool get outlineVisible => _outlineVisible;
   bool get initialized => _initialized;
 
@@ -53,6 +56,9 @@ class WorkspaceController extends ChangeNotifier {
               _workspaceRoot;
         }
         _sidebarVisible = snapshot.sidebarVisible;
+        _sidebarWidth = WorkspaceLayout.normalizeSidebarWidth(
+          snapshot.sidebarWidth,
+        );
         _outlineVisible = snapshot.outlineVisible;
         for (final documentJson in snapshot.documents) {
           final restored = DocumentSession.fromJson(documentJson);
@@ -312,6 +318,15 @@ class WorkspaceController extends ChangeNotifier {
     _schedulePersist();
   }
 
+  void setSidebarWidth(double width) {
+    if (!width.isFinite) return;
+    final normalized = WorkspaceLayout.normalizeSidebarWidth(width);
+    if (_sidebarWidth == normalized) return;
+    _sidebarWidth = normalized;
+    notifyListeners();
+    _schedulePersist();
+  }
+
   void toggleOutline() {
     _outlineVisible = !_outlineVisible;
     notifyListeners();
@@ -445,6 +460,7 @@ class WorkspaceController extends ChangeNotifier {
       workspaceRoot: _workspaceRoot,
       workspaceAccessToken: _workspaceAccessToken,
       sidebarVisible: _sidebarVisible,
+      sidebarWidth: _sidebarWidth,
       outlineVisible: _outlineVisible,
     );
     try {

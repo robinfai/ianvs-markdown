@@ -1,0 +1,15 @@
+classDiagram
+  Animal <|-- Duck
+  Animal <|-- Fish
+  Pond *-- Fish
+  Pond o-- Duck
+  class Animal {
+    +String name
+    +move()
+  }
+  class Duck {
+    +swim()
+  }
+  class Fish {
+    +breathe()
+  }

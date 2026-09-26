@@ -1,0 +1,13 @@
+sequenceDiagram
+  participant U as 用户
+  participant A as 应用服务
+  participant M as 模型引擎
+  U->>A: 提交问题
+  activate A
+  A->>M: 请求推理
+  loop 流式生成
+    M-->>A: Token 分片
+    A-->>U: 增量显示
+  end
+  deactivate A
+  Note over U,M: 中文标签 / English / 123

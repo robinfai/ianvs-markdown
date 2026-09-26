@@ -1,0 +1,128 @@
+[
+  {
+    "id": "flow",
+    "variant": "input",
+    "flutter_compile_median_ms_debug": 4.214,
+    "flutter_to_image_1x_ms_debug": 9.534,
+    "flutter_to_image_2x_ms_debug": 1.651,
+    "flutter_to_image_4x_ms_debug": 2.704
+  },
+  {
+    "id": "flow",
+    "variant": "vector",
+    "flutter_compile_median_ms_debug": 5.047,
+    "flutter_to_image_1x_ms_debug": 0.559,
+    "flutter_to_image_2x_ms_debug": 1.041,
+    "rgb_mean_absolute_error_2x": 0.3659539473684211,
+    "pixels_with_mean_rgb_error_gt20_pct_2x": 0.40758634868421056,
+    "flutter_to_image_4x_ms_debug": 1.89
+  },
+  {
+    "id": "sequence",
+    "variant": "input",
+    "flutter_compile_median_ms_debug": 4.383,
+    "flutter_to_image_1x_ms_debug": 2.366,
+    "flutter_to_image_2x_ms_debug": 3.168,
+    "flutter_to_image_4x_ms_debug": 6.942
+  },
+  {
+    "id": "sequence",
+    "variant": "vector",
+    "flutter_compile_median_ms_debug": 3.959,
+    "flutter_to_image_1x_ms_debug": 1.219,
+    "flutter_to_image_2x_ms_debug": 2.858,
+    "rgb_mean_absolute_error_2x": 0.17321044007490638,
+    "pixels_with_mean_rgb_error_gt20_pct_2x": 0.10024578651685392,
+    "flutter_to_image_4x_ms_debug": 5.806
+  },
+  {
+    "id": "class",
+    "variant": "input",
+    "flutter_compile_median_ms_debug": 3.135,
+    "flutter_to_image_1x_ms_debug": 0.816,
+    "flutter_to_image_2x_ms_debug": 1.774,
+    "flutter_to_image_4x_ms_debug": 6.575
+  },
+  {
+    "id": "class",
+    "variant": "vector",
+    "flutter_compile_median_ms_debug": 2.436,
+    "flutter_to_image_1x_ms_debug": 1.353,
+    "flutter_to_image_2x_ms_debug": 2.514,
+    "rgb_mean_absolute_error_2x": 0.07907924107142857,
+    "pixels_with_mean_rgb_error_gt20_pct_2x": 0.057756696428571425,
+    "flutter_to_image_4x_ms_debug": 8.564
+  },
+  {
+    "id": "state",
+    "variant": "input",
+    "flutter_compile_median_ms_debug": 4.275,
+    "flutter_to_image_1x_ms_debug": 2.787,
+    "flutter_to_image_2x_ms_debug": 4.674,
+    "flutter_to_image_4x_ms_debug": 13.231
+  },
+  {
+    "id": "state",
+    "variant": "vector",
+    "flutter_compile_median_ms_debug": 4.731,
+    "flutter_to_image_1x_ms_debug": 2.399,
+    "flutter_to_image_2x_ms_debug": 4.457,
+    "rgb_mean_absolute_error_2x": 0.10298872162553321,
+    "pixels_with_mean_rgb_error_gt20_pct_2x": 0.1308986517367459,
+    "flutter_to_image_4x_ms_debug": 8.579
+  },
+  {
+    "id": "dense",
+    "variant": "input",
+    "flutter_compile_median_ms_debug": 7.852,
+    "flutter_to_image_1x_ms_debug": 1.183,
+    "flutter_to_image_2x_ms_debug": 1.642,
+    "flutter_to_image_4x_ms_debug": 4.769
+  },
+  {
+    "id": "dense",
+    "variant": "vector",
+    "flutter_compile_median_ms_debug": 13.411,
+    "flutter_to_image_1x_ms_debug": 1.897,
+    "flutter_to_image_2x_ms_debug": 3.44,
+    "rgb_mean_absolute_error_2x": 0.473417566872428,
+    "pixels_with_mean_rgb_error_gt20_pct_2x": 0.28761574074074076,
+    "flutter_to_image_4x_ms_debug": 6.439
+  },
+  {
+    "id": "article-01-01",
+    "variant": "input",
+    "flutter_compile_median_ms_debug": 2.523,
+    "flutter_to_image_1x_ms_debug": 4.369,
+    "flutter_to_image_2x_ms_debug": 5.608,
+    "flutter_to_image_4x_ms_debug": 9.356
+  },
+  {
+    "id": "article-01-01",
+    "variant": "vector",
+    "flutter_compile_median_ms_debug": 7.114,
+    "flutter_to_image_1x_ms_debug": 1.88,
+    "flutter_to_image_2x_ms_debug": 3.431,
+    "rgb_mean_absolute_error_2x": 0.1764020799291939,
+    "pixels_with_mean_rgb_error_gt20_pct_2x": 0.17356855936819174,
+    "flutter_to_image_4x_ms_debug": 6.603
+  },
+  {
+    "id": "article-04-01",
+    "variant": "input",
+    "flutter_compile_median_ms_debug": 1.172,
+    "flutter_to_image_1x_ms_debug": 2.126,
+    "flutter_to_image_2x_ms_debug": 2.766,
+    "flutter_to_image_4x_ms_debug": 5.41
+  },
+  {
+    "id": "article-04-01",
+    "variant": "vector",
+    "flutter_compile_median_ms_debug": 2.995,
+    "flutter_to_image_1x_ms_debug": 1.212,
+    "flutter_to_image_2x_ms_debug": 2.071,
+    "rgb_mean_absolute_error_2x": 0.17300332633053223,
+    "pixels_with_mean_rgb_error_gt20_pct_2x": 0.15014443277310924,
+    "flutter_to_image_4x_ms_debug": 5.512
+  }
+]

@@ -1,0 +1,9 @@
+stateDiagram-v2
+  [*] --> Idle
+  Idle --> Loading: 打开文件
+  Loading --> Ready: 读取完成
+  Loading --> Error: 读取失败
+  Error --> Loading: 重试
+  Ready --> Editing: 输入内容
+  Editing --> Ready: 保存
+  Ready --> [*]: 关闭

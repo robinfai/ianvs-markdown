@@ -5,12 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-
-import 'package:ianvs_markdown_example/mermaid/mermaid_render_options.dart';
-import 'package:ianvs_markdown_example/mermaid/mermaid_render_result.dart';
-import 'package:ianvs_markdown_example/mermaid/mermaid_renderer.dart';
-import 'package:ianvs_markdown_example/mermaid/mermaid_view.dart';
-import 'package:ianvs_markdown_example/mermaid/native_merman_renderer.dart';
+import 'package:ianvs_mermaid/ianvs_mermaid.dart';
 
 void main() {
   testWidgets('renders generated SVG in the Mermaid view', (tester) async {
@@ -39,9 +34,7 @@ void main() {
     final libraryPath = await _nativeLibraryPath();
     expect(libraryPath, isNotNull);
 
-    final renderer = NativeMermanRenderer(
-      openEngine: () => BundledMermanEngine.openPath(libraryPath!),
-    );
+    final renderer = NativeMermanRenderer(libraryPath: libraryPath!);
     addTearDown(renderer.dispose);
 
     final result = await renderer.render(
@@ -49,8 +42,10 @@ void main() {
     );
 
     expect(result.svg, contains('<svg'));
-    expect(result.svg, contains('Source'));
-    expect(result.svg, contains('Render'));
+    expect(result.svg, contains('<path'));
+    expect(result.svg, isNot(contains('<text')));
+    expect(result.svg, isNot(contains('<marker')));
+    expect(result.preprocessingIdentity, contains('usvg/0.45.1'));
     expect(result.svg, isNot(contains('<style')));
   });
 }

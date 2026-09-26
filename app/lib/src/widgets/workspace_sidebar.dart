@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
@@ -8,6 +9,7 @@ import '../desktop_theme.dart';
 import '../desktop_typography.dart';
 import '../app_icons.dart';
 import '../services/markdown_file_service.dart';
+import 'middle_ellipsis_text.dart';
 
 const _sidebarBackground = Color(0xff17191a);
 const _sidebarRaised = Color(0xff242728);
@@ -24,10 +26,12 @@ class WorkspaceSidebar extends StatefulWidget {
     super.key,
     required this.workspace,
     required this.onError,
+    this.width,
   });
 
   final WorkspaceController workspace;
   final ValueChanged<String> onError;
+  final double? width;
 
   @override
   State<WorkspaceSidebar> createState() => _WorkspaceSidebarState();
@@ -40,6 +44,8 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
   Timer? _debounce;
   var _searchGeneration = 0;
   late int _filesRevision;
+  late List<String> _temporaryPaths;
+  final _temporaryTree = _TemporaryFileTree();
   String? _root;
 
   @override
@@ -47,6 +53,8 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
     super.initState();
     _root = widget.workspace.workspaceRoot;
     _filesRevision = widget.workspace.workspaceFilesRevision;
+    _temporaryPaths = _collectTemporaryPaths();
+    _temporaryTree.updatePaths(_temporaryPaths);
     widget.workspace.addListener(_workspaceChanged);
   }
 
@@ -63,14 +71,33 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
   void _workspaceChanged() {
     final root = widget.workspace.workspaceRoot;
     final revision = widget.workspace.workspaceFilesRevision;
-    final refreshSearch = root != _root || revision != _filesRevision;
+    final temporaryPaths = _collectTemporaryPaths();
+    final temporaryPathsChanged = !listEquals(temporaryPaths, _temporaryPaths);
+    final refreshSearch =
+        root != _root || revision != _filesRevision || temporaryPathsChanged;
+    if (temporaryPathsChanged) _temporaryTree.updatePaths(temporaryPaths);
     setState(() {
       _root = root;
       _filesRevision = revision;
+      _temporaryPaths = temporaryPaths;
     });
     if (refreshSearch && _searchController.text.trim().isNotEmpty) {
       _search(_searchController.text, showProgress: false);
     }
+  }
+
+  List<String> _collectTemporaryPaths() {
+    final root = widget.workspace.workspaceRoot;
+    // Single-file access does not grant permission to browse its parent.
+    // Build these branches from open sessions without listing directories.
+    return widget.workspace.documents
+        .map((document) => document.path)
+        .whereType<String>()
+        .map((path) => p.normalize(p.absolute(path)))
+        .where((path) => root == null || !p.isWithin(root, path))
+        .toSet()
+        .toList()
+      ..sort();
   }
 
   @override
@@ -89,7 +116,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
       child: Material(
         color: _sidebarBackground,
         child: Container(
-          width: DesktopMetrics.sidebarWidth,
+          width: widget.width ?? widget.workspace.sidebarWidth,
           decoration: const BoxDecoration(
             border: Border(right: BorderSide(color: _sidebarBorder)),
           ),
@@ -100,6 +127,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
               const _SectionLabel('Workspace'),
               _ProjectTitle(
                 root: root,
+                hasTemporaryFiles: _temporaryPaths.isNotEmpty,
                 onOpen: () => _run(widget.workspace.chooseWorkspaceFolder),
               ),
               Expanded(child: _buildSearchPanel(root)),
@@ -112,24 +140,45 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
   }
 
   Widget _buildFilesPanel(String? root) {
-    return root == null
-        ? _EmptyWorkspace()
-        : _DirectoryBranch(
-            key: ValueKey(root),
-            path: root,
-            depth: 0,
-            service: widget.workspace.fileService,
-            revision: _filesRevision,
-            selectedPath: widget.workspace.activeDocument?.path,
-            onOpen: (path) => _run(() => widget.workspace.openPath(path)),
-          );
+    final temporaryBranches = <Widget>[
+      if (root != null && _temporaryPaths.isNotEmpty)
+        const _SectionLabel('Temporary Files'),
+      for (final directory in _temporaryTree.roots)
+        _DirectoryTile(
+          key: ValueKey('temporary-directory-${directory.path}'),
+          entry: directory,
+          depth: 0,
+          service: widget.workspace.fileService,
+          revision: _filesRevision,
+          selectedPath: widget.workspace.activeDocument?.path,
+          temporaryTree: _temporaryTree,
+          onOpen: (path) => _run(() => widget.workspace.openPath(path)),
+        ),
+    ];
+    if (root != null) {
+      return _DirectoryBranch(
+        key: ValueKey(root),
+        path: root,
+        depth: 0,
+        service: widget.workspace.fileService,
+        revision: _filesRevision,
+        selectedPath: widget.workspace.activeDocument?.path,
+        onOpen: (path) => _run(() => widget.workspace.openPath(path)),
+        trailing: temporaryBranches,
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(0, 2, 0, 12),
+      children: temporaryBranches,
+    );
   }
 
   Widget _buildSearchPanel(String? root) {
+    final hasFiles = root != null || _temporaryPaths.isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (root != null)
+        if (hasFiles)
           Padding(
             padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
             child: SizedBox(
@@ -184,7 +233,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
             ),
           ),
         Expanded(
-          child: root == null
+          child: !hasFiles
               ? _EmptyWorkspace()
               : IndexedStack(
                   index: _searchController.text.trim().isEmpty ? 0 : 1,
@@ -210,7 +259,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
     final generation = ++_searchGeneration;
     final root = widget.workspace.workspaceRoot;
     final normalized = query.trim().toLowerCase();
-    if (root == null || normalized.isEmpty) {
+    if (normalized.isEmpty) {
       setState(() {
         _searching = false;
         _results = const <WorkspaceEntry>[];
@@ -240,10 +289,20 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
     });
   }
 
-  Future<List<WorkspaceEntry>> _findFiles(String root, String query) async {
+  Future<List<WorkspaceEntry>> _findFiles(String? root, String query) async {
     final service = widget.workspace.fileService;
-    final matches = <WorkspaceEntry>[];
-    final pending = <String>[root];
+    final matches = _temporaryPaths
+        .where((path) => path.toLowerCase().contains(query))
+        .take(200)
+        .map(
+          (path) => WorkspaceEntry(
+            path: path,
+            name: p.basename(path),
+            isDirectory: false,
+          ),
+        )
+        .toList();
+    final pending = <String>[?root];
     while (pending.isNotEmpty && matches.length < 200) {
       final directory = pending.removeLast();
       for (final entry in await service.listDirectory(directory)) {
@@ -286,9 +345,14 @@ class _SectionLabel extends StatelessWidget {
 }
 
 class _ProjectTitle extends StatelessWidget {
-  const _ProjectTitle({required this.root, required this.onOpen});
+  const _ProjectTitle({
+    required this.root,
+    required this.hasTemporaryFiles,
+    required this.onOpen,
+  });
 
   final String? root;
+  final bool hasTemporaryFiles;
   final VoidCallback onOpen;
 
   @override
@@ -306,7 +370,11 @@ class _ProjectTitle extends StatelessWidget {
           const SizedBox(width: 7),
           Expanded(
             child: Text(
-              root == null ? 'No folder open' : p.basename(root!),
+              root != null
+                  ? p.basename(root!)
+                  : hasTemporaryFiles
+                  ? 'Temporary Files'
+                  : 'No folder open',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: DesktopTypography.emphasizedBody.copyWith(
@@ -358,6 +426,85 @@ class _EmptyWorkspace extends StatelessWidget {
   }
 }
 
+class _TemporaryFileTree {
+  final _roots = <String, WorkspaceEntry>{};
+  final _children = <String, Map<String, WorkspaceEntry>>{};
+  final _collapsedDirectories = <String>{};
+
+  void updatePaths(List<String> paths) {
+    _roots.clear();
+    _children.clear();
+    for (final path in paths) {
+      final parts = p.split(path);
+      var directory = parts.first;
+      _roots.putIfAbsent(
+        directory,
+        () =>
+            WorkspaceEntry(path: directory, name: directory, isDirectory: true),
+      );
+      var children = _children.putIfAbsent(directory, () => {});
+      for (final name in parts.skip(1).take(parts.length - 2)) {
+        directory = p.join(directory, name);
+        children.putIfAbsent(
+          directory,
+          () => WorkspaceEntry(path: directory, name: name, isDirectory: true),
+        );
+        children = _children.putIfAbsent(directory, () => {});
+      }
+      children[path] = WorkspaceEntry(
+        path: path,
+        name: parts.last,
+        isDirectory: false,
+      );
+    }
+    _collapsedDirectories.retainAll(_children.keys);
+  }
+
+  Iterable<WorkspaceEntry> get roots =>
+      _roots.values.map((entry) => _compactDirectory(entry));
+
+  List<WorkspaceEntry> childrenOf(String directory) {
+    final entries = _children[directory]!.values
+        .map(
+          (entry) => entry.isDirectory
+              ? _compactDirectory(entry, parent: directory)
+              : entry,
+        )
+        .toList();
+    entries.sort((left, right) {
+      if (left.isDirectory != right.isDirectory) {
+        return left.isDirectory ? -1 : 1;
+      }
+      return left.name.compareTo(right.name);
+    });
+    return entries;
+  }
+
+  WorkspaceEntry _compactDirectory(WorkspaceEntry entry, {String? parent}) {
+    // Keep shared ancestors and folders containing files as branch points.
+    // Compact unbranched paths so deep absolute paths fit in the sidebar.
+    var children = _children[entry.path]!;
+    while (children.length == 1 && children.values.single.isDirectory) {
+      entry = children.values.single;
+      children = _children[entry.path]!;
+    }
+    return WorkspaceEntry(
+      path: entry.path,
+      name: parent == null ? entry.path : p.relative(entry.path, from: parent),
+      isDirectory: true,
+    );
+  }
+
+  bool isExpanded(String directory) =>
+      !_collapsedDirectories.contains(directory);
+
+  void toggleDirectory(String directory) {
+    if (!_collapsedDirectories.add(directory)) {
+      _collapsedDirectories.remove(directory);
+    }
+  }
+}
+
 class _DirectoryBranch extends StatefulWidget {
   const _DirectoryBranch({
     super.key,
@@ -367,6 +514,7 @@ class _DirectoryBranch extends StatefulWidget {
     required this.revision,
     required this.selectedPath,
     required this.onOpen,
+    this.trailing = const <Widget>[],
   });
 
   final String path;
@@ -375,6 +523,7 @@ class _DirectoryBranch extends StatefulWidget {
   final int revision;
   final String? selectedPath;
   final ValueChanged<String> onOpen;
+  final List<Widget> trailing;
 
   @override
   State<_DirectoryBranch> createState() => _DirectoryBranchState();
@@ -403,24 +552,30 @@ class _DirectoryBranchState extends State<_DirectoryBranch> {
       future: _entries,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                'Unable to read folder: ${snapshot.error}',
-                textAlign: TextAlign.center,
-                style: DesktopTypography.callout.copyWith(color: _sidebarMuted),
+          return _buildChildren([
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'Unable to read folder: ${snapshot.error}',
+                  textAlign: TextAlign.center,
+                  style: DesktopTypography.callout.copyWith(
+                    color: _sidebarMuted,
+                  ),
+                ),
               ),
             ),
-          );
+          ]);
         }
         if (!snapshot.hasData) {
-          return const Center(
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: _sidebarAccent,
+          return _buildChildren(const [
+            Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: _sidebarAccent,
+              ),
             ),
-          );
+          ]);
         }
         final children = <Widget>[
           for (final entry in snapshot.data!)
@@ -444,15 +599,19 @@ class _DirectoryBranchState extends State<_DirectoryBranch> {
                 onOpen: widget.onOpen,
               ),
         ];
-        if (widget.depth == 0) {
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(0, 2, 0, 12),
-            children: children,
-          );
-        }
-        return Column(mainAxisSize: MainAxisSize.min, children: children);
+        return _buildChildren(children);
       },
     );
+  }
+
+  Widget _buildChildren(List<Widget> children) {
+    if (widget.depth == 0) {
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(0, 2, 0, 12),
+        children: [...children, ...widget.trailing],
+      );
+    }
+    return Column(mainAxisSize: MainAxisSize.min, children: children);
   }
 }
 
@@ -465,6 +624,7 @@ class _DirectoryTile extends StatefulWidget {
     required this.revision,
     required this.selectedPath,
     required this.onOpen,
+    this.temporaryTree,
   });
 
   final WorkspaceEntry entry;
@@ -473,18 +633,33 @@ class _DirectoryTile extends StatefulWidget {
   final int revision;
   final String? selectedPath;
   final ValueChanged<String> onOpen;
+  final _TemporaryFileTree? temporaryTree;
 
   @override
   State<_DirectoryTile> createState() => _DirectoryTileState();
 }
 
 class _DirectoryTileState extends State<_DirectoryTile> {
-  var _expanded = false;
+  var _workspaceExpanded = false;
   var _hovered = false;
+
+  bool get _expanded =>
+      widget.temporaryTree?.isExpanded(widget.entry.path) ?? _workspaceExpanded;
+
+  void _toggleExpanded() {
+    setState(() {
+      if (widget.temporaryTree case final tree?) {
+        tree.toggleDirectory(widget.entry.path);
+      } else {
+        _workspaceExpanded = !_workspaceExpanded;
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final entry = widget.entry;
+    final temporary = widget.temporaryTree != null;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -492,57 +667,59 @@ class _DirectoryTileState extends State<_DirectoryTile> {
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
           child: Semantics(
             button: true,
-            onTap: () => setState(() => _expanded = !_expanded),
+            onTap: _toggleExpanded,
             label: entry.name,
+            hint: temporary ? entry.path : null,
             value: _expanded ? 'Expanded' : 'Collapsed',
             excludeSemantics: true,
-            child: MouseRegion(
-              cursor: SystemMouseCursors.basic,
-              onEnter: (_) => setState(() => _hovered = true),
-              onExit: (_) => setState(() => _hovered = false),
-              child: Material(
-                color: _hovered ? _treeHover : Colors.transparent,
-                borderRadius: BorderRadius.circular(5),
-                child: InkWell(
-                  onTap: () => setState(() => _expanded = !_expanded),
+            child: Tooltip(
+              message: entry.path,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.basic,
+                onEnter: (_) => setState(() => _hovered = true),
+                onExit: (_) => setState(() => _hovered = false),
+                child: Material(
+                  color: _hovered ? _treeHover : Colors.transparent,
                   borderRadius: BorderRadius.circular(5),
-                  child: SizedBox(
-                    height: 26,
-                    child: Padding(
-                      padding: EdgeInsets.only(
-                        left: 5 + widget.depth * 14,
-                        right: 7,
-                      ),
-                      child: Row(
-                        children: [
-                          AnimatedRotation(
-                            turns: _expanded ? .25 : 0,
-                            duration: const Duration(milliseconds: 120),
-                            curve: Curves.easeOut,
-                            child: const Icon(
-                              AppIcons.disclosure,
-                              size: 12,
-                              color: _sidebarMuted,
-                            ),
-                          ),
-                          const SizedBox(width: 3),
-                          const Icon(
-                            AppIcons.folder,
-                            size: 14,
-                            color: _sidebarSecondary,
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              entry.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: DesktopTypography.body.copyWith(
-                                color: _sidebarSecondary,
+                  child: InkWell(
+                    onTap: _toggleExpanded,
+                    borderRadius: BorderRadius.circular(5),
+                    child: SizedBox(
+                      height: 26,
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          left: 5 + widget.depth * 14,
+                          right: 7,
+                        ),
+                        child: Row(
+                          children: [
+                            AnimatedRotation(
+                              turns: _expanded ? .25 : 0,
+                              duration: const Duration(milliseconds: 120),
+                              curve: Curves.easeOut,
+                              child: const Icon(
+                                AppIcons.disclosure,
+                                size: 12,
+                                color: _sidebarMuted,
                               ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 3),
+                            const Icon(
+                              AppIcons.folder,
+                              size: 14,
+                              color: _sidebarSecondary,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: MiddleEllipsisText(
+                                entry.name,
+                                style: DesktopTypography.body.copyWith(
+                                  color: _sidebarSecondary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -552,14 +729,43 @@ class _DirectoryTileState extends State<_DirectoryTile> {
           ),
         ),
         if (_expanded)
-          _DirectoryBranch(
-            path: entry.path,
-            depth: widget.depth + 1,
-            service: widget.service,
-            revision: widget.revision,
-            selectedPath: widget.selectedPath,
-            onOpen: widget.onOpen,
-          ),
+          if (widget.temporaryTree case final tree?)
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final child in tree.childrenOf(entry.path))
+                  if (child.isDirectory)
+                    _DirectoryTile(
+                      key: ValueKey('temporary-directory-${child.path}'),
+                      entry: child,
+                      depth: widget.depth + 1,
+                      service: widget.service,
+                      revision: widget.revision,
+                      selectedPath: widget.selectedPath,
+                      onOpen: widget.onOpen,
+                      temporaryTree: tree,
+                    )
+                  else
+                    _FileTile(
+                      key: ValueKey(child.path),
+                      entry: child,
+                      depth: widget.depth + 1,
+                      selected:
+                          widget.selectedPath != null &&
+                          p.equals(child.path, widget.selectedPath!),
+                      onOpen: widget.onOpen,
+                    ),
+              ],
+            )
+          else
+            _DirectoryBranch(
+              path: entry.path,
+              depth: widget.depth + 1,
+              service: widget.service,
+              revision: widget.revision,
+              selectedPath: widget.selectedPath,
+              onOpen: widget.onOpen,
+            ),
       ],
     );
   }
@@ -567,6 +773,7 @@ class _DirectoryTileState extends State<_DirectoryTile> {
 
 class _FileTile extends StatefulWidget {
   const _FileTile({
+    super.key,
     required this.entry,
     required this.depth,
     required this.selected,
@@ -595,48 +802,54 @@ class _FileTileState extends State<_FileTile> {
         onTap: () => widget.onOpen(widget.entry.path),
         selected: selected,
         label: widget.entry.name,
+        hint: widget.entry.path,
         excludeSemantics: true,
-        child: MouseRegion(
-          cursor: SystemMouseCursors.basic,
-          onEnter: (_) => setState(() => _hovered = true),
-          onExit: (_) => setState(() => _hovered = false),
-          child: Material(
-            key: ValueKey('workspace-file-${widget.entry.path}'),
-            color: selected
-                ? _treeSelection
-                : _hovered
-                ? _treeHover
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(5),
-            child: InkWell(
-              onTap: () => widget.onOpen(widget.entry.path),
+        child: Tooltip(
+          message: widget.entry.path,
+          child: MouseRegion(
+            cursor: SystemMouseCursors.basic,
+            onEnter: (_) => setState(() => _hovered = true),
+            onExit: (_) => setState(() => _hovered = false),
+            child: Material(
+              key: ValueKey('workspace-file-${widget.entry.path}'),
+              color: selected
+                  ? _treeSelection
+                  : _hovered
+                  ? _treeHover
+                  : Colors.transparent,
               borderRadius: BorderRadius.circular(5),
-              child: SizedBox(
-                height: 26,
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    left: 20 + widget.depth * 14,
-                    right: 7,
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        AppIcons.document,
-                        size: 14,
-                        color: selected ? Colors.white : _sidebarMuted,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          widget.entry.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: DesktopTypography.body.copyWith(
-                            color: selected ? Colors.white : _sidebarSecondary,
+              child: InkWell(
+                onTap: () => widget.onOpen(widget.entry.path),
+                borderRadius: BorderRadius.circular(5),
+                child: SizedBox(
+                  height: 26,
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      left: 20 + widget.depth * 14,
+                      right: 7,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          AppIcons.document,
+                          size: 14,
+                          color: selected ? Colors.white : _sidebarMuted,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            widget.entry.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: DesktopTypography.body.copyWith(
+                              color: selected
+                                  ? Colors.white
+                                  : _sidebarSecondary,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -658,7 +871,7 @@ class _SearchResults extends StatelessWidget {
 
   final bool searching;
   final List<WorkspaceEntry> results;
-  final String root;
+  final String? root;
   final ValueChanged<String> onOpen;
 
   @override
@@ -689,13 +902,20 @@ class _SearchResults extends StatelessWidget {
           ),
           title: Text(
             result.name,
-            style: DesktopTypography.body.copyWith(color: _sidebarText),
-          ),
-          subtitle: Text(
-            p.relative(p.dirname(result.path), from: root),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: DesktopTypography.subheadline.copyWith(color: _sidebarMuted),
+            style: DesktopTypography.body.copyWith(color: _sidebarText),
+          ),
+          subtitle: Tooltip(
+            message: result.path,
+            child: MiddleEllipsisText(
+              root != null && p.isWithin(root!, result.path)
+                  ? p.relative(p.dirname(result.path), from: root)
+                  : p.dirname(result.path),
+              style: DesktopTypography.subheadline.copyWith(
+                color: _sidebarMuted,
+              ),
+            ),
           ),
           onTap: () => onOpen(result.path),
         );

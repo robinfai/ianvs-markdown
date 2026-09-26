@@ -4,26 +4,28 @@ INSTALL_DIR ?= /Applications
 
 .DEFAULT_GOAL := help
 
-.PHONY: help deps format format-check analyze test test-example test-app check run example run-app install clean publish-dry-run
+.PHONY: help deps format format-check analyze test test-example test-app test-mermaid check run example run-app install clean publish-dry-run
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 deps: ## Install package, example, and app dependencies
 	$(FLUTTER) pub get
+	cd packages/ianvs_mermaid && $(FLUTTER) pub get
 	cd example && $(FLUTTER) pub get
 	cd app && $(FLUTTER) pub get
 
 format: ## Format Dart source and test files
-	$(DART) format lib test example/lib example/test app/lib app/test
+	$(DART) format lib test example/lib example/test app/lib app/test packages/ianvs_mermaid/lib packages/ianvs_mermaid/hook packages/ianvs_mermaid/test
 
 format-check: ## Check Dart formatting without changing files
-	$(DART) format --output=none --set-exit-if-changed lib test example/lib example/test app/lib app/test
+	$(DART) format --output=none --set-exit-if-changed lib test example/lib example/test app/lib app/test packages/ianvs_mermaid/lib packages/ianvs_mermaid/hook packages/ianvs_mermaid/test
 
 analyze: ## Run static analysis for the package and example
 	$(FLUTTER) analyze
 	cd example && $(FLUTTER) analyze
 	cd app && $(FLUTTER) analyze
+	cd packages/ianvs_mermaid && $(FLUTTER) analyze
 
 test: ## Run package tests
 	$(FLUTTER) test
@@ -34,7 +36,11 @@ test-example: ## Run example application tests
 test-app: ## Run desktop application tests
 	cd app && $(FLUTTER) test
 
-check: format-check analyze test test-example test-app ## Run all validation checks
+test-mermaid: ## Run the macOS native Mermaid bridge and visual regressions
+	cargo test --locked --manifest-path packages/ianvs_mermaid/rust/Cargo.toml
+	cd packages/ianvs_mermaid && $(FLUTTER) test
+
+check: format-check analyze test test-example test-app test-mermaid ## Run all validation checks
 
 run: ## Run the desktop app on macOS (make run example for the example)
 	cd $(if $(filter example,$(MAKECMDGOALS)),example,app) && $(FLUTTER) run -d macos

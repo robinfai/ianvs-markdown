@@ -441,7 +441,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${SRCROOT}/scripts/normalize_merman.sh\"\n";
+			shellScript = "\"${SRCROOT}/../../packages/ianvs_mermaid/tool/normalize_macos.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		7B6A7E8A2D1F4C7A00A1B2C4 /* Normalize RunnerTests merman dylib path */ = {
@@ -461,7 +461,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${SRCROOT}/scripts/normalize_merman.sh\"\n";
+			shellScript = "\"${SRCROOT}/../../packages/ianvs_mermaid/tool/normalize_macos.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */

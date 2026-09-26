@@ -1,0 +1,352 @@
+[
+  {
+    "font": "Hiragino Sans GB",
+    "foreign_objects": 0,
+    "id": "flow",
+    "markers": 12,
+    "merman_median_ms": 15.99,
+    "merman_version": "0.7.0",
+    "pipeline": "resvg-safe",
+    "rust": {
+      "font_load_once_ms": 0.921333,
+      "height": 152,
+      "input_bytes": 14295,
+      "parse_median_ms": 5.395834000000001,
+      "raster": [
+        {
+          "height": 152,
+          "png_bytes": 28862,
+          "png_encode_ms": 0.208875,
+          "ratio": 1,
+          "render_median_ms": 0.471042,
+          "rgba_bytes": 389120,
+          "width": 640
+        },
+        {
+          "height": 304,
+          "png_bytes": 73673,
+          "png_encode_ms": 0.633833,
+          "ratio": 2,
+          "render_median_ms": 0.980042,
+          "rgba_bytes": 1556480,
+          "width": 1280
+        },
+        {
+          "height": 608,
+          "png_bytes": 172433,
+          "png_encode_ms": 1.987042,
+          "ratio": 4,
+          "render_median_ms": 2.0292079999999997,
+          "rgba_bytes": 6225920,
+          "width": 2560
+        }
+      ],
+      "resvg_version": "0.45.1",
+      "serialize_ms": 0.354542,
+      "vector_bytes": 60170,
+      "width": 640
+    },
+    "source": "flowchart LR\n  A[\"输入中文问题\"] --> B{\"命中缓存？\"}\n  B -->|是| C[\"返回结果\"]\n  B -.->|否| D[\"模型推理<br/>生成下一个 Token\"]\n  D ==> C\n  style A fill:#e0f2fe,stroke:#0284c7\n  style C fill:#dcfce7,stroke:#16a34a",
+    "title": "中文流程 · 箭头与换行"
+  },
+  {
+    "font": "Hiragino Sans GB",
+    "foreign_objects": 0,
+    "id": "sequence",
+    "markers": 8,
+    "merman_median_ms": 10.034,
+    "merman_version": "0.7.0",
+    "pipeline": "resvg-safe",
+    "rust": {
+      "font_load_once_ms": 0.921333,
+      "height": 445,
+      "input_bytes": 24281,
+      "parse_median_ms": 12.783375,
+      "raster": [
+        {
+          "height": 445,
+          "png_bytes": 77152,
+          "png_encode_ms": 0.39233399999999996,
+          "ratio": 1,
+          "render_median_ms": 1.818084,
+          "rgba_bytes": 1139200,
+          "width": 640
+        },
+        {
+          "height": 890,
+          "png_bytes": 190173,
+          "png_encode_ms": 1.408125,
+          "ratio": 2,
+          "render_median_ms": 3.3948329999999998,
+          "rgba_bytes": 4556800,
+          "width": 1280
+        },
+        {
+          "height": 1780,
+          "png_bytes": 434546,
+          "png_encode_ms": 6.161792,
+          "ratio": 4,
+          "render_median_ms": 6.220792,
+          "rgba_bytes": 18227200,
+          "width": 2560
+        }
+      ],
+      "resvg_version": "0.45.1",
+      "serialize_ms": 0.652417,
+      "vector_bytes": 109608,
+      "width": 640
+    },
+    "source": "sequenceDiagram\n  participant U as 用户\n  participant A as 应用服务\n  participant M as 模型引擎\n  U->>A: 提交问题\n  activate A\n  A->>M: 请求推理\n  loop 流式生成\n    M-->>A: Token 分片\n    A-->>U: 增量显示\n  end\n  deactivate A\n  Note over U,M: 中文标签 / English / 123",
+    "title": "时序图 · 虚线与激活条"
+  },
+  {
+    "font": "Hiragino Sans GB",
+    "foreign_objects": 0,
+    "id": "class",
+    "markers": 20,
+    "merman_median_ms": 22.651,
+    "merman_version": "0.7.0",
+    "pipeline": "resvg-safe",
+    "rust": {
+      "font_load_once_ms": 0.921333,
+      "height": 700,
+      "input_bytes": 24435,
+      "parse_median_ms": 9.104167,
+      "raster": [
+        {
+          "height": 700,
+          "png_bytes": 82352,
+          "png_encode_ms": 0.555167,
+          "ratio": 1,
+          "render_median_ms": 1.274458,
+          "rgba_bytes": 1792000,
+          "width": 640
+        },
+        {
+          "height": 1400,
+          "png_bytes": 190462,
+          "png_encode_ms": 2.2047920000000003,
+          "ratio": 2,
+          "render_median_ms": 2.7676250000000002,
+          "rgba_bytes": 7168000,
+          "width": 1280
+        },
+        {
+          "height": 2800,
+          "png_bytes": 457177,
+          "png_encode_ms": 8.678292,
+          "ratio": 4,
+          "render_median_ms": 6.645207999999999,
+          "rgba_bytes": 28672000,
+          "width": 2560
+        }
+      ],
+      "resvg_version": "0.45.1",
+      "serialize_ms": 0.25833300000000003,
+      "vector_bytes": 50548,
+      "width": 640
+    },
+    "source": "classDiagram\n  Animal <|-- Duck\n  Animal <|-- Fish\n  Pond *-- Fish\n  Pond o-- Duck\n  class Animal {\n    +String name\n    +move()\n  }\n  class Duck {\n    +swim()\n  }\n  class Fish {\n    +breathe()\n  }",
+    "title": "类图 · 空心箭头与菱形"
+  },
+  {
+    "font": "Hiragino Sans GB",
+    "foreign_objects": 0,
+    "id": "state",
+    "markers": 1,
+    "merman_median_ms": 27.945,
+    "merman_version": "0.7.0",
+    "pipeline": "resvg-safe",
+    "rust": {
+      "font_load_once_ms": 0.921333,
+      "height": 1094,
+      "input_bytes": 205277,
+      "parse_median_ms": 9.34275,
+      "raster": [
+        {
+          "height": 1094,
+          "png_bytes": 132686,
+          "png_encode_ms": 1.018666,
+          "ratio": 1,
+          "render_median_ms": 2.5153749999999997,
+          "rgba_bytes": 2800640,
+          "width": 640
+        },
+        {
+          "height": 2188,
+          "png_bytes": 300460,
+          "png_encode_ms": 3.59875,
+          "ratio": 2,
+          "render_median_ms": 4.896707999999999,
+          "rgba_bytes": 11202560,
+          "width": 1280
+        },
+        {
+          "height": 4376,
+          "png_bytes": 720176,
+          "png_encode_ms": 13.984,
+          "ratio": 4,
+          "render_median_ms": 11.817875,
+          "rgba_bytes": 44810240,
+          "width": 2560
+        }
+      ],
+      "resvg_version": "0.45.1",
+      "serialize_ms": 0.907458,
+      "vector_bytes": 189460,
+      "width": 640
+    },
+    "source": "stateDiagram-v2\n  [*] --> Idle\n  Idle --> Loading: 打开文件\n  Loading --> Ready: 读取完成\n  Loading --> Error: 读取失败\n  Error --> Loading: 重试\n  Ready --> Editing: 输入内容\n  Editing --> Ready: 保存\n  Ready --> [*]: 关闭",
+    "title": "状态图 · 起止节点"
+  },
+  {
+    "font": "Hiragino Sans GB",
+    "foreign_objects": 0,
+    "id": "dense",
+    "markers": 12,
+    "merman_median_ms": 106.909,
+    "merman_version": "0.7.0",
+    "pipeline": "resvg-safe",
+    "rust": {
+      "font_load_once_ms": 0.921333,
+      "height": 405,
+      "input_bytes": 108604,
+      "parse_median_ms": 93.166625,
+      "raster": [
+        {
+          "height": 405,
+          "png_bytes": 117559,
+          "png_encode_ms": 0.5616669999999999,
+          "ratio": 1,
+          "render_median_ms": 2.926166,
+          "rgba_bytes": 1036800,
+          "width": 640
+        },
+        {
+          "height": 810,
+          "png_bytes": 270658,
+          "png_encode_ms": 23.918875,
+          "ratio": 2,
+          "render_median_ms": 5.360959,
+          "rgba_bytes": 4147200,
+          "width": 1280
+        },
+        {
+          "height": 1620,
+          "png_bytes": 689326,
+          "png_encode_ms": 5.180916,
+          "ratio": 4,
+          "render_median_ms": 15.489625,
+          "rgba_bytes": 16588800,
+          "width": 2560
+        }
+      ],
+      "resvg_version": "0.45.1",
+      "serialize_ms": 2.418083,
+      "vector_bytes": 413872,
+      "width": 640
+    },
+    "source": "flowchart TB\nN0_0[\"节点 1·1\"] --> N0_1\nN0_1[\"节点 1·2\"] --> N0_2\nN0_2[\"节点 1·3\"] --> N0_3\nN0_3[\"节点 1·4\"] --> N0_4\nN0_4[\"节点 1·5\"] --> N0_5\nN0_5[\"节点 1·6\"] --> N0_6\nN0_6[\"节点 1·7\"] --> N0_7\nN0_7[\"节点 1·8\"]\nN1_0[\"节点 2·1\"] --> N1_1\nN1_1[\"节点 2·2\"] --> N1_2\nN1_2[\"节点 2·3\"] --> N1_3\nN1_3[\"节点 2·4\"] --> N1_4\nN1_4[\"节点 2·5\"] --> N1_5\nN1_5[\"节点 2·6\"] --> N1_6\nN1_6[\"节点 2·7\"] --> N1_7\nN1_7[\"节点 2·8\"]\nN2_0[\"节点 3·1\"] --> N2_1\nN2_1[\"节点 3·2\"] --> N2_2\nN2_2[\"节点 3·3\"] --> N2_3\nN2_3[\"节点 3·4\"] --> N2_4\nN2_4[\"节点 3·5\"] --> N2_5\nN2_5[\"节点 3·6\"] --> N2_6\nN2_6[\"节点 3·7\"] --> N2_7\nN2_7[\"节点 3·8\"]\nN3_0[\"节点 4·1\"] --> N3_1\nN3_1[\"节点 4·2\"] --> N3_2\nN3_2[\"节点 4·3\"] --> N3_3\nN3_3[\"节点 4·4\"] --> N3_4\nN3_4[\"节点 4·5\"] --> N3_5\nN3_5[\"节点 4·6\"] --> N3_6\nN3_6[\"节点 4·7\"] --> N3_7\nN3_7[\"节点 4·8\"]\nN4_0[\"节点 5·1\"] --> N4_1\nN4_1[\"节点 5·2\"] --> N4_2\nN4_2[\"节点 5·3\"] --> N4_3\nN4_3[\"节点 5·4\"] --> N4_4\nN4_4[\"节点 5·5\"] --> N4_5\nN4_5[\"节点 5·6\"] --> N4_6\nN4_6[\"节点 5·7\"] --> N4_7\nN4_7[\"节点 5·8\"]\nN5_0[\"节点 6·1\"] --> N5_1\nN5_1[\"节点 6·2\"] --> N5_2\nN5_2[\"节点 6·3\"] --> N5_3\nN5_3[\"节点 6·4\"] --> N5_4\nN5_4[\"节点 6·5\"] --> N5_5\nN5_5[\"节点 6·6\"] --> N5_6\nN5_6[\"节点 6·7\"] --> N5_7\nN5_7[\"节点 6·8\"]\nN6_0[\"节点 7·1\"] --> N6_1\nN6_1[\"节点 7·2\"] --> N6_2\nN6_2[\"节点 7·3\"] --> N6_3\nN6_3[\"节点 7·4\"] --> N6_4\nN6_4[\"节点 7·5\"] --> N6_5\nN6_5[\"节点 7·6\"] --> N6_6\nN6_6[\"节点 7·7\"] --> N6_7\nN6_7[\"节点 7·8\"]\nN7_0[\"节点 8·1\"] --> N7_1\nN7_1[\"节点 8·2\"] --> N7_2\nN7_2[\"节点 8·3\"] --> N7_3\nN7_3[\"节点 8·4\"] --> N7_4\nN7_4[\"节点 8·5\"] --> N7_5\nN7_5[\"节点 8·6\"] --> N7_6\nN7_6[\"节点 8·7\"] --> N7_7\nN7_7[\"节点 8·8\"]",
+    "title": "压力样例 · 64 个节点"
+  },
+  {
+    "font": "Hiragino Sans GB",
+    "foreign_objects": 0,
+    "id": "article-01-01",
+    "markers": 12,
+    "merman_median_ms": 23.818,
+    "merman_version": "0.7.0",
+    "pipeline": "resvg-safe",
+    "rust": {
+      "font_load_once_ms": 0.921333,
+      "height": 918,
+      "input_bytes": 27242,
+      "parse_median_ms": 27.684625,
+      "raster": [
+        {
+          "height": 918,
+          "png_bytes": 119086,
+          "png_encode_ms": 3.106667,
+          "ratio": 1,
+          "render_median_ms": 3.6190409999999997,
+          "rgba_bytes": 2350080,
+          "width": 640
+        },
+        {
+          "height": 1836,
+          "png_bytes": 313332,
+          "png_encode_ms": 3.1825,
+          "ratio": 2,
+          "render_median_ms": 5.84325,
+          "rgba_bytes": 9400320,
+          "width": 1280
+        },
+        {
+          "height": 3672,
+          "png_bytes": 742168,
+          "png_encode_ms": 11.59925,
+          "ratio": 4,
+          "render_median_ms": 9.511125,
+          "rgba_bytes": 37601280,
+          "width": 2560
+        }
+      ],
+      "resvg_version": "0.45.1",
+      "serialize_ms": 1.7032919999999998,
+      "vector_bytes": 236219,
+      "width": 640
+    },
+    "source": "flowchart TD\n  A[\"用户问题与历史消息\"] --> B[\"应用选择上下文并套用聊天模板\"]\n  B --> C[\"Tokenizer：文本转 Token ID\"]\n  C --> D[\"模型前向计算：Embedding 与多层网络\"]\n  D --> E[\"输出层：词表上的 logits\"]\n  E --> F[\"解码策略：选择下一个 Token\"]\n  F --> G{\"达到停止条件？\"}\n  G -->|否| H[\"追加 Token 并复用可用缓存\"]\n  H --> D\n  G -->|是| I[\"返回结束状态\"]\n  F --> J[\"增量解码与网络传输\"]\n  J --> K[\"客户端显示文字\"]\n",
+    "title": "实际文章 · 01-01"
+  },
+  {
+    "font": "Hiragino Sans GB",
+    "foreign_objects": 0,
+    "id": "article-04-01",
+    "markers": 12,
+    "merman_median_ms": 20.46,
+    "merman_version": "0.7.0",
+    "pipeline": "resvg-safe",
+    "rust": {
+      "font_load_once_ms": 0.921333,
+      "height": 595,
+      "input_bytes": 22892,
+      "parse_median_ms": 19.446167,
+      "raster": [
+        {
+          "height": 595,
+          "png_bytes": 75608,
+          "png_encode_ms": 5.918583,
+          "ratio": 1,
+          "render_median_ms": 1.998041,
+          "rgba_bytes": 1523200,
+          "width": 640
+        },
+        {
+          "height": 1190,
+          "png_bytes": 198217,
+          "png_encode_ms": 2.052375,
+          "ratio": 2,
+          "render_median_ms": 2.988958,
+          "rgba_bytes": 6092800,
+          "width": 1280
+        },
+        {
+          "height": 2380,
+          "png_bytes": 473924,
+          "png_encode_ms": 7.93375,
+          "ratio": 4,
+          "render_median_ms": 6.162834,
+          "rgba_bytes": 24371200,
+          "width": 2560
+        }
+      ],
+      "resvg_version": "0.45.1",
+      "serialize_ms": 0.818334,
+      "vector_bytes": 127236,
+      "width": 640
+    },
+    "source": "flowchart TD\n  X[\"输入隐藏状态 X\"] --> Q[\"Q = XWq：当前查询\"]\n  X --> K[\"K = XWk：匹配索引\"]\n  X --> V[\"V = XWv：待汇总信息\"]\n  Q --> S[\"点积 QKᵀ，再缩放\"]\n  K --> S\n  M[\"可见性 mask\"] --> P[\"相加后做 Softmax\"]\n  S --> P\n  P --> O[\"按权重汇总 V\"]\n  V --> O\n  O --> Y[\"输出上下文表示\"]\n",
+    "title": "实际文章 · 04-01"
+  }
+]

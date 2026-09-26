@@ -206,3 +206,12 @@ bool isMarkdownFileName(String name) {
     '.txt',
   }.contains(extension);
 }
+
+String describeFileError(Object error) {
+  if (error is FileSystemException &&
+      (error.osError?.errorCode == 1 || error.osError?.errorCode == 13)) {
+    return 'Access denied. Use File → Open Folder… to open the folder containing '
+        'this document and its linked files, then try again.';
+  }
+  return error.toString();
+}

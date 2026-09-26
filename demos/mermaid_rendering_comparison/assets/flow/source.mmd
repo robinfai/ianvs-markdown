@@ -1,0 +1,7 @@
+flowchart LR
+  A["输入中文问题"] --> B{"命中缓存？"}
+  B -->|是| C["返回结果"]
+  B -.->|否| D["模型推理<br/>生成下一个 Token"]
+  D ==> C
+  style A fill:#e0f2fe,stroke:#0284c7
+  style C fill:#dcfce7,stroke:#16a34a

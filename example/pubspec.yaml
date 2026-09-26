@@ -7,12 +7,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  crypto: ^3.0.7
   flutter_svg: ^2.3.0
+  ianvs_mermaid:
+    path: ../packages/ianvs_mermaid
   ianvs_markdown:
     path: ../
-  merman: ^0.7.0
-  xml: ^7.0.1
 
 dev_dependencies:
   flutter_test:
