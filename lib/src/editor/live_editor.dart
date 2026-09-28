@@ -7164,12 +7164,10 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                                         enabledBorder: InputBorder.none,
                                         focusedBorder: InputBorder.none,
                                         isCollapsed: true,
-                                        constraints: BoxConstraints(
-                                          minHeight: _minimumCellHeight,
-                                        ),
+                                        visualDensity: VisualDensity.standard,
                                         contentPadding: EdgeInsets.symmetric(
                                           horizontal: 10,
-                                          vertical: 4.5,
+                                          vertical: 7,
                                         ),
                                       ),
                                       onChanged: (_) => widget.onCellChanged(
@@ -7210,6 +7208,12 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                                 key: ValueKey(
                                   'ianvs-markdown-table-cell-surface-${cell.key}',
                                 ),
+                                // Keep row sizing independent of InputDecorator's
+                                // density and minimum-height text positioning.
+                                constraints: const BoxConstraints(
+                                  minHeight: _minimumCellHeight,
+                                ),
+                                alignment: Alignment.center,
                                 decoration: _tableCellDecoration(
                                   cell,
                                   direction,

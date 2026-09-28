@@ -14597,6 +14597,68 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     expect(find.text('After'), findsOneWidget);
   });
 
+  testWidgets('table rows preserve balanced padding at desktop density', (
+    tester,
+  ) async {
+    final controller = IanvsMarkdownController(
+      text:
+          '| 路径 | 实际操作与结果 |\n| --- | --- |\n'
+          '| 从空白开始 | ${List.filled(12, '中文 Live / Source / Read').join(' ')} |\n'
+          '| 下一行 | 短文字 |',
+    );
+    addTearDown(controller.dispose);
+
+    for (final scale in [1.0, 1.5]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(visualDensity: VisualDensity.compact),
+          home: MediaQuery(
+            data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+            child: Scaffold(
+              body: SizedBox(
+                width: 600,
+                child: IanvsMarkdownLiveEditor(
+                  controller: controller,
+                  showToolbar: false,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final fields = find.descendant(
+        of: find.bySemanticsLabel('Editable Markdown table'),
+        matching: find.byType(TextField),
+      );
+      final table = tester.renderObject<RenderTable>(find.byType(Table));
+      void checkPadding() {
+        for (var index = 0; index < 6; index++) {
+          final editable = editableWithin(tester, fields.at(index));
+          final top = editable.localToGlobal(Offset.zero, ancestor: table).dy;
+          final row = table.getRowBox(index ~/ 2);
+          final above = top - row.top;
+          final below = row.bottom - top - editable.size.height;
+          expect(above, greaterThanOrEqualTo(4.4));
+          expect(below, greaterThanOrEqualTo(4.4));
+          expect(above, closeTo(below, 0.1));
+        }
+        expect(tester.takeException(), isNull);
+      }
+
+      checkPadding();
+      final wrappedHeight = table.getRowBox(1).height;
+      expect(wrappedHeight, greaterThan(table.getRowBox(0).height));
+      await tester.enterText(fields.at(3), '缩短');
+      await tester.pumpAndSettle();
+      checkPadding();
+      expect(table.getRowBox(1).height, lessThan(wrappedHeight));
+      controller.undo();
+      await tester.pumpAndSettle();
+      checkPadding();
+    }
+  });
+
   testWidgets('table cells edit their source ranges without exposing pipes', (
     tester,
   ) async {
