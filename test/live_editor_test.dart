@@ -1076,13 +1076,18 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final links = find.text(url);
-    expect(links, findsNWidgets(2));
-    expect(find.text('<$url>'), findsNothing);
+    final links = <Finder>[
+      selectableTextWithPlainText('Bare $url omega'),
+      selectableTextWithPlainText('Angle $url omega'),
+    ];
+    for (final link in links) {
+      expect(link, findsOneWidget);
+    }
+    expect(find.textContaining('<$url>', findRichText: true), findsNothing);
 
-    for (final link in <Finder>[links.first, links.last]) {
+    for (final link in links) {
       for (var tapCount = 1; tapCount <= 3; tapCount += 1) {
-        await tester.tap(link);
+        await tapSelectableSubstring(tester, link, url);
         await tester.pump(const Duration(milliseconds: 100));
 
         expect(

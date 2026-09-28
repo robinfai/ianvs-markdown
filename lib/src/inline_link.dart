@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
@@ -8,6 +9,36 @@ import 'theme.dart';
 typedef IanvsMarkdownWikiLinkExists = bool Function(String target);
 
 const _obsidianCurrentNoteHref = 'app://obsidian.md/index.html';
+
+/// Owns the tap recognizer used by text autolinks in Live Preview. Keeping the
+/// recognizer outside the element builder gives it the renderer's lifetime.
+class IanvsMarkdownAutolinkScope extends StatefulWidget {
+  const IanvsMarkdownAutolinkScope({super.key, required this.child});
+
+  final Widget child;
+
+  static GestureRecognizer? recognizerOf(BuildContext context) => context
+      .findAncestorStateOfType<_IanvsMarkdownAutolinkScopeState>()
+      ?._recognizer;
+
+  @override
+  State<IanvsMarkdownAutolinkScope> createState() =>
+      _IanvsMarkdownAutolinkScopeState();
+}
+
+class _IanvsMarkdownAutolinkScopeState
+    extends State<IanvsMarkdownAutolinkScope> {
+  final _recognizer = TapGestureRecognizer()..onTap = (() {});
+
+  @override
+  void dispose() {
+    _recognizer.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
 
 class IanvsMarkdownInlineLinkBuilder extends MarkdownElementBuilder {
   IanvsMarkdownInlineLinkBuilder({
@@ -67,6 +98,26 @@ class IanvsMarkdownInlineLinkBuilder extends MarkdownElementBuilder {
               TextDecoration.lineThrough,
             ),
           );
+    }
+    if (editing && autolink && !angleWwwFallback) {
+      final colors = IanvsMarkdownThemeData.resolve(context, theme);
+      // Source editing already renders autolinks as text. Use the same inline
+      // layout while inactive: a multiline WidgetSpan under Markdown's forced
+      // strut only reserves one line and paints over subsequent blocks.
+      return Text.rich(
+        TextSpan(
+          text: label,
+          style: (effectivePreferredStyle ?? const TextStyle()).copyWith(
+            color: colors.accentDark,
+            decoration: _combineMarkdownLinkDecorations(
+              effectivePreferredStyle?.decoration,
+              TextDecoration.underline,
+            ),
+            decorationColor: colors.textTertiary,
+          ),
+          recognizer: IanvsMarkdownAutolinkScope.recognizerOf(context),
+        ),
+      );
     }
     final link = _MarkdownInlineLink(
       label: label,

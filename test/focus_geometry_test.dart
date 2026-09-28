@@ -299,6 +299,9 @@ void main() {
         'Alpha **粗体 bold** *斜体 italic* ~~删除线 strike~~ ==高亮 highlight==。',
     'inline code': 'Alpha 中文 `inline code` 正文结束。',
     'inline link': 'Alpha 中文 [链接 example](https://example.com) 正文。',
+    'long autolink':
+        '2. Alpha echo "https://github.com/ABC_EDF_GHJ/bk_xxxxxxx/gateway/'
+        'merge_requests/new?merge_request%5Bsource_branch%5D=wasm"',
     'heading 1': '# $mixed',
     'heading 2': '## $mixed',
     'heading 3': '### $mixed',

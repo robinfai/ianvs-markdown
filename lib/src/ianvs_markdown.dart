@@ -199,11 +199,15 @@ class IanvsMarkdown extends StatelessWidget {
         selectable && documentSelection && !insideDocumentSelection;
     final useBlockSelection =
         selectable && !documentSelection && !insideDocumentSelection;
-    final content = LayoutBuilder(
-      builder: (context, constraints) => _buildConstrained(
-        context,
-        constraints,
-        blockSelectable: useBlockSelection,
+    // Keep this scope mounted across presentation changes so local controls
+    // (for example HTML inputs) retain their state when entering Live Preview.
+    final content = IanvsMarkdownAutolinkScope(
+      child: LayoutBuilder(
+        builder: (context, constraints) => _buildConstrained(
+          context,
+          constraints,
+          blockSelectable: useBlockSelection,
+        ),
       ),
     );
     if (!useDocumentSelection) return content;
