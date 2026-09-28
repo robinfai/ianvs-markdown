@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import '../models/document_session.dart';
 import '../desktop_theme.dart';
 import '../desktop_typography.dart';
 import '../app_icons.dart';
+import 'file_context_menu.dart';
 
 class TitleTabsBar extends StatelessWidget {
   const TitleTabsBar({
@@ -17,7 +19,7 @@ class TitleTabsBar extends StatelessWidget {
   });
 
   final WorkspaceController workspace;
-  final ValueChanged<DocumentSession> onClose;
+  final FutureOr<void> Function(DocumentSession) onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -150,7 +152,7 @@ double _tabWidth(BuildContext context, DocumentSession document) {
 class _DocumentTabs extends StatefulWidget {
   const _DocumentTabs({required this.workspace, required this.onClose});
   final WorkspaceController workspace;
-  final ValueChanged<DocumentSession> onClose;
+  final FutureOr<void> Function(DocumentSession) onClose;
 
   @override
   State<_DocumentTabs> createState() => _DocumentTabsState();
@@ -221,11 +223,23 @@ class _DocumentTabsState extends State<_DocumentTabs> {
           return ReorderableDragStartListener(
             key: ValueKey(document.id),
             index: index,
-            child: _DocumentTab(
-              document: document,
-              selected: index == widget.workspace.activeIndex,
-              onSelected: () => widget.workspace.selectDocument(index),
-              onClose: () => widget.onClose(document),
+            child: FileContextMenu(
+              path: document.path,
+              actions: [
+                FileMenuAction('Save', () async {
+                  await widget.workspace.saveDocument(document);
+                }),
+                FileMenuAction('Save As…', () async {
+                  await widget.workspace.saveDocument(document, saveAs: true);
+                }),
+                FileMenuAction('Close Tab', () => widget.onClose(document)),
+              ],
+              child: _DocumentTab(
+                document: document,
+                selected: index == widget.workspace.activeIndex,
+                onSelected: () => widget.workspace.selectDocument(index),
+                onClose: () => widget.onClose(document),
+              ),
             ),
           );
         },

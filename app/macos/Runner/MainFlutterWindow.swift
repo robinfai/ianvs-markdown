@@ -94,6 +94,12 @@ class MainFlutterWindow: NSWindow {
 
       do {
         switch call.method {
+        case "revealInFinder":
+          guard let path = arguments["path"] as? String, !path.isEmpty else {
+            throw FileAccessError.missingValue("path")
+          }
+          NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+          result(nil)
         case "openExternal":
           guard let value = arguments["url"] as? String,
                 let url = URL(string: value),

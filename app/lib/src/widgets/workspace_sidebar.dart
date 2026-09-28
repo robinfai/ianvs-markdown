@@ -10,6 +10,7 @@ import '../desktop_typography.dart';
 import '../app_icons.dart';
 import '../services/markdown_file_service.dart';
 import 'middle_ellipsis_text.dart';
+import 'file_context_menu.dart';
 
 const _sidebarBackground = Color(0xff17191a);
 const _sidebarRaised = Color(0xff242728);
@@ -125,10 +126,13 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
             children: [
               const SizedBox(height: DesktopMetrics.toolbarHeight),
               const _SectionLabel('Workspace'),
-              _ProjectTitle(
-                root: root,
-                hasTemporaryFiles: _temporaryPaths.isNotEmpty,
-                onOpen: () => _run(widget.workspace.chooseWorkspaceFolder),
+              FileContextMenu(
+                path: root,
+                child: _ProjectTitle(
+                  root: root,
+                  hasTemporaryFiles: _temporaryPaths.isNotEmpty,
+                  onOpen: () => _run(widget.workspace.chooseWorkspaceFolder),
+                ),
               ),
               Expanded(child: _buildSearchPanel(root)),
               const SizedBox(height: 10),
@@ -672,53 +676,62 @@ class _DirectoryTileState extends State<_DirectoryTile> {
             hint: temporary ? entry.path : null,
             value: _expanded ? 'Expanded' : 'Collapsed',
             excludeSemantics: true,
-            child: Tooltip(
-              message: entry.path,
-              child: MouseRegion(
-                cursor: SystemMouseCursors.basic,
-                onEnter: (_) => setState(() => _hovered = true),
-                onExit: (_) => setState(() => _hovered = false),
-                child: Material(
-                  color: _hovered ? _treeHover : Colors.transparent,
-                  borderRadius: BorderRadius.circular(5),
-                  child: InkWell(
-                    onTap: _toggleExpanded,
+            child: FileContextMenu(
+              path: entry.path,
+              actions: [
+                FileMenuAction(
+                  _expanded ? 'Collapse Folder' : 'Expand Folder',
+                  _toggleExpanded,
+                ),
+              ],
+              child: Tooltip(
+                message: entry.path,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.basic,
+                  onEnter: (_) => setState(() => _hovered = true),
+                  onExit: (_) => setState(() => _hovered = false),
+                  child: Material(
+                    color: _hovered ? _treeHover : Colors.transparent,
                     borderRadius: BorderRadius.circular(5),
-                    child: SizedBox(
-                      height: 26,
-                      child: Padding(
-                        padding: EdgeInsets.only(
-                          left: 5 + widget.depth * 14,
-                          right: 7,
-                        ),
-                        child: Row(
-                          children: [
-                            AnimatedRotation(
-                              turns: _expanded ? .25 : 0,
-                              duration: const Duration(milliseconds: 120),
-                              curve: Curves.easeOut,
-                              child: const Icon(
-                                AppIcons.disclosure,
-                                size: 12,
-                                color: _sidebarMuted,
-                              ),
-                            ),
-                            const SizedBox(width: 3),
-                            const Icon(
-                              AppIcons.folder,
-                              size: 14,
-                              color: _sidebarSecondary,
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: MiddleEllipsisText(
-                                entry.name,
-                                style: DesktopTypography.body.copyWith(
-                                  color: _sidebarSecondary,
+                    child: InkWell(
+                      onTap: _toggleExpanded,
+                      borderRadius: BorderRadius.circular(5),
+                      child: SizedBox(
+                        height: 26,
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                            left: 5 + widget.depth * 14,
+                            right: 7,
+                          ),
+                          child: Row(
+                            children: [
+                              AnimatedRotation(
+                                turns: _expanded ? .25 : 0,
+                                duration: const Duration(milliseconds: 120),
+                                curve: Curves.easeOut,
+                                child: const Icon(
+                                  AppIcons.disclosure,
+                                  size: 12,
+                                  color: _sidebarMuted,
                                 ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 3),
+                              const Icon(
+                                AppIcons.folder,
+                                size: 14,
+                                color: _sidebarSecondary,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: MiddleEllipsisText(
+                                  entry.name,
+                                  style: DesktopTypography.body.copyWith(
+                                    color: _sidebarSecondary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -804,51 +817,57 @@ class _FileTileState extends State<_FileTile> {
         label: widget.entry.name,
         hint: widget.entry.path,
         excludeSemantics: true,
-        child: Tooltip(
-          message: widget.entry.path,
-          child: MouseRegion(
-            cursor: SystemMouseCursors.basic,
-            onEnter: (_) => setState(() => _hovered = true),
-            onExit: (_) => setState(() => _hovered = false),
-            child: Material(
-              key: ValueKey('workspace-file-${widget.entry.path}'),
-              color: selected
-                  ? _treeSelection
-                  : _hovered
-                  ? _treeHover
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(5),
-              child: InkWell(
-                onTap: () => widget.onOpen(widget.entry.path),
+        child: FileContextMenu(
+          path: widget.entry.path,
+          actions: [
+            FileMenuAction('Open', () => widget.onOpen(widget.entry.path)),
+          ],
+          child: Tooltip(
+            message: widget.entry.path,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.basic,
+              onEnter: (_) => setState(() => _hovered = true),
+              onExit: (_) => setState(() => _hovered = false),
+              child: Material(
+                key: ValueKey('workspace-file-${widget.entry.path}'),
+                color: selected
+                    ? _treeSelection
+                    : _hovered
+                    ? _treeHover
+                    : Colors.transparent,
                 borderRadius: BorderRadius.circular(5),
-                child: SizedBox(
-                  height: 26,
-                  child: Padding(
-                    padding: EdgeInsets.only(
-                      left: 20 + widget.depth * 14,
-                      right: 7,
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          AppIcons.document,
-                          size: 14,
-                          color: selected ? Colors.white : _sidebarMuted,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            widget.entry.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: DesktopTypography.body.copyWith(
-                              color: selected
-                                  ? Colors.white
-                                  : _sidebarSecondary,
+                child: InkWell(
+                  onTap: () => widget.onOpen(widget.entry.path),
+                  borderRadius: BorderRadius.circular(5),
+                  child: SizedBox(
+                    height: 26,
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        left: 20 + widget.depth * 14,
+                        right: 7,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            AppIcons.document,
+                            size: 14,
+                            color: selected ? Colors.white : _sidebarMuted,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              widget.entry.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: DesktopTypography.body.copyWith(
+                                color: selected
+                                    ? Colors.white
+                                    : _sidebarSecondary,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -893,31 +912,35 @@ class _SearchResults extends StatelessWidget {
       itemCount: results.length,
       itemBuilder: (context, index) {
         final result = results[index];
-        return ListTile(
-          dense: true,
-          leading: const Icon(
-            AppIcons.document,
-            size: 14,
-            color: _sidebarMuted,
-          ),
-          title: Text(
-            result.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: DesktopTypography.body.copyWith(color: _sidebarText),
-          ),
-          subtitle: Tooltip(
-            message: result.path,
-            child: MiddleEllipsisText(
-              root != null && p.isWithin(root!, result.path)
-                  ? p.relative(p.dirname(result.path), from: root)
-                  : p.dirname(result.path),
-              style: DesktopTypography.subheadline.copyWith(
-                color: _sidebarMuted,
+        return FileContextMenu(
+          path: result.path,
+          actions: [FileMenuAction('Open', () => onOpen(result.path))],
+          child: ListTile(
+            dense: true,
+            leading: const Icon(
+              AppIcons.document,
+              size: 14,
+              color: _sidebarMuted,
+            ),
+            title: Text(
+              result.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: DesktopTypography.body.copyWith(color: _sidebarText),
+            ),
+            subtitle: Tooltip(
+              message: result.path,
+              child: MiddleEllipsisText(
+                root != null && p.isWithin(root!, result.path)
+                    ? p.relative(p.dirname(result.path), from: root)
+                    : p.dirname(result.path),
+                style: DesktopTypography.subheadline.copyWith(
+                  color: _sidebarMuted,
+                ),
               ),
             ),
+            onTap: () => onOpen(result.path),
           ),
-          onTap: () => onOpen(result.path),
         );
       },
     );
