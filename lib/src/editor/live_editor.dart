@@ -7642,10 +7642,28 @@ Map<int, TableColumnWidth> _obsidianTableColumnWidths(
   final flexibleThreshold = largestScore * .8;
   return <int, TableColumnWidth>{
     for (var column = 0; column < columnCount; column += 1)
-      column: contentScores[column] >= flexibleThreshold
-          ? const IntrinsicColumnWidth(flex: 1)
-          : const IntrinsicColumnWidth(),
+      column: _WrappingIntrinsicColumnWidth(
+        columnCount: columnCount,
+        flex: contentScores[column] >= flexibleThreshold ? 1 : null,
+      ),
   };
+}
+
+final class _WrappingIntrinsicColumnWidth extends IntrinsicColumnWidth {
+  const _WrappingIntrinsicColumnWidth({required this.columnCount, super.flex});
+
+  final int columnCount;
+
+  @override
+  double minIntrinsicWidth(Iterable<RenderBox> cells, double containerWidth) {
+    // Long tokens can exceed the document width. Let them wrap so columns stay
+    // inside the table's painted and interactive bounds, while retaining their
+    // content-based preferred widths and flex allocation.
+    return math.min(
+      super.minIntrinsicWidth(cells, containerWidth),
+      containerWidth / columnCount,
+    );
+  }
 }
 
 int _tableCellDisplayScore(String source) {

@@ -15,7 +15,7 @@ void main() {
     testWidgets('table backgrounds stay uniform with ${brightness.name} form theme', (
       tester,
     ) async {
-      tester.view.physicalSize = const Size(900, 440);
+      tester.view.physicalSize = const Size(1280, 600);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -51,6 +51,7 @@ void main() {
                 controller: controller,
                 showToolbar: false,
                 showNavigationPane: false,
+                contentMaxWidth: 720,
               ),
             ),
           ),
@@ -70,18 +71,23 @@ void main() {
                 as RenderRepaintBoundary;
         final origin = table.localToGlobal(Offset.zero, ancestor: boundary);
         final header = table.getRowBox(0);
+        final headerCells = [
+          for (final cell in table.row(0))
+            cell.localToGlobal(Offset.zero, ancestor: table) & cell.size,
+        ];
         final row = table.getRowBox(1);
         late Color headerColor, bodyTop, bodyMiddle, bodyBottom;
+        final headerSamples = <Offset, Color>{};
         await tester.runAsync(() async {
           final image = await boundary.toImage();
           final pixels = (await image.toByteData(
             format: ui.ImageByteFormat.rawRgba,
           ))!;
-          Color sample(double y) {
+          Color sample(double y, {double x = 4}) {
             // Stay inside cell padding, away from text, cursor and grid lines.
             final index =
                 ((origin.dy + y).floor() * image.width +
-                    (origin.dx + 4).floor()) *
+                    (origin.dx + x).floor()) *
                 4;
             return Color.fromARGB(
               pixels.getUint8(index + 3),
@@ -92,6 +98,13 @@ void main() {
           }
 
           headerColor = sample(header.center.dy);
+          for (final cell in headerCells) {
+            for (final x in [cell.left + 4, cell.center.dx, cell.right - 4]) {
+              for (final y in [header.top + 3, header.bottom - 3]) {
+                headerSamples[Offset(x, y)] = sample(y, x: x);
+              }
+            }
+          }
           bodyTop = sample(row.top + 4);
           bodyMiddle = sample(row.center.dy);
           bodyBottom = sample(row.bottom - 4);
@@ -102,7 +115,7 @@ void main() {
               format: ui.ImageByteFormat.png,
             ))!;
             await File(
-              '${directory.path}/table-${brightness.name}.png',
+              '${directory.path}/table-${brightness.name}${state == 'long unbroken content' ? '-wide-content' : ''}.png',
             ).writeAsBytes(png.buffer.asUint8List());
           }
           image.dispose();
@@ -129,6 +142,20 @@ void main() {
           reason:
               '$state: the header background remains visible through its editor',
         );
+        for (final sample in headerSamples.entries) {
+          expect(
+            sample.value,
+            colors.surfaceMuted,
+            reason: '$state: header background must cover ${sample.key}',
+          );
+        }
+        for (final cell in headerCells) {
+          expect(
+            cell.right,
+            lessThanOrEqualTo(table.size.width + .01),
+            reason: '$state: columns must fit the painted table bounds',
+          );
+        }
       }
 
       await checkBackground('idle', save: true);
@@ -144,6 +171,14 @@ void main() {
       await tester.pump();
       expect(controller.text, contains('| A03 |'));
       await checkBackground('editing');
+      final wideCell = find.byKey(const ValueKey('ianvs-markdown-table-2-2'));
+      await tester.tap(wideCell);
+      await tester.pumpAndSettle();
+      final longToken = List.filled(60, 'W').join();
+      await tester.enterText(wideCell, longToken);
+      await tester.pumpAndSettle();
+      expect(controller.text, contains(longToken));
+      await checkBackground('long unbroken content', save: true);
       await mouse.removePointer();
       await tester.pumpWidget(const SizedBox.shrink());
       expect(tester.takeException(), isNull);
