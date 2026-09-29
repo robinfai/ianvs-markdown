@@ -7160,6 +7160,9 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                                       cursorColor: widget.colors.accent,
                                       cursorWidth: 1.5,
                                       decoration: const InputDecoration(
+                                        // The table owns cell backgrounds; host
+                                        // form-field fills must not cover them.
+                                        filled: false,
                                         border: InputBorder.none,
                                         enabledBorder: InputBorder.none,
                                         focusedBorder: InputBorder.none,
