@@ -12,14 +12,14 @@ conventions with a user-selected black workspace sidebar.
 | --- | --- | --- |
 | Main process and renderer shell | Flutter macOS runner + `EditorShell` | Native file access stays behind services instead of entering editor widgets. |
 | Open-file tabs | `WorkspaceController` + `DocumentSession` | Every tab owns source, selection, history, mode, and scroll state. |
-| Folder sidebar | `WorkspaceSidebar` + lazy `MarkdownFileService.listDirectory` | Directories are read when expanded; the app does not require a vault or database. |
+| Folder sidebar | `WorkspaceSidebar` + `FileBrowserController` | Virtualized visible rows; lazily cached directories form the incremental search index. No database is required. |
 | Outline sidebar | `FloatingOutline` | A toggleable right-hand inspector participates in layout so it cannot cover document content. The existing class name is retained. |
 | Editor modes | `IanvsMarkdownEditorMode` | Live Preview, Source, and Read all share one exact Markdown source string. |
-| Window/session state | `WorkspaceSessionStore` | Open tabs, active tab, layout visibility, sidebar width, and unsaved source are recovered after restart. |
+| Window/session state | `WorkspaceSessionStore` | Open tabs, active tab, layout visibility, sidebar width, per-workspace browser preferences, favorites, and unsaved source are recovered after restart. |
 | macOS file permission recovery | security-scoped bookmarks over a platform channel | User-approved file and folder access survives an app restart without disabling the sandbox. |
 | Default Markdown application | `FileAssociationController` + native `MarkdownFileAssociation` | UserDefaults stores the choice separately from Launch Services; explicit changes use NSWorkspace with system consent and readback. |
 | Finder document opens | native `IncomingMarkdownFiles` + `IncomingFilesService` | Queue file URLs before Flutter recovery and serialize delivery into the existing workspace, preserving unsaved tabs. |
-| File watching | per-document directory subscriptions | External edits are surfaced explicitly; recovered local edits are never silently overwritten. |
+| File watching | document subscriptions + indexed-directory subscriptions | External edits are surfaced explicitly; tree events refresh only affected directory caches. |
 | Safe persistence | `writeMarkdownFileAtomic` | A same-directory temporary file is flushed and renamed over the target. |
 
 ## Dependency direction
@@ -68,12 +68,17 @@ File reads continue to use the existing sandbox permissions.
 
 ## App-shell visual contract
 
-The shell uses one resizable black workspace sidebar (248 points by default), a 44-point document
+The shell uses one resizable black workspace sidebar (248 points by default), a minimum 52-point document
 toolbar, a 32-point tab strip, and an optional 224-point outline inspector.
 The sidebar's preferred width is persisted; the shell limits its displayed width
 to leave space for the editor, toolbar, status bar, and visible outline.
-`desktop_theme.dart` owns neutral surfaces, system typography, blue action
-accents, compact controls, menus, dialogs, and scrollbars. `DesktopMenuBar`
+`ianvs_design` supplies the shared compact theme, semantic surfaces, controls,
+menus and dialogs. `desktop_theme.dart` bridges its tokens into the independent
+Markdown theme extension. `IanvsToolbar`, themed segmented controls,
+`IanvsIconButton`, `IanvsTextField` and `IanvsResizeHandle` keep product behavior
+in host callbacks. The virtualized hierarchical file tree remains host-owned;
+`IanvsSidebar` is a flat navigation component and would lose those contracts.
+The app starts in system appearance and permits a session override. `DesktopMenuBar`
 exposes the same document commands through the native macOS menu bar.
 The document canvas adapts its padding to available width; word counts,
 saved/edited state, encoding, and line endings live in a quiet bottom status bar.
@@ -110,3 +115,27 @@ which lets macOS request consent when required. The saved previous application
 is restored only while Linefold remains the current default; an external choice
 is preserved. If no previous application remains available, an application
 picker allows the user to choose a replacement.
+
+## Sidebar state and file mutations
+
+`WorkspaceController` owns `FileBrowserController` for the lifetime of the session,
+including when the sidebar is hidden. Browser preferences are keyed by workspace
+root. The browser flattens visible rows for `ListView.builder`, separates focus
+and selection from the active document, and never enumerates external parents.
+Search walks the directory cache with a cancellation generation; subsequent
+queries reuse it. Filesystem events debounce a local cache refresh. Root epochs
+and reveal generations reject stale reads across workspace switches and rapid
+navigation. Symlink directories are not followed.
+
+File create, move, duplicate, Trash, save and open are serialized by the workspace
+controller. `MarkdownFileService` delegates mutations to native
+`WorkspaceFileOperations`: exclusive creation, no-replace FileManager move/copy,
+and recoverable macOS Trash. A successful move remaps open sessions, watchers,
+expanded paths, selection, favorites and bookmarks before persisting recovery.
+Failures before disk success leave session identity unchanged. Batch operations
+preflight collisions and report partial filesystem failures explicitly.
+
+Additional containing-folder grants and external-file favorite bookmarks are
+persisted separately. New changes typed during an asynchronous Trash operation
+remain in an untitled session, while queued saves of removed sessions are ignored.
+This preserves the file-first model without a second content database.

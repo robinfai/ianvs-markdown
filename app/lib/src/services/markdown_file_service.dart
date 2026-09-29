@@ -32,11 +32,13 @@ class WorkspaceEntry {
     required this.path,
     required this.name,
     required this.isDirectory,
+    this.modified,
   });
 
   final String path;
   final String name;
   final bool isDirectory;
+  final DateTime? modified;
 }
 
 abstract class MarkdownFileService {
@@ -59,6 +61,17 @@ abstract class MarkdownFileService {
   Future<String?> restorePersistentAccess(String token);
 
   bool fileExists(String path);
+
+  Future<void> createEntry(
+    String path, {
+    required bool directory,
+    String contents = '',
+  });
+  Future<void> moveEntry(String source, String destination);
+  Future<void> copyEntry(String source, String destination);
+  Future<void> trashEntry(String path);
+  Future<bool> entryExists(String path);
+  Future<DateTime?> readModifiedTime(String path);
 }
 
 class DesktopMarkdownFileService implements MarkdownFileService {
@@ -127,6 +140,7 @@ class DesktopMarkdownFileService implements MarkdownFileService {
   Future<List<WorkspaceEntry>> listDirectory(String path) async {
     final entries = <WorkspaceEntry>[];
     await for (final entity in Directory(path).list(followLinks: false)) {
+      if (entity is Link) continue;
       final stat = await entity.stat();
       if (stat.type == FileSystemEntityType.directory) {
         if (!p.basename(entity.path).startsWith('.')) {
@@ -135,6 +149,7 @@ class DesktopMarkdownFileService implements MarkdownFileService {
               path: entity.path,
               name: p.basename(entity.path),
               isDirectory: true,
+              modified: stat.modified,
             ),
           );
         }
@@ -145,6 +160,7 @@ class DesktopMarkdownFileService implements MarkdownFileService {
             path: entity.path,
             name: p.basename(entity.path),
             isDirectory: false,
+            modified: stat.modified,
           ),
         );
       }
@@ -191,6 +207,46 @@ class DesktopMarkdownFileService implements MarkdownFileService {
       return null;
     }
   }
+
+  @override
+  Future<DateTime?> readModifiedTime(String path) async {
+    final stat = await FileStat.stat(path);
+    return stat.type == FileSystemEntityType.notFound ? null : stat.modified;
+  }
+
+  @override
+  Future<bool> entryExists(String path) async =>
+      await FileSystemEntity.type(path, followLinks: false) !=
+      FileSystemEntityType.notFound;
+
+  @override
+  Future<void> createEntry(
+    String path, {
+    required bool directory,
+    String contents = '',
+  }) => _fileAccessChannel.invokeMethod<void>('createEntry', {
+    'path': path,
+    'directory': directory,
+    'contents': contents,
+  });
+
+  @override
+  Future<void> moveEntry(String source, String destination) =>
+      _fileAccessChannel.invokeMethod<void>('moveEntry', {
+        'path': source,
+        'destination': destination,
+      });
+
+  @override
+  Future<void> copyEntry(String source, String destination) =>
+      _fileAccessChannel.invokeMethod<void>('copyEntry', {
+        'path': source,
+        'destination': destination,
+      });
+
+  @override
+  Future<void> trashEntry(String path) =>
+      _fileAccessChannel.invokeMethod<void>('trashEntry', {'path': path});
 
   @override
   bool fileExists(String path) => File(path).existsSync();

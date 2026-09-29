@@ -94,6 +94,8 @@ class MainFlutterWindow: NSWindow {
 
       do {
         switch call.method {
+        case "createEntry", "moveEntry", "copyEntry", "trashEntry":
+          result(try WorkspaceFileOperations.perform(call.method, arguments: arguments))
         case "revealInFinder":
           guard let path = arguments["path"] as? String, !path.isEmpty else {
             throw FileAccessError.missingValue("path")

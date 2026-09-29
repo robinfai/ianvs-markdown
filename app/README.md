@@ -13,8 +13,13 @@ Implemented application-shell capabilities:
 - black workspace sidebar, neutral light/dark chrome, and blue action accents
 - native File, Edit, View, and Window menus and an all-open-documents menu
 - new/open/save/save-as and Finder file drop
-- folder workspace with lazy Markdown file tree and filename search
-- temporary file tree for individually opened files outside the workspace,
+- virtualized Markdown file tree with cancellable filename/path search, ranked
+  highlights, result counts, natural/modified sorting and directory-local refresh
+- reveal active file, optional follow mode, keyboard navigation and per-workspace
+  expansion, scroll, sort and favorites recovery
+- inline new Markdown/folder and rename, duplicate saved copy, move picker,
+  multi-selection, folder drop targets and native Trash with unsaved-edit protection
+- External Files tree for individually opened files outside the workspace,
   with shared directory paths merged into expanded branches and synced with
   open tabs; paths stay on one line with middle ellipsis and full-path tooltips
 - collapsible left sidebar with a draggable right edge and remembered width,
@@ -39,14 +44,22 @@ Integration boundaries in the current desktop shell:
   links retain their source-editing behavior; use Read mode to follow them.
 - YAML is editable in Source and hidden in Live/Read. The package's optional
   Properties editor and heading-fold controls are not enabled in this app.
-- Search filters filenames across the workspace; it is not a document-content
-  search. Individually opened files can also be filtered by their full paths.
+- Search matches names and relative paths in the workspace, and full paths for
+  external files. It returns the best 200 matches with the total count; it is not
+  a document-content search. Rename and move do not rewrite Markdown links.
   Find/replace, export, and an encoding or line-ending selector are not currently
   exposed.
 - Open-document text, modes, and workspace visibility are recovered. Appearance,
   caret positions, and scroll offsets are not serialized across app launches.
 
-Desktop interface typography is defined in `lib/src/desktop_typography.dart`.
+The desktop shell integrates the published `ianvs_design: ^0.4.0` package.
+Shared themes and controls use compact density and macOS system fonts.
+Appearance follows the system by default; View → Use System Appearance restores
+following after a manual override. Sidebar resize supports arrow keys, Home/End,
+and double-click or Enter to reset. Control-click opens the file context menu;
+Command-click remains additive selection.
+
+Specialized outline/tab typography is defined in `lib/src/desktop_typography.dart`.
 It maps Apple's macOS text styles to system-font controls: 13/16 pt for primary
 interface text, 12/15 pt for tabs, and 11/14 pt for secondary information. Use
 these shared styles for app chrome so font family, leading, and tracking remain
@@ -110,3 +123,43 @@ belong here instead of in the example application.
 
 See [DESIGN.md](DESIGN.md) for the macOS visual contract and verification notes,
 and [ARCHITECTURE.md](ARCHITECTURE.md) for dependency and recovery rules.
+
+## Sidebar file management
+
+Use the workspace **…** menu for new files/folders, reveal/follow, collapse,
+refresh and sorting. Right-click a row for file operations, favorites and path
+copying. A new item uses the selected folder (or selected file's parent); names
+are edited inline. Return commits and Escape cancels. New Markdown names receive
+`.md` when no extension is supplied. External-folder creation uses a dialog
+because the external tree contains only open files, never a directory listing.
+
+Arrow keys navigate the tree independently of the active document. Return opens;
+Escape clears search and restores the previous tree position. Command-click
+(or Control-click) toggles selection; Shift-click extends a range. Use **Move
+selected** / **Trash selected**, or right-click for batch actions. Drop onto a
+folder to move into it. To move back to the workspace root, drop onto its title,
+a root-level file row, or the empty space below the tree. File-row and empty-space
+targets show the destination folder while hovering. Touch/trackpad scrolling
+continues to scroll the list. Favorites appear only after the first item is added.
+
+Moves and copies refuse collisions. Trash uses the macOS Trash and checks all
+open descendants for unsaved changes. Copies use saved bytes. Editing during a
+pending Trash operation preserves the new text as a recoverable untitled draft.
+Operations outside the workspace request a containing-folder grant; they do not
+silently enumerate an individually opened file's parent. External directory rows
+are synthetic groups: bulk commands affect only their opened files, and whole-folder
+rename/move/Trash requires opening that folder as a workspace. Partial batch failures
+report the number completed and identify each failed item.
+
+Run all sidebar acceptance gates with `bash app/tool/verify_sidebar.sh` from the
+repository root. Logs and rendered normal/narrow/search screenshots are written
+to `app/build/sidebar-acceptance/`. See
+[the acceptance matrix](design/sidebar-enhancement-acceptance.md) for coverage.
+
+
+The Ianvs/macOS design integration and visual acceptance artifacts are documented
+in [the acceptance record](design/ianvs-macos-acceptance/README.md). Run
+`bash tool/verify_sidebar.sh` from `app/` for static analysis, all app tests,
+native file-operation checks, and a macOS debug build. The visual fixture also
+covers system-style light/dark surfaces, 840 × 560, 200% text, context menus,
+and root-directory drop feedback.

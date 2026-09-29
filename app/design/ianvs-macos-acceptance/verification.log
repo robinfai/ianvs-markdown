@@ -1,0 +1,174 @@
+Formatted 54 files (0 changed) in 0.16 seconds.
+Analyzing app...
+No issues found! (ran in 1.8s)
+00:00 +0: loading /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart
+00:00 +0: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/incoming_files_service_test.dart: native startup and live queues drain serially without reopening batches
+00:00 +1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/incoming_files_service_test.dart: one failed open does not block later native requests
+00:00 +2: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/document_link_service_test.dart: SVG external-view action dispatches the local file URL
+00:00 +3: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/file_context_menu_test.dart: sidebar reveals clicked file and folder without selecting
+00:00 +4: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/file_context_menu_test.dart: sidebar reveals clicked file and folder without selecting
+00:00 +5: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/file_context_menu_test.dart: sidebar reveals clicked file and folder without selecting
+00:00 +6: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/file_context_menu_test.dart: sidebar reveals clicked file and folder without selecting
+00:00 +7: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/file_context_menu_test.dart: sidebar reveals clicked file and folder without selecting
+00:00 +8: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/file_context_menu_test.dart: sidebar reveals clicked file and folder without selecting
+00:00 +9: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/file_context_menu_test.dart: sidebar reveals clicked file and folder without selecting
+00:00 +10: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/file_context_menu_test.dart: sidebar reveals clicked file and folder without selecting
+00:00 +11: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/file_context_menu_test.dart: sidebar reveals clicked file and folder without selecting
+00:00 +12: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/file_context_menu_test.dart: sidebar reveals clicked file and folder without selecting
+00:00 +13: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:00 +14: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:01 +15: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:01 +16: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:01 +17: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:01 +18: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:01 +19: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:01 +19 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:01 +20 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:01 +21 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:01 +22 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:01 +23 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:01 +24 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:01 +25 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:01 +26 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:01 +27 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:01 +28 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:01 +29 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:02 +30 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:02 +31 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:02 +32 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:02 +33 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:02 +34 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:02 +35 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:02 +36 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:02 +37 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:02 +38 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:02 +39 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:02 +40 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:02 +41 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:02 +42 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:02 +43 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:02 +44 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:02 +45 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:02 +46 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:02 +47 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:02 +48 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_design_visual_test.dart: render desktop design acceptance in light, dark and narrow views
+00:02 +49 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:02 +50 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:02 +51 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:02 +52 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:03 +53 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:03 +54 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:03 +55 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:03 +56 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:03 +57 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:03 +58 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:03 +59 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:03 +60 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:03 +61 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:03 +62 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:03 +63 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:03 +64 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:04 +65 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:04 +66 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:04 +67 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:04 +68 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:04 +69 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:04 +70 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:04 +71 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:04 +72 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:04 +73 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:04 +74 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:04 +75 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:04 +76 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:04 +77 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:04 +78 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:04 +79 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:04 +80 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/outline_navigation_test.dart: desktop outline reveals the right heading in livePreview
+00:04 +81 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/sidebar_enhancement_test.dart: inline folder create and Escape cancel; selection chooses parent
+00:05 +82 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/sidebar_layout_test.dart: resize limits leave room for editor and adapt to the window
+00:05 +83 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/sidebar_layout_test.dart: resize limits leave room for editor and adapt to the window
+00:05 +84 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/sidebar_layout_test.dart: resize limits leave room for editor and adapt to the window
+00:05 +85 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/sidebar_layout_test.dart: resize limits leave room for editor and adapt to the window
+00:05 +86 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/sidebar_layout_test.dart: resize limits leave room for editor and adapt to the window
+00:05 +86 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/file_watcher_save_test.dart: deleting a file immediately after save raises a conflict
+Unable to check watched file /notes/one.md: FileSystemException: File no longer exists, path = '/notes/one.md'
+Unable to check watched file /notes/one.md: FileSystemException: File no longer exists, path = '/notes/one.md'
+00:05 +87 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/sidebar_layout_test.dart: resize limits leave room for editor and adapt to the window
+00:05 +88 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/sidebar_layout_test.dart: resize limits leave room for editor and adapt to the window
+00:05 +89 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/sidebar_layout_test.dart: resize limits leave room for editor and adapt to the window
+00:05 +90 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/sidebar_layout_test.dart: resize limits leave room for editor and adapt to the window
+00:05 +91 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/sidebar_layout_test.dart: resize limits leave room for editor and adapt to the window
+00:05 +92 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/sidebar_layout_test.dart: resize limits leave room for editor and adapt to the window
+00:05 +93 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/sidebar_layout_test.dart: resize limits leave room for editor and adapt to the window
+00:05 +94 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/sidebar_layout_test.dart: resize limits leave room for editor and adapt to the window
+00:05 +95 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/sidebar_layout_test.dart: resize limits leave room for editor and adapt to the window
+00:05 +96 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:05 +97 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:05 +98 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:05 +99 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:05 +100 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:05 +101 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:05 +102 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:05 +103 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:05 +104 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:06 +105 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:06 +106 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:06 +107 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:06 +108 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:06 +109 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:06 +110 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:06 +111 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:06 +112 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:06 +113 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:06 +114 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:06 +115 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:06 +116 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:06 +117 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:06 +118 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:06 +119 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:07 +120 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:07 +121 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:07 +122 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:07 +123 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:07 +124 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:07 +125 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:07 +126 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:07 +127 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:07 +128 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/desktop_appearance_test.dart: system appearance follows macOS and can be restored after an override (variant: TargetPlatform.macOS)
+00:07 +129 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/temporary_workspace_tree_test.dart: a standalone file appears under its full directory path
+00:07 +130 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/temporary_workspace_tree_test.dart: a standalone file appears under its full directory path
+00:07 +131 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/file_association_widgets_test.dart: a cancelled opt-out can be retried from settings after restarting (variant: TargetPlatform.macOS)
+00:08 +132 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/temporary_workspace_tree_test.dart: multiple files share folders and distinguish identical names
+00:08 +133 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/file_association_widgets_test.dart: acceptance can be changed later from the native settings menu (variant: TargetPlatform.macOS)
+00:08 +134 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/temporary_workspace_tree_test.dart: shared ancestors contain files and nested expanded branches
+00:08 +135 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/file_association_widgets_test.dart: a denied association shows the saved preference and real system status (variant: TargetPlatform.macOS)
+00:08 +136 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/temporary_workspace_tree_test.dart: reparenting and Save As retain directory expansion choices
+00:08 +137 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/file_association_widgets_test.dart: Command comma opens settings and refreshes the external default (variant: TargetPlatform.macOS)
+00:08 +138 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/file_association_widgets_test.dart: Command comma opens settings and refreshes the external default (variant: TargetPlatform.macOS)
+00:08 +139 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/file_association_widgets_test.dart: Command comma opens settings and refreshes the external default (variant: TargetPlatform.macOS)
+00:08 +140 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/temporary_workspace_tree_test.dart: saving and Save As update the temporary path and filename
+00:08 +141 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/file_association_widgets_test.dart: Finder files wait for recovery and live opens reuse existing tabs (variant: TargetPlatform.macOS)
+00:08 +142 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/file_association_widgets_test.dart: Finder files wait for recovery and live opens reuse existing tabs (variant: TargetPlatform.macOS)
+00:08 +143 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/temporary_workspace_tree_test.dart: temporary search follows opens, Save As and closes
+00:09 +144 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/temporary_workspace_tree_test.dart: restored open sessions rebuild temporary folders
+00:09 +145 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/temporary_workspace_tree_test.dart: long directory paths stay on one line with middle ellipsis
+00:09 +146 ~1: /Users/robinfai/flutter_projects/ianvs-markdown/app/test/temporary_workspace_tree_test.dart: an unreadable workspace does not hide temporary files
+00:09 +147 ~1: All tests passed!
+PASS: exclusive create, Unicode, copy, collision, descendant move, directory move, Trash and restore
+The following plugins do not support Swift Package Manager for macos:
+  - irondash_engine_context
+  - super_native_extensions
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Building macOS application...
+/Users/robinfai/flutter_projects/ianvs-markdown/app/macos/Pods/Pods.xcodeproj: desktop_drop: ld: warning: search path '/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v27.1.266.1.joF8at/Metal.xctoolchain/usr/lib/swift/macosx' not found
+/Users/robinfai/flutter_projects/ianvs-markdown/app/macos/Pods/Pods.xcodeproj: merman: ld: warning: search path '/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v27.1.266.1.joF8at/Metal.xctoolchain/usr/lib/swift/macosx' not found
+/Users/robinfai/flutter_projects/ianvs-markdown/app/macos/Pods/Pods.xcodeproj: device_info_plus: ld: warning: search path '/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v27.1.266.1.joF8at/Metal.xctoolchain/usr/lib/swift/macosx' not found
+/Users/robinfai/flutter_projects/ianvs-markdown/app/macos/Pods/Pods.xcodeproj: file_selector_macos: ld: warning: search path '/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v27.1.266.1.joF8at/Metal.xctoolchain/usr/lib/swift/macosx' not found
+/Users/robinfai/flutter_projects/ianvs-markdown/app/macos/Runner.xcodeproj: Runner: ld: warning: search path '/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v27.1.266.1.joF8at/Metal.xctoolchain/usr/lib/swift/macosx' not found
+/Users/robinfai/flutter_projects/ianvs-markdown/app/macos/Runner.xcodeproj: Runner: ld: warning: search path '/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v27.1.266.1.joF8at/Metal.xctoolchain/usr/lib/swift/macosx' not found
+/Users/robinfai/flutter_projects/ianvs-markdown/app/macos/Runner.xcodeproj: Runner: ld: warning: search path '/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v27.1.266.1.joF8at/Metal.xctoolchain/usr/lib/swift/macosx' not found
+/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/install_name_tool: warning: changes being made to the file will invalidate the code signature in: /Users/robinfai/flutter_projects/ianvs-markdown/app/build/macos/Build/Products/Debug/Linefold.app/Contents/Frameworks/libmerman_ffi.dylib (for architecture arm64)
+/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/install_name_tool: warning: changes being made to the file will invalidate the code signature in: /Users/robinfai/flutter_projects/ianvs-markdown/app/build/macos/Build/Products/Debug/Linefold.app/Contents/Frameworks/merman.framework/Versions/A/merman
+/Users/robinfai/flutter_projects/ianvs-markdown/app/build/macos/Build/Products/Debug/Linefold.app/Contents/Frameworks/libmerman_ffi.dylib: replacing existing signature
+/Users/robinfai/flutter_projects/ianvs-markdown/app/build/macos/Build/Products/Debug/Linefold.app/Contents/Frameworks/merman.framework: replacing existing signature
+✓ Built build/macos/Build/Products/Debug/Linefold.app

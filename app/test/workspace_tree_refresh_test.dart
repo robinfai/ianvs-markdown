@@ -84,7 +84,7 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 200));
       await tester.pumpAndSettle();
-      expect(find.text('draft.md'), findsNothing);
+      expect(find.text('draft.md', findRichText: true), findsNothing);
 
       final document = workspace.newDocument();
       document.controller.text = '# Draft';
@@ -95,14 +95,17 @@ void main() {
       await tester.pumpAndSettle();
 
       final search = tester.widget<TextField>(
-        find.byKey(const ValueKey('workspace-search-field')),
+        find.descendant(
+          of: find.byKey(const ValueKey('workspace-search-field')),
+          matching: find.byType(TextField),
+        ),
       );
       expect(search.controller!.text, 'draft');
-      expect(find.text('draft.md'), findsOneWidget);
+      expect(find.text('draft.md', findRichText: true), findsOneWidget);
       await tester.tap(find.byTooltip('Clear'));
       await tester.pumpAndSettle();
       expect(find.text('nested.md'), findsOneWidget);
-      expect(find.text('draft.md'), findsOneWidget);
+      expect(find.text('draft.md', findRichText: true), findsOneWidget);
       await _finish(tester);
     },
   );
@@ -111,6 +114,8 @@ void main() {
     for (var i = 0; i < 40; i++) {
       files.files['/vault/note-${i.toString().padLeft(2, '0')}.md'] = '# Note';
     }
+    // These synthetic disk changes bypass the filesystem watcher.
+    await workspace.browser.refresh();
     await _pumpSidebar(tester, workspace);
     await tester.drag(find.byType(ListView), const Offset(0, -350));
     await tester.pumpAndSettle();

@@ -42,7 +42,7 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
       widget.incomingFilesService ?? MacOSIncomingFilesService();
   final _navigatorKey = GlobalKey<NavigatorState>();
   final _messengerKey = GlobalKey<ScaffoldMessengerState>();
-  var _dark = false;
+  var _themeMode = ThemeMode.system;
   var _settingsOpen = false;
   var _promptOpen = false;
 
@@ -137,18 +137,26 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
       scaffoldMessengerKey: _messengerKey,
       debugShowCheckedModeBanner: false,
       title: 'Linefold',
-      themeMode: _dark ? ThemeMode.dark : ThemeMode.light,
+      themeMode: _themeMode,
       theme: desktopTheme(Brightness.light),
       darkTheme: desktopTheme(Brightness.dark),
       // Isolate editor semantics when modal routes block and reveal the document.
-      home: Semantics(
-        container: true,
-        explicitChildNodes: true,
-        child: EditorShell(
-          workspace: _workspace,
-          dark: _dark,
-          onToggleTheme: () => setState(() => _dark = !_dark),
-          onOpenSettings: _openSettings,
+      home: Builder(
+        builder: (context) => Semantics(
+          container: true,
+          explicitChildNodes: true,
+          child: EditorShell(
+            workspace: _workspace,
+            dark: Theme.of(context).brightness == Brightness.dark,
+            onToggleTheme: () => setState(
+              () => _themeMode = Theme.of(context).brightness == Brightness.dark
+                  ? ThemeMode.light
+                  : ThemeMode.dark,
+            ),
+            onUseSystemTheme: () =>
+                setState(() => _themeMode = ThemeMode.system),
+            onOpenSettings: _openSettings,
+          ),
         ),
       ),
     );

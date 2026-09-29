@@ -35,7 +35,7 @@ void main() {
     final document = workspace.activeDocument!;
     final source = document.controller.text;
     final live = tester.getSemantics(find.bySemanticsLabel('Live Preview'));
-    expect(live.flagsCollection.isButton, isTrue);
+    expect(live.getSemanticsData().flagsCollection.isButton, isTrue);
     expect(live.flagsCollection.isSelected, Tristate.isTrue);
     expect(live.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
     expect(live.rect.height, greaterThanOrEqualTo(28));

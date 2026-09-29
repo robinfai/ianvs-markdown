@@ -31,6 +31,7 @@ class EditorShell extends StatefulWidget {
     required this.workspace,
     required this.dark,
     required this.onToggleTheme,
+    this.onUseSystemTheme,
     this.onOpenSettings,
     this.enableFileDrop = true,
   });
@@ -38,6 +39,7 @@ class EditorShell extends StatefulWidget {
   final WorkspaceController workspace;
   final bool dark;
   final VoidCallback onToggleTheme;
+  final VoidCallback? onUseSystemTheme;
   final VoidCallback? onOpenSettings;
   final bool enableFileDrop;
 
@@ -108,6 +110,7 @@ class _EditorShellState extends State<EditorShell> {
           onSaveAs: () => _guard(() => workspace.saveActive(saveAs: true)),
           onClose: () => _guard(() => _closeDocument(document)),
           onToggleTheme: widget.onToggleTheme,
+          onUseSystemTheme: widget.onUseSystemTheme,
           onOpenSettings: widget.onOpenSettings,
           child: CallbackShortcuts(
             bindings: <ShortcutActivator, VoidCallback>{
@@ -211,7 +214,7 @@ class _EditorShellState extends State<EditorShell> {
                                 top: 0,
                                 bottom: 0,
                                 right: 0,
-                                width: 6,
+                                width: 8,
                                 child: SidebarResizeHandle(
                                   key: const ValueKey('sidebar-resize-handle'),
                                   width: sidebarWidth,
@@ -485,8 +488,9 @@ class _DocumentStatusBar extends StatelessWidget {
       builder: (context, value, _) {
         final words = RegExp(r'\S+').allMatches(value.text).length;
         return Container(
-          height: 25,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+          width: double.infinity,
+          constraints: const BoxConstraints(minHeight: 25),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
           decoration: BoxDecoration(
             border: Border(top: BorderSide(color: colors.borderSoft)),
           ),
@@ -494,21 +498,30 @@ class _DocumentStatusBar extends StatelessWidget {
             style: DesktopTypography.subheadline.copyWith(
               color: colors.textTertiary,
             ),
-            child: Row(
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              spacing: 16,
+              runSpacing: 4,
               children: [
-                Text('$words words'),
-                const SizedBox(width: 14),
-                Text('${value.text.runes.length} characters'),
-                const Spacer(),
-                ValueListenableBuilder<bool>(
-                  valueListenable: document.controller.dirtyListenable,
-                  builder: (context, dirty, _) =>
-                      Text(dirty ? 'Edited' : 'Saved'),
+                Wrap(
+                  spacing: 14,
+                  children: [
+                    Text('$words words'),
+                    Text('${value.text.runes.length} characters'),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Text(document.encoding),
-                const SizedBox(width: 12),
-                Text(document.lineEnding),
+                Wrap(
+                  spacing: 12,
+                  children: [
+                    ValueListenableBuilder<bool>(
+                      valueListenable: document.controller.dirtyListenable,
+                      builder: (context, dirty, _) =>
+                          Text(dirty ? 'Edited' : 'Saved'),
+                    ),
+                    Text(document.encoding),
+                    Text(document.lineEnding),
+                  ],
+                ),
               ],
             ),
           ),

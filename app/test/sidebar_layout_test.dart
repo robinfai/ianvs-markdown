@@ -40,6 +40,9 @@ void main() {
     await tester.pumpAndSettle();
 
     final gesture = await tester.startGesture(tester.getCenter(_handle));
+    // The shared handle starts after Flutter's drag slop, then tracks deltas.
+    await gesture.moveBy(const Offset(20, 0));
+    await tester.pump();
     await gesture.moveBy(const Offset(60, 0));
     await tester.pump();
     expect(_sidebarWidth(tester), closeTo(308, .01));
@@ -103,7 +106,11 @@ void main() {
     tester,
   ) async {
     await _pumpShell(tester, workspace);
-    await tester.drag(_handle, const Offset(120, 0));
+    final gesture = await tester.startGesture(tester.getCenter(_handle));
+    await gesture.moveBy(const Offset(20, 0));
+    await tester.pump();
+    await gesture.moveBy(const Offset(120, 0));
+    await gesture.up();
     await tester.pumpAndSettle();
     await _finish(tester);
     final saved = WorkspaceSnapshot.fromJson(sessions.snapshot!.toJson());
@@ -139,6 +146,37 @@ void main() {
       semantics.dispose();
     }
   });
+
+  testWidgets(
+    'keyboard and double-click resize share the saved workspace width',
+    (tester) async {
+      await _pumpShell(tester, workspace);
+      await tester.tap(_handle);
+      // A single click resolves after the double-click reset interval.
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      expect(workspace.sidebarWidth, WorkspaceLayout.defaultSidebarWidth + 20);
+      await tester.sendKeyEvent(LogicalKeyboardKey.home);
+      await tester.pumpAndSettle();
+      expect(workspace.sidebarWidth, WorkspaceLayout.minSidebarWidth);
+      await tester.sendKeyEvent(LogicalKeyboardKey.end);
+      await tester.pumpAndSettle();
+      expect(workspace.sidebarWidth, WorkspaceLayout.maxSidebarWidth);
+      await tester.tap(_handle);
+      await tester.pump(const Duration(milliseconds: 80));
+      await tester.tap(_handle);
+      await tester.pumpAndSettle();
+      expect(workspace.sidebarWidth, WorkspaceLayout.defaultSidebarWidth);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(workspace.sidebarWidth, WorkspaceLayout.defaultSidebarWidth);
+      await _finish(tester);
+    },
+  );
 
   test('old sessions and invalid widths use safe layout bounds', () {
     expect(

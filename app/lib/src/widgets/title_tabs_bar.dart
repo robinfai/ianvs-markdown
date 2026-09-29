@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:ianvs_design/ianvs_design.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 
 import '../controllers/workspace_controller.dart';
@@ -29,45 +30,38 @@ class TitleTabsBar extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
-            height: DesktopMetrics.toolbarHeight,
-            child: Padding(
-              padding: EdgeInsets.only(
-                left: Platform.isMacOS && !workspace.sidebarVisible ? 78 : 8,
-                right: 8,
+          Padding(
+            padding: EdgeInsets.only(
+              left: Platform.isMacOS && !workspace.sidebarVisible ? 70 : 0,
+            ),
+            child: IanvsToolbar(
+              height: DesktopMetrics.toolbarHeight,
+              leading: _HeaderIconButton(
+                tooltip: workspace.sidebarVisible
+                    ? 'Hide sidebar'
+                    : 'Show sidebar',
+                icon: AppIcons.sidebar,
+                selected: workspace.sidebarVisible,
+                onPressed: workspace.toggleSidebar,
               ),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return Row(
-                    children: [
-                      _HeaderIconButton(
-                        tooltip: workspace.sidebarVisible
-                            ? 'Hide sidebar'
-                            : 'Show sidebar',
-                        icon: AppIcons.sidebar,
-                        onPressed: workspace.toggleSidebar,
-                      ),
-                      Expanded(
-                        child: Center(
-                          child: _EditorModePicker(workspace: workspace),
-                        ),
-                      ),
-                      _HeaderIconButton(
-                        tooltip: workspace.outlineVisible
-                            ? 'Hide outline'
-                            : 'Show outline',
-                        icon: AppIcons.outline,
-                        onPressed: workspace.toggleOutline,
-                      ),
-                    ],
-                  );
-                },
-              ),
+              title: Center(child: _EditorModePicker(workspace: workspace)),
+              actions: [
+                _HeaderIconButton(
+                  tooltip: workspace.outlineVisible
+                      ? 'Hide outline'
+                      : 'Show outline',
+                  icon: AppIcons.outline,
+                  selected: workspace.outlineVisible,
+                  onPressed: workspace.toggleOutline,
+                ),
+              ],
             ),
           ),
-          const Divider(),
           SizedBox(
-            height: DesktopMetrics.tabsHeight,
+            height: math.max(
+              DesktopMetrics.tabsHeight,
+              MediaQuery.textScalerOf(context).scale(15) + 12,
+            ),
             child: Row(
               children: [
                 Expanded(
@@ -293,7 +287,7 @@ class _DocumentTabState extends State<_DocumentTab> {
               decoration: BoxDecoration(
                 border: Border(
                   bottom: BorderSide(
-                    color: selected ? colors.textTertiary : Colors.transparent,
+                    color: selected ? colors.accent : Colors.transparent,
                     width: 1,
                   ),
                 ),
@@ -357,87 +351,53 @@ class _EditorModePicker extends StatelessWidget {
   final WorkspaceController workspace;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = IanvsMarkdownThemeData.resolve(context);
-    return ValueListenableBuilder<IanvsMarkdownEditorMode>(
-      valueListenable: workspace.activeDocument!.controller.modeListenable,
-      builder: (context, selected, _) {
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            color: colors.surfaceHover,
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(2),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (final mode in IanvsMarkdownEditorMode.values)
-                  Semantics(
-                    button: true,
-                    selected: selected == mode,
-                    label: switch (mode) {
-                      IanvsMarkdownEditorMode.livePreview => 'Live Preview',
-                      IanvsMarkdownEditorMode.source => 'Source',
-                      IanvsMarkdownEditorMode.preview => 'Read',
-                    },
-                    hint: switch (mode) {
-                      IanvsMarkdownEditorMode.livePreview =>
-                        'Edit with inline formatting',
-                      IanvsMarkdownEditorMode.source => 'Edit Markdown source',
-                      IanvsMarkdownEditorMode.preview =>
-                        'Preview without editing',
-                    },
-                    onTap: () => workspace.setMode(mode),
-                    excludeSemantics: true,
-                    child: Tooltip(
-                      excludeFromSemantics: true,
-                      message: switch (mode) {
-                        IanvsMarkdownEditorMode.livePreview =>
-                          'Live Preview: edit with inline formatting',
-                        IanvsMarkdownEditorMode.source =>
-                          'Source: edit Markdown source',
-                        IanvsMarkdownEditorMode.preview =>
-                          'Read: preview without editing',
-                      },
-                      child: Material(
-                        color: selected == mode
-                            ? colors.surfaceRaised
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(4),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(4),
-                          onTap: () => workspace.setMode(mode),
-                          child: Container(
-                            constraints: const BoxConstraints(minHeight: 28),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            child: Text(
-                              switch (mode) {
-                                IanvsMarkdownEditorMode.livePreview => 'Live',
-                                IanvsMarkdownEditorMode.source => 'Source',
-                                IanvsMarkdownEditorMode.preview => 'Read',
-                              },
-                              style: DesktopTypography.body.copyWith(
-                                color: selected == mode
-                                    ? colors.textPrimary
-                                    : colors.textSecondary,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
+  Widget build(BuildContext context) =>
+      ValueListenableBuilder<IanvsMarkdownEditorMode>(
+        valueListenable: workspace.activeDocument!.controller.modeListenable,
+        builder: (context, selected, _) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: SegmentedButton<IanvsMarkdownEditorMode>(
+            showSelectedIcon: false,
+            style: ButtonStyle(
+              minimumSize: const WidgetStatePropertyAll(Size(0, 32)),
+              padding: const WidgetStatePropertyAll(
+                EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              ),
+              textStyle: WidgetStatePropertyAll(
+                Theme.of(context).textTheme.bodyMedium,
+              ),
             ),
+            segments: const [
+              ButtonSegment(
+                value: IanvsMarkdownEditorMode.livePreview,
+                label: Tooltip(
+                  message: 'Live Preview: edit with inline formatting',
+                  excludeFromSemantics: true,
+                  child: Text('Live', semanticsLabel: 'Live Preview'),
+                ),
+              ),
+              ButtonSegment(
+                value: IanvsMarkdownEditorMode.source,
+                label: Tooltip(
+                  message: 'Source: edit Markdown source',
+                  excludeFromSemantics: true,
+                  child: Text('Source'),
+                ),
+              ),
+              ButtonSegment(
+                value: IanvsMarkdownEditorMode.preview,
+                label: Tooltip(
+                  message: 'Read: preview without editing',
+                  excludeFromSemantics: true,
+                  child: Text('Read'),
+                ),
+              ),
+            ],
+            selected: {selected},
+            onSelectionChanged: (modes) => workspace.setMode(modes.single),
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
 }
 
 class _HeaderIconButton extends StatelessWidget {
@@ -446,22 +406,34 @@ class _HeaderIconButton extends StatelessWidget {
     required this.tooltip,
     required this.icon,
     required this.onPressed,
+    this.selected = false,
   });
 
   final String tooltip;
   final IconData icon;
   final VoidCallback onPressed;
+  final bool selected;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = IanvsMarkdownThemeData.resolve(context);
-    return IconButton(
-      tooltip: tooltip,
-      onPressed: onPressed,
-      icon: Icon(icon, size: 16),
-      color: colors.textSecondary,
-      constraints: const BoxConstraints.tightFor(width: 28, height: 28),
-      padding: EdgeInsets.zero,
-    );
-  }
+  Widget build(BuildContext context) => IanvsIconButton(
+    tooltip: tooltip,
+    onPressed: onPressed,
+    icon: icon,
+    selected: selected,
+    style: ButtonStyle(
+      minimumSize: const WidgetStatePropertyAll(Size(32, 32)),
+      iconSize: const WidgetStatePropertyAll(16),
+      padding: const WidgetStatePropertyAll(EdgeInsets.all(6)),
+      backgroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? context.ianvs.selected
+            : Colors.transparent,
+      ),
+      foregroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? context.ianvs.onSelected
+            : context.ianvs.muted,
+      ),
+    ),
+  );
 }

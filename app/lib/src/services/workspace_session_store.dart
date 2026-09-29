@@ -15,11 +15,23 @@ class WorkspaceSnapshot {
     required this.sidebarVisible,
     required this.outlineVisible,
     this.sidebarWidth = WorkspaceLayout.defaultSidebarWidth,
+    this.browserState = const {},
+    this.operationGrants = const {},
+    this.favoriteAccessTokens = const {},
   });
 
   factory WorkspaceSnapshot.fromJson(Map<String, Object?> json) {
     final rawDocuments = json['documents'];
     return WorkspaceSnapshot(
+      browserState: json['browserState'] is Map
+          ? Map<String, Object?>.from(json['browserState'] as Map)
+          : const {},
+      favoriteAccessTokens: json['favoriteAccessTokens'] is Map
+          ? Map<String, String>.from(json['favoriteAccessTokens'] as Map)
+          : const {},
+      operationGrants: json['operationGrants'] is Map
+          ? Map<String, String>.from(json['operationGrants'] as Map)
+          : const {},
       documents: rawDocuments is List
           ? rawDocuments
                 .whereType<Map>()
@@ -47,8 +59,14 @@ class WorkspaceSnapshot {
   final bool sidebarVisible;
   final bool outlineVisible;
   final double sidebarWidth;
+  final Map<String, Object?> browserState;
+  final Map<String, String> operationGrants;
+  final Map<String, String> favoriteAccessTokens;
 
   Map<String, Object?> toJson() => <String, Object?>{
+    'browserState': browserState,
+    'operationGrants': operationGrants,
+    'favoriteAccessTokens': favoriteAccessTokens,
     'documents': documents,
     'activeDocumentId': activeDocumentId,
     'workspaceRoot': workspaceRoot,

@@ -198,3 +198,46 @@ final class IncomingMarkdownFiles {
     for url in securityScopedURLs.values { url.stopAccessingSecurityScopedResource() }
   }
 }
+
+/// Shared with native acceptance tests; FileManager never replaces a destination.
+enum WorkspaceFileOperations {
+  static func perform(_ operation: String, arguments: [String: Any]) throws -> String? {
+    guard let path = arguments["path"] as? String, !path.isEmpty else {
+      throw CocoaError(.fileNoSuchFile)
+    }
+    let manager = FileManager.default
+    let url = URL(fileURLWithPath: path).standardizedFileURL
+    switch operation {
+    case "createEntry":
+      if arguments["directory"] as? Bool == true {
+        // mkdir fails on an existing name, including a racing create.
+        guard mkdir(url.path, 0o777) == 0 else {
+          throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
+      } else {
+        try Data((arguments["contents"] as? String ?? "").utf8)
+          .write(to: url, options: .withoutOverwriting)
+      }
+    case "moveEntry", "copyEntry":
+      guard let destination = arguments["destination"] as? String, !destination.isEmpty else {
+        throw CocoaError(.fileNoSuchFile)
+      }
+      let target = URL(fileURLWithPath: destination).standardizedFileURL
+      if target.path == url.path || target.path.hasPrefix(url.path + "/") {
+        throw CocoaError(.fileWriteInvalidFileName)
+      }
+      if operation == "moveEntry" {
+        try manager.moveItem(at: url, to: target)
+      } else {
+        try manager.copyItem(at: url, to: target)
+      }
+    case "trashEntry":
+      var trashed: NSURL?
+      try manager.trashItem(at: url, resultingItemURL: &trashed)
+      return trashed?.path
+    default:
+      throw CocoaError(.featureUnsupported)
+    }
+    return nil
+  }
+}

@@ -265,7 +265,11 @@ void main() {
             find
                 .ancestor(
                   of: find.byTooltip('Source: edit Markdown source'),
-                  matching: find.byType(Semantics),
+                  matching: find.byWidgetPredicate(
+                    (widget) =>
+                        widget is Semantics &&
+                        widget.properties.selected != null,
+                  ),
                 )
                 .first,
           )

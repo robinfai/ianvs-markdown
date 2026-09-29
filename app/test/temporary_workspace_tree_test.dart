@@ -34,9 +34,9 @@ void main() {
     final document = (await workspace.openPath('/tmp/notes/draft.md'))!;
     await tester.pumpAndSettle();
 
-    expect(find.text('Temporary Files'), findsOneWidget);
+    expect(find.text('External Files'), findsOneWidget);
     expect(find.text('/tmp/notes'), findsOneWidget);
-    expect(find.text('draft.md'), findsOneWidget);
+    expect(find.text('draft.md', findRichText: true), findsOneWidget);
     expect(find.text('No folder open'), findsNothing);
     expect(find.byTooltip('/tmp/notes/draft.md'), findsOneWidget);
     expect(workspace.workspaceRoot, isNull);
@@ -58,7 +58,7 @@ void main() {
       ),
     );
     expect(semantics.properties.selected, isTrue);
-    expect(semantics.properties.hint, '/tmp/notes/draft.md');
+    expect(semantics.properties.hint, '/tmp/notes/draft.md, unsaved changes');
     await _finish(tester);
   });
 
@@ -85,14 +85,12 @@ void main() {
     expect(find.text('two'), findsOneWidget);
     expect(find.text('/tmp/one'), findsNothing);
     expect(find.text('/tmp/two'), findsNothing);
+    expect(_fileRow('/tmp/one/readme.md'), findsOneWidget);
     expect(
-      find.descendant(
-        of: _directory('/tmp/one'),
-        matching: _fileRow('/tmp/one/readme.md'),
-      ),
-      findsOneWidget,
+      tester.getTopLeft(_fileRow('/tmp/one/readme.md')).dy,
+      greaterThan(tester.getTopLeft(_directory('/tmp/one')).dy),
     );
-    expect(find.text('readme.md'), findsNWidgets(2));
+    expect(find.text('readme.md', findRichText: true), findsNWidgets(2));
     expect(find.text('design.md'), findsOneWidget);
     expect(find.text('later.md'), findsNothing);
     expect(workspace.documents.length, 4);
@@ -131,27 +129,29 @@ void main() {
     expect(find.text('notes'), findsOneWidget);
     expect(find.text('daily'), findsOneWidget);
     expect(find.text('reference'), findsOneWidget);
-    expect(find.text('readme.md'), findsNWidgets(2));
+    expect(find.text('readme.md', findRichText: true), findsNWidgets(2));
+    final rows = workspace.browser.rows
+        .where((row) => row.entry != null)
+        .toList();
     expect(
-      find.descendant(
-        of: _directory('/tmp/project/notes'),
-        matching: _directory('/tmp/project/notes/daily'),
-      ),
-      findsOneWidget,
+      rows
+          .firstWhere((row) => row.entry!.path == '/tmp/project/notes/daily')
+          .depth,
+      2,
     );
     expect(
-      find.descendant(
-        of: _directory('/tmp/project/notes/daily'),
-        matching: _fileRow('/tmp/project/notes/daily/readme.md'),
-      ),
-      findsOneWidget,
+      rows
+          .firstWhere(
+            (row) => row.entry!.path == '/tmp/project/notes/daily/readme.md',
+          )
+          .depth,
+      3,
     );
     expect(
-      find.descendant(
-        of: _directory('/tmp/project/notes'),
-        matching: _fileRow('/tmp/project/readme.md'),
-      ),
-      findsNothing,
+      rows
+          .firstWhere((row) => row.entry!.path == '/tmp/project/readme.md')
+          .depth,
+      1,
     );
 
     await tester.tap(find.text('notes'));
@@ -171,7 +171,7 @@ void main() {
     await tester.tap(find.text('notes'));
     await tester.pumpAndSettle();
     expect(find.text('summary.md'), findsOneWidget);
-    expect(find.text('readme.md'), findsNWidgets(2));
+    expect(find.text('readme.md', findRichText: true), findsNWidgets(2));
     expect(files.listedDirectories, isEmpty);
     await _finish(tester);
   });
@@ -229,20 +229,13 @@ void main() {
     expect(find.text('notes-old'), findsOneWidget);
     expect(_pathLabel('other/deep/folder'), findsOneWidget);
     expect(find.byTooltip('/other/deep/folder'), findsOneWidget);
-    expect(
-      find.descendant(
-        of: _directory('/tmp'),
-        matching: _directory('/tmp/notes'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: _directory('/tmp/notes'),
-        matching: _fileRow('/tmp/notes-old/b.md'),
-      ),
-      findsNothing,
-    );
+    expect(_directory('/tmp/notes'), findsOneWidget);
+    await tester.tap(find.text('notes'));
+    await tester.pumpAndSettle();
+    expect(_fileRow('/tmp/notes/a.md'), findsNothing);
+    expect(_fileRow('/tmp/notes-old/b.md'), findsOneWidget);
+    await tester.tap(find.text('notes'));
+    await tester.pumpAndSettle();
     expect(find.text('a.md'), findsOneWidget);
     expect(find.text('b.md'), findsOneWidget);
     expect(find.text('c.md'), findsOneWidget);
@@ -264,7 +257,7 @@ void main() {
 
     workspace.removeDocument(two);
     await tester.pumpAndSettle();
-    expect(find.text('Temporary Files'), findsNothing);
+    expect(find.text('External Files'), findsNothing);
     expect(find.text('/tmp/two'), findsNothing);
     expect(find.text('No folder open'), findsOneWidget);
     expect(find.text('Welcome.md'), findsNothing);
@@ -281,7 +274,7 @@ void main() {
     expect(await workspace.saveDocument(draft), isTrue);
     await tester.pumpAndSettle();
     expect(find.text('/tmp/original'), findsOneWidget);
-    expect(find.text('draft.md'), findsOneWidget);
+    expect(find.text('draft.md', findRichText: true), findsOneWidget);
 
     files.savePath = '/tmp/renamed/copy.md';
     expect(
@@ -290,7 +283,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('/tmp/original'), findsNothing);
-    expect(find.text('draft.md'), findsNothing);
+    expect(find.text('draft.md', findRichText: true), findsNothing);
     expect(find.text('/tmp/renamed'), findsOneWidget);
     expect(find.text('copy.md'), findsOneWidget);
     expect(files.files['/tmp/original/draft.md'], '# Draft');
@@ -336,7 +329,7 @@ void main() {
     expect(files.listedDirectories, ['/vault']);
 
     await _search(tester, 'readme');
-    expect(find.text('readme.md'), findsNWidgets(2));
+    expect(find.text('readme.md', findRichText: true), findsNWidgets(2));
     expect(find.text('/vault-other'), findsOneWidget);
     await tester.tap(find.byTooltip('Clear'));
     await tester.pumpAndSettle();
@@ -363,13 +356,13 @@ void main() {
     await workspace.openPath('/else/other.md');
     await _pumpSidebar(tester, workspace);
     await _search(tester, 'note');
-    expect(find.text('note.md'), findsOneWidget);
-    expect(find.text('other.md'), findsNothing);
+    expect(find.text('note.md', findRichText: true), findsOneWidget);
+    expect(find.text('other.md', findRichText: true), findsNothing);
 
     final two = (await workspace.openPath('/tmp/two/note.md'))!;
     await tester.pump(const Duration(milliseconds: 200));
     await tester.pumpAndSettle();
-    expect(find.text('note.md'), findsNWidgets(2));
+    expect(find.text('note.md', findRichText: true), findsNWidgets(2));
 
     files.savePath = '/else/renamed.md';
     expect(
@@ -384,15 +377,15 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 200));
     await tester.pumpAndSettle();
-    expect(find.text('note.md'), findsOneWidget);
+    expect(find.text('note.md', findRichText: true), findsOneWidget);
     workspace.removeDocument(one);
     await tester.pump(const Duration(milliseconds: 200));
     await tester.pumpAndSettle();
     expect(find.text('No matching files'), findsOneWidget);
 
     await _search(tester, '/else');
-    expect(find.text('renamed.md'), findsOneWidget);
-    expect(find.text('other.md'), findsOneWidget);
+    expect(find.text('renamed.md', findRichText: true), findsOneWidget);
+    expect(find.text('other.md', findRichText: true), findsOneWidget);
     expect(files.listedDirectories, isEmpty);
     await _finish(tester);
   });
@@ -472,7 +465,7 @@ void main() {
 Finder _fileRow(String path) => find.byKey(ValueKey('workspace-file-$path'));
 
 Finder _directory(String path) =>
-    find.byKey(ValueKey('temporary-directory-$path'));
+    find.byKey(ValueKey('workspace-directory-$path'));
 
 Finder _pathLabel(String path) => find.byWidgetPredicate(
   (widget) => widget is MiddleEllipsisText && widget.data == path,

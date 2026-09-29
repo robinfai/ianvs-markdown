@@ -18,6 +18,7 @@ class DesktopMenuBar extends StatelessWidget {
     required this.onSaveAs,
     required this.onClose,
     required this.onToggleTheme,
+    this.onUseSystemTheme,
     this.onOpenSettings,
     required this.child,
   });
@@ -29,6 +30,7 @@ class DesktopMenuBar extends StatelessWidget {
   final VoidCallback onSaveAs;
   final VoidCallback onClose;
   final VoidCallback onToggleTheme;
+  final VoidCallback? onUseSystemTheme;
   final VoidCallback? onOpenSettings;
   final Widget child;
 
@@ -266,6 +268,11 @@ class DesktopMenuBar extends StatelessWidget {
               label: 'Toggle Appearance',
               onSelected: onToggleTheme,
             ),
+            if (onUseSystemTheme != null)
+              PlatformMenuItem(
+                label: 'Use System Appearance',
+                onSelected: onUseSystemTheme,
+              ),
             const PlatformProvidedMenuItem(
               type: PlatformProvidedMenuItemType.toggleFullScreen,
             ),
