@@ -52,11 +52,13 @@ Integration boundaries in the current desktop shell:
 - Open-document text, modes, and workspace visibility are recovered. Appearance,
   caret positions, and scroll offsets are not serialized across app launches.
 
-The desktop shell integrates the published `ianvs_design: ^0.4.0` package.
+The desktop shell integrates the published `ianvs_design: ^0.4.1` package.
 Shared themes and controls use compact density and macOS system fonts.
 Appearance follows the system by default; View → Use System Appearance restores
 following after a manual override. Sidebar resize supports arrow keys, Home/End,
-and double-click or Enter to reset. Control-click opens the file context menu;
+and double-click or Enter to reset. Its single divider sits at the sidebar's
+right edge while retaining an 8-point drag target inside the sidebar.
+Control-click opens the file context menu;
 Command-click remains additive selection.
 
 Specialized outline/tab typography is defined in `lib/src/desktop_typography.dart`.

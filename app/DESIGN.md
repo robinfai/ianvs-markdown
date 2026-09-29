@@ -15,7 +15,7 @@ an AppKit control or that the app implements Liquid Glass.
 - [Apple: Context menus](https://developer.apple.com/design/human-interface-guidelines/context-menus)
 - [Apple: Menus](https://developer.apple.com/design/human-interface-guidelines/menus)
 
-The app uses the published `ianvs_design: ^0.4.0` package. `IanvsTheme.build`
+The app uses the published `ianvs_design: ^0.4.1` package. `IanvsTheme.build`
 with compact density supplies Material controls, `IanvsTokens` and code
 `IanvsTypography`. `desktop_theme.dart` maps the same semantic colors into
 `IanvsMarkdownThemeData`; it does not maintain a second palette or add
@@ -71,7 +71,9 @@ Exact sizes below are app design decisions, not Apple-mandated dimensions.
 - `IanvsResizeHandle` owns drag, keyboard and accessibility input. Arrow keys
   adjust width by 20 points, Home/End go to its current limits, Enter or a
   double-click resets the preferred width. Width persistence remains in the
-  workspace controller.
+  workspace controller. Its 8-point hit area stays inside the sidebar, with
+  `lineAlignment: Alignment.centerRight` placing the visible divider at the
+  physical right edge. The sidebar does not paint a second border.
 - macOS Control-click and secondary click open the same context menu without
   opening a file. Command-click toggles selection and Shift-click selects a
   range. Move to Trash is separated and appears last in a destructive color.

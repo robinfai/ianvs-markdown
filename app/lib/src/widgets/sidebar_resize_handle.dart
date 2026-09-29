@@ -28,6 +28,7 @@ class SidebarResizeHandle extends StatelessWidget {
         max: maxWidth,
         resetValue: WorkspaceLayout.defaultSidebarWidth,
         hitExtent: 8,
+        lineAlignment: Alignment.centerRight,
         semanticLabel: 'Resize sidebar',
         semanticValueFormatter: (value) => '${value.round()} points',
         onChanged: onResize,

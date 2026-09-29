@@ -248,11 +248,8 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
       data: desktopTheme(Brightness.dark),
       child: Material(
         color: _background,
-        child: Container(
+        child: SizedBox(
           width: widget.width ?? widget.workspace.sidebarWidth,
-          decoration: const BoxDecoration(
-            border: Border(right: BorderSide(color: Color(0xff323536))),
-          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

@@ -292,10 +292,10 @@ packages:
     dependency: "direct main"
     description:
       name: ianvs_design
-      sha256: "702d15f43e586ff01088876248ef88d012e4879944f9864fb554ec55b2ee9b37"
+      sha256: ee0fa8478032cfeb645d1d2649ae593ee7d9062f5f1af51bf93f160f5611beab
       url: "https://pub.dev"
     source: hosted
-    version: "0.4.0"
+    version: "0.4.1"
   ianvs_markdown:
     dependency: "direct main"
     description:
