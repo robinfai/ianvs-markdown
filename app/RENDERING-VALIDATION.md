@@ -157,3 +157,36 @@ with different hashes. On this case-insensitive volume they resolve to one
 file, so the latter hash check fails. This pre-existing HTML-preview packaging
 issue does not affect the Markdown app checks. The previews and those manifest
 entries were not changed; the repaired `MATH-NOTES.md` checksum matches.
+
+## Quick Look 系统预览（2026-09-30）
+
+- 环境：macOS 27.0.1、Xcode 27、Apple Silicon。随 Linefold 安装数据型
+  `work.ianvs.linefold.QuickLook` 扩展，支持宿主声明的 `.md` / `.markdown`。
+- 原生渲染：8 个 Rust 测试和 10 项 Swift 检查通过，覆盖中文 GFM、真实
+  merman SVG、箭头、错误图表、HTML/链接处理、重复标题、front matter、
+  UTF-8/BOM/UTF-16、空文件、缺失文件、无效编码与有界读取。
+- Finder 实测：安装后选中 `中文系统预览.markdown` 按空格，显示标题、中文、
+  表格、任务列表、代码和三个中文节点的 Mermaid 流程图。箭头完整；光标位于
+  图表时可滚动至文末。错误 Mermaid 保留源码，后续“文档结尾：预览完整”可见。
+  本次看到的是系统 Quick Look HTML 内容，AX 标题为 `Linefold Markdown Preview`，
+  不是浏览器或单独导出的 HTML 演示。
+- 打包边界：Release 构建和深度签名检查通过。扩展的非系统动态依赖只有自身
+  Frameworks 下的 `@rpath/libmerman_ffi.dylib`；无 Flutter 插件或构建机器绝对
+  路径。沙箱开启，无网络客户端授权。安装脚本在替换旧应用前执行此检查。
+- 本机临时签名沿用主应用策略。首次联调发现额外开启 Hardened Runtime 会因
+  ad-hoc 签名没有 Team ID 拒绝动态库；已移除新扩展单独添加的该构建设置，
+  没有增加禁用库校验的 entitlement，也没有修改系统安全设置。
+- 既有回归：四个包静态分析和 Dart 格式检查通过；example 5 项、app 149 项
+  （另有 1 项需外部语料而跳过）、Mermaid 7 项 Flutter 测试和 3 项 Rust 测试通过。
+- `make check` **未全绿**：根包 796 项通过，`test/focus_geometry_test.dart`
+  因既有跨包依赖无法加载。该测试引用 `app/lib/src/desktop_theme.dart`，而根包
+  未声明应用使用的 `ianvs_design`；相关文件与 HEAD 完全一致。本次未修改这一
+  无关依赖，已单独运行并通过被 `make check` 提前退出跳过的后续检查。
+- 未验证：Intel 真机、macOS 12 真机、Developer ID 分发/公证，以及所有 Mermaid
+  图类型与 Obsidian 专属语法的完整一致性。亮色 CSS 已实现，本次 Finder 实测
+  使用系统当前的暗色外观。
+
+复现入口：`make test-quicklook`、`make install`，以及
+`bash app/tool/verify_quicklook_bundle.sh /Applications/Linefold.app`。
+本机日志保存在 `app/build/quicklook-native-check.log`、`quicklook-build.log`、
+`quicklook-check.log` 和 `quicklook-remaining-checks.log`（均不提交）。

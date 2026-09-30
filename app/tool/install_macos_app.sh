@@ -48,10 +48,20 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 ditto "$linefold_source" "$linefold_stage/Linefold.app"
-codesign --verify --deep --strict "$linefold_stage/Linefold.app"
+bash "$linefold_app_dir/tool/verify_quicklook_bundle.sh" "$linefold_stage/Linefold.app"
 if [[ -d "$linefold_target" ]]; then
   mv "$linefold_target" "$linefold_backup"
 fi
 mv "$linefold_stage/Linefold.app" "$linefold_target"
 
 printf 'Installed Linefold at %s\n' "$linefold_target"
+
+# Register the containing app and its embedded preview extension. This leaves
+# the user's default editor and choices of other Quick Look providers intact.
+linefold_lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+if ! "$linefold_lsregister" -f "$linefold_target" ||
+   ! /usr/bin/pluginkit -a "$linefold_target/Contents/PlugIns/LinefoldQuickLook.appex"; then
+  printf 'Quick Look registration could not finish. Open Linefold once, then enable Linefold Markdown Preview in System Settings → General → Login Items & Extensions → Quick Look.\n' >&2
+else
+  printf 'Registered Linefold Markdown Preview for Finder Quick Look.\n'
+fi

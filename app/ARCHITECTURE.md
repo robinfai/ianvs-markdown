@@ -66,6 +66,34 @@ Markdown through the workspace, image files to a preview, and web/HTML/PDF links
 to macOS. The SVG preview's external-open action also delegates to macOS.
 File reads continue to use the existing sandbox permissions.
 
+## Quick Look 扩展
+
+`macos/QuickLook` 是独立的 macOS 12+ 数据型预览扩展，随 Runner 放入
+`Contents/PlugIns/LinefoldQuickLook.appex`。`PreviewProvider` 向系统返回
+`QLPreviewReply(.html)`，文件读取与渲染在 reply 的数据创建闭包中进行。
+扩展仅声明 `net.daringfireball.markdown`，沿用宿主的 `.md` / `.markdown`
+类型关联，不接管所有纯文本。
+
+```text
+Finder → Quick Look → PreviewProvider
+                      ↓ 有界文件读取、编码转换
+                Rust pulldown-cmark
+                      ↓
+              HTML + merman SVG 图像 → 系统 HTML 预览
+```
+
+Mermaid 复用 Flutter 已锁定的 `merman` 原生库与 `resvg-safe` 输出模式。系统
+SVG 图像支持文字和 marker，因此这里不做 Flutter 专用的 usvg 路径展开。
+普通 Markdown 使用锁定版本的 `pulldown-cmark` 生成静态 HTML；不载入 Flutter
+引擎、不调用宿主进程、不执行文档脚本。正文样式在 `renderer/style.css`，不
+依赖用户环境中的主题文件。扩展具备独立沙箱，无网络访问授权。
+
+`tool/build_quicklook.sh` 按 Xcode 的 ARCHS 构建 Rust 静态库，并把当前 merman
+库放入扩展自身的 Frameworks；归一化 install name 后签名。扩展显式覆盖
+项目层继承的 CocoaPods 链接参数，避免依赖宿主插件或发布机器上的绝对路径。
+`tool/verify_quicklook_bundle.sh` 检查这一边界，安装脚本在替换旧应用前运行它。
+安装完成后只注册宿主与扩展，不重设默认编辑器，不禁用其他预览提供方。
+
 ## App-shell visual contract
 
 The shell uses one resizable black workspace sidebar (248 points by default), a minimum 52-point document

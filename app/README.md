@@ -32,6 +32,7 @@ Implemented application-shell capabilities:
   persistent preference in Linefold → Settings… (Command-,)
 - Finder open requests, including files received before workspace recovery finishes
 - native Mermaid diagrams in Live/Read, including SVG arrowheads and Chinese labels
+- Finder Quick Look previews for `.md` and `.markdown`, including native Mermaid diagrams
 - Read-mode links to local Markdown and headings, local image previews, and
   external web, HTML, and PDF links
 
@@ -122,6 +123,39 @@ replaces the app bundle after verifying the new copy and preserves user data.
 
 `example/` remains the small package-integration example. Product features
 belong here instead of in the example application.
+
+## macOS 系统快速预览
+
+`make install` 会同时安装并注册 `Linefold Markdown Preview` 扩展。在 Finder
+选中 `.md` 或 `.markdown` 文件并按空格，即可预览磁盘上已保存的内容；无需启动
+Linefold，也不改变默认编辑器。若系统没有自动启用，可在“系统设置 → 通用 →
+登录项与扩展 → 快速查看”中启用它。不同 macOS 版本的设置位置可能略有区别。
+已有其他 Markdown 预览扩展时，最终使用哪个扩展由系统和用户的扩展选择决定。
+
+支持标题、强调、列表、任务、引用、表格、围栏代码、删除线、脚注、标题锚点和
+Mermaid；闭合的 YAML front matter 不显示。正文随系统切换亮暗配色，图表使用
+白底以保持原生引擎的文字和连线对比度。读取支持 UTF-8、UTF-8 BOM 和带 BOM 的
+UTF-16。图表失败时显示原因和原始源码，其余正文继续显示。
+
+Quick Look 的正文使用 CommonMark/GFM HTML 输出，与应用里的 Flutter 排版是
+两个展示后端；公式、Wiki 嵌入及其他 Obsidian 专属语法不承诺与应用一致。
+原始 HTML 显示为文本；本地和远程图片显示带说明的占位符，扩展不读取相邻文件
+或请求网络。网页、邮件与标题锚点保留链接，本地相对链接只保留文字。
+预览限制为 2 MiB 文本、32 张图，每图 128 KiB 源码，生成内容最多
+16 MiB；超限会显示提示，文档不会被修改。
+
+在仓库根目录运行：
+
+```sh
+make test-quicklook
+make install
+bash app/tool/verify_quicklook_bundle.sh /Applications/Linefold.app
+```
+
+原生测试覆盖实际 merman FFI、Markdown 结构、编码、错误恢复和输入限制；打包
+检查覆盖扩展声明、宿主版本一致性、独立动态库路径与签名。交互样例为
+`app/test/fixtures/quicklook.md`。Finder 按空格的实测用于确认系统选中了扩展；
+`qlmanage -p` 的成功不能替代这一步。
 
 See [DESIGN.md](DESIGN.md) for the macOS visual contract and verification notes,
 and [ARCHITECTURE.md](ARCHITECTURE.md) for dependency and recovery rules.

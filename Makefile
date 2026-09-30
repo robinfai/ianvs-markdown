@@ -4,7 +4,7 @@ INSTALL_DIR ?= /Applications
 
 .DEFAULT_GOAL := help
 
-.PHONY: help deps format format-check analyze test test-example test-app test-mermaid check run example run-app install clean publish-dry-run
+.PHONY: help deps format format-check analyze test test-example test-app test-mermaid test-quicklook check run example run-app install clean publish-dry-run
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -40,7 +40,11 @@ test-mermaid: ## Run the macOS native Mermaid bridge and visual regressions
 	cargo test --locked --manifest-path packages/ianvs_mermaid/rust/Cargo.toml
 	cd packages/ianvs_mermaid && $(FLUTTER) test
 
-check: format-check analyze test test-example test-app test-mermaid ## Run all validation checks
+test-quicklook: ## Test the native macOS Quick Look renderer and file loading
+	cargo fmt --check --manifest-path app/macos/QuickLook/renderer/Cargo.toml
+	bash app/tool/test_native_quicklook.sh
+
+check: format-check analyze test test-example test-app test-mermaid test-quicklook ## Run all validation checks
 
 run: ## Run the desktop app on macOS (make run example for the example)
 	cd $(if $(filter example,$(MAKECMDGOALS)),example,app) && $(FLUTTER) run -d macos

@@ -1,0 +1,15 @@
+[package]
+name = "linefold_quicklook"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+pulldown-cmark = { version = "=0.13.4", default-features = false, features = ["html"] }
+base64 = "=0.22.1"
+
+[profile.release]
+strip = "none"

@@ -1,0 +1,17 @@
+#include "../Flutter/ephemeral/Flutter-Generated.xcconfig"
+
+PRODUCT_NAME = LinefoldQuickLook
+PRODUCT_BUNDLE_IDENTIFIER = work.ianvs.linefold.QuickLook
+INFOPLIST_FILE = QuickLook/Info.plist
+CODE_SIGN_ENTITLEMENTS = QuickLook/QuickLook.entitlements
+SWIFT_OBJC_BRIDGING_HEADER = QuickLook/PreviewBridge.h
+SWIFT_VERSION = 5.0
+MACOSX_DEPLOYMENT_TARGET = 12.0
+APPLICATION_EXTENSION_API_ONLY = YES
+SKIP_INSTALL = YES
+ENABLE_USER_SCRIPT_SANDBOXING = NO
+// Project-level Flutter configs include Runner's CocoaPods flags. The extension
+// must link only its own native library, never the editor's Flutter plugins.
+LIBRARY_SEARCH_PATHS = "$(BUILT_PRODUCTS_DIR)/LinefoldQuickLookNative"
+OTHER_LDFLAGS = -llinefold_quicklook -lmerman_ffi -liconv
+LD_RUNPATH_SEARCH_PATHS = @executable_path/../Frameworks
