@@ -7,6 +7,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
+import 'package:ianvs_markdown/src/editor/editor_diagnostics.dart';
 import 'package:ianvs_markdown/src/code_surface.dart';
 import 'package:ianvs_markdown/src/html_date_input.dart';
 import 'package:ianvs_markdown/src/html_radio_group.dart';
@@ -98,6 +99,125 @@ void main() {
       TextPosition(offset: substringStart + offsetWithin),
     );
     await tester.tapAt(editable.localToGlobal(caret.center));
+  }
+
+  testWidgets(
+    'selection and composing reuse document structure across blocks',
+    (tester) async {
+      const source = 'Alpha first paragraph\n\nBeta second paragraph';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tapSelectableSubstring(
+        tester,
+        selectableTextContainingPlainText('Alpha'),
+        'Alpha',
+      );
+      await tester.pumpAndSettle();
+      final parses = IanvsMarkdownEditorDiagnostics.documentParses;
+      controller.value = controller.value.copyWith(
+        selection: const TextSelection.collapsed(offset: 3),
+        composing: const TextRange(start: 1, end: 3),
+      );
+      await tester.pump();
+      var local = tester.widget<TextField>(find.byType(TextField)).controller!;
+      expect(local.selection, controller.selection);
+      expect(local.value.composing, const TextRange(start: 1, end: 3));
+
+      controller.value = controller.value.copyWith(
+        selection: TextSelection.collapsed(offset: source.indexOf('Beta') + 2),
+        composing: TextRange.empty,
+      );
+      await tester.pump();
+      local = tester.widget<TextField>(find.byType(TextField)).controller!;
+      expect(local.text, 'Beta second paragraph');
+      expect(local.selection.extentOffset, 2);
+      local.value = local.value.copyWith(
+        selection: const TextSelection.collapsed(offset: 4),
+        composing: const TextRange(start: 2, end: 4),
+      );
+      await tester.pump();
+      expect(controller.selection.extentOffset, source.indexOf('Beta') + 4);
+      expect(
+        controller.value.composing,
+        TextRange(
+          start: source.indexOf('Beta') + 2,
+          end: source.indexOf('Beta') + 4,
+        ),
+      );
+      expect(IanvsMarkdownEditorDiagnostics.documentParses, parses);
+      expect(controller.text, source);
+      expect(controller.isDirty, isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('source edits, undo and redo refresh document structure', (
+    tester,
+  ) async {
+    const original = '# First\n\n- Alpha\n\n[link][ref]\n\n[ref]: first.md';
+    const changed = '# Second\n\n- Beta\n\n[link][ref]\n\n[ref]: second.md';
+    final controller = IanvsMarkdownController(text: original);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+    final parses = IanvsMarkdownEditorDiagnostics.documentParses;
+    controller.text = changed;
+    await tester.pumpAndSettle();
+    expect(find.text('Second'), findsWidgets);
+    expect(IanvsMarkdownEditorDiagnostics.documentParses, parses + 1);
+    controller.undo();
+    await tester.pumpAndSettle();
+    expect(controller.text, original);
+    expect(find.text('First'), findsWidgets);
+    expect(IanvsMarkdownEditorDiagnostics.documentParses, parses + 2);
+    controller.redo();
+    await tester.pumpAndSettle();
+    expect(controller.text, changed);
+    expect(find.text('Second'), findsWidgets);
+    expect(IanvsMarkdownEditorDiagnostics.documentParses, parses + 3);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final source in [
+    'Alpha **bold** text',
+    '# Alpha heading',
+    '- Alpha item',
+  ]) {
+    testWidgets('filled host fields preserve live text width: $source', (
+      tester,
+    ) async {
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(
+            inputDecorationTheme: const InputDecorationThemeData(
+              filled: true,
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.all(24),
+            ),
+          ),
+          home: Scaffold(
+            body: IanvsMarkdownLiveEditor(
+              controller: controller,
+              contentMaxWidth: 320,
+              showToolbar: false,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final rendered = selectableTextContainingPlainText('Alpha');
+      final beforeWidth = editableWithin(tester, rendered).constraints.maxWidth;
+      await tapSelectableSubstring(tester, rendered, 'Alpha');
+      await tester.pumpAndSettle();
+      final active = editableWithin(tester, find.byType(TextField));
+      expect(active.constraints.maxWidth, closeTo(beforeWidth, .01));
+      expect(controller.text, source);
+      expect(controller.isDirty, isFalse);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   testWidgets('basic list items stay compact across blur and focus', (

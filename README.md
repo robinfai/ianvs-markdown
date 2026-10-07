@@ -2,6 +2,8 @@
 
 从 `ianvs-acp` 抽离并继续演进的 Flutter Markdown 渲染与编辑组件。它保留了原有的阅读体验，同时去掉了对 ACP 状态、工作区文件系统和特定 Mermaid 实现的耦合。
 
+组件库的迭代任务、依赖、验收标准和执行记录见仓库中的 [ROADMAP.md](https://github.com/robinfai/ianvs-markdown/blob/main/ROADMAP.md)。当前优先推进独立发布基线，再完善宿主接入、性能与平台兼容性。
+
 ## 能力
 
 - GitHub Flavored Markdown、可选择文本、表格与任务列表
@@ -232,13 +234,18 @@ IanvsMarkdownEditor(controller: controller)
 也可通过 `make install INSTALL_DIR="$HOME/Applications"` 安装到当前用户的应用程序目录。
 
 [example](example/) 保持为最小的组件集成示例，展示 Controller、三种模式、
-保存回调、主题以及 Mermaid builder 注入，不读取或写入用户文件：
+保存回调和主题，不读取或写入用户文件。默认图片使用占位，Mermaid 使用代码回退；
+无需安装原生 Mermaid 后端：
 
 ```sh
 cd example
-flutter pub get --offline
+flutter pub get
 flutter run -d macos
 ```
+
+可选原生 Mermaid 接入示例位于仓库中的
+[packages/ianvs_mermaid/example](https://github.com/robinfai/ianvs-markdown/tree/main/packages/ianvs_mermaid/example)，
+通过 `diagramBuilder` 注入，并单独说明 Rust 工具链及平台要求。
 
 完整的文件优先桌面编辑器位于 GitHub 仓库中的 [app](https://github.com/robinfai/ianvs-markdown/tree/main/app)，不包含在 pub.dev 包中。它保留 MarkText 式文件优先产品结构，
 使用 macOS 风格的工具栏、全高黑色工作区侧栏、中性亮暗配色和蓝色操作强调。
@@ -281,9 +288,18 @@ IanvsMarkdown(data: trustedSource, renderBudget: null)
 
 首版基于 `ianvs-acp` 的 Markdown 代码块、链接、front matter 和文件预览实现整理。ACP 专属输入预算、图片解码账本、工作区路径校验和文件预览导航没有进入本包；对应能力改为通用预算或宿主注入点。
 
-运行验证：
+最低支持 Flutter 3.44.0 / Dart 3.12.0。核心验证矩阵覆盖 Flutter 3.44.0
+与 3.47.6；平台支持仍以已验证的宿主场景为准。
+
+在 GitHub 仓库运行验证（发布包不包含仓库维护脚本）：
 
 ```sh
-flutter test
-flutter analyze
+make check-core
+make check-package
 ```
+
+`make check-integrations` 在 macOS 执行宿主、原生 Mermaid 和 Quick Look
+回归；`make check` 汇总全部检查。格式器固定在 Dart 3.12 系列；使用较新
+SDK 时，可传入 `FORMAT_DART=/path/to/flutter-3.44.0/bin/dart`。
+详细发布接入检查和 CI 合入设置见
+[CONTRIBUTING.md](https://github.com/robinfai/ianvs-markdown/blob/main/CONTRIBUTING.md)。

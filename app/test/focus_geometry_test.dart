@@ -6,9 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 
-// Exercise the actual host typography without a package dependency on the app.
-// ignore: avoid_relative_lib_imports
-import '../app/lib/src/desktop_theme.dart';
+// Exercise the actual host typography in the package that owns its theme.
+import 'package:linefold/src/desktop_theme.dart';
 
 RenderEditable _editableWithin(WidgetTester tester, Finder finder) {
   RenderEditable? editable;

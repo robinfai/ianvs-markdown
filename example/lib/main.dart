@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 
-import 'package:ianvs_mermaid/ianvs_mermaid.dart';
-
 void main() => runApp(const ExampleApp());
 
 class ExampleApp extends StatefulWidget {
@@ -103,8 +101,6 @@ class _MarkdownExampleState extends State<MarkdownExample> {
         showNavigationPane: false,
         showFrontMatter: true,
         enableHeadingFolding: true,
-        imageBuilder: buildExampleNetworkImage,
-        diagramBuilder: (context, source) => MermaidView(source: source),
         onSaveRequested: (_) {
           _controller.markSaved();
           ScaffoldMessenger.of(context).showSnackBar(
@@ -125,44 +121,6 @@ class _MarkdownExampleState extends State<MarkdownExample> {
       ..clearHistory()
       ..markSaved();
   }
-}
-
-Widget buildExampleNetworkImage(Uri uri, String? title, String? alt) {
-  if (uri.scheme != 'https' && uri.scheme != 'http') {
-    return Text(alt?.isNotEmpty == true ? alt! : uri.toString());
-  }
-  return Image.network(
-    uri.toString(),
-    semanticLabel: alt,
-    fit: BoxFit.contain,
-    filterQuality: FilterQuality.medium,
-    loadingBuilder: (context, child, progress) {
-      if (progress == null) return child;
-      final total = progress.expectedTotalBytes;
-      return SizedBox(
-        height: 180,
-        child: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            value: total == null
-                ? null
-                : progress.cumulativeBytesLoaded / total,
-          ),
-        ),
-      );
-    },
-    errorBuilder: (context, error, stackTrace) => SizedBox(
-      height: 120,
-      child: Center(
-        child: Text(
-          alt?.isNotEmpty == true
-              ? 'Unable to load $alt'
-              : 'Unable to load image',
-          textAlign: TextAlign.center,
-        ),
-      ),
-    ),
-  );
 }
 
 const exampleMarkdown =
@@ -288,7 +246,8 @@ Indented code is also supported:
 
 ## Mermaid diagram
 
-The example app injects its Mermaid renderer through `diagramBuilder`.
+Without a host-supplied `diagramBuilder`, Mermaid remains a code block.
+The optional native adapter has its own example in the repository.
 
 ```mermaid
 flowchart LR
@@ -307,7 +266,7 @@ ${r'$$'}
 
 ## Images and embeds
 
-Standard image syntax remains host-controlled for safe loading:
+Images display a placeholder until the host supplies an `imageBuilder`:
 
 ![Frame diff principle advantages](https://robinfai.github.io/ianvs-terminal/assets/images/frame-diff/principle-advantages.png "Frame diff principle advantages")
 

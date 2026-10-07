@@ -10,6 +10,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
+import 'editor_diagnostics.dart';
+
 import '../callout.dart';
 import '../code_block.dart';
 import '../code_surface.dart';
@@ -330,11 +332,16 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
 
   void _handleDocumentChanged() {
     final source = widget.controller.text;
-    if (source != _lastText) {
+    final textChanged = source != _lastText;
+    if (textChanged) {
       _lastText = source;
       widget.onChanged?.call(source);
     }
-    _refreshBlocks(source);
+    // Selection and IME composing changes still need the active surface sync
+    // below, but references, blocks and folds depend only on the source text.
+    if (textChanged || IanvsMarkdownEditorDiagnostics.forceDocumentRefresh) {
+      _refreshBlocks(source);
+    }
     if (_activeBlockStart != null &&
         widget.controller.mode == IanvsMarkdownEditorMode.livePreview) {
       final selected = markdownBlockAtOffset(
@@ -471,6 +478,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   }
 
   void _refreshBlocks(String source) {
+    IanvsMarkdownEditorDiagnostics.recordDocumentParse();
     _linkReferences = MarkdownLinkReferenceContext.parse(source);
     _blockController.linkReferenceLabels = _linkReferences.labels;
     _crossParagraphHighlightLiteralRuns =
@@ -3836,6 +3844,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       cursorColor: colors.accent,
       cursorWidth: 1.5,
       decoration: const InputDecoration(
+        filled: false,
         border: InputBorder.none,
         enabledBorder: InputBorder.none,
         focusedBorder: InputBorder.none,
@@ -4110,6 +4119,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       cursorColor: colors.accent,
       cursorWidth: 1.5,
       decoration: InputDecoration(
+        // The block paints its own surface. Inheriting a filled host field
+        // adds Material 3 input gaps even with collapsed, zero padding.
+        filled: false,
         hintText: widget.controller.text.isEmpty ? widget.placeholder : null,
         hintStyle: activeTextStyle.copyWith(color: colors.textTertiary),
         border: InputBorder.none,
@@ -6610,7 +6622,11 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
     if (!mounted) return;
     var changed = false;
     final tableRender = _tableGeometryKey.currentContext?.findRenderObject();
-    if (tableRender is RenderTable && !tableRender.debugNeedsLayout) {
+    // This callback runs after layout. debugNeedsLayout itself throws in
+    // profile/release on supported Flutter versions; only read it in debug.
+    if (tableRender is RenderTable &&
+        tableRender.hasSize &&
+        (!kDebugMode || !tableRender.debugNeedsLayout)) {
       for (var row = 0; row < tableRender.rows; row++) {
         final height = tableRender.getRowBox(row).height;
         if (_rowHandleLengths[row] != height) {

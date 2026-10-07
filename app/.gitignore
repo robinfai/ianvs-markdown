@@ -1,6 +1,8 @@
 # Miscellaneous
 *.class
 *.log
+# Keep the historical, checked-in report visible to Git and Pub validation.
+!design/ianvs-macos-acceptance/verification.log
 *.pyc
 *.swp
 .DS_Store

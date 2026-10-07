@@ -5,8 +5,13 @@
 .product-design/
 .vscode/
 app/
-# This integration test imports the standalone application's theme.
-test/focus_geometry_test.dart
+demos/
+packages/
+tool/
+benchmark/
+ROADMAP.md
+Makefile
+CONTRIBUTING.md
 build/
 coverage/
 design-qa.md

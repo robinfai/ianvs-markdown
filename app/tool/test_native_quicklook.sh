@@ -3,7 +3,24 @@ set -euo pipefail
 
 linefold_app_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 linefold_output="$linefold_app_dir/build/quicklook-tests"
-export MERMAN_LIB_DIR="$linefold_app_dir/macos/Flutter/ephemeral/.symlinks/plugins/merman/macos/Libraries"
+# Pub resolution is sufficient for these native tests. A clean checkout has
+# not run CocoaPods yet, so its generated plugin symlink need not exist.
+MERMAN_LIB_DIR="$("${PYTHON:-python3}" - "$linefold_app_dir" <<'PY'
+import json
+from pathlib import Path
+import sys
+from urllib.parse import unquote, urljoin, urlparse
+
+config = Path(sys.argv[1]) / '.dart_tool/package_config.json'
+packages = json.loads(config.read_text())['packages']
+package = next(item for item in packages if item['name'] == 'merman')
+uri = urlparse(urljoin(config.as_uri(), package['rootUri']))
+if uri.scheme != 'file':
+    raise RuntimeError(f'Expected a local merman package, got {uri.scheme}')
+print(Path(unquote(uri.path)).resolve() / 'macos/Libraries')
+PY
+)"
+export MERMAN_LIB_DIR
 export CARGO_TARGET_DIR="$linefold_app_dir/build/quicklook-native"
 mkdir -p "$linefold_output"
 

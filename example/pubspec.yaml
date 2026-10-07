@@ -7,9 +7,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_svg: ^2.3.0
-  ianvs_mermaid:
-    path: ../packages/ianvs_mermaid
   ianvs_markdown:
     path: ../
 

@@ -190,3 +190,8 @@ entries were not changed; the repaired `MATH-NOTES.md` checksum matches.
 `bash app/tool/verify_quicklook_bundle.sh /Applications/Linefold.app`。
 本机日志保存在 `app/build/quicklook-native-check.log`、`quicklook-build.log`、
 `quicklook-check.log` 和 `quicklook-remaining-checks.log`（均不提交）。
+
+2026-10-07 补充：上述根包加载问题已在组件库 R0-01 修复。真实主题布局测试
+现位于 `app/test/focus_geometry_test.dart`，保留 111 项检查，并修复了宿主
+填充输入框主题引起的焦点宽度偏移。后续结果以 [组件库迭代记录](../ROADMAP.md)
+为准；上面的验证记录保留当时的结果。

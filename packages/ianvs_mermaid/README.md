@@ -17,7 +17,7 @@ normalization remains in `tool/normalize_macos.sh`; merman is still the diagram
 engine. End users need neither Cargo nor a font bundle.
 
 After adding this build hook to an existing checkout, run `flutter clean` and
-`flutter pub get` once in `app/` and `example/` to discard old native-asset
+`flutter pub get` once in `app/` and `packages/ianvs_mermaid/example/` to discard old native-asset
 manifests. Normal subsequent builds are incremental. Do not run a clean/build
 concurrently with another Flutter command against the same application.
 
@@ -76,3 +76,6 @@ Run `make test-mermaid` from the repository root on macOS. To validate the
 production document widget, run `flutter test test/document_diagram_test.dart`
 from `app/`. The optional LLM corpus test reads all 57 documents in Read/Live and
 preprocesses all 25 Mermaid sources through the same native pipeline.
+
+The [optional adapter example](example/) demonstrates `diagramBuilder`
+integration. The repository's root `example/` is independent of this backend.

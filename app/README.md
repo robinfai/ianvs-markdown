@@ -85,6 +85,12 @@ workspace; run `bash app/tool/test_native_file_association.sh` from the reposito
 root. They do not change the machine's default applications. Run the Flutter
 controller, settings, and Finder-delivery tests with `cd app && flutter test`.
 
+The host typography and focus geometry suite lives in
+[`test/focus_geometry_test.dart`](test/focus_geometry_test.dart). From `app/`,
+run `flutter test test/focus_geometry_test.dart`. On macOS, add
+`--dart-define=LINEFOLD_SYSTEM_FONTS=true` to also check the system Latin/CJK fonts.
+The root package's tests use its own dependencies and do not import the app theme.
+
 Mermaid blocks use the shared [native vector pipeline](../packages/ianvs_mermaid/README.md):
 merman renders in a background isolate, usvg expands markers and outlines system
 font glyphs, and Flutter displays the result. Document diagrams have no embedded

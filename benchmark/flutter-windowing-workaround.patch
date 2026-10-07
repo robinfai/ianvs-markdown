@@ -1,0 +1,6 @@
+diff --git a/packages/flutter/lib/src/foundation/_features.dart b/packages/flutter/lib/src/foundation/_features.dart
+--- a/packages/flutter/lib/src/foundation/_features.dart
++++ b/packages/flutter/lib/src/foundation/_features.dart
+@@ -23,1 +23,1 @@
+-bool isWindowingEnabled = debugEnabledFeatureFlags.contains('windowing');
++bool isWindowingEnabled = false;

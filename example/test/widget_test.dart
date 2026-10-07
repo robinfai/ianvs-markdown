@@ -22,16 +22,17 @@ void main() {
     expect(exampleMarkdown.split('\n').length, greaterThan(120));
   });
 
-  test('example enables HTTP network images by default', () {
-    final image = buildExampleNetworkImage(
-      Uri.parse('https://example.com/image.png'),
-      null,
-      'Example',
+  testWidgets('default integration leaves resources host-controlled', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const ExampleApp());
+    await tester.pumpAndSettle();
+    final editor = tester.widget<IanvsMarkdownLiveEditor>(
+      find.byType(IanvsMarkdownLiveEditor),
     );
-
-    expect(image, isA<Image>());
-    expect((image as Image).image, isA<NetworkImage>());
-    expect((image.image as NetworkImage).url, 'https://example.com/image.png');
+    expect(editor.imageBuilder, isNull);
+    expect(editor.diagramBuilder, isNull);
+    expect(find.byType(Image), findsNothing);
   });
 
   testWidgets('example stays focused on package integration', (tester) async {
@@ -62,5 +63,9 @@ void main() {
     await tester.tap(find.byTooltip('保存'));
     await tester.pumpAndSettle();
     expect(find.text('Host save callback invoked'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Use dark theme'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Use light theme'), findsOneWidget);
   });
 }

@@ -2,6 +2,10 @@
 
 日期：2026-09-22。实现遵循已完成的两轮 imagegen 评审及 `design-review-round-2.md`；生成图只用于设计约束，以下结论来自运行中的 Flutter 布局与交互测试。桌面应用最终截图复验由主代理执行。
 
+2026-10-07 路径更新：该宿主主题测试已迁入 `app/test/focus_geometry_test.dart`。
+当前请从 `app/` 运行 `flutter test test/focus_geometry_test.dart`，真实字体检查
+追加 `--dart-define=LINEFOLD_SYSTEM_FONTS=true`。下方保留当时的测试数量和历史命令。
+
 ## 已定位的原因
 
 - 展示段落使用 `bodyMedium` 与 Markdown 样式合并，TextField 却隐式继承 `bodyLarge`；字距、字体以及 compact visual density 的内边距不同。最初普通段落、标题和列表聚焦后通常矮 6 px，首行基线上移 3 px。

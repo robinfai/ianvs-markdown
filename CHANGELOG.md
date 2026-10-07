@@ -1,3 +1,23 @@
+## Unreleased
+
+- Move the desktop-theme focus geometry integration suite into `app/test` so
+  core package tests no longer depend on the application's design-system package.
+- Keep live block text widths stable under host themes with filled input fields;
+  the editor owns these surfaces and no longer inherits form-field fill gaps.
+- Keep the published example independent of the optional native Mermaid backend
+  and retain safe image defaults. Native rendering has its own adapter example;
+  experimental diagrams, fonts, and native subpackages are excluded from the
+  core archive. Validate the actual Pub file list in an external host with
+  `python3 tool/check_package.py` from the repository.
+- Split core and native integration validation, add an external-package smoke
+  check and CI SDK matrix, and declare the verified Flutter 3.44.0 minimum.
+- Reuse Live Preview document structure for selection-only and composing-only
+  controller updates. Text changes, undo/redo and controller replacement still
+  rebuild document references, blocks and heading folds. Add an opt-in profile
+  benchmark for document sizes from 10 KiB to 1 MiB.
+- Avoid reading a debug-only layout getter while synchronizing table drag
+  handles in profile/release builds on the minimum supported Flutter SDK.
+
 ## 0.3.1
 
 - Add opt-in `IanvsMarkdownSyntaxPreset.standard` to the standalone

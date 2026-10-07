@@ -41,14 +41,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.2"
-  code_assets:
-    dependency: transitive
-    description:
-      name: code_assets
-      sha256: bf394f466ba9205f1812a0433b392d6af280f155f56651eda7c18cc32ed493b8
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.2.1"
   collection:
     dependency: transitive
     description:
@@ -151,7 +143,7 @@ packages:
     source: hosted
     version: "0.7.4"
   flutter_svg:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: flutter_svg
       sha256: "35882981abcbfb8c15b286f0cd690ff25bac12d95eff3e25ee207f37d4c42e7f"
@@ -168,14 +160,6 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  hooks:
-    dependency: transitive
-    description:
-      name: hooks
-      sha256: "9a62a50b50b769a737bc0a8ff381f333529df3ab746b2f6b02e83760231455ba"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.0.2"
   html:
     dependency: transitive
     description:
@@ -207,13 +191,6 @@ packages:
       relative: true
     source: path
     version: "0.3.1"
-  ianvs_mermaid:
-    dependency: "direct main"
-    description:
-      path: "../packages/ianvs_mermaid"
-      relative: true
-    source: path
-    version: "0.1.0"
   irondash_engine_context:
     dependency: transitive
     description:
@@ -262,14 +239,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.1.0"
-  logging:
-    dependency: transitive
-    description:
-      name: logging
-      sha256: c8245ada5f1717ed44271ed1c26b8ce85ca3228fd2ffdb75468ab01979309d61
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.3.0"
   markdown:
     dependency: transitive
     description:
@@ -294,14 +263,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.13.0"
-  merman:
-    dependency: transitive
-    description:
-      name: merman
-      sha256: ab54a092df9d39f4f1ff03a7ce0144293cac3badd867d958855ac6479d318a72
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.7.0"
   meta:
     dependency: transitive
     description:
@@ -366,14 +327,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.1.5+1"
-  pub_semver:
-    dependency: transitive
-    description:
-      name: pub_semver
-      sha256: "261236774e8b1d69cfc6b9eabbc96c40f25e7a2d6b171f3385d4f65d5734fb24"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.2.1"
   re_highlight:
     dependency: transitive
     description:
@@ -382,14 +335,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.0.3"
-  record_use:
-    dependency: transitive
-    description:
-      name: record_use
-      sha256: "2551bd8eecfe95d14ae75f6021ad0248be5c27f138c2ec12fcb52b500b3ba1ed"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.6.0"
   sky_engine:
     dependency: transitive
     description: flutter
@@ -565,4 +510,4 @@ packages:
     version: "3.1.3"
 sdks:
   dart: ">=3.12.0 <4.0.0"
-  flutter: ">=3.35.0"
+  flutter: ">=3.44.0"

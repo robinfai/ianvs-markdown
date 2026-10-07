@@ -1,0 +1,58 @@
+name: Native integrations
+
+on:
+  pull_request:
+    paths: &integration-paths
+      - 'lib/**'
+      - 'test/**'
+      - 'example/**'
+      - 'app/**'
+      - 'packages/ianvs_mermaid/**'
+      - 'demos/**'
+      - 'pubspec.*'
+      - 'analysis_options.yaml'
+      - 'Makefile'
+      - '.github/workflows/**'
+  push:
+    branches: [main]
+    paths: *integration-paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-integrations-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.44.8'
+          cache: true
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Record toolchains
+        run: |
+          flutter --version
+          rustc --version
+          xcodebuild -version
+          sw_vers
+      - name: Host and native regressions
+        run: make check-integrations
+      - name: Build both example hosts
+        run: |
+          (cd example && flutter build macos --debug)
+          (cd packages/ianvs_mermaid/example && flutter build macos --debug)
+      - name: Save native rendering evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-rendering
+          path: packages/ianvs_mermaid/build/visual-regression/
+          if-no-files-found: ignore

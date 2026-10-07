@@ -1,0 +1,69 @@
+name: Core
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    name: Flutter ${{ matrix.flutter }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        flutter: ['3.44.0', '3.47.6']
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up canonical formatter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.44.0'
+          cache: true
+      - name: Preserve formatter path
+        id: formatter
+        run: echo "dart=$FLUTTER_ROOT/bin/dart" >> "$GITHUB_OUTPUT"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ matrix.flutter }}
+          cache: true
+      - name: Record SDK versions
+        run: |
+          flutter --version
+          dart --version
+          python3 --version
+      - name: Install Flutter test runtime library
+        run: sudo apt-get update && sudo apt-get install -y libglu1-mesa
+      - name: Core format, analysis and tests
+        run: make check-core FORMAT_DART="${{ steps.formatter.outputs.dart }}"
+      - name: Publication contents and external host
+        run: make check-package
+      - name: Save package validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-check-${{ matrix.flutter }}
+          path: build/package-check/
+          if-no-files-found: ignore
+
+  required:
+    name: Core required
+    if: always()
+    needs: core
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require every supported SDK
+        env:
+          CORE_RESULT: ${{ needs.core.result }}
+        run: test "$CORE_RESULT" = success
