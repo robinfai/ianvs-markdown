@@ -78,5 +78,7 @@ Force pushes and branch deletion remain disabled.
 The first [core run](https://github.com/robinfai/ianvs-markdown/actions/runs/37605838941)
 and [native run](https://github.com/robinfai/ianvs-markdown/actions/runs/37605838983)
 passed for `ebe7dd7`. The protection API was read back after configuration on
-2026-10-07. Record the first pull-request gate result in [ROADMAP.md](ROADMAP.md)
-before closing R0-03; a successful main-branch run alone is not that acceptance.
+2026-10-07. [PR #1](https://github.com/robinfai/ianvs-markdown/pull/1) verified that
+`Core required` is required and passes. Its core and manually dispatched native
+integration runs passed for `11f04ac`; see [R0 acceptance](benchmark/ACCEPTANCE-2026-10-07.md)
+for the recorded evidence and performance reproduction commands.

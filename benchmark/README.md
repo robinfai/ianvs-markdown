@@ -142,4 +142,38 @@ harness/runner/corpus hashes, window size, sampling and watchdog settings. Indiv
 be reported as **partial diagnostic evidence** only if they finished before any
 runtime error; identify every unfinished phase and do not infer its result.
 Checkpoint files alone are not accepted baselines. The latest investigation is recorded in
-[the R0-04 validation report](VALIDATION-2026-10-07.md).
+[the completed R0 acceptance report](ACCEPTANCE-2026-10-07.md); the
+[earlier partial investigation](VALIDATION-2026-10-07.md) remains as historical evidence.
+
+## Repeated comparisons
+
+Keep one complete before/after pair. Repeat it in fresh processes, or repeat
+all six selection cases in fresh processes with `--operations selection` to
+measure the variation of R0's selection optimization. Such focused repetitions
+supplement the full pair; they never replace its other operations.
+
+```sh
+python3 tool/compare_benchmarks.py \
+  --before build/benchmark/before.json --after build/benchmark/after.json \
+  --selection-before build/benchmark/selection-before-1.json \
+  --selection-after build/benchmark/selection-after-1.json \
+  --selection-before build/benchmark/selection-before-2.json \
+  --selection-after build/benchmark/selection-after-2.json \
+  --output build/benchmark/comparison.json
+```
+
+The validator requires at least 5 warmups and 20 measured samples per operation,
+a complete matched pair, independent repetitions, exact scenario/operation coverage, unchanged source/SDK/harness inputs and valid raw
+sample counts and percentiles. It also checks the deterministic parse gates:
+selection 1 → 0, text changes 1 → 1. A partial/filtered file cannot fill the
+complete-pair role. Duplicate files/timestamps do not count as another run.
+
+Use at least two complete pairs, or one complete pair plus two focused selection
+pairs. The full suite and selection-only suite have different preceding actions
+and cache histories, so their P95 ranges and observation lines are kept separate.
+P95 values remain separate per process. For operations with repetitions, the
+summary proposes an investigation line for the same machine/SDK/workload:
+maximum observed optimized P95 × max(1.25, 1 + 2 × relative spread). This is a
+conservative initial observation rule, not a statistical confidence interval
+or a portable CI performance limit. Unrepeated operations get no such line.
+The deterministic parse-count gates remain the automated regression contract.
