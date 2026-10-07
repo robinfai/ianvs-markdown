@@ -1,7 +1,9 @@
 // ignore_for_file: avoid_print
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:io';
+import 'dart:ui' show FramePhase;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -13,6 +15,28 @@ import 'corpus.dart';
 
 const samples = int.fromEnvironment('BENCHMARK_SAMPLES', defaultValue: 20);
 const warmup = int.fromEnvironment('BENCHMARK_WARMUP', defaultValue: 5);
+const allOperations = [
+  'initialDisplay',
+  'selection',
+  'typing',
+  'scroll',
+  'liveToSource',
+  'sourceToReading',
+  'readingToLive',
+];
+final selectedSizes = const String.fromEnvironment(
+  'BENCHMARK_SIZES',
+  defaultValue: '10240,102400,1048576',
+).split(',').map(int.parse).toList();
+final selectedBudgets = const String.fromEnvironment(
+  'BENCHMARK_BUDGETS',
+  defaultValue: 'default,unlimited',
+).split(',');
+final selectedOperations = const String.fromEnvironment(
+  'BENCHMARK_OPERATIONS',
+  defaultValue:
+      'initialDisplay,selection,typing,scroll,liveToSource,sourceToReading,readingToLive',
+).split(',');
 final failures = <String>[];
 
 void main() {
@@ -21,11 +45,19 @@ void main() {
       'Run in profile mode with IANVS_MARKDOWN_DIAGNOSTICS=true',
     );
   }
+  if (samples < 1 ||
+      warmup < 0 ||
+      selectedSizes.any((size) => !corpusSizes.contains(size)) ||
+      selectedBudgets.any(
+        (value) => !['default', 'unlimited'].contains(value),
+      ) ||
+      selectedOperations.any((value) => !allOperations.contains(value))) {
+    throw ArgumentError('Invalid benchmark configuration');
+  }
   FlutterError.onError = (details) {
     failures.add(details.exceptionAsString());
     print('IANVS_BENCHMARK_FAILURE: ${jsonEncode(failures.last)}');
     print(details.stack);
-    // Later timings are invalid after a rendering exception.
     exit(1);
   };
   runApp(const _BenchmarkApp());
@@ -45,6 +77,8 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
   IanvsMarkdownController? controller;
   IanvsMarkdownRenderBudget? budget;
   var generation = 0;
+  var currentSize = 0;
+  var currentBudget = '';
 
   @override
   void initState() {
@@ -78,6 +112,8 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
   );
 
   Future<void> nextFrame() => SchedulerBinding.instance.endOfFrame;
+  int get frameStamp =>
+      SchedulerBinding.instance.currentSystemFrameTimeStamp.inMicroseconds;
 
   Future<void> replaceDocument(String source) async {
     final old = controller;
@@ -105,60 +141,124 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
     return result ?? (throw StateError('No active editable'));
   }
 
+  void trace(Map<String, Object> event) {
+    print(
+      'IANVS_BENCHMARK_SAMPLE: ${jsonEncode({'utf8Bytes': currentSize, 'budget': currentBudget, ...event})}',
+    );
+  }
+
+  Future<void> action(
+    _Operation operation,
+    String stage,
+    int index,
+    Future<void> Function() callback,
+  ) async {
+    final identity = {
+      'operation': operation.name,
+      'stage': stage,
+      'index': index,
+    };
+    trace({
+      ...identity,
+      'event': 'start',
+      'timelineMicros': developer.Timeline.now,
+    });
+    final firstFrame = frameStamp;
+    final parses = IanvsMarkdownEditorDiagnostics.documentParses;
+    final watch = Stopwatch()..start();
+    await callback();
+    await nextFrame();
+    watch.stop();
+    final latency = watch.elapsedMicroseconds / 1000;
+    final parseCount = (IanvsMarkdownEditorDiagnostics.documentParses - parses)
+        .toDouble();
+    final rss = ProcessInfo.currentRss / (1024 * 1024);
+    if (stage == 'sample') {
+      operation.durations.add(latency);
+      operation.parses.add(parseCount);
+      operation.rss.add(rss);
+      operation.frameIntervals.add((firstFrame, frameStamp));
+    }
+    trace({
+      ...identity,
+      'event': 'end',
+      'timelineMicros': developer.Timeline.now,
+      'latencyMs': latency,
+      'documentParses': parseCount,
+      'rssMiB': rss,
+      'firstFrameMicros': firstFrame,
+      'lastFrameMicros': frameStamp,
+    });
+  }
+
   Future<Map<String, Object>> measure(
     String name,
-    Future<void> Function(int) action,
+    Future<void> Function(int) callback,
   ) async {
+    final operation = _Operation(name);
     for (var i = 0; i < warmup; i += 1) {
-      await action(i);
-      await nextFrame();
+      await action(operation, 'warmup', i, () => callback(i));
     }
-    // Profile FrameTiming delivery is batched. Drain the previous phase first.
+    // Profile FrameTiming delivery is batched. Drain warmup frames first.
     await Future<void>.delayed(const Duration(milliseconds: 1100));
     frames.clear();
-    final durations = <double>[];
-    final parseCounts = <double>[];
-    final rss = <double>[];
     for (var i = 0; i < samples; i += 1) {
-      final parses = IanvsMarkdownEditorDiagnostics.documentParses;
-      final watch = Stopwatch()..start();
-      await action(i + warmup);
-      await nextFrame();
-      durations.add(watch.elapsedMicroseconds / 1000);
-      parseCounts.add(
-        (IanvsMarkdownEditorDiagnostics.documentParses - parses).toDouble(),
-      );
-      rss.add(ProcessInfo.currentRss / (1024 * 1024));
+      await action(operation, 'sample', i, () => callback(i + warmup));
     }
     await Future<void>.delayed(const Duration(milliseconds: 1100));
-    final result = <String, Object>{
-      'operation': name,
-      'latencyMs': distribution(durations),
-      'documentParses': distribution(parseCounts),
-      'buildMs': distribution([
-        for (final frame in frames) frame.buildDuration.inMicroseconds / 1000,
-      ]),
-      'rasterMs': distribution([
-        for (final frame in frames) frame.rasterDuration.inMicroseconds / 1000,
-      ]),
-      'rssMiB': distribution(rss),
-    };
-    print('IANVS_BENCHMARK_PROGRESS: $name ${durations.length} samples');
-    return result;
+    print('IANVS_BENCHMARK_PROGRESS: $name $samples samples');
+    return operation.result(frames);
+  }
+
+  Future<List<Map<String, Object>>> measureModes() async {
+    final transitions = [
+      (_Operation('liveToSource'), IanvsMarkdownEditorMode.source),
+      (_Operation('sourceToReading'), IanvsMarkdownEditorMode.preview),
+      (_Operation('readingToLive'), IanvsMarkdownEditorMode.livePreview),
+    ];
+    Future<void> cycle(String stage, int index) async {
+      for (final (operation, mode) in transitions) {
+        final selected = selectedOperations.contains(operation.name);
+        await action(
+          operation,
+          selected ? stage : 'preparation',
+          index,
+          () async => controller!.mode = mode,
+        );
+      }
+    }
+
+    for (var i = 0; i < warmup; i += 1) {
+      await cycle('warmup', i);
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 1100));
+    frames.clear();
+    for (var i = 0; i < samples; i += 1) {
+      await cycle('sample', i);
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 1100));
+    return [
+      for (final (operation, _) in transitions)
+        if (selectedOperations.contains(operation.name))
+          operation.result(frames),
+    ];
   }
 
   Future<void> run() async {
     final results = <Map<String, Object>>[];
     try {
-      for (final size in corpusSizes) {
+      for (final size in selectedSizes) {
         final source = benchmarkCorpus(size);
-        for (final full in [false, true]) {
+        currentSize = size;
+        for (final selectedBudget in selectedBudgets) {
+          final full = selectedBudget == 'unlimited';
+          currentBudget = selectedBudget;
           budget = full ? null : const IanvsMarkdownRenderBudget();
           final decision = scanMarkdownForRendering(
             source,
             budget: const IanvsMarkdownRenderBudget(),
           );
-          print('IANVS_BENCHMARK_PROGRESS: bytes=$size full=$full');
+          print('IANVS_BENCHMARK_PROGRESS: bytes=$size budget=$selectedBudget');
           final operations = <Map<String, Object>>[];
           results.add({
             'utf8Bytes': utf8.encode(source).length,
@@ -178,21 +278,18 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
             );
           }
 
-          checkpoint('initialDisplay');
-          operations.add(
-            await measure('initialDisplay', (_) => replaceDocument(source)),
-          );
-          checkpoint('selection');
-          operations.add(
-            await measure('selection', (i) async {
+          checkpoint('setup');
+          await action(_Operation('setup'), 'preparation', 0, () async {
+            await replaceDocument(source);
+          });
+          final callbacks = <String, Future<void> Function(int)>{
+            'initialDisplay': (_) => replaceDocument(source),
+            'selection': (i) async {
               controller!.selection = TextSelection.collapsed(
                 offset: 2 + i % 20,
               );
-            }),
-          );
-          checkpoint('typing');
-          operations.add(
-            await measure('typing', (i) async {
+            },
+            'typing': (i) async {
               final editable = activeEditable();
               final value = editable.widget.controller.value;
               final offset = value.selection.extentOffset;
@@ -202,38 +299,45 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
                   selection: TextSelection.collapsed(offset: offset + 1),
                 ),
               );
-            }),
-          );
-          checkpoint('scroll');
-          controller!.text = source;
-          controller!.clearHistory();
-          await nextFrame();
-          operations.add(
-            await measure('scroll', (i) async {
+            },
+            'scroll': (i) async {
               final destination = i.isEven ? 0.0 : 300.0 + (i % 4) * 300;
               scroll.jumpTo(
                 destination.clamp(0.0, scroll.position.maxScrollExtent),
               );
-            }),
-          );
-          checkpoint('modeSwitch');
-          scroll.jumpTo(0);
-          await nextFrame();
-          operations.add(
-            await measure('modeSwitch', (i) async {
-              controller!.mode = [
-                IanvsMarkdownEditorMode.source,
-                IanvsMarkdownEditorMode.preview,
-                IanvsMarkdownEditorMode.livePreview,
-              ][i % 3];
-            }),
-          );
+            },
+          };
+          for (final entry in callbacks.entries) {
+            if (!selectedOperations.contains(entry.key)) continue;
+            checkpoint(entry.key);
+            if (entry.key == 'scroll') {
+              await action(_Operation('resetText'), 'preparation', 0, () async {
+                controller!.text = source;
+                controller!.clearHistory();
+              });
+            }
+            operations.add(await measure(entry.key, entry.value));
+          }
+          if (selectedOperations.any((name) => !callbacks.containsKey(name))) {
+            checkpoint('modeSwitch');
+            await action(_Operation('resetModes'), 'preparation', 0, () async {
+              controller!.text = source;
+              controller!.clearHistory();
+              scroll.jumpTo(0);
+              controller!.mode = IanvsMarkdownEditorMode.livePreview;
+            });
+            operations.addAll(await measureModes());
+            if (controller!.text != source) {
+              throw StateError('Mode switching changed document source');
+            }
+          }
           checkpoint('caseComplete');
         }
       }
-      final result = snapshot(results, complete: true);
-      print('IANVS_BENCHMARK_RESULT: ${jsonEncode(result)}');
-      exit(failures.isEmpty ? 0 : 1);
+      print(
+        'IANVS_BENCHMARK_RESULT: ${jsonEncode(snapshot(results, complete: true))}',
+      );
+      exit(0);
     } catch (error, stack) {
       print('IANVS_BENCHMARK_ERROR: $error\n$stack');
       exit(1);
@@ -247,10 +351,19 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
   }) {
     final view = WidgetsBinding.instance.platformDispatcher.views.first;
     return {
+      'schemaVersion': 2,
       'corpusVersion': corpusVersion,
       'mode': 'profile',
       'warmupPerOperation': warmup,
       'samplesPerOperation': samples,
+      'requestedSizes': selectedSizes,
+      'requestedBudgets': selectedBudgets,
+      'requestedOperations': selectedOperations,
+      'fullBaseline':
+          complete &&
+          setEquals(selectedSizes.toSet(), corpusSizes.toSet()) &&
+          setEquals(selectedBudgets.toSet(), {'default', 'unlimited'}) &&
+          setEquals(selectedOperations.toSet(), allOperations.toSet()),
       'dart': Platform.version,
       'os': Platform.operatingSystemVersion,
       'viewPhysicalWidth': view.physicalSize.width,
@@ -262,6 +375,46 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
       'activeOperation': activeOperation,
       'results': results,
       'errors': failures,
+    };
+  }
+}
+
+class _Operation {
+  _Operation(this.name);
+
+  final String name;
+  final durations = <double>[];
+  final parses = <double>[];
+  final rss = <double>[];
+  final frameIntervals = <(int, int)>[];
+
+  Map<String, Object> result(List<FrameTiming> allFrames) {
+    // Both timestamps originate from the engine's raw frame clock. Assign
+    // batched reports to the action's completed frames, excluding unmeasured
+    // preparation and caret/settling frames between actions.
+    final frames = allFrames.where((frame) {
+      final stamp = frame.timestampInMicroseconds(FramePhase.vsyncStart);
+      return frameIntervals.any(
+        (range) => stamp > range.$1 && stamp <= range.$2,
+      );
+    }).toList();
+    if (durations.length != samples || frames.isEmpty) {
+      throw StateError(
+        'Incomplete samples or missing frame evidence for $name',
+      );
+    }
+    return {
+      'operation': name,
+      'latencyMs': distribution(durations),
+      'documentParses': distribution(parses),
+      'buildMs': distribution([
+        for (final frame in frames) frame.buildDuration.inMicroseconds / 1000,
+      ]),
+      'rasterMs': distribution([
+        for (final frame in frames) frame.rasterDuration.inMicroseconds / 1000,
+      ]),
+      'frameAttribution': 'engine-vsync-intervals',
+      'rssMiB': distribution(rss),
     };
   }
 }
