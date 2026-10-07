@@ -1,0 +1,1440 @@
+{
+  "matchedFullPairs": 1,
+  "selectionRepeatPairs": 2,
+  "fullBaselineGate": "passed",
+  "deterministicGates": {
+    "selectionBefore": 1,
+    "selectionAfter": 0,
+    "typingBoth": 1
+  },
+  "runs": [
+    {
+      "before": "r0-before-1.json",
+      "after": "r0-after-1.json",
+      "selectionOnly": false,
+      "beforeSha256": "6d839165888308a5a210e07f0a7e84ab5096eceade120edb46f5cc1c78e15af6",
+      "afterSha256": "c745a1395bb8836db0f277202d5f517be7d24c0a4ea07911bf03f980acdcd73b"
+    },
+    {
+      "before": "r0-selection-before-1.json",
+      "after": "r0-selection-after-1.json",
+      "selectionOnly": true,
+      "beforeSha256": "cd6e1b7044ad811bc6f261f8d1d62e5a4bf8d4c578ed78a5dca7cf5270e94e3a",
+      "afterSha256": "dedd54721d470e86839d2affc7473eb272d7990c27cd07d0460df9176c9c88b2"
+    },
+    {
+      "before": "r0-selection-before-2.json",
+      "after": "r0-selection-after-2.json",
+      "selectionOnly": true,
+      "beforeSha256": "ce44364336de4bb2a6afb38302bcebbb6e957a3fb450a8ac6e4a7aae62c87598",
+      "afterSha256": "2f662e715b690cc8a54e463244b45b8ae95f71c3b003f29d1c49fa04a7d742cf"
+    }
+  ],
+  "environment": {
+    "schemaVersion": 2,
+    "corpusVersion": 1,
+    "mode": "profile",
+    "warmupPerOperation": 5,
+    "samplesPerOperation": 20,
+    "requestedSizes": [
+      10240,
+      102400,
+      1048576
+    ],
+    "requestedBudgets": [
+      "default",
+      "unlimited"
+    ],
+    "requestedOperations": [
+      "initialDisplay",
+      "selection",
+      "typing",
+      "scroll",
+      "liveToSource",
+      "sourceToReading",
+      "readingToLive"
+    ],
+    "dart": "3.12.0 (stable) (Fri May 8 01:51:14 2026 -0700) on \"macos_arm64\"",
+    "os": "Version 27.0.1 (Build 26A434)",
+    "host": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "cpu": "Apple M4 Pro",
+    "viewPhysicalWidth": 2360.0,
+    "viewPhysicalHeight": 1560.0,
+    "devicePixelRatio": 2.0,
+    "sourceFilesSha256": {
+      "lib/ianvs_markdown.dart": "1b29f62052ce852d6d2a90569c37884ad5917e4954ee7658d60ecb1a8419d01d",
+      "lib/src/blocked_image.dart": "bc67922fc701dd3c49b794f52016f4e9b01450be0bfa388de957ee8c377c84db",
+      "lib/src/callout.dart": "030894e99305c80a7f1941a84bd86f99f724a2ecc643564c8a25e2756b1cbe9d",
+      "lib/src/code_block.dart": "673e1f9d4709e157c1aad32c030a857bf5d0f8f1f18f3f0eddbe3da6d31ad6fe",
+      "lib/src/code_surface.dart": "cf32f71e0bd6d2889d83bfbd70d0af4606777e91beeeaa4d19ef9fc7e9fca1de",
+      "lib/src/editor/editor_controller.dart": "05ac5dbcd7a202c9cbe6160df240d4d02d2bba222234f7833aef9c0219901af0",
+      "lib/src/editor/editor_diagnostics.dart": "cc2c1243cb02bba4ad428e8f59c467c1c55b5a8ada3598201b112a83c4a6ea7e",
+      "lib/src/editor/editor_models.dart": "be569da9a9b93052dc3728f8a2b12f18be02e951282e2fd69000a254c97952f7",
+      "lib/src/editor/editor_shortcuts.dart": "7093632bbfcac9389e2e6723fce501a03357da07b5296d2c3b4f001174fed0a8",
+      "lib/src/editor/editor_toolbar.dart": "cf1e2bb5a6f08b7c035937de9ac2879e53be5ec6c8dc5e65bfe2e670e1d2485d",
+      "lib/src/editor/live_editor.dart": "455ac490377e6ab9baaa71e9fca6cb3aac09fa166fab833d743ec862f5016589",
+      "lib/src/editor/markdown_code_ranges.dart": "05f9833b8a5443b1ed8780fb4dc368b3cd106931d57c7ec5979029dc8a116688",
+      "lib/src/editor/markdown_paste.dart": "b15e67f356c31674df91b193ce72c84c5d58a4ac634c3d57fbe8edbcae3a0f8e",
+      "lib/src/editor/reference_links.dart": "9625a7a6128ea91baa2d5a03e42729641d2c5e102ab0520e2f4d264103ff5988",
+      "lib/src/editor/source_editor.dart": "2f9c99e9fc59088fad9d9380a28c04af5ecbe6abfa360c8fae1a534325ac5f2a",
+      "lib/src/emphasis.dart": "5bdc393917dfa0155bd39b394ff815f721cdab7e844002e6994ecb9a2189c94b",
+      "lib/src/footnote_syntax.dart": "0f0ff84f714befe38e182a4a7fc76740bd4077994310179856e221dab3970252",
+      "lib/src/front_matter.dart": "1eae5fa3c84c65b95343230aa2f71d66112ca79cbaf04774e4fb71171bac9995",
+      "lib/src/front_matter_card.dart": "66eba99b22e90e2c264e3453b2ee1b024544824df23ad03f5d802cfcfb9b3f01",
+      "lib/src/heading_folding.dart": "b02a1211e186b7a0a32921457c8624e99600ff85158aefb675d93766fe4a87aa",
+      "lib/src/highlight.dart": "8816caedb541ffa0f8f82adb793d7a556d792b7a16eb253fe983c432c53ba76c",
+      "lib/src/html_blockquote.dart": "cf1e5dd26fc40ba1e9382dc0c4b98251193ee7b6386a63186a6b147b66fc6ada",
+      "lib/src/html_button.dart": "cd6051ce57b512fb29543bf0f92e45b674988157d34a9a76b6e097f6093218f1",
+      "lib/src/html_center.dart": "f180d4af039a43d48aa0c4d0b55d95a6f176cf8055fc5dd606470b03b386b055",
+      "lib/src/html_checkbox.dart": "36976a762c3b42f7c3246e468b35546ada7eed927fbce39b23e0ee63e02a1e7d",
+      "lib/src/html_date_input.dart": "1766cfed99fd3af1f3d1d7b526ed053ee7aae33e25bc311fd871422df650be96",
+      "lib/src/html_definition_list.dart": "18335a1729074cf1adbff8d6ba144b13b8d4eb942de203f1230052ab1b3225ac",
+      "lib/src/html_details.dart": "06cc32b910ae3c92452c4328dce7904d6ae082dd6fb3c7ed0d76a347633678a2",
+      "lib/src/html_fieldset.dart": "984cd869170b906c18879aff8ff26411733d3743bb961711a79e44498cb803ea",
+      "lib/src/html_figure.dart": "5d14795bbf7866b103dbf66539ce9e81e96c1b03a4fdf2b245faa6398fa433b5",
+      "lib/src/html_hr.dart": "db3808b279207bdca438d8b93891fcfdcd2c1ce3dd00bcc038bf56e0d916c3fe",
+      "lib/src/html_meter.dart": "f4fc90aecdff4739074343c5a2bf4c8790b02ac03da07f0682d5470ef441c0d2",
+      "lib/src/html_number_input.dart": "9019f8845019b146a0777e819e8e7439d7889ac37b4213cfe5a3e9d9510439fa",
+      "lib/src/html_ordered_list.dart": "b7cba5190585c4da4996a5792ccbecd588bf35dd2a2fc122c94c79dd2150df35",
+      "lib/src/html_password_input.dart": "ce2be1602243962a9736beec7e1db0cecd459ffd033af8c9aacaaab93effddc6",
+      "lib/src/html_pre.dart": "47509c4286a427a7013e29004ff6b65b8717bb50642c4060d30ec282024fa9b0",
+      "lib/src/html_progress.dart": "35ed4ba18ac503255a2e3022b2b12cb73daca34cd56f76759ee0065d84ee4bab",
+      "lib/src/html_radio_group.dart": "2e19f2f694ef25056e61a47005df2f84cb684ac706675422cb22d1fae8844dc8",
+      "lib/src/html_range_input.dart": "33a10b4cbade23373a1b19ea9f7ccde9c971686c63349659829b1f1f14aac4b3",
+      "lib/src/html_ruby.dart": "18fb6766ba19b8b00f1bb90a3931eba8545614a6ecabc648a45d8f2cb8459b0a",
+      "lib/src/html_select.dart": "1d52f223cf710ccd481f6d111995c2d93994967e6c9090482666bfc1a802f92e",
+      "lib/src/html_table.dart": "aa9524b1cae2298ddcb75fd7d722079d0afb2e2c12db1d5108a1197dcd9d0d10",
+      "lib/src/html_temporal_input.dart": "6aa925ddb191204f0e2fae97726e1929e0b769ee35b8328de48f69b5a7d586c8",
+      "lib/src/html_text_input.dart": "b266c598448f8958a67cd92a08493ccb5d7b362b2b0c37202802c1b1ffc6d207",
+      "lib/src/html_textarea.dart": "1c07e58e191e463218e9107c11d5ead6c153c929733fceed2a668359266014ac",
+      "lib/src/html_time_input.dart": "ddeb3901810c4b38f72d95ba7f28ac2f0812cc785ad028d222e6c861854768d8",
+      "lib/src/html_unordered_list.dart": "1c25614cce2aed8b8d65aae2452a2a3d9dafd113863fba5c17e48668508fbc9a",
+      "lib/src/ianvs_markdown.dart": "4c47f5daeeca9eab326d9ffcdc573f1eb0f797ecbee6ebe8280c47c565a71d9b",
+      "lib/src/inline_code.dart": "391e300068a48c800018c7c0a65098990e86f033df622d6e3cf051c5aac4fe3a",
+      "lib/src/inline_link.dart": "b457ed9ab562abd9e10a0191ee749e80f65de598e8b38be0af373b9316a2089d",
+      "lib/src/list_guide.dart": "ab0d542ff7636c0f77b673e4ef7769f5f669bc6ff528dace2b8c51125862d733",
+      "lib/src/markdown_document.dart": "b51310c875a902bf78af5ae5dc133f9af9462c4523bae402305f38b80775aed3",
+      "lib/src/markdown_link_source.dart": "ac2500fdf9863ae604b5d6ef590568dea1d0cee03cca9931a7f8461b9f5e2894",
+      "lib/src/markdown_list_syntax.dart": "7f4f8a7c5a0c7a4fd1e53f595d80536190fccd842fd87ff16cd6072327a568a7",
+      "lib/src/markdown_table_syntax.dart": "6c678deceb47cf6b6437f829b259b4b1b30d64d06ab4fff819ead119025ad5a1",
+      "lib/src/math.dart": "314d704a708aec5a8cf447e10a339b5a5b006b63a561861e719661df9d07a229",
+      "lib/src/obsidian_autolink.dart": "19ba84c275290dbe50a5c84fa7ce694397592a6719f0f2ab308fa0c2778f158e",
+      "lib/src/obsidian_html.dart": "eb7a0286107f90fd0ba0ef886f7e94f67606f74a60e181ae052291a36abf4ea4",
+      "lib/src/obsidian_image.dart": "4f5d66abcd42568cf1e028b83c3c54b692f6d2fd7e9ea79e5b895988b822552b",
+      "lib/src/obsidian_inline.dart": "35d4f460b6fc22a8828e93a9dd35b1d67a37dd0f640481586d94a0cd26a32659",
+      "lib/src/obsidian_metadata.dart": "b355d01987d6693d913a007b78a8fbf6956b52b33e86ecbcec407023aee36b0f",
+      "lib/src/render_budget.dart": "f41a8c5d30a75179b2a0e1eaf13fca775b5e17bcd9ad8a5ada6c6e1c676d3120",
+      "lib/src/rich_clipboard.dart": "6886858a6156cb1a3da054a92a316e0f502de2531adb812a11faa698a3375e2a",
+      "lib/src/scroll_fade_region.dart": "a3972a9b032322b0ecf9e8172cc2bda7bc24d8773ac0e05f1613da18c537b6f5",
+      "lib/src/strikethrough.dart": "e6a0d34ffe1e16974e7a1c78fd2cb2df305ef846b7774526d10bf58dc6506850",
+      "lib/src/syntax_preset.dart": "7692c086171c41f15b955e235eaf4fe802dcea010ed40cfb7e5777778c6cb11a",
+      "lib/src/task_checkbox.dart": "5dec0f4441101105720766804a5963decde5899af15c1ccaa6f7aef15a5174de",
+      "lib/src/task_syntax.dart": "c6eac21ae9669d08d92d2989352e48e36b9408109544c9bc6f0f59558480e623",
+      "lib/src/theme.dart": "e298934cc85ce2f59199f9c153dd5bce98536e7d42e391f845e56ee32f635ef5",
+      "lib/src/wiki_embed.dart": "7cb0390692889c3f29d590abdccf1eda8e1f5a60e41a74072d120a560264ab5a",
+      "lib/src/wiki_link_reference.dart": "6083e8e3a67ea7299c56d089e2fb5f8512901e6fc1d6db7dd94b598bcf5c0b9f"
+    },
+    "corpusGeneratorSha256": "2e148ea6c5ed73c05b823d46010dcbf9fd3758f88f0e552bf99ba1441b597116",
+    "harnessSha256": "dee0d4bc8fb32c19aa40f0287aceb19b0eba6a9b49f2eda378f42455764d5694",
+    "runnerSha256": "98b018f584e56720683ade02ab5f91463c4fcf5d1087e4290127aaea91bec183",
+    "editorSha256": "455ac490377e6ab9baaa71e9fca6cb3aac09fa166fab833d743ec862f5016589",
+    "frameworkFeatureFileSha256": "668ce492866ec9eb7e6404ce4ab3599c0f978eba33a036ca9c48e9dbd89ae44a",
+    "frameworkFeatureDiff": "diff --git a/packages/flutter/lib/src/foundation/_features.dart b/packages/flutter/lib/src/foundation/_features.dart\nindex cbd290f467b..0e4f220bfb9 100644\n--- a/packages/flutter/lib/src/foundation/_features.dart\n+++ b/packages/flutter/lib/src/foundation/_features.dart\n@@ -20,7 +20,7 @@ import 'package:meta/meta.dart';\n ///\n /// See: https://github.com/flutter/flutter/issues/30701.\n @internal\n-bool isWindowingEnabled = debugEnabledFeatureFlags.contains('windowing');\n+bool isWindowingEnabled = false;\n \n /// Whether the accessibility evaluations feature is enabled for the current\n /// application.\n",
+    "experimentalWindowingWorkaround": true,
+    "operationTimeoutSeconds": 900,
+    "sampleTimeoutSeconds": 120
+  },
+  "flutter": {
+    "frameworkVersion": "3.44.0",
+    "frameworkRevision": "559ffa3f75e7402d65a8def9c28389a9b2e6fe42",
+    "engineRevision": "4c525dac5ebe5971c5708ef73558ed8edcf4a362",
+    "dartSdkVersion": "3.12.0"
+  },
+  "watchRule": "Full and selection-only contexts are summarized separately. max observed optimized P95 * max(1.25, 1 + 2 * relative spread); investigation threshold on the same machine, SDK and workload, not a cross-machine CI limit",
+  "rows": [
+    {
+      "utf8Bytes": 10240,
+      "budget": "default",
+      "operation": "initialDisplay",
+      "scope": "full",
+      "beforeP95Ms": [
+        138.455
+      ],
+      "afterP95Ms": [
+        149.157
+      ],
+      "p95ReductionPercent": [
+        -7.729587230508095
+      ],
+      "afterBuildP95Ms": [
+        51.881
+      ],
+      "afterRasterP95Ms": [
+        1.181
+      ],
+      "afterMaxRssMiB": [
+        217.8125
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 10240,
+      "budget": "default",
+      "operation": "liveToSource",
+      "scope": "full",
+      "beforeP95Ms": [
+        16.334
+      ],
+      "afterP95Ms": [
+        14.508
+      ],
+      "p95ReductionPercent": [
+        11.17913554548794
+      ],
+      "afterBuildP95Ms": [
+        36.436
+      ],
+      "afterRasterP95Ms": [
+        2.716
+      ],
+      "afterMaxRssMiB": [
+        243.78125
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 10240,
+      "budget": "default",
+      "operation": "readingToLive",
+      "scope": "full",
+      "beforeP95Ms": [
+        66.185
+      ],
+      "afterP95Ms": [
+        72.326
+      ],
+      "p95ReductionPercent": [
+        -9.278537432953083
+      ],
+      "afterBuildP95Ms": [
+        52.924
+      ],
+      "afterRasterP95Ms": [
+        1.274
+      ],
+      "afterMaxRssMiB": [
+        244.421875
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 10240,
+      "budget": "default",
+      "operation": "scroll",
+      "scope": "full",
+      "beforeP95Ms": [
+        81.438
+      ],
+      "afterP95Ms": [
+        84.084
+      ],
+      "p95ReductionPercent": [
+        -3.2490974729241895
+      ],
+      "afterBuildP95Ms": [
+        78.762
+      ],
+      "afterRasterP95Ms": [
+        1.191
+      ],
+      "afterMaxRssMiB": [
+        223.25
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 10240,
+      "budget": "default",
+      "operation": "selection",
+      "scope": "full",
+      "beforeP95Ms": [
+        57.294
+      ],
+      "afterP95Ms": [
+        49.525
+      ],
+      "p95ReductionPercent": [
+        13.5598841065382
+      ],
+      "afterBuildP95Ms": [
+        44.476
+      ],
+      "afterRasterP95Ms": [
+        1.074
+      ],
+      "afterMaxRssMiB": [
+        215.125
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 10240,
+      "budget": "default",
+      "operation": "selection",
+      "scope": "selection-repeat",
+      "beforeP95Ms": [
+        56.02,
+        51.873
+      ],
+      "afterP95Ms": [
+        47.17,
+        46.522
+      ],
+      "p95ReductionPercent": [
+        15.797929310960368,
+        10.315578431939542
+      ],
+      "afterBuildP95Ms": [
+        42.094,
+        42.06
+      ],
+      "afterRasterP95Ms": [
+        1.112,
+        1.18
+      ],
+      "afterMaxRssMiB": [
+        204.53125,
+        206.375
+      ],
+      "afterP95RelativeSpread": 0.013928893856670033,
+      "sameEnvironmentWatchP95Ms": 59
+    },
+    {
+      "utf8Bytes": 10240,
+      "budget": "default",
+      "operation": "sourceToReading",
+      "scope": "full",
+      "beforeP95Ms": [
+        53.434
+      ],
+      "afterP95Ms": [
+        59.281
+      ],
+      "p95ReductionPercent": [
+        -10.942471085825511
+      ],
+      "afterBuildP95Ms": [
+        54.569
+      ],
+      "afterRasterP95Ms": [
+        2.592
+      ],
+      "afterMaxRssMiB": [
+        243.015625
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 10240,
+      "budget": "default",
+      "operation": "typing",
+      "scope": "full",
+      "beforeP95Ms": [
+        61.591
+      ],
+      "afterP95Ms": [
+        64.175
+      ],
+      "p95ReductionPercent": [
+        -4.195418161744402
+      ],
+      "afterBuildP95Ms": [
+        49.032
+      ],
+      "afterRasterP95Ms": [
+        1.332
+      ],
+      "afterMaxRssMiB": [
+        221.015625
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 10240,
+      "budget": "unlimited-controlled-corpus",
+      "operation": "initialDisplay",
+      "scope": "full",
+      "beforeP95Ms": [
+        140.323
+      ],
+      "afterP95Ms": [
+        150.272
+      ],
+      "p95ReductionPercent": [
+        -7.090070765305745
+      ],
+      "afterBuildP95Ms": [
+        55.176
+      ],
+      "afterRasterP95Ms": [
+        1.152
+      ],
+      "afterMaxRssMiB": [
+        255.421875
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 10240,
+      "budget": "unlimited-controlled-corpus",
+      "operation": "liveToSource",
+      "scope": "full",
+      "beforeP95Ms": [
+        17.41
+      ],
+      "afterP95Ms": [
+        18.407
+      ],
+      "p95ReductionPercent": [
+        -5.726593911545086
+      ],
+      "afterBuildP95Ms": [
+        10.749
+      ],
+      "afterRasterP95Ms": [
+        1.441
+      ],
+      "afterMaxRssMiB": [
+        274.375
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 10240,
+      "budget": "unlimited-controlled-corpus",
+      "operation": "readingToLive",
+      "scope": "full",
+      "beforeP95Ms": [
+        70.753
+      ],
+      "afterP95Ms": [
+        75.458
+      ],
+      "p95ReductionPercent": [
+        -6.649894704111481
+      ],
+      "afterBuildP95Ms": [
+        54.967
+      ],
+      "afterRasterP95Ms": [
+        1.242
+      ],
+      "afterMaxRssMiB": [
+        274.375
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 10240,
+      "budget": "unlimited-controlled-corpus",
+      "operation": "scroll",
+      "scope": "full",
+      "beforeP95Ms": [
+        82.693
+      ],
+      "afterP95Ms": [
+        92.136
+      ],
+      "p95ReductionPercent": [
+        -11.419346256635986
+      ],
+      "afterBuildP95Ms": [
+        85.368
+      ],
+      "afterRasterP95Ms": [
+        1.162
+      ],
+      "afterMaxRssMiB": [
+        267.890625
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 10240,
+      "budget": "unlimited-controlled-corpus",
+      "operation": "selection",
+      "scope": "full",
+      "beforeP95Ms": [
+        54.302
+      ],
+      "afterP95Ms": [
+        68.86
+      ],
+      "p95ReductionPercent": [
+        -26.80932562336562
+      ],
+      "afterBuildP95Ms": [
+        52.366
+      ],
+      "afterRasterP95Ms": [
+        1.176
+      ],
+      "afterMaxRssMiB": [
+        259.6875
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 10240,
+      "budget": "unlimited-controlled-corpus",
+      "operation": "selection",
+      "scope": "selection-repeat",
+      "beforeP95Ms": [
+        53.846,
+        49.354
+      ],
+      "afterP95Ms": [
+        52.727,
+        49.888
+      ],
+      "p95ReductionPercent": [
+        2.0781487947108435,
+        -1.081979170887859
+      ],
+      "afterBuildP95Ms": [
+        44.107,
+        42.749
+      ],
+      "afterRasterP95Ms": [
+        1.135,
+        1.115
+      ],
+      "afterMaxRssMiB": [
+        209.15625,
+        208.875
+      ],
+      "afterP95RelativeSpread": 0.05690747273893519,
+      "sameEnvironmentWatchP95Ms": 66
+    },
+    {
+      "utf8Bytes": 10240,
+      "budget": "unlimited-controlled-corpus",
+      "operation": "sourceToReading",
+      "scope": "full",
+      "beforeP95Ms": [
+        67.188
+      ],
+      "afterP95Ms": [
+        75.522
+      ],
+      "p95ReductionPercent": [
+        -12.4040007144133
+      ],
+      "afterBuildP95Ms": [
+        57.476
+      ],
+      "afterRasterP95Ms": [
+        2.068
+      ],
+      "afterMaxRssMiB": [
+        273.078125
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 10240,
+      "budget": "unlimited-controlled-corpus",
+      "operation": "typing",
+      "scope": "full",
+      "beforeP95Ms": [
+        64.686
+      ],
+      "afterP95Ms": [
+        66.816
+      ],
+      "p95ReductionPercent": [
+        -3.2928299786661563
+      ],
+      "afterBuildP95Ms": [
+        50.997
+      ],
+      "afterRasterP95Ms": [
+        1.145
+      ],
+      "afterMaxRssMiB": [
+        268.359375
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 102400,
+      "budget": "default",
+      "operation": "initialDisplay",
+      "scope": "full",
+      "beforeP95Ms": [
+        208.68
+      ],
+      "afterP95Ms": [
+        228.532
+      ],
+      "p95ReductionPercent": [
+        -9.51313015142803
+      ],
+      "afterBuildP95Ms": [
+        96.688
+      ],
+      "afterRasterP95Ms": [
+        1.206
+      ],
+      "afterMaxRssMiB": [
+        267.28125
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 102400,
+      "budget": "default",
+      "operation": "liveToSource",
+      "scope": "full",
+      "beforeP95Ms": [
+        166.501
+      ],
+      "afterP95Ms": [
+        172.026
+      ],
+      "p95ReductionPercent": [
+        -3.318298388598273
+      ],
+      "afterBuildP95Ms": [
+        169.468
+      ],
+      "afterRasterP95Ms": [
+        1.938
+      ],
+      "afterMaxRssMiB": [
+        476.296875
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 102400,
+      "budget": "default",
+      "operation": "readingToLive",
+      "scope": "full",
+      "beforeP95Ms": [
+        94.393
+      ],
+      "afterP95Ms": [
+        103.848
+      ],
+      "p95ReductionPercent": [
+        -10.016632589280983
+      ],
+      "afterBuildP95Ms": [
+        59.483
+      ],
+      "afterRasterP95Ms": [
+        1.197
+      ],
+      "afterMaxRssMiB": [
+        476.171875
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 102400,
+      "budget": "default",
+      "operation": "scroll",
+      "scope": "full",
+      "beforeP95Ms": [
+        89.656
+      ],
+      "afterP95Ms": [
+        92.978
+      ],
+      "p95ReductionPercent": [
+        -3.7052734897831563
+      ],
+      "afterBuildP95Ms": [
+        84.158
+      ],
+      "afterRasterP95Ms": [
+        1.203
+      ],
+      "afterMaxRssMiB": [
+        264.53125
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 102400,
+      "budget": "default",
+      "operation": "selection",
+      "scope": "full",
+      "beforeP95Ms": [
+        93.853
+      ],
+      "afterP95Ms": [
+        65.93
+      ],
+      "p95ReductionPercent": [
+        29.751845971892198
+      ],
+      "afterBuildP95Ms": [
+        57.509
+      ],
+      "afterRasterP95Ms": [
+        1.352
+      ],
+      "afterMaxRssMiB": [
+        258.890625
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 102400,
+      "budget": "default",
+      "operation": "selection",
+      "scope": "selection-repeat",
+      "beforeP95Ms": [
+        87.294,
+        87.264
+      ],
+      "afterP95Ms": [
+        50.085,
+        49.654
+      ],
+      "p95ReductionPercent": [
+        42.62492267509794,
+        43.09910157682434
+      ],
+      "afterBuildP95Ms": [
+        42.85,
+        42.254
+      ],
+      "afterRasterP95Ms": [
+        1.111,
+        1.095
+      ],
+      "afterMaxRssMiB": [
+        216.25,
+        214.078125
+      ],
+      "afterP95RelativeSpread": 0.008680066057115184,
+      "sameEnvironmentWatchP95Ms": 63
+    },
+    {
+      "utf8Bytes": 102400,
+      "budget": "default",
+      "operation": "sourceToReading",
+      "scope": "full",
+      "beforeP95Ms": [
+        661.779
+      ],
+      "afterP95Ms": [
+        720.423
+      ],
+      "p95ReductionPercent": [
+        -8.861568590118463
+      ],
+      "afterBuildP95Ms": [
+        700.209
+      ],
+      "afterRasterP95Ms": [
+        10.233
+      ],
+      "afterMaxRssMiB": [
+        471.84375
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 102400,
+      "budget": "default",
+      "operation": "typing",
+      "scope": "full",
+      "beforeP95Ms": [
+        133.864
+      ],
+      "afterP95Ms": [
+        148.439
+      ],
+      "p95ReductionPercent": [
+        -10.887916093946082
+      ],
+      "afterBuildP95Ms": [
+        58.111
+      ],
+      "afterRasterP95Ms": [
+        1.195
+      ],
+      "afterMaxRssMiB": [
+        267.0
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 102400,
+      "budget": "unlimited-controlled-corpus",
+      "operation": "initialDisplay",
+      "scope": "full",
+      "beforeP95Ms": [
+        220.127
+      ],
+      "afterP95Ms": [
+        232.51
+      ],
+      "p95ReductionPercent": [
+        -5.625388979997892
+      ],
+      "afterBuildP95Ms": [
+        96.093
+      ],
+      "afterRasterP95Ms": [
+        1.226
+      ],
+      "afterMaxRssMiB": [
+        399.34375
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 102400,
+      "budget": "unlimited-controlled-corpus",
+      "operation": "liveToSource",
+      "scope": "full",
+      "beforeP95Ms": [
+        165.5
+      ],
+      "afterP95Ms": [
+        186.95
+      ],
+      "p95ReductionPercent": [
+        -12.9607250755287
+      ],
+      "afterBuildP95Ms": [
+        185.078
+      ],
+      "afterRasterP95Ms": [
+        1.812
+      ],
+      "afterMaxRssMiB": [
+        477.3125
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 102400,
+      "budget": "unlimited-controlled-corpus",
+      "operation": "readingToLive",
+      "scope": "full",
+      "beforeP95Ms": [
+        98.586
+      ],
+      "afterP95Ms": [
+        106.242
+      ],
+      "p95ReductionPercent": [
+        -7.765808532651697
+      ],
+      "afterBuildP95Ms": [
+        67.1
+      ],
+      "afterRasterP95Ms": [
+        1.326
+      ],
+      "afterMaxRssMiB": [
+        476.953125
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 102400,
+      "budget": "unlimited-controlled-corpus",
+      "operation": "scroll",
+      "scope": "full",
+      "beforeP95Ms": [
+        86.54
+      ],
+      "afterP95Ms": [
+        93.941
+      ],
+      "p95ReductionPercent": [
+        -8.552114629073259
+      ],
+      "afterBuildP95Ms": [
+        86.563
+      ],
+      "afterRasterP95Ms": [
+        1.139
+      ],
+      "afterMaxRssMiB": [
+        398.578125
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 102400,
+      "budget": "unlimited-controlled-corpus",
+      "operation": "selection",
+      "scope": "full",
+      "beforeP95Ms": [
+        96.525
+      ],
+      "afterP95Ms": [
+        59.139
+      ],
+      "p95ReductionPercent": [
+        38.731934731934736
+      ],
+      "afterBuildP95Ms": [
+        53.591
+      ],
+      "afterRasterP95Ms": [
+        1.447
+      ],
+      "afterMaxRssMiB": [
+        392.578125
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 102400,
+      "budget": "unlimited-controlled-corpus",
+      "operation": "selection",
+      "scope": "selection-repeat",
+      "beforeP95Ms": [
+        84.097,
+        85.327
+      ],
+      "afterP95Ms": [
+        49.446,
+        45.103
+      ],
+      "p95ReductionPercent": [
+        41.20361011688883,
+        47.140998746000676
+      ],
+      "afterBuildP95Ms": [
+        43.075,
+        42.648
+      ],
+      "afterRasterP95Ms": [
+        1.072,
+        1.085
+      ],
+      "afterMaxRssMiB": [
+        214.546875,
+        213.203125
+      ],
+      "afterP95RelativeSpread": 0.09629071236946536,
+      "sameEnvironmentWatchP95Ms": 62
+    },
+    {
+      "utf8Bytes": 102400,
+      "budget": "unlimited-controlled-corpus",
+      "operation": "sourceToReading",
+      "scope": "full",
+      "beforeP95Ms": [
+        816.201
+      ],
+      "afterP95Ms": [
+        890.292
+      ],
+      "p95ReductionPercent": [
+        -9.077543399236209
+      ],
+      "afterBuildP95Ms": [
+        870.29
+      ],
+      "afterRasterP95Ms": [
+        10.668
+      ],
+      "afterMaxRssMiB": [
+        472.515625
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 102400,
+      "budget": "unlimited-controlled-corpus",
+      "operation": "typing",
+      "scope": "full",
+      "beforeP95Ms": [
+        148.981
+      ],
+      "afterP95Ms": [
+        141.084
+      ],
+      "p95ReductionPercent": [
+        5.300675925117959
+      ],
+      "afterBuildP95Ms": [
+        55.057
+      ],
+      "afterRasterP95Ms": [
+        1.183
+      ],
+      "afterMaxRssMiB": [
+        402.21875
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 1048576,
+      "budget": "default",
+      "operation": "initialDisplay",
+      "scope": "full",
+      "beforeP95Ms": [
+        899.159
+      ],
+      "afterP95Ms": [
+        1043.332
+      ],
+      "p95ReductionPercent": [
+        -16.034205296282433
+      ],
+      "afterBuildP95Ms": [
+        513.912
+      ],
+      "afterRasterP95Ms": [
+        1.406
+      ],
+      "afterMaxRssMiB": [
+        317.625
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 1048576,
+      "budget": "default",
+      "operation": "liveToSource",
+      "scope": "full",
+      "beforeP95Ms": [
+        840.152
+      ],
+      "afterP95Ms": [
+        857.468
+      ],
+      "p95ReductionPercent": [
+        -2.0610556185071127
+      ],
+      "afterBuildP95Ms": [
+        855.125
+      ],
+      "afterRasterP95Ms": [
+        2.086
+      ],
+      "afterMaxRssMiB": [
+        1407.265625
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 1048576,
+      "budget": "default",
+      "operation": "readingToLive",
+      "scope": "full",
+      "beforeP95Ms": [
+        79.524
+      ],
+      "afterP95Ms": [
+        82.144
+      ],
+      "p95ReductionPercent": [
+        -3.2946028871787103
+      ],
+      "afterBuildP95Ms": [
+        60.115
+      ],
+      "afterRasterP95Ms": [
+        1.468
+      ],
+      "afterMaxRssMiB": [
+        1404.28125
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 1048576,
+      "budget": "default",
+      "operation": "scroll",
+      "scope": "full",
+      "beforeP95Ms": [
+        88.843
+      ],
+      "afterP95Ms": [
+        95.241
+      ],
+      "p95ReductionPercent": [
+        -7.201467757729918
+      ],
+      "afterBuildP95Ms": [
+        91.23
+      ],
+      "afterRasterP95Ms": [
+        1.228
+      ],
+      "afterMaxRssMiB": [
+        310.765625
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 1048576,
+      "budget": "default",
+      "operation": "selection",
+      "scope": "full",
+      "beforeP95Ms": [
+        442.257
+      ],
+      "afterP95Ms": [
+        68.199
+      ],
+      "p95ReductionPercent": [
+        84.57932830910534
+      ],
+      "afterBuildP95Ms": [
+        62.622
+      ],
+      "afterRasterP95Ms": [
+        1.311
+      ],
+      "afterMaxRssMiB": [
+        299.78125
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 1048576,
+      "budget": "default",
+      "operation": "selection",
+      "scope": "selection-repeat",
+      "beforeP95Ms": [
+        448.374,
+        430.832
+      ],
+      "afterP95Ms": [
+        50.592,
+        50.537
+      ],
+      "p95ReductionPercent": [
+        88.71656251254532,
+        88.26990567088797
+      ],
+      "afterBuildP95Ms": [
+        43.161,
+        43.325
+      ],
+      "afterRasterP95Ms": [
+        1.187,
+        1.084
+      ],
+      "afterMaxRssMiB": [
+        220.59375,
+        219.34375
+      ],
+      "afterP95RelativeSpread": 0.0010883115341235078,
+      "sameEnvironmentWatchP95Ms": 64
+    },
+    {
+      "utf8Bytes": 1048576,
+      "budget": "default",
+      "operation": "sourceToReading",
+      "scope": "full",
+      "beforeP95Ms": [
+        454.35
+      ],
+      "afterP95Ms": [
+        462.559
+      ],
+      "p95ReductionPercent": [
+        -1.8067569054693422
+      ],
+      "afterBuildP95Ms": [
+        410.333
+      ],
+      "afterRasterP95Ms": [
+        0.848
+      ],
+      "afterMaxRssMiB": [
+        1408.53125
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 1048576,
+      "budget": "default",
+      "operation": "typing",
+      "scope": "full",
+      "beforeP95Ms": [
+        804.25
+      ],
+      "afterP95Ms": [
+        856.037
+      ],
+      "p95ReductionPercent": [
+        -6.439166925707185
+      ],
+      "afterBuildP95Ms": [
+        60.929
+      ],
+      "afterRasterP95Ms": [
+        1.501
+      ],
+      "afterMaxRssMiB": [
+        318.6875
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 1048576,
+      "budget": "unlimited-controlled-corpus",
+      "operation": "initialDisplay",
+      "scope": "full",
+      "beforeP95Ms": [
+        905.716
+      ],
+      "afterP95Ms": [
+        920.583
+      ],
+      "p95ReductionPercent": [
+        -1.6414637701001045
+      ],
+      "afterBuildP95Ms": [
+        449.269
+      ],
+      "afterRasterP95Ms": [
+        1.203
+      ],
+      "afterMaxRssMiB": [
+        984.703125
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 1048576,
+      "budget": "unlimited-controlled-corpus",
+      "operation": "liveToSource",
+      "scope": "full",
+      "beforeP95Ms": [
+        6567.221
+      ],
+      "afterP95Ms": [
+        6348.313
+      ],
+      "p95ReductionPercent": [
+        3.3333429771892797
+      ],
+      "afterBuildP95Ms": [
+        6336.669
+      ],
+      "afterRasterP95Ms": [
+        7.025
+      ],
+      "afterMaxRssMiB": [
+        2449.875
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 1048576,
+      "budget": "unlimited-controlled-corpus",
+      "operation": "readingToLive",
+      "scope": "full",
+      "beforeP95Ms": [
+        573.817
+      ],
+      "afterP95Ms": [
+        553.351
+      ],
+      "p95ReductionPercent": [
+        3.566642326734837
+      ],
+      "afterBuildP95Ms": [
+        97.093
+      ],
+      "afterRasterP95Ms": [
+        1.829
+      ],
+      "afterMaxRssMiB": [
+        2190.859375
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 1048576,
+      "budget": "unlimited-controlled-corpus",
+      "operation": "scroll",
+      "scope": "full",
+      "beforeP95Ms": [
+        92.914
+      ],
+      "afterP95Ms": [
+        91.037
+      ],
+      "p95ReductionPercent": [
+        2.0201476634306936
+      ],
+      "afterBuildP95Ms": [
+        83.696
+      ],
+      "afterRasterP95Ms": [
+        1.144
+      ],
+      "afterMaxRssMiB": [
+        985.921875
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 1048576,
+      "budget": "unlimited-controlled-corpus",
+      "operation": "selection",
+      "scope": "full",
+      "beforeP95Ms": [
+        443.929
+      ],
+      "afterP95Ms": [
+        65.339
+      ],
+      "p95ReductionPercent": [
+        85.28165539984998
+      ],
+      "afterBuildP95Ms": [
+        58.665
+      ],
+      "afterRasterP95Ms": [
+        1.154
+      ],
+      "afterMaxRssMiB": [
+        974.828125
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 1048576,
+      "budget": "unlimited-controlled-corpus",
+      "operation": "selection",
+      "scope": "selection-repeat",
+      "beforeP95Ms": [
+        433.961,
+        434.154
+      ],
+      "afterP95Ms": [
+        52.586,
+        51.857
+      ],
+      "p95ReductionPercent": [
+        87.88232122241399,
+        88.0556208165766
+      ],
+      "afterBuildP95Ms": [
+        46.389,
+        46.169
+      ],
+      "afterRasterP95Ms": [
+        1.094,
+        1.141
+      ],
+      "afterMaxRssMiB": [
+        227.484375,
+        227.765625
+      ],
+      "afterP95RelativeSpread": 0.01405788996663901,
+      "sameEnvironmentWatchP95Ms": 66
+    },
+    {
+      "utf8Bytes": 1048576,
+      "budget": "unlimited-controlled-corpus",
+      "operation": "sourceToReading",
+      "scope": "full",
+      "beforeP95Ms": [
+        11728.249
+      ],
+      "afterP95Ms": [
+        11754.54
+      ],
+      "p95ReductionPercent": [
+        -0.22416816014054763
+      ],
+      "afterBuildP95Ms": [
+        11692.644
+      ],
+      "afterRasterP95Ms": [
+        97.188
+      ],
+      "afterMaxRssMiB": [
+        2412.125
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    },
+    {
+      "utf8Bytes": 1048576,
+      "budget": "unlimited-controlled-corpus",
+      "operation": "typing",
+      "scope": "full",
+      "beforeP95Ms": [
+        822.923
+      ],
+      "afterP95Ms": [
+        824.76
+      ],
+      "p95ReductionPercent": [
+        -0.22322866173383193
+      ],
+      "afterBuildP95Ms": [
+        60.329
+      ],
+      "afterRasterP95Ms": [
+        1.544
+      ],
+      "afterMaxRssMiB": [
+        992.265625
+      ],
+      "afterP95RelativeSpread": 0.0,
+      "sameEnvironmentWatchP95Ms": null
+    }
+  ]
+}
