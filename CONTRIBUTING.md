@@ -69,9 +69,14 @@ dependency and workflow paths. Manual dispatch forces a complete native run.
 It uses Flutter 3.44.8 so a core SDK upgrade does not silently change native
 rendering baselines.
 
-After these workflows are committed and pushed, run both once on GitHub. Enable
-the stable **Core required** check in the `main` branch protection/ruleset. The
-workflow aggregates both matrix results and fails if either fails or is
-cancelled. Merely adding YAML cannot enforce a repository's merge rules. The
-initial remote run and this repository setting must be verified before declaring
-the R0-03 merge gate fully accepted.
+`main` requires the **Core required** check from GitHub Actions (app ID 15368),
+with the branch up to date. The rule also applies to administrators. Push changes
+to a feature branch, open a pull request, and merge after the checks pass. The
+workflow aggregates both SDK results and fails if either fails or is cancelled.
+Force pushes and branch deletion remain disabled.
+
+The first [core run](https://github.com/robinfai/ianvs-markdown/actions/runs/37605838941)
+and [native run](https://github.com/robinfai/ianvs-markdown/actions/runs/37605838983)
+passed for `ebe7dd7`. The protection API was read back after configuration on
+2026-10-07. Record the first pull-request gate result in [ROADMAP.md](ROADMAP.md)
+before closing R0-03; a successful main-branch run alone is not that acceptance.

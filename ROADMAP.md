@@ -137,7 +137,7 @@ iCloud、Quick Look、文件树、全文搜索界面、导出界面和应用外�
 - 修改核心交互、宿主或 Mermaid 时，路径规则能覆盖相应集成回归。
 - CI 和本地命令使用同一套检查入口；最低 SDK 组合有实际验证记录。
 
-`check-core`、`check-integrations` 和 `check-package` 已实现，详见 [CONTRIBUTING.md](CONTRIBUTING.md)。R0-03 仍需提交后的首次远端 CI 运行及 `Core required` 合入规则验收；本地双 SDK 检查通过后可继续 R0-04。
+`check-core`、`check-integrations` 和 `check-package` 已实现，详见 [CONTRIBUTING.md](CONTRIBUTING.md)。首次远端核心与原生 CI 已通过，`main` 已启用 GitHub Actions 来源的 `Core required`（要求分支最新并对管理员生效）；R0-03 仍需在 PR 上核验合入门禁，本地双 SDK 检查通过后可继续 R0-04。
 
 远端验收清单：审阅并提交本轮改动；在 PR 上确认两套核心 SDK 及原生集成工作流通过；在 `main` 的保护规则中启用 `Core required`；在执行记录保存 PR/Actions 链接及规则核验结果。仅本地命令或 YAML 检查通过，不将本任务标为完成。
 
@@ -267,5 +267,6 @@ make benchmark LABEL=after
 | 2026-10-07 | R0-04 本地实现与诊断 | 纯选区/composing 变化复用文档结构，增加 2 项核心回归；修复表格在 profile/release 读取 debug 专用 getter 的异常；加入固定语料、解析计数、帧/RSS 采样、SDK 校验、阶段保存及超时退出 | Apple M4 Pro / macOS 27.0.1，临时打补丁的 Flutter 3.44.0 profile 配对采样；六场景纯选区刷新均从 1 次降至 0 次，文本输入仍各刷新 1 次。两组各完成 29/30 阶段，1 MiB 无预算模式切换均超过 180 秒阶段上限，故基准验收未完成、任务保持进行中。局部结果、原始数据和下一步见 [验证报告](benchmark/VALIDATION-2026-10-07.md) |
 | 2026-10-07 | 首轮最终回归（含工作区宿主改动） | Quick Look 测试改为从 Pub 配置定位原生库，去除对已有 CocoaPods 链接的依赖；原生 Markdown 导入纳入完整检查 | 未修改的 Flutter 3.44.0、3.44.8、3.47.6 均通过核心 801 项、最小示例 3 项、分析/格式和仓库外包接入；3.44.8 的 `make check` 全部通过：app 274 项通过、外部语料 1 项跳过；Mermaid Flutter 9 项、Rust 4 项、原生示例 3 项；Quick Look Rust 8 项、Swift 10 项及原生文件导入通过。最小示例以正常入口重新完成 macOS Debug 构建。最终发布快照 130 文件、约 560 KB，零警告。未提交、推送或发布；下一轮先关闭 R0-03/R0-04 剩余验收，再进入 R1 |
 | 2026-10-07 | 本次提交验证（R0 独立快照） | 按提交范围仅保留 roadmap/R0 改动，排除已有 iOS、应用界面及原生字体功能；混合文件按改动片段拆分，CI 不依赖未提交的宿主脚本 | 从暂存区导出独立源码，在未修改的 Flutter 3.44.8 / Dart 3.12.2 / macOS 上运行 `make check` 全部通过：核心 801 项、最小示例 3 项、app 260 项（外部语料 1 项跳过）、Mermaid Flutter 9 项与 Rust 3 项、原生示例 3 项、Quick Look Rust 8 项与 Swift 10 项；格式/分析通过，发布快照 130 文件、约 560 KB、零警告，外部宿主接入通过。此处测试数量与含宿主改动的工作区记录分别保留。R0-03 远端门禁及 R0-04 完整性能基准仍待验收 |
+| 2026-10-07 | R0-03 远端检查与规则 | `ebe7dd7` 的 [Core](https://github.com/robinfai/ianvs-markdown/actions/runs/37605838941) 与 [Native integrations](https://github.com/robinfai/ianvs-markdown/actions/runs/37605838983) 均成功；`main` 配置 `Core required`，限定 GitHub Actions app 15368、分支最新、管理员同样遵守，禁止强推及删除 | 先读取并确认原先没有保护规则或 ruleset，再通过 API 设置并回读。后续改动使用分支/PR；首次 PR 检查及门禁结果仍需记录，状态暂保留进行中 |
 
 后续每次完成、阻塞或调整任务时追加记录，注明提交或工作区范围、验证结果和下一步。表中的「计划建立」只表示文档完成。
