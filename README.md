@@ -2,7 +2,7 @@
 
 从 `ianvs-acp` 抽离并继续演进的 Flutter Markdown 渲染与编辑组件。它保留了原有的阅读体验，同时去掉了对 ACP 状态、工作区文件系统和特定 Mermaid 实现的耦合。
 
-组件库的迭代任务、依赖、验收标准和执行记录见仓库中的 [ROADMAP.md](https://github.com/robinfai/ianvs-markdown/blob/main/ROADMAP.md)。当前优先推进独立发布基线，再完善宿主接入、性能与平台兼容性。
+组件库的迭代任务、依赖、验收标准和执行记录见仓库中的 [ROADMAP.md](https://github.com/robinfai/ianvs-markdown/blob/main/ROADMAP.md)。独立发布基线已验收；下一步先明确公共 API 与生命周期契约，再完善宿主接入，并按任务依赖推进性能、历史容量和平台验证。
 
 ## 能力
 
