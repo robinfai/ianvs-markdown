@@ -113,6 +113,7 @@ class IanvsMarkdownController extends TextEditingController {
   Timer? _coalescingTimer;
   var _historyIndex = 0;
   var _applyingHistory = false;
+  var _disposed = false;
   _EditKind? _coalescingKind;
 
   /// Updated by editor widgets before they build their editable text.
@@ -144,7 +145,10 @@ class IanvsMarkdownController extends TextEditingController {
   }
 
   /// Records the source actually persisted, preserving edits made during save.
+  ///
+  /// A late asynchronous save acknowledgment after [dispose] is ignored.
   void markSaved({String? savedText}) {
+    if (_disposed) return;
     _savedText = savedText ?? text;
     _setDirty(text != _savedText);
   }
@@ -750,6 +754,7 @@ class IanvsMarkdownController extends TextEditingController {
 
   @override
   void dispose() {
+    _disposed = true;
     removeListener(_handleValueChanged);
     _coalescingTimer?.cancel();
     _mode.dispose();
