@@ -37,38 +37,49 @@ void main() {
           )
           as Map<String, dynamic>;
   for (final fixture in contract['fixtures'] as List<dynamic>) {
-    testWidgets('standard contract: ${fixture['id']}', (tester) async {
-      await tester.pumpWidget(
-        app(
-          IanvsMarkdown(
-            data: fixture['source'] as String,
-            syntaxPreset: standard,
-          ),
-        ),
-      );
-      final text = visibleText(tester);
-      for (final expected in fixture['contains'] as List<dynamic>) {
-        expect(text, contains(expected as String));
-      }
-      for (final unexpected
-          in fixture['doesNotContain'] as List<dynamic>? ?? []) {
-        expect(text, isNot(contains(unexpected as String)));
-      }
-      expect(find.byType(TextField), findsNothing);
-      expect(find.byType(IanvsMarkdownCallout), findsNothing);
-      if (fixture['id'] == 'html-keeps-upstream-gfm-behavior') {
-        await tester.pumpWidget(
-          app(
-            MarkdownBody(
-              data: fixture['source'] as String,
-              extensionSet: md.ExtensionSet.gitHubFlavored,
+    for (final view in [false, true]) {
+      testWidgets(
+        'standard ${view ? 'View' : 'Body'} contract: ${fixture['id']}',
+        (tester) async {
+          await tester.pumpWidget(
+            app(
+              view
+                  ? IanvsMarkdownView(
+                      data: fixture['source'] as String,
+                      syntaxPreset: standard,
+                      showOutline: false,
+                    )
+                  : IanvsMarkdown(
+                      data: fixture['source'] as String,
+                      syntaxPreset: standard,
+                    ),
             ),
-          ),
-        );
-        expect(visibleText(tester), text);
-      }
-      expect(tester.takeException(), isNull);
-    });
+          );
+          final text = visibleText(tester);
+          for (final expected in fixture['contains'] as List<dynamic>) {
+            expect(text, contains(expected as String));
+          }
+          for (final unexpected
+              in fixture['doesNotContain'] as List<dynamic>? ?? []) {
+            expect(text, isNot(contains(unexpected as String)));
+          }
+          expect(find.byType(TextField), findsNothing);
+          expect(find.byType(IanvsMarkdownCallout), findsNothing);
+          if (fixture['id'] == 'html-keeps-upstream-gfm-behavior') {
+            await tester.pumpWidget(
+              app(
+                MarkdownBody(
+                  data: fixture['source'] as String,
+                  extensionSet: md.ExtensionSet.gitHubFlavored,
+                ),
+              ),
+            );
+            expect(visibleText(tester), text);
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
   }
 
   testWidgets('standard blocks every default image path before I/O', (

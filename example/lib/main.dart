@@ -102,7 +102,6 @@ class _MarkdownExampleState extends State<MarkdownExample> {
         showFrontMatter: true,
         enableHeadingFolding: true,
         onSaveRequested: (_) {
-          _controller.markSaved();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Host save callback invoked')),
           );

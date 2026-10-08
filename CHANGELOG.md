@@ -1,5 +1,15 @@
 ## Unreleased
 
+- Add the opt-in standard GFM preset to `IanvsMarkdownView`, keeping its default
+  Obsidian behavior. Align literal metadata, heading folds/navigation, budget
+  scanning and whole-document copy; share fixtures with the body renderer.
+- Preserve CRLF/CR source offsets in standard heading folds and normalize line
+  endings for heading discovery, matching the renderer's GFM parser.
+- Document the public component matrix, exported API surface and host lifecycle,
+  including captured asynchronous saves and ordered per-document persistence.
+- Ignore late save acknowledgments after a document controller is disposed,
+  avoiding access to disposed dirty-state listeners when an in-flight save ends.
+
 - Move the desktop-theme focus geometry integration suite into `app/test` so
   core package tests no longer depend on the application's design-system package.
 - Keep live block text widths stable under host themes with filled input fields;

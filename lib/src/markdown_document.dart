@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/widgets.dart';
 import 'package:markdown/markdown.dart' as md;
 
@@ -59,7 +61,7 @@ List<IanvsMarkdownHeading> parseMarkdownHeadings(
 }) {
   assert(maximumLevel >= 1 && maximumLevel <= 6);
   final document = md.Document(extensionSet: md.ExtensionSet.gitHubFlavored);
-  final nodes = document.parseLines(source.split('\n'));
+  final nodes = document.parseLines(const LineSplitter().convert(source));
   final result = <IanvsMarkdownHeading>[];
   for (final node in nodes) {
     if (node is! md.Element || node.tag.length != 2) continue;

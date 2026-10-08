@@ -215,6 +215,7 @@ class IanvsMarkdown extends StatelessWidget {
       enabled: true,
       markdown: data,
       richMarkdown: data,
+      syntaxPreset: syntaxPreset,
       clipboardWriter: clipboardWriter,
       onSelectionChanged: onSelectionChanged,
       child: content,
@@ -1268,6 +1269,7 @@ class IanvsMarkdownView extends StatefulWidget {
   const IanvsMarkdownView({
     super.key,
     required this.data,
+    this.syntaxPreset = IanvsMarkdownSyntaxPreset.obsidian,
     this.controller,
     this.padding = const EdgeInsets.fromLTRB(28, 24, 32, 44),
     this.showFrontMatter = false,
@@ -1303,6 +1305,12 @@ class IanvsMarkdownView extends StatefulWidget {
   });
 
   final String data;
+
+  /// Syntax shared by the body, heading model, and render-budget scan.
+  ///
+  /// [IanvsMarkdownSyntaxPreset.standard] keeps front matter as literal GFM
+  /// source; [showFrontMatter] and [showDocumentTitle] have no effect there.
+  final IanvsMarkdownSyntaxPreset syntaxPreset;
   final ScrollController? controller;
   final EdgeInsetsGeometry padding;
   final bool showFrontMatter;
@@ -1400,6 +1408,7 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
       _headingFoldController.retainIdentities(_headingFoldModel.identities);
     }
     if (oldWidget.data != widget.data ||
+        oldWidget.syntaxPreset != widget.syntaxPreset ||
         oldWidget.showFrontMatter != widget.showFrontMatter ||
         oldWidget.renderBudget != widget.renderBudget) {
       _parseDocument();
@@ -1413,18 +1422,28 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
   }
 
   void _parseDocument() {
-    // YAML is always removed from the Markdown body. [showFrontMatter]
-    // controls only the optional properties card, matching Obsidian's
-    // document-surface setting rather than leaking raw YAML into Reading view.
-    _document = IanvsMarkdownDocument.parse(widget.data);
+    // Obsidian removes YAML regardless of the properties-card setting.
+    // Standard keeps the complete source, including YAML-shaped GFM headings.
+    _document = IanvsMarkdownDocument.parse(
+      widget.data,
+      parseFrontMatter:
+          widget.syntaxPreset == IanvsMarkdownSyntaxPreset.obsidian,
+    );
     final budget = widget.renderBudget;
     final canRenderHeadings =
         budget == null ||
-        scanMarkdownForRendering(_document.body, budget: budget).useMarkdown;
+        scanMarkdownForRendering(
+          _document.body,
+          budget: budget,
+          syntaxPreset: widget.syntaxPreset,
+        ).useMarkdown;
     _headings = canRenderHeadings
         ? _document.headings
         : const <IanvsMarkdownHeading>[];
-    _headingFoldModel = IanvsMarkdownHeadingFoldModel.parse(_document.body);
+    _headingFoldModel = IanvsMarkdownHeadingFoldModel.parse(
+      _document.body,
+      syntaxPreset: widget.syntaxPreset,
+    );
     _headingFoldController.retainIdentities(_headingFoldModel.identities);
   }
 
@@ -1529,6 +1548,7 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
                 enabled: widget.selectable,
                 markdown: widget.data,
                 richMarkdown: _document.body,
+                syntaxPreset: widget.syntaxPreset,
                 clipboardWriter: widget.clipboardWriter,
                 onSelectionChanged: widget.onSelectionChanged,
                 child: SingleChildScrollView(
@@ -1558,6 +1578,7 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
                           ],
                           IanvsMarkdown(
                             data: foldProjection.source,
+                            syntaxPreset: widget.syntaxPreset,
                             selectable: false,
                             softLineBreak: widget.softLineBreak,
                             styleSheet: widget.styleSheet,
@@ -1630,6 +1651,7 @@ class _IanvsMarkdownReadingSelection extends StatefulWidget {
     required this.enabled,
     required this.markdown,
     required this.richMarkdown,
+    required this.syntaxPreset,
     required this.clipboardWriter,
     required this.onSelectionChanged,
     required this.child,
@@ -1638,6 +1660,7 @@ class _IanvsMarkdownReadingSelection extends StatefulWidget {
   final bool enabled;
   final String markdown;
   final String richMarkdown;
+  final IanvsMarkdownSyntaxPreset syntaxPreset;
   final IanvsMarkdownClipboardWriter clipboardWriter;
   final MarkdownOnSelectionChangedCallback? onSelectionChanged;
   final Widget child;
@@ -1705,6 +1728,7 @@ class _IanvsMarkdownReadingSelectionState
   void didUpdateWidget(covariant _IanvsMarkdownReadingSelection oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.markdown != widget.markdown ||
+        oldWidget.syntaxPreset != widget.syntaxPreset ||
         oldWidget.enabled != widget.enabled) {
       _selectedContent = null;
       _wholeDocumentSelected = false;
