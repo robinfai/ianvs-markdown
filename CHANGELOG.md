@@ -1,5 +1,10 @@
 ## Unreleased
 
+- Document the public component matrix, exported API surface and host lifecycle,
+  including captured asynchronous saves and ordered per-document persistence.
+- Ignore late save acknowledgments after a document controller is disposed,
+  avoiding access to disposed dirty-state listeners when an in-flight save ends.
+
 - Move the desktop-theme focus geometry integration suite into `app/test` so
   core package tests no longer depend on the application's design-system package.
 - Keep live block text widths stable under host themes with filled input fields;
