@@ -1,8 +1,49 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:ianvs_markdown/src/editor/reference_links.dart';
 import 'package:markdown/markdown.dart' as md;
 
 void main() {
+  test('reference-free megabyte line can be opened, edited and restored', () {
+    final source = 'a' * (1024 * 1024);
+    expect(MarkdownLinkReferenceContext.parse(source).references, isEmpty);
+    expect(parseMarkdownLinkReferenceDefinitions(source), isEmpty);
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    controller.text = 'next $source';
+    expect(controller.text, 'next $source');
+    controller.undo();
+    expect(controller.text, source);
+    expect(controller.isDirty, isFalse);
+    controller.redo();
+    expect(controller.text, 'next $source');
+  });
+
+  test(
+    'brackets retain parser authority across containers and literal code',
+    () {
+      for (final source in [
+        '> [ref]: /quoted',
+        '- [ref]: /listed',
+        '```md\n[ref]: /literal\n```',
+        '<div>\n[ref]: /literal\n</div>',
+        '[ref]: /real\n\ntext',
+      ]) {
+        final upstream = md.Document(
+          extensionSet: md.ExtensionSet.gitHubFlavored,
+        )..parseLines(source.split('\n'));
+        final actual = MarkdownLinkReferenceContext.parse(source).references;
+        expect(actual.keys, upstream.linkReferences.keys, reason: source);
+        for (final key in actual.keys) {
+          expect(
+            actual[key]!.destination,
+            upstream.linkReferences[key]!.destination,
+          );
+        }
+      }
+    },
+  );
+
   test('isolated reference definitions preserve destination and title', () {
     const documents = <String>[
       '[label][ref]\n\n[ref]: docs/a\\)b "A \\"title\\""',

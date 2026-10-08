@@ -20,7 +20,9 @@ final class MarkdownLinkReferenceDefinition {
 List<MarkdownLinkReferenceDefinition> parseMarkdownLinkReferenceDefinitions(
   String source,
 ) {
-  if (source.isEmpty) return const <MarkdownLinkReferenceDefinition>[];
+  if (!source.contains('[')) {
+    return const <MarkdownLinkReferenceDefinition>[];
+  }
   final document = md.Document(extensionSet: md.ExtensionSet.gitHubFlavored);
   final nodes = document.parseLines(source.split('\n'));
   if (nodes.isNotEmpty || document.linkReferences.isEmpty) {
@@ -71,7 +73,9 @@ final class MarkdownLinkReferenceContext {
   MarkdownLinkReferenceContext._(this.references);
 
   factory MarkdownLinkReferenceContext.parse(String source) {
-    if (source.isEmpty) return MarkdownLinkReferenceContext._(const {});
+    // Every Markdown reference definition requires a literal opening bracket.
+    // Avoid a full GFM parse for ordinary prose, including very long lines.
+    if (!source.contains('[')) return MarkdownLinkReferenceContext._(const {});
     final document = md.Document(extensionSet: md.ExtensionSet.gitHubFlavored);
     document.parseLines(source.split('\n'));
     return MarkdownLinkReferenceContext._(

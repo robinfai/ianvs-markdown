@@ -1,6 +1,6 @@
 # 公共 API 与行为契约
 
-适用范围：2026-10-08 的仓库版本（`0.3.1` + `Unreleased`）。本文件对应 R1-01 / R1-02，说明已有行为与接入边界；后续修改预设、预算或默认行为时必须同步更新。平台构建能力另行验收，不能从 Dart 类型可用推断平台支持。
+适用范围：2026-10-08 的仓库版本（`0.3.1` + `Unreleased`）。本文件对应 R1-01 / R1-02 / R2-02，说明已有行为与接入边界；后续修改预设、预算或默认行为时必须同步更新。平台范围见 [构建与交互证据](PLATFORM_SUPPORT.md)，不能从 Dart 类型可用推断平台支持。
 
 ## 四种入口
 
@@ -65,9 +65,33 @@ Live 与 Source 在本轮继续使用 Obsidian 编辑语义。**暂不向 Live �
 
 UTF-8 降级边界不切开有效 Unicode 码点；小于下一个码点所需字节时停止。宿主设置 `renderBudget: null` 意味着承担该渲染路径的完整负载，不能据此宣称其他路径有独立保护。
 
-View 在正文渲染预算判断前解析文档，Live 在各块渲染前维护全文结构；Source 排版完整源码。富文本复制还会转换 Markdown/HTML。历史容量、预解析和复制预算分别由 R2-02 / R2-05 跟进，不能把当前预算描述成这些路径的完整保护。
+View 在正文渲染预算判断前解析文档，Live 在各块渲染前维护全文结构；Source 排版完整源码。富文本复制还会转换 Markdown/HTML。历史使用下文单独的 R2-02 容量策略；预解析和复制预算由 R2-05 跟进，不能把渲染预算描述成这些路径的完整保护。
 
 图片默认显示占位，不自动读取文件或网络；图片、Wiki 嵌入、链接导航和图表后端的权限、解码、缓存及过期结果由宿主负责。`super_clipboard` 是包级依赖，注入 writer 只改变调用行为，不能消除原生构建依赖。参考 [剪贴板](../lib/src/rich_clipboard.dart)、[预算](../lib/src/render_budget.dart)。
+
+## 撤销历史容量（R2-02）
+
+`IanvsMarkdownController.historyPolicy` 默认是 `IanvsMarkdownHistoryPolicy(maxEntries: 200, maxTextBytes: 32 * 1024 * 1024)`。这是一项 **Unreleased 行为变更**：此前无限保留，升级后旧快照会被裁剪。依赖完整历史的宿主可以显式传入 `historyPolicy: null` 保持旧行为，也可以创建 Controller 时提供不同限额；运行中不支持替换策略。
+
+```dart
+final bounded = IanvsMarkdownController(
+  text: initialMarkdown,
+  historyPolicy: const IanvsMarkdownHistoryPolicy(
+    maxEntries: 100,
+    maxTextBytes: 16 * 1024 * 1024,
+  ),
+);
+final legacy = IanvsMarkdownController(text: initialMarkdown, historyPolicy: null);
+```
+
+- 条目包含撤销、当前和重做快照；200 条最多产生 199 步撤销，连续输入合并后算一个快照。`maxEntries: 1` 仅保留当前状态。
+- 文本容量按每个快照的 `text.length * 2` 求和，即 UTF-16 计费字节。`中` 为 2，`😀` 为 4；与降级文本的 UTF-8 限额不同。不去重共享字符串，不包含对象开销、解析缓存及单独保留的保存基线，因此不是 Dart 堆或进程 RSS 的硬上限。
+- 每次文字改变后，先释放被新编辑替代的 redo 分支，再更新输入分组，最后裁掉最旧的连续前缀，直到同时满足两个限额。撤销/重做本身不改变保留集合。
+- 当前快照始终完整保留。如果当前文本本身超过字节限额，保留它作为唯一状态，不能撤销；缩小文本后也不会重新获得已裁剪的超大快照。`maxTextBytes: 0` 同样只保留当前状态，不截断用户原文。
+- `retainedHistoryEntries` / `retainedHistoryTextBytes` 提供当前计数。选择/composing-only 更新不增加计费量；文字变化沿用既有输入分组，历史恢复会清除 composing。该策略不重新定义“一次 IME 会话等于一次撤销”。
+- 保存基线独立于历史。保存点被裁剪不表示文件已保存，dirty 仍用当前原文与最近确认的 `savedText` 比较；异步保存契约不变。`clearHistory()` 只保留当前状态并重置计数，不改变 dirty 或保存基线。
+
+默认值是可配置的容量起点，优先限制长期编辑持有的完整快照；不是最佳性能承诺。约 1 MiB ASCII 文档每个快照计费约 2 MiB，默认字节限额通常会先于 200 条上限生效。回归覆盖 [历史策略](../test/history_policy_test.dart)、[编辑 Controller](../test/editor_controller_test.dart) 和 [异步宿主保存](../test/host_contract_test.dart)。
 
 ## 对象与保存
 
@@ -80,7 +104,7 @@ View 在正文渲染预算判断前解析文档，Live 在各块渲染前维护�
 
 ## 公共导出承诺与分层
 
-入口是 `package:ianvs_markdown/ianvs_markdown.dart`。本次用 Dart AST 审查其直接导出及 show/hide 规则，并用 Flutter 编译探针核对全部符号。清单包括 164 个项目符号和 11 个第三方重导出；不包含实例成员清单。
+入口是 `package:ianvs_markdown/ianvs_markdown.dart`。本次用 Dart AST 审查其直接导出及 show/hide 规则，并用 Flutter 编译探针核对全部符号。清单包括 165 个项目符号和 11 个第三方重导出；不包含实例成员清单。
 
 | 使用面 | 范围 | 兼容约束 |
 | --- | --- | --- |
@@ -107,7 +131,7 @@ View 在正文渲染预算判断前解析文档，Live 在各块渲染前维护�
 
 ### [lib/src/editor/editor_controller.dart](../lib/src/editor/editor_controller.dart)
 
-`IanvsMarkdownController`、`IanvsMarkdownEditingFormatter`、`IanvsMarkdownHistoryValue`、`IanvsMarkdownInlineMathSource`、`IanvsMarkdownSyntaxTheme`、`buildMarkdownSourceTextSpan`、`ianvsMarkdownInlineLinkSources`、`ianvsMarkdownInlineMathSources`
+`IanvsMarkdownController`、`IanvsMarkdownEditingFormatter`、`IanvsMarkdownHistoryPolicy`、`IanvsMarkdownHistoryValue`、`IanvsMarkdownInlineMathSource`、`IanvsMarkdownSyntaxTheme`、`buildMarkdownSourceTextSpan`、`ianvsMarkdownInlineLinkSources`、`ianvsMarkdownInlineMathSources`
 
 ### [lib/src/editor/editor_models.dart](../lib/src/editor/editor_models.dart)
 

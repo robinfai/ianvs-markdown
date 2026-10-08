@@ -20,6 +20,27 @@ import 'markdown_code_ranges.dart';
 import 'markdown_paste.dart';
 import 'reference_links.dart';
 
+/// Limits retained full-text undo/redo snapshots, including the current state.
+///
+/// Bytes are an accounting measure: two bytes per UTF-16 code unit per snapshot,
+/// without deduplicating shared strings. They do not measure Dart heap or RSS.
+/// The current snapshot is always retained, even when it alone exceeds the byte
+/// limit; in that case all undo/redo snapshots are discarded.
+@immutable
+final class IanvsMarkdownHistoryPolicy {
+  const IanvsMarkdownHistoryPolicy({
+    this.maxEntries = 200,
+    this.maxTextBytes = 32 * 1024 * 1024,
+  }) : assert(maxEntries >= 1),
+       assert(maxTextBytes >= 0);
+
+  /// Maximum retained states, including the current one. One disables undo.
+  final int maxEntries;
+
+  /// Maximum accounted text bytes, except for an oversized current state.
+  final int maxTextBytes;
+}
+
 @immutable
 final class IanvsMarkdownHistoryValue {
   const IanvsMarkdownHistoryValue({
@@ -84,6 +105,7 @@ class IanvsMarkdownController extends TextEditingController {
     String text = '',
     IanvsMarkdownEditorMode mode = IanvsMarkdownEditorMode.livePreview,
     this.historyCoalescingDuration = const Duration(milliseconds: 500),
+    this.historyPolicy = const IanvsMarkdownHistoryPolicy(),
   }) : _mode = ValueNotifier<IanvsMarkdownEditorMode>(mode),
        _savedText = text,
        super.fromValue(
@@ -94,11 +116,16 @@ class IanvsMarkdownController extends TextEditingController {
        ) {
     _linkReferences = MarkdownLinkReferenceContext.parse(text);
     _history.add(value);
+    _historyTextBytes = text.length * 2;
     _lastObservedValue = value;
     addListener(_handleValueChanged);
   }
 
   final Duration historyCoalescingDuration;
+
+  /// Retention limits for history. Set to null for legacy unlimited retention.
+  /// Changing this policy requires creating a new controller.
+  final IanvsMarkdownHistoryPolicy? historyPolicy;
   final ValueNotifier<IanvsMarkdownEditorMode> _mode;
   final ValueNotifier<IanvsMarkdownHistoryValue> _historyState =
       ValueNotifier<IanvsMarkdownHistoryValue>(IanvsMarkdownHistoryValue.empty);
@@ -112,6 +139,7 @@ class IanvsMarkdownController extends TextEditingController {
   String _savedText;
   Timer? _coalescingTimer;
   var _historyIndex = 0;
+  var _historyTextBytes = 0;
   var _applyingHistory = false;
   var _disposed = false;
   _EditKind? _coalescingKind;
@@ -133,6 +161,13 @@ class IanvsMarkdownController extends TextEditingController {
   bool get isDirty => _dirty.value;
   bool get canUndo => _historyIndex > 0;
   bool get canRedo => _historyIndex + 1 < _history.length;
+
+  /// Number of retained snapshots, including undo, current, and redo states.
+  int get retainedHistoryEntries => _history.length;
+
+  /// Sum of twice the UTF-16 length of every retained snapshot's text.
+  /// Excludes the separately retained save baseline, object overhead and caches.
+  int get retainedHistoryTextBytes => _historyTextBytes;
 
   ValueListenable<IanvsMarkdownHeadingNavigation?> get headingNavigation =>
       _headingNavigation;
@@ -173,6 +208,7 @@ class IanvsMarkdownController extends TextEditingController {
       ..clear()
       ..add(value);
     _historyIndex = 0;
+    _historyTextBytes = text.length * 2;
     _updateHistoryState();
   }
 
@@ -680,6 +716,9 @@ class IanvsMarkdownController extends TextEditingController {
     }
 
     if (_historyIndex + 1 < _history.length) {
+      for (var i = _historyIndex + 1; i < _history.length; i += 1) {
+        _historyTextBytes -= _history[i].text.length * 2;
+      }
       _history.removeRange(_historyIndex + 1, _history.length);
     }
     final kind = _editKind(previous, current);
@@ -689,15 +728,35 @@ class IanvsMarkdownController extends TextEditingController {
         kind == _coalescingKind &&
         _historyIndex > 0;
     if (canCoalesce) {
+      _historyTextBytes -= _history[_historyIndex].text.length * 2;
       _history[_historyIndex] = current;
     } else {
       _history.add(current);
       _historyIndex = _history.length - 1;
     }
+    _historyTextBytes += current.text.length * 2;
+    _trimHistory();
     _coalescingKind = kind;
     _coalescingTimer?.cancel();
     _coalescingTimer = Timer(historyCoalescingDuration, _closeCoalescingGroup);
     _updateHistoryState();
+  }
+
+  void _trimHistory() {
+    final policy = historyPolicy;
+    if (policy == null) return;
+    // Called only after an edit has discarded redo and made current the last
+    // state. Remove one prefix so retained undo steps stay contiguous.
+    var removed = 0;
+    while (_history.length - removed > 1 &&
+        (_history.length - removed > policy.maxEntries ||
+            _historyTextBytes > policy.maxTextBytes)) {
+      _historyTextBytes -= _history[removed].text.length * 2;
+      removed += 1;
+    }
+    if (removed == 0) return;
+    _history.removeRange(0, removed);
+    _historyIndex -= removed;
   }
 
   void _restoreHistoryValue(TextEditingValue restored) {

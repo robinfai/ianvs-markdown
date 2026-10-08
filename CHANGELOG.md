@@ -1,5 +1,13 @@
 ## Unreleased
 
+- Skip full GFM reference-context parsing when source has no opening bracket,
+  allowing long reference-free lines to be opened, edited and restored without
+  entering that parser path. Inputs containing brackets keep parser authority.
+- **History retention change:** controllers now keep at most 200 snapshots and
+  32 MiB of accounted UTF-16 text by default. Configure `historyPolicy` or pass
+  `null` for legacy unlimited retention. The current source is never truncated;
+  an oversized current state is retained alone. Expose retained entry/byte
+  counts, preserve save baselines and document the migration and memory scope.
 - Add the opt-in standard GFM preset to `IanvsMarkdownView`, keeping its default
   Obsidian behavior. Align literal metadata, heading folds/navigation, budget
   scanning and whole-document copy; share fixtures with the body renderer.

@@ -32,6 +32,9 @@ workarounds and incomplete-run handling are separate from widget-test results.
 Only a complete, error-free matched pair satisfies the full baseline gate.
 Partial diagnostics must identify unfinished phases and their limitations.
 
+Candidate macOS Profile/Release commands, observed native build requirements,
+and remaining device checks are recorded in [the platform matrix](doc/PLATFORM_SUPPORT.md).
+
 ## Publication snapshot
 
 `tool/check_package.py` reads the archive file list emitted by
