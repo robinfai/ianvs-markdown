@@ -4,6 +4,8 @@
 
 组件库的迭代任务、依赖、验收标准和执行记录见仓库中的 [ROADMAP.md](https://github.com/robinfai/ianvs-markdown/blob/main/ROADMAP.md)。独立发布基线与公共 API/生命周期契约已验收；正文与 View 现均支持标准 GFM 预设，撤销历史已有可配置容量限制，后续推进宿主接入、性能和平台验证。
 
+实际平台构建和交互覆盖范围见 [平台能力矩阵](doc/PLATFORM_SUPPORT.md)。
+
 ## 能力
 
 - GitHub Flavored Markdown、可选择文本、表格与任务列表
