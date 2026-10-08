@@ -2,7 +2,7 @@
 
 从 `ianvs-acp` 抽离并继续演进的 Flutter Markdown 渲染与编辑组件。它保留了原有的阅读体验，同时去掉了对 ACP 状态、工作区文件系统和特定 Mermaid 实现的耦合。
 
-组件库的迭代任务、依赖、验收标准和执行记录见仓库中的 [ROADMAP.md](https://github.com/robinfai/ianvs-markdown/blob/main/ROADMAP.md)。独立发布基线与公共 API/生命周期契约已验收；正文与 View 现均支持标准 GFM 预设，后续按任务依赖推进历史容量、宿主接入、性能和平台验证。
+组件库的迭代任务、依赖、验收标准和执行记录见仓库中的 [ROADMAP.md](https://github.com/robinfai/ianvs-markdown/blob/main/ROADMAP.md)。独立发布基线与公共 API/生命周期契约已验收；正文与 View 现均支持标准 GFM 预设，撤销历史已有可配置容量限制，后续推进宿主接入、性能和平台验证。
 
 ## 能力
 
@@ -169,6 +169,8 @@ IanvsMarkdown(
 在桌面端 Live Preview 中，宿主成功解析的标准图片和 Wiki 图片会在悬停时显示右下角缩放柄。拖拽保持当前宽高比，宽度限制在 `20` 到编辑区可用宽度之间；松开后只把整数宽度写回 `|宽度`，双击缩放柄则移除有效尺寸。拖拽和重置各自形成独立撤销项。阅读模式、源码模式和移动端不显示该控件，安全占位也不会因此触发任何图片 I/O。
 
 ## 编辑与实时预览
+
+Controller 默认保留最多 200 个完整历史状态、32 MiB 的 UTF-16 计费文本（包含当前状态）。超大当前文档不会被截断，但可能无法撤销。可用 `historyPolicy` 配置限额，或设为 `null` 保留旧版无限历史；计量、保存基线与升级说明见 [历史容量契约](doc/API_CONTRACTS.md#撤销历史容量r2-02)。
 
 `IanvsMarkdownController` 是编辑状态的唯一数据源，管理文本、选区、模式、dirty 状态和撤销历史。`IanvsMarkdownLiveEditor` 会把当前块显示为原始 Markdown，其余块继续使用渲染组件：
 
