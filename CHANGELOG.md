@@ -1,5 +1,8 @@
 ## Unreleased
 
+- Skip full GFM reference-context parsing when source has no opening bracket,
+  allowing long reference-free lines to be opened, edited and restored without
+  entering that parser path. Inputs containing brackets keep parser authority.
 - **History retention change:** controllers now keep at most 200 snapshots and
   32 MiB of accounted UTF-16 text by default. Configure `historyPolicy` or pass
   `null` for legacy unlimited retention. The current source is never truncated;
