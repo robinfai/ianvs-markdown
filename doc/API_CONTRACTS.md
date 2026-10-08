@@ -1,6 +1,6 @@
 # 公共 API 与行为契约
 
-适用范围：2026-10-08 的仓库版本（`0.3.1` + `Unreleased`）。本文件对应 R1-01，说明已有行为与接入边界；后续修改预设、预算或默认行为时必须同步更新。平台构建能力另行验收，不能从 Dart 类型可用推断平台支持。
+适用范围：2026-10-08 的仓库版本（`0.3.1` + `Unreleased`）。本文件对应 R1-01 / R1-02，说明已有行为与接入边界；后续修改预设、预算或默认行为时必须同步更新。平台构建能力另行验收，不能从 Dart 类型可用推断平台支持。
 
 ## 四种入口
 
@@ -9,7 +9,7 @@
 | 用途 | 内容大小的正文/消息 | 有界高度的完整文档阅读 | 完整源码编辑 | Live / Source / Reading 三模式容器 |
 | 文档输入 | `data: String` | `data: String` | 宿主的 `IanvsMarkdownController` | 宿主的 `IanvsMarkdownController` |
 | 修改原文 | 无编辑 Controller | 无编辑 Controller；局部 HTML 控件状态不等于文档编辑 | 编辑 Controller 原文 | 编辑 Controller 原文 |
-| 语法预设 | `syntaxPreset`，默认 `obsidian`，可选 `standard` | 当前仅 Obsidian 文档语义 | Obsidian 风格源码高亮与输入行为 | 当前仅 Obsidian 文档语义 |
+| 语法预设 | `syntaxPreset`，默认 `obsidian`，可选 `standard` | `syntaxPreset`，默认 `obsidian`，可选 `standard` | Obsidian 风格源码高亮与输入行为 | 当前仅 Obsidian 文档语义 |
 | 自定义语法 | `blockSyntaxes` / `inlineSyntaxes` / `extensionSet` | 不公开上述参数 | 不公开 | 不公开 |
 | 自定义元素 | `builders`、`paddingBuilders`、图片/图表/公式/Wiki builder | `builders`、图片/图表/公式/Wiki builder | 无渲染 builder | `builders`、图片/图表/公式/Wiki builder；应用于可渲染模式 |
 | 选择 | 默认单文档跨块选择；可用 `documentSelection: false` 退回块级选择；`selectable: false` 关闭 | 默认跨块选择；可用 `selectable: false` 关闭 | Controller 的原文选区 | Live/Source 使用源码选区；Reading 使用阅读态选择 |
@@ -25,20 +25,45 @@
 | 阅读复制 | 原始 Markdown / 安全 HTML 双表示，可注入 `clipboardWriter` | 同正文 | 使用文本编辑面复制；无 `clipboardWriter` 参数 | `clipboardWriter` 用于阅读/渲染面，不替换 Source 的文本编辑复制 |
 
 源码依据：[正文与 View](../lib/src/ianvs_markdown.dart)、[Source](../lib/src/editor/source_editor.dart)、[Live](../lib/src/editor/live_editor.dart)。
-行为证据：[标准语法](../test/standard_syntax_test.dart)、[正文/View](../test/ianvs_markdown_test.dart)、[Live](../test/live_editor_test.dart)、[宿主契约](../test/host_contract_test.dart)。矩阵描述支持范围，不能把同名参数视为相同的处理路径。
+行为证据：[标准 View](../test/standard_view_test.dart)、[标题范围](../test/heading_folding_test.dart)、[标准语法](../test/standard_syntax_test.dart)、[正文/View](../test/ianvs_markdown_test.dart)、[Live](../test/live_editor_test.dart)、[宿主契约](../test/host_contract_test.dart)。矩阵描述支持范围，不能把同名参数视为相同的处理路径。
 
 ## 原文、选择与更新
 
 - 原始 Markdown 是唯一文档模型。编辑 Controller 和块范围使用 Dart 字符串的 UTF-16 偏移；语法预算降级的大小使用 UTF-8 字节，两者不能混用。
 - 阅读态 `onSelectionChanged` 提供选择内容及阅读态范围，不保证是原始 Markdown 的精确偏移；需要编辑或源码导航时使用编辑 Controller / 源码范围接口。
-- 正文 `data` 变化重新构建解析；阅读选择会随源码变化失效，不承诺增量 AST。View 的 `data`、`showFrontMatter` 或预算变化会重新解析并安排滚动回到顶部。
+- 正文 `data` 变化重新构建解析；阅读选择会随源码变化失效，不承诺增量 AST。View 的 `data`、`syntaxPreset`、`showFrontMatter` 或预算变化会重新解析并安排滚动回到顶部。
 - Live 在纯选区/composing 变化时复用文档结构，文本变化、撤销/重做与替换 Controller 时重新更新结构。Controller 自身还维护引用上下文。解析次数减少不代表所有布局成本已经消除。
 - 模式切换使用同一 Controller 的原文、dirty 和历史。Live 与 Reading 的选区是不同交互面，不保证恢复阅读态的拖选区域或所有模式的滚动像素位置。
 - 没有独立的 document ID API。推荐每个文档持有一个 Controller，宿主保存文档身份并用稳定 Key 区分文档。直接替换 `controller.text` 不会自动重置历史或保存基线。
 
+## 语法预设的范围（R1-02）
+
+正文和 View 均支持 `syntaxPreset: IanvsMarkdownSyntaxPreset.standard`，默认继续为 `obsidian`。两种入口使用同一份 [v2 标准语法样例](../test/fixtures/standard_syntax_contract.json)，覆盖字面 Obsidian 标记、HTML、YAML、任务、强调、表格、嵌套列表、链接和脚注。
+
+| 行为 | `obsidian` | `standard` |
+| --- | --- | --- |
+| View front matter | 从正文移除；`showFrontMatter` 控制属性卡 | 完整原文进入 GFM，YAML 形状的内容可能成为 Setext 标题；不生成属性卡，`showFrontMatter` / `showDocumentTitle` 不生效 |
+| Wiki、注释、数学等扩展 | 保留既有投影和 builder | 标记保持 GFM 原始语义，不启用 Obsidian 投影、数学或 HTML 交互控件 |
+| View 大纲/折叠/导航 | 既有文档块模型 | 按 GFM 顶层标题建立范围，保留原始 UTF-16 偏移；代码围栏、HTML、引用和列表中的标题不进入文档大纲 |
+| 预算 token | 美元符号计入数学语法 | 字面美元符号不计入数学语法；View 的标题判断与正文使用相同预设 |
+| 全选复制 | plain text 保留完整原文；View 的富文本从去除 front matter 后的正文生成 | plain text 保留完整原文；富文本从完整 GFM 原文生成 |
+
+复制的 HTML 经过安全过滤，不承诺自定义 Widget、Obsidian 扩展或原生图表的视觉复刻；部分选择按已有 GFM DOM 映射，无法匹配时降为所选纯文本。预算截断的是显示前缀，全选复制不截断原文。预设切换会使阅读选择失效，View 重新解析并回到顶部；旧折叠状态仅保留新标题模型中仍存在的身份。
+
+Live 与 Source 在本轮继续使用 Obsidian 编辑语义。**暂不向 Live 暴露 standard 参数**：它同时影响源码高亮、块分割、投影后的选区/输入映射、嵌套编辑和三模式切换，仅传递给 Reading 会产生模式间语义差异。需要标准 GFM 阅读时使用正文或 View；完整标准编辑作为独立扩展，先具备上述编辑契约和回归，再决定实现，不阻塞本轮只读接入。
+
 ## 预算与资源
 
 默认 `IanvsMarkdownRenderBudget` 为 4096 个语法 token、64 KiB UTF-8 降级文本。`renderBudget: null` 显式关闭相应渲染预算。它不是整个文档大小、内存、布局时间、资源解码或全部预解析的总量上限。
+
+| 入口 | 计量与降级范围 |
+| --- | --- |
+| 正文 | 使用所选预设扫描传入 `data`，超限后调用 `fallbackBuilder`，不调用渲染资源 builder |
+| View | 使用所选预设扫描正文以决定大纲可用性；显示正文（开启折叠时为折叠投影）由内部正文组件再扫描和降级。Obsidian 元数据卡不计入正文预算，standard 的 YAML 计入原文 |
+| Live | 渲染块分别使用预算，Reading 传给 View；不能把每块额度解释为全文件总额 |
+| Source | 无渲染预算参数，排版完整可编辑原文 |
+
+UTF-8 降级边界不切开有效 Unicode 码点；小于下一个码点所需字节时停止。宿主设置 `renderBudget: null` 意味着承担该渲染路径的完整负载，不能据此宣称其他路径有独立保护。
 
 View 在正文渲染预算判断前解析文档，Live 在各块渲染前维护全文结构；Source 排版完整源码。富文本复制还会转换 Markdown/HTML。历史容量、预解析和复制预算分别由 R2-02 / R2-05 跟进，不能把当前预算描述成这些路径的完整保护。
 

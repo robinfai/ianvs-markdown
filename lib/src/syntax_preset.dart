@@ -1,4 +1,5 @@
-/// Selects the built-in syntax and source transformations of `IanvsMarkdown`.
+/// Selects the built-in syntax and source transformations of `IanvsMarkdown` and
+/// `IanvsMarkdownView`.
 enum IanvsMarkdownSyntaxPreset {
   /// Obsidian-compatible documents, including metadata, math, and inert HTML
   /// controls. This preserves the renderer's original behavior.

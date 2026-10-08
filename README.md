@@ -2,7 +2,7 @@
 
 从 `ianvs-acp` 抽离并继续演进的 Flutter Markdown 渲染与编辑组件。它保留了原有的阅读体验，同时去掉了对 ACP 状态、工作区文件系统和特定 Mermaid 实现的耦合。
 
-组件库的迭代任务、依赖、验收标准和执行记录见仓库中的 [ROADMAP.md](https://github.com/robinfai/ianvs-markdown/blob/main/ROADMAP.md)。独立发布基线与公共 API/生命周期契约已验收；下一步完善正文与 View 的预设配置，并按任务依赖推进宿主接入、性能、历史容量和平台验证。
+组件库的迭代任务、依赖、验收标准和执行记录见仓库中的 [ROADMAP.md](https://github.com/robinfai/ianvs-markdown/blob/main/ROADMAP.md)。独立发布基线与公共 API/生命周期契约已验收；正文与 View 现均支持标准 GFM 预设，后续按任务依赖推进历史容量、宿主接入、性能和平台验证。
 
 ## 能力
 
@@ -66,8 +66,16 @@ Markdown，不添加 Obsidian、数学、HTML 控件语法，也不执行元数�
 表格、链接或图片尺寸投影。例如 `%%注释%%`、`^block-id`、`[[Wiki]]`、`$x$`
 和非 GFM 任务状态会按普通 GFM 文本处理。原始 HTML 遵循 `MarkdownBody` 的
 GFM 行为；不支持的 HTML 块可能不显示，不会成为交互控件或触发资源加载。
-标准预设不应用 Obsidian 列表引导线和编辑交互；该选项仅提供给独立正文组件，
-`IanvsMarkdownView` 和编辑器继续使用既有文档语义。
+标准预设不应用 Obsidian 列表引导线和编辑交互。完整文档阅读也可选择相同预设：
+
+```dart
+IanvsMarkdownView(
+  data: document,
+  syntaxPreset: IanvsMarkdownSyntaxPreset.standard,
+)
+```
+
+此时 YAML 形状的原文按 GFM 渲染，`showFrontMatter` 不生成属性卡；大纲、折叠和标题导航使用 GFM 标题。Live / Source 编辑器继续使用 Obsidian 编辑语义，范围决策见 [预设契约](doc/API_CONTRACTS.md#语法预设的范围r1-02)。
 
 标准预设保留 `styleSheet`、`theme`、`imageBuilder`、`onTapLink`、`onCopyCode`、
 `clipboardWriter`、`blockSyntaxes`、`inlineSyntaxes` 和 `builders` 等扩展点。

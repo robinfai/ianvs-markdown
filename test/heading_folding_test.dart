@@ -84,4 +84,69 @@ Omega body.
     );
     expect(shiftedBeta.identity, beta.identity);
   });
+
+  test('standard headings match GFM and preserve CRLF UTF-16 ranges', () {
+    const source =
+        '---\r\ntitle: 中文😀\r\n---\r\n\r\n'
+        '> # Quoted\r\n\r\n- # Listed\r\n\r\n'
+        '```md\r\n# Fenced\r\n```\r\n\r\n'
+        '<div>\r\n# HTML\r\n</div>\r\n\r\n'
+        '# [Named][ref]\r\n\r\nText.\r\n\r\n'
+        '%%\r\n## In literal comment\r\n%%\r\n\r\n'
+        r'$$'
+        '\r\n## In literal math\r\n'
+        r'$$'
+        '\r\n\r\n'
+        'Multiline\r\nsetext\r\n===\r\n\r\n'
+        '[ref]: https://example.com\r\n';
+    final model = IanvsMarkdownHeadingFoldModel.parse(
+      source,
+      syntaxPreset: IanvsMarkdownSyntaxPreset.standard,
+    );
+    expect(model.sections.map((s) => s.text), [
+      'title: 中文😀',
+      'Named',
+      'In literal comment',
+      'In literal math',
+      'Multiline\nsetext',
+    ]);
+    expect(
+      model.sections.map((s) => (s.level, s.text)),
+      parseMarkdownHeadings(source).map((s) => (s.level, s.text)),
+    );
+    for (final block in model.blocks) {
+      expect(source.substring(block.start, block.end), block.source);
+      expect(block.source.endsWith('\r'), isFalse);
+    }
+    final named = model.sections[1];
+    expect(
+      model.blocks[named.headingBlockIndex].start,
+      source.indexOf('# [Named]'),
+    );
+    final controller = IanvsMarkdownHeadingFoldController();
+    addTearDown(controller.dispose);
+    expect(model.project(controller).source, source);
+    controller.toggleIdentity(named.identity);
+    final folded = model.project(controller);
+    expect(folded.source, contains('# [Named][ref]'));
+    expect(folded.source, isNot(contains('In literal comment')));
+    expect(folded.source, isNot(contains('In literal math')));
+    expect(folded.source, contains('Multiline\r\nsetext\r\n==='));
+  });
+
+  test('standard parser retains GFM table precedence and empty headings', () {
+    const source =
+        '# Column | Value\n--- | ---\nA | B\n\n'
+        '#\n\n## Actual\n\n# End';
+    final model = IanvsMarkdownHeadingFoldModel.parse(
+      source,
+      syntaxPreset: IanvsMarkdownSyntaxPreset.standard,
+    );
+    expect(model.sections.map((s) => s.text), ['Actual', 'End']);
+    expect(model.sections.map((s) => s.canFold), [false, false]);
+    expect(
+      model.sections.map((s) => s.text),
+      parseMarkdownHeadings(source).map((s) => s.text),
+    );
+  });
 }

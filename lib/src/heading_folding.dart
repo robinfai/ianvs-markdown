@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
+import 'package:markdown/markdown.dart' as md;
 
 import 'editor/editor_models.dart';
 import 'markdown_document.dart';
+import 'syntax_preset.dart';
 
 /// Keeps heading-fold state independent from Markdown source mutations.
 ///
@@ -84,10 +86,17 @@ final class IanvsMarkdownHeadingFoldModel {
     required this.sections,
   });
 
+  /// Uses top-level GFM headings in [IanvsMarkdownSyntaxPreset.standard].
+  /// Non-heading content is retained as opaque ranges in that preset;
+  /// [splitListItems] applies only to the Obsidian block model.
   factory IanvsMarkdownHeadingFoldModel.parse(
     String source, {
     bool splitListItems = false,
+    IanvsMarkdownSyntaxPreset syntaxPreset = IanvsMarkdownSyntaxPreset.obsidian,
   }) {
+    if (syntaxPreset == IanvsMarkdownSyntaxPreset.standard) {
+      return _parseStandardHeadingModel(source);
+    }
     return IanvsMarkdownHeadingFoldModel.fromBlocks(
       source,
       parseMarkdownBlocks(source, splitListItems: splitListItems),
@@ -98,8 +107,7 @@ final class IanvsMarkdownHeadingFoldModel {
     String source,
     List<IanvsMarkdownBlock> blocks,
   ) {
-    final headings =
-        <({int blockIndex, int level, String text, String source})>[];
+    final headings = <_ParsedHeading>[];
     for (var index = 0; index < blocks.length; index += 1) {
       final block = blocks[index];
       if (block.type != IanvsMarkdownBlockType.heading) continue;
@@ -113,6 +121,18 @@ final class IanvsMarkdownHeadingFoldModel {
       ));
     }
 
+    return IanvsMarkdownHeadingFoldModel._fromHeadings(
+      source,
+      blocks,
+      headings,
+    );
+  }
+
+  factory IanvsMarkdownHeadingFoldModel._fromHeadings(
+    String source,
+    List<IanvsMarkdownBlock> blocks,
+    List<_ParsedHeading> headings,
+  ) {
     final occurrences = <String, int>{};
     final sections = <IanvsMarkdownHeadingSection>[];
     for (
@@ -238,5 +258,136 @@ final class IanvsMarkdownHeadingFoldModel {
       source: buffer.toString(),
       visibleHeadingIdentities: visibleIdentities,
     );
+  }
+}
+
+typedef _ParsedHeading = ({
+  int blockIndex,
+  int level,
+  String text,
+  String source,
+});
+typedef _HeadingRange = ({int first, int last});
+typedef _RecordHeading =
+    void Function(
+      md.BlockParser parser,
+      md.Node? node,
+      md.Line first,
+      md.Line last,
+    );
+
+// Let the same GFM parser used by the renderer decide which lines are headings.
+// Recording source lines avoids interpreting YAML, math, or Obsidian comments
+// as special blocks and preserves original UTF-16 offsets (including CRLF).
+IanvsMarkdownHeadingFoldModel _parseStandardHeadingModel(String source) {
+  final rawLines = <String>[];
+  final starts = <int>[];
+  var offset = 0;
+  for (final separator in RegExp(r'\r\n|\r|\n').allMatches(source)) {
+    starts.add(offset);
+    rawLines.add(source.substring(offset, separator.start));
+    offset = separator.end;
+  }
+  starts.add(offset);
+  rawLines.add(source.substring(offset));
+  final lines = rawLines.map(md.Line.new).toList(growable: false);
+  final indices = Map<md.Line, int>.identity();
+  for (var i = 0; i < lines.length; i += 1) {
+    indices[lines[i]] = i;
+  }
+  final ranges = Map<md.Node, _HeadingRange>.identity();
+  void record(
+    md.BlockParser parser,
+    md.Node? node,
+    md.Line first,
+    md.Line last,
+  ) {
+    if (node == null || parser.parentSyntax != null) return;
+    final start = indices[first];
+    final end = indices[last];
+    if (start != null && end != null) ranges[node] = (first: start, last: end);
+  }
+
+  final document = md.Document(
+    extensionSet: md.ExtensionSet.gitHubFlavored,
+    blockSyntaxes: [
+      // Preserve upstream precedence: GFM extensions and HTML precede headings.
+      ...md.ExtensionSet.gitHubFlavored.blockSyntaxes,
+      const md.EmptyBlockSyntax(),
+      const md.HtmlBlockSyntax(),
+      _RecordingSetextHeader(record),
+      _RecordingHeader(record),
+    ],
+  );
+  final nodes = document.parseLineList(lines);
+  final blocks = <IanvsMarkdownBlock>[];
+  final headings = <_ParsedHeading>[];
+  void addBlock(int first, int last, IanvsMarkdownBlockType type) {
+    while (first <= last && rawLines[first].trim().isEmpty) {
+      first += 1;
+    }
+    while (last >= first && rawLines[last].trim().isEmpty) {
+      last -= 1;
+    }
+    if (first > last) return;
+    final end = starts[last] + rawLines[last].length;
+    blocks.add(
+      IanvsMarkdownBlock(
+        type: type,
+        start: starts[first],
+        end: end,
+        firstLine: first,
+        lastLine: last,
+        source: source.substring(starts[first], end),
+      ),
+    );
+  }
+
+  var nextLine = 0;
+  for (final node in nodes) {
+    final range = ranges[node];
+    if (range == null ||
+        node is! md.Element ||
+        node.textContent.trim().isEmpty) {
+      continue;
+    }
+    addBlock(nextLine, range.first - 1, IanvsMarkdownBlockType.paragraph);
+    addBlock(range.first, range.last, IanvsMarkdownBlockType.heading);
+    headings.add((
+      blockIndex: blocks.length - 1,
+      level: int.parse(node.tag.substring(1)),
+      text: node.textContent.trim(),
+      source: blocks.last.source,
+    ));
+    nextLine = range.last + 1;
+  }
+  addBlock(nextLine, lines.length - 1, IanvsMarkdownBlockType.paragraph);
+  return IanvsMarkdownHeadingFoldModel._fromHeadings(source, blocks, headings);
+}
+
+final class _RecordingHeader extends md.HeaderSyntax {
+  const _RecordingHeader(this.record);
+  final _RecordHeading record;
+
+  @override
+  md.Node parse(md.BlockParser parser) {
+    final line = parser.current;
+    final node = super.parse(parser);
+    record(parser, node, line, line);
+    return node;
+  }
+}
+
+final class _RecordingSetextHeader extends md.SetextHeaderSyntax {
+  const _RecordingSetextHeader(this.record);
+  final _RecordHeading record;
+
+  @override
+  md.Node? parse(md.BlockParser parser) {
+    final first = parser.linesToConsume.first;
+    final last = parser.current;
+    final node = super.parse(parser);
+    record(parser, node, first, last);
+    return node;
   }
 }

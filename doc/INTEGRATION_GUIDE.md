@@ -43,7 +43,7 @@ IanvsMarkdownLiveEditor(
 | 宿主动作 | 当前行为 | 宿主责任 |
 | --- | --- | --- |
 | 修改正文 `data` | 重新渲染，阅读选择失效；没有增量 AST 保证 | 合并分片、控制更新频率与总量 |
-| 修改 View `data` | 重新解析并安排滚动到顶部 | 需要持续追加/跟随滚动时先定义策略；该扩展记录在 R2-03 |
+| 修改 View `data` / `syntaxPreset` | 重新解析并安排滚动到顶部 | 需要持续追加/跟随滚动时先定义策略；该扩展记录在 R2-03 |
 | 修改编辑 Controller 的选区 | 源码范围变化，Live 复用文档结构 | 使用 UTF-16 偏移；避免把字节数当偏移 |
 | 修改编辑文本 | 刷新相关状态与当前全文结构，更新历史和 dirty | 需要精确选区时提供完整 TextEditingValue；尊重 IME composing |
 | 改变 Controller.mode | Live 切换三种界面；独立 Source 控件仍显示源码 | 根据入口选择合适容器；模式切换不代表保存 |
@@ -56,7 +56,7 @@ IanvsMarkdownLiveEditor(
 
 | 缺口 | 归属 | 当前接入方式 |
 | --- | --- | --- |
-| View / Live 无标准 GFM 预设参数 | R1-02 | 标准消息使用独立正文组件；按矩阵使用现有文档语义 |
+| Live / Source 尚无标准 GFM 编辑预设 | R1-02 范围决策；后续独立扩展 | 标准只读内容使用正文或 View 的 `syntaxPreset: standard`；编辑仍按 Obsidian 契约 |
 | 文案与部分内部按键映射不能统一覆盖 | R1-03 | 可隐藏工具栏；`enableModeShortcuts` 仅关闭模式键，不代表禁用全部命令 |
 | 注入 clipboard writer 仍保留原生依赖 | R1-04 | 把它当作行为注入；按实际平台构建验证，拆包另行决策 |
 | 历史没有容量限制 | R2-02 | 宿主管理文档会话寿命；主动 clearHistory 会失去历史，不能静默当作容量策略 |
