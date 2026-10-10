@@ -1,0 +1,6 @@
+usage: check_macos_candidates.py [-h] --flutter FLUTTER --label LABEL
+                                 [--target {body,reading,editor,main,streaming}]
+                                 [--mode {profile,release}]
+                                 [--include-control] [--keep-host]
+                                 [--timeout TIMEOUT]
+check_macos_candidates.py: error: Candidate builds require an unmodified Flutter SDK
