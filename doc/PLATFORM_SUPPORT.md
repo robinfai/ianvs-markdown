@@ -36,6 +36,19 @@ CARGO_PROFILE_RELEASE_STRIP=none FLUTTER_XCODE_ARCHS=arm64 flutter build macos -
 
 示例声明 macOS 12 最低部署目标，并未因此证明已在 macOS 12 真机运行。R0 profile 性能基准使用的临时 windowing 补丁，仅用于受控性能归因，不能作为未修改 SDK 的候选版本验收。历史记录见 [R0 报告](https://github.com/robinfai/ianvs-markdown/blob/main/benchmark/ACCEPTANCE-2026-10-07.md)。
 
+## 三 SDK、六入口的候选复核（2026-10-10）
+
+在已合入的 `6b2db7f` 上，未修改 Flutter 3.44.0、3.44.8、3.47.6 各执行
+纯 Flutter 对照及 Body / Reading / Editor / playground / Streaming 的 Profile、Release，
+共 36 次。对照、Body 和 playground 共 18 次通过；Reading、Editor、Streaming 共 18 次
+在 `_window_macos.dart / _Rect` 的 AOT 快照生成阶段失败。最低 SDK 候选已执行，
+结果仍未满足完整入口支持条件。工具拒绝补丁 SDK 与重复证据标签，成功产物均检查架构。
+
+逐入口结果、原始日志、源码/SDK 哈希、锁文件及 12 行公共 View 入口复现见
+[候选构建复核](../benchmark/MACOS-CANDIDATES-2026-10-10.md)。
+本次仅验证 macOS arm64 构建，没有执行候选产物的真实输入/剪贴板/无障碍验收。
+R2 性能分支的后续优化仍需重验，R3-01 保持进行中。
+
 ## 核心库能力矩阵
 
 “待验收”表示没有足够证据，并不等于已确认不支持。首先完善 macOS，再由首个实际仓库外宿主需求决定下一平台。
@@ -99,5 +112,6 @@ Linefold 使用仓库内核心路径依赖，因此不算 R3-02 的仓库外只�
 `flutter build macos --debug --target lib/streaming.dart` 通过。最终样例静态分析、
 完整 `make check` 和包外快照测试通过；记录及源码哈希见
 [R2-03 验证摘要](../benchmark/results/2026-10-10-streaming/validation.json)。
-该入口已加入 `make build-examples`，由 Native CI 后续验证。主机仍处于锁屏，
-此证据仅证明构建和自动回归，不是触摸、真实 IME、跨应用复制、读屏或性能验收。
+该入口已加入 `make build-examples`；PR #10 的 Core / Native 门禁通过后已合入 `6b2db7f`。
+初次 Debug 记录采集时主机锁定；本轮候选矩阵见上节。构建和自动回归不是触摸、
+真实 IME、跨应用复制、读屏或性能验收。

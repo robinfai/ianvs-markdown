@@ -1,0 +1,25 @@
+Building 3.44.8 aot_control profile
+aot_control/profile: PASS
+Building 3.44.8 aot_control release
+aot_control/release: PASS
+Building 3.44.8 body profile
+body/profile: PASS
+Building 3.44.8 body release
+body/release: PASS
+Building 3.44.8 reading profile
+reading/profile: FAIL
+Building 3.44.8 reading release
+reading/release: FAIL
+Building 3.44.8 editor profile
+editor/profile: FAIL
+Building 3.44.8 editor release
+editor/release: FAIL
+Building 3.44.8 main profile
+main/profile: PASS
+Building 3.44.8 main release
+main/release: PASS
+Building 3.44.8 streaming profile
+streaming/profile: FAIL
+Building 3.44.8 streaming release
+streaming/release: FAIL
+Saved /Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/platform-candidates/stock-3.44.8/summary.json
