@@ -49,6 +49,12 @@ CARGO_PROFILE_RELEASE_STRIP=none FLUTTER_XCODE_ARCHS=arm64 flutter build macos -
 本次仅验证 macOS arm64 构建，没有执行候选产物的真实输入/剪贴板/无障碍验收。
 R2 性能分支的后续优化仍需重验，R3-01 保持进行中。
 
+补充：未修改 Flutter 3.47.7 / Dart 3.13.5 分别对已合入 `3234d44` 和 PR #9 的
+`d882078` 优化输入完成 Reading 定向复测。新增 8 次构建中，两个版本的纯 Flutter
+对照 Profile/Release 共 4 次通过，Reading 共 4 次仍为同签名 AOT 失败。
+3.47.7 的其他入口与真实交互未复测，完整平台验收仍未通过。见
+[定向复测及哈希证据](../benchmark/MACOS-CANDIDATES-2026-10-10.md#flutter-3477-的-reading-定向复测)。
+
 ## 核心库能力矩阵
 
 “待验收”表示没有足够证据，并不等于已确认不支持。首先完善 macOS，再由首个实际仓库外宿主需求决定下一平台。

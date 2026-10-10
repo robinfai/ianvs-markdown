@@ -1,0 +1,22 @@
+{
+  "flutter-compare-3.47.6-3.47.7.json": "c7805d0303a474358de00a35659e6cd8d4c36816b154f2c09887247d6ffac54c",
+  "flutter-tag-3.47.7.json": "a5a920c74f5b644afe91b8ef8a8170be2ee3c71e6d6aff7ffa9c00a9aa3c8ff0",
+  "stock-3.47.7-optimized-reading/aot_control-profile.log": "119c8e8f7ace7974cf204b4bbe8704fab7e550b5cc78a303a1d449b0a08b1039",
+  "stock-3.47.7-optimized-reading/aot_control-release.log": "0e2ecb7009b531eb81b60ca8a5137d4b08b83cbc0378f49ad350338feb0ee7db",
+  "stock-3.47.7-optimized-reading/example-pubspec.lock": "644ed0dc8303f6c15a7f043de56482a2eef0282cc4615bcfce9bedc22dc2f610",
+  "stock-3.47.7-optimized-reading/pub-get.log": "11e5a743defa14a8246bc8fab188018b57ca31dfd00f791f9d8a26d11c0eee97",
+  "stock-3.47.7-optimized-reading/pubspec.lock": "8039cf0730271a0330ef043702bc0bac3a7f58ff5a943abf83dbe8d19fb7b060",
+  "stock-3.47.7-optimized-reading/reading-profile.log": "e8002de8297c6d7b4b8c05ddb6902dfb79b1e90b6386293c0d562a5412e6ec6b",
+  "stock-3.47.7-optimized-reading/reading-release.log": "dc87c5a5d07339f335a75fa50adcad752599b96a94ff9f64f7eb0264cc324238",
+  "stock-3.47.7-optimized-reading/sdk-version.json": "1aadc77c8dfcabc528e4802c6655fecaae08bdf0587f40d5d99b8eeae10e43af",
+  "stock-3.47.7-optimized-reading/summary.json": "68a8502f3daf31ee4efd4aff5b878fe65f69b048d888b57ae5c6c8c54bfd7fdf",
+  "stock-3.47.7-reading/aot_control-profile.log": "7cfca0607a0641f996f24725bc4e1be17603c6ad9cd3ec275378a1a2cfe247eb",
+  "stock-3.47.7-reading/aot_control-release.log": "784cfdc73d1acac295a56277f5f0ef63553e2ea9394c98604540df967cbd7326",
+  "stock-3.47.7-reading/example-pubspec.lock": "644ed0dc8303f6c15a7f043de56482a2eef0282cc4615bcfce9bedc22dc2f610",
+  "stock-3.47.7-reading/pub-get.log": "11e5a743defa14a8246bc8fab188018b57ca31dfd00f791f9d8a26d11c0eee97",
+  "stock-3.47.7-reading/pubspec.lock": "8039cf0730271a0330ef043702bc0bac3a7f58ff5a943abf83dbe8d19fb7b060",
+  "stock-3.47.7-reading/reading-profile.log": "4f2861186c43e6bfaddd83e6dffcf31bbc3624309bc8b879a8ec9b0072346dfc",
+  "stock-3.47.7-reading/reading-release.log": "2657c8cb5e4b85d15892409e4f2afa054ec9ad1aa7e8687c86c5841f5da75d01",
+  "stock-3.47.7-reading/sdk-version.json": "1aadc77c8dfcabc528e4802c6655fecaae08bdf0587f40d5d99b8eeae10e43af",
+  "stock-3.47.7-reading/summary.json": "d1818cd9fe47ae10b7b0d8e96ff2b376f390d1002d13477ac9b523edf2890898"
+}
