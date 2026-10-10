@@ -1,3 +1,4 @@
+import 'localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -148,7 +149,7 @@ class _IanvsMarkdownHtmlTimeInputState
         Semantics(
           container: true,
           explicitChildNodes: true,
-          label: 'Time picker',
+          label: IanvsMarkdownMessage.timePicker.resolve(context),
           value: _sourceTime(_minutes),
           child: Container(
             key: const ValueKey('ianvs-markdown-html-time-input'),
@@ -190,7 +191,9 @@ class _IanvsMarkdownHtmlTimeInputState
                     key: const ValueKey(
                       'ianvs-markdown-html-time-input-picker-button',
                     ),
-                    tooltip: 'Show time picker',
+                    tooltip: IanvsMarkdownMessage.showTimePicker.resolve(
+                      context,
+                    ),
                     onPressed: () {},
                     padding: EdgeInsets.zero,
                     splashRadius: 8,

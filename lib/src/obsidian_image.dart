@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -440,7 +441,7 @@ class _IanvsMarkdownInteractiveImageState
                     children: [
                       _imageAction(
                         key: const ValueKey('ianvs-markdown-image-zoom'),
-                        label: 'Zoom image',
+                        label: IanvsMarkdownMessage.zoomImage.resolve(context),
                         icon: Icons.zoom_out_map_rounded,
                         colors: colors,
                         onPressed: _showExpanded,
@@ -448,7 +449,9 @@ class _IanvsMarkdownInteractiveImageState
                       if (widget.onEdit != null)
                         _imageAction(
                           key: const ValueKey('ianvs-markdown-image-edit'),
-                          label: 'Edit image block',
+                          label: IanvsMarkdownMessage.editImage.resolve(
+                            context,
+                          ),
                           icon: Icons.edit_outlined,
                           colors: colors,
                           onPressed: widget.onEdit!,
@@ -505,7 +508,9 @@ class _IanvsMarkdownInteractiveImageState
                     const SizedBox(width: 16),
                     Expanded(
                       child: Text(
-                        alt == null || alt.isEmpty ? 'Image' : alt,
+                        alt == null || alt.isEmpty
+                            ? IanvsMarkdownMessage.image.resolve(dialogContext)
+                            : alt,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -517,7 +522,9 @@ class _IanvsMarkdownInteractiveImageState
                     ),
                     IconButton(
                       key: const ValueKey('ianvs-markdown-image-viewer-close'),
-                      tooltip: 'Close image viewer',
+                      tooltip: IanvsMarkdownMessage.closeImage.resolve(
+                        dialogContext,
+                      ),
                       color: Colors.white,
                       onPressed: () => Navigator.of(dialogContext).pop(),
                       icon: const Icon(Icons.close),

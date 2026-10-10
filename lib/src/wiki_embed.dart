@@ -1,3 +1,4 @@
+import 'localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
@@ -243,7 +244,10 @@ class IanvsMarkdownWikiEmbed extends StatelessWidget {
               right: 3,
               top: 3,
               child: Tooltip(
-                message: '打开 ${reference.displayLabel}',
+                message: IanvsMarkdownMessage.openEmbed.resolve(
+                  context,
+                  arguments: {'label': reference.displayLabel},
+                ),
                 child: IconButton(
                   key: const ValueKey('ianvs-markdown-wiki-embed-open'),
                   visualDensity: VisualDensity.compact,

@@ -13,22 +13,27 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: IanvsMarkdownLiveEditor(
-            controller: controller,
-            onSaveRequested: (value) => saved = value,
+          body: IanvsMarkdownLocalization(
+            strings: const IanvsMarkdownStrings.english(
+              overrides: {IanvsMarkdownMessage.save: 'Persist note'},
+            ),
+            child: IanvsMarkdownLiveEditor(
+              controller: controller,
+              onSaveRequested: (value) => saved = value,
+            ),
           ),
         ),
       ),
     );
     await tester.pumpAndSettle();
     expect(find.text('外部宿主'), findsWidgets);
-    await tester.tap(find.byTooltip('源码模式'));
+    await tester.tap(find.byTooltip('Source mode'));
     await tester.pumpAndSettle();
     final field = find.byKey(const ValueKey('ianvs-markdown-source-field'));
     expect(field, findsOneWidget);
     await tester.enterText(field, '$source\n\nNew paragraph.');
     await tester.pump();
-    await tester.tap(find.byTooltip('保存'));
+    await tester.tap(find.byTooltip('Persist note'));
     await tester.pump();
     expect(saved, '$source\n\nNew paragraph.');
     controller.undo();

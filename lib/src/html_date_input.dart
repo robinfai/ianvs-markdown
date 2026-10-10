@@ -1,3 +1,4 @@
+import 'localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -141,7 +142,7 @@ class _IanvsMarkdownHtmlDateInputState
         Semantics(
           container: true,
           explicitChildNodes: true,
-          label: 'Date picker',
+          label: IanvsMarkdownMessage.datePicker.resolve(context),
           value: _sourceDate(_value),
           child: Container(
             key: const ValueKey('ianvs-markdown-html-date-input'),
@@ -181,7 +182,9 @@ class _IanvsMarkdownHtmlDateInputState
                     key: const ValueKey(
                       'ianvs-markdown-html-date-input-picker-button',
                     ),
-                    tooltip: 'Show date picker',
+                    tooltip: IanvsMarkdownMessage.showDatePicker.resolve(
+                      context,
+                    ),
                     onPressed: () {},
                     padding: EdgeInsets.zero,
                     splashRadius: 8,

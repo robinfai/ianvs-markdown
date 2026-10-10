@@ -1,3 +1,4 @@
+import 'localization.dart';
 import 'dart:async';
 import 'dart:collection';
 
@@ -289,6 +290,8 @@ class _IanvsMarkdownCodeBlockState extends State<IanvsMarkdownCodeBlock> {
         return SizedBox(
           width: constraints.maxWidth,
           child: SelectableText.rich(
+            contextMenuBuilder: (_, state) =>
+                buildMarkdownSelectableContextMenu(context, state),
             span,
             style: baseStyle,
             // Measure the highlighted runs themselves, as the live editor
@@ -440,7 +443,7 @@ class _CodeBlockToolbar extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Tooltip(
-              message: '代码过大，已回退为纯文本以保持预览流畅',
+              message: IanvsMarkdownMessage.codeTooLarge.resolve(context),
               child: Icon(
                 Icons.speed_rounded,
                 size: 14,
@@ -475,7 +478,11 @@ class _CodeBlockToolbar extends StatelessWidget {
               expanded ? Icons.unfold_less_rounded : Icons.unfold_more_rounded,
               size: 14,
             ),
-            label: Text(expanded ? '收起' : '展开'),
+            label: Text(
+              expanded
+                  ? IanvsMarkdownMessage.collapseCode.resolve(context)
+                  : IanvsMarkdownMessage.expandCode.resolve(context),
+            ),
           ),
           const SizedBox(width: 2),
         ],
@@ -490,7 +497,9 @@ class _CodeBlockToolbar extends StatelessWidget {
           KeyedSubtree(
             key: const ValueKey('ianvs-markdown-code-action-strip'),
             child: _CodeToolbarButton(
-              tooltip: copied ? '已复制到剪贴板' : '复制',
+              tooltip: copied
+                  ? IanvsMarkdownMessage.copied.resolve(context)
+                  : IanvsMarkdownMessage.copy.resolve(context),
               icon: copied ? Icons.check_rounded : Icons.content_copy_rounded,
               selected: copied,
               colors: colors,
@@ -535,7 +544,7 @@ class IanvsMarkdownCodeFlair extends StatelessWidget {
     final label = language == null ? null : markdownCodeLanguageLabel(language);
     final hasLabel = label != null && label.isNotEmpty;
     return Tooltip(
-      message: '复制',
+      message: IanvsMarkdownMessage.copy.resolve(context),
       child: TextButton(
         key: const ValueKey('ianvs-markdown-code-flair'),
         onPressed: _copy,

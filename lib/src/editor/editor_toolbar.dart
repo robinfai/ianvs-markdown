@@ -1,3 +1,4 @@
+import '../localization.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -53,7 +54,9 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
                 children: [
                   if (showModeSwitcher) ...[
                     _ModeButton(
-                      tooltip: '实时预览',
+                      tooltip: IanvsMarkdownMessage.livePreview.resolve(
+                        context,
+                      ),
                       icon: Icons.vertical_split_outlined,
                       selected: mode == IanvsMarkdownEditorMode.livePreview,
                       colors: colors,
@@ -61,7 +64,7 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
                           controller.mode = IanvsMarkdownEditorMode.livePreview,
                     ),
                     _ModeButton(
-                      tooltip: '源码模式',
+                      tooltip: IanvsMarkdownMessage.sourceMode.resolve(context),
                       icon: Icons.code_rounded,
                       selected: mode == IanvsMarkdownEditorMode.source,
                       colors: colors,
@@ -69,7 +72,9 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
                           controller.mode = IanvsMarkdownEditorMode.source,
                     ),
                     _ModeButton(
-                      tooltip: '阅读模式',
+                      tooltip: IanvsMarkdownMessage.readingMode.resolve(
+                        context,
+                      ),
                       icon: Icons.menu_book_outlined,
                       selected: mode == IanvsMarkdownEditorMode.preview,
                       colors: colors,
@@ -84,14 +89,14 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
                       return Row(
                         children: [
                           _ToolbarButton(
-                            tooltip: '撤销',
+                            tooltip: IanvsMarkdownMessage.undo.resolve(context),
                             icon: Icons.undo_rounded,
                             enabled: history.canUndo,
                             colors: colors,
                             onPressed: controller.undo,
                           ),
                           _ToolbarButton(
-                            tooltip: '重做',
+                            tooltip: IanvsMarkdownMessage.redo.resolve(context),
                             icon: Icons.redo_rounded,
                             enabled: history.canRedo,
                             colors: colors,
@@ -103,56 +108,56 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
                   ),
                   _ToolbarDivider(colors: colors),
                   _ToolbarButton(
-                    tooltip: '粗体',
+                    tooltip: IanvsMarkdownMessage.bold.resolve(context),
                     icon: Icons.format_bold_rounded,
                     enabled: editable,
                     colors: colors,
                     onPressed: () => controller.toggleInline('**'),
                   ),
                   _ToolbarButton(
-                    tooltip: '斜体',
+                    tooltip: IanvsMarkdownMessage.italic.resolve(context),
                     icon: Icons.format_italic_rounded,
                     enabled: editable,
                     colors: colors,
                     onPressed: () => controller.toggleInline('*'),
                   ),
                   _ToolbarButton(
-                    tooltip: '行内代码',
+                    tooltip: IanvsMarkdownMessage.inlineCode.resolve(context),
                     icon: Icons.data_object_rounded,
                     enabled: editable,
                     colors: colors,
                     onPressed: () => controller.toggleInline('`'),
                   ),
                   _ToolbarButton(
-                    tooltip: '链接',
+                    tooltip: IanvsMarkdownMessage.link.resolve(context),
                     icon: Icons.link_rounded,
                     enabled: editable,
                     colors: colors,
                     onPressed: controller.insertLink,
                   ),
                   _ToolbarButton(
-                    tooltip: '标题',
+                    tooltip: IanvsMarkdownMessage.heading.resolve(context),
                     icon: Icons.title_rounded,
                     enabled: editable,
                     colors: colors,
                     onPressed: () => controller.toggleLinePrefix('## '),
                   ),
                   _ToolbarButton(
-                    tooltip: '项目列表',
+                    tooltip: IanvsMarkdownMessage.bulletList.resolve(context),
                     icon: Icons.format_list_bulleted_rounded,
                     enabled: editable,
                     colors: colors,
                     onPressed: () => controller.toggleLinePrefix('- '),
                   ),
                   _ToolbarButton(
-                    tooltip: '任务列表',
+                    tooltip: IanvsMarkdownMessage.taskList.resolve(context),
                     icon: Icons.check_box_outlined,
                     enabled: editable,
                     colors: colors,
                     onPressed: () => controller.toggleLinePrefix('- [ ] '),
                   ),
                   _ToolbarButton(
-                    tooltip: '代码块',
+                    tooltip: IanvsMarkdownMessage.codeBlock.resolve(context),
                     icon: Icons.terminal_rounded,
                     enabled: editable,
                     colors: colors,
@@ -163,7 +168,9 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
                     ValueListenableBuilder<bool>(
                       valueListenable: controller.dirtyListenable,
                       builder: (context, dirty, _) => _ToolbarButton(
-                        tooltip: dirty ? '保存' : '已保存',
+                        tooltip: dirty
+                            ? IanvsMarkdownMessage.save.resolve(context)
+                            : IanvsMarkdownMessage.saved.resolve(context),
                         icon: dirty
                             ? Icons.save_outlined
                             : Icons.cloud_done_outlined,

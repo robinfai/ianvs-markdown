@@ -31,6 +31,12 @@
 
 四种入口的能力与限制见 [公共 API 契约](doc/API_CONTRACTS.md)；对象释放、文档切换和异步保存见 [宿主接入指南](doc/INTEGRATION_GUIDE.md)。
 
+界面文案可在四种入口外包裹 `IanvsMarkdownLocalization`，选择
+`IanvsMarkdownStrings.chinese()` / `.english()`，并通过类型化的
+`IanvsMarkdownMessage` 覆盖单条文案。不配置时保留既有显示。
+作用域覆盖工具栏、大纲、表格、属性、代码、图片和选择菜单，详见
+[文案接入](doc/INTEGRATION_GUIDE.md#界面文案与作用域)。
+
 在应用的 `pubspec.yaml` 中添加依赖：
 
 ```yaml

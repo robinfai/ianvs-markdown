@@ -1,3 +1,4 @@
+import 'localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -197,7 +198,7 @@ class _IanvsMarkdownTaskCheckboxState extends State<IanvsMarkdownTaskCheckbox> {
       button: true,
       checked: widget.value,
       enabled: _enabled,
-      label: _taskMarkerSemanticLabel(marker),
+      label: _taskMarkerSemanticLabel(context, marker),
       onTap: _enabled ? _toggle : null,
       child: ExcludeSemantics(child: interactive),
     );
@@ -288,29 +289,32 @@ Color _taskMarkerColor(String marker, IanvsMarkdownThemeData colors) {
   };
 }
 
-String _taskMarkerSemanticLabel(String marker) {
+String _taskMarkerSemanticLabel(BuildContext context, String marker) {
   return switch (marker) {
-    ' ' => 'Incomplete task',
-    'x' || 'X' => 'Completed task',
-    '/' => 'In progress task',
-    '-' => 'Cancelled task',
-    '>' => 'Forwarded task',
-    '<' => 'Scheduled task',
-    '?' => 'Question task',
-    '!' => 'Important task',
-    '*' => 'Starred task',
-    'i' => 'Information task',
-    'I' => 'Idea task',
-    'l' => 'Location task',
-    'b' => 'Bookmark task',
-    'n' => 'Note task',
-    'p' => 'Positive task',
-    'c' => 'Negative task',
-    '"' || '“' => 'Quote task',
-    'S' => 'Savings task',
-    'u' => 'Up task',
-    'd' => 'Down task',
-    _ => 'Checked task $marker',
+    ' ' => IanvsMarkdownMessage.taskIncomplete.resolve(context),
+    'x' || 'X' => IanvsMarkdownMessage.taskCompleted.resolve(context),
+    '/' => IanvsMarkdownMessage.taskInProgress.resolve(context),
+    '-' => IanvsMarkdownMessage.taskCancelled.resolve(context),
+    '>' => IanvsMarkdownMessage.taskForwarded.resolve(context),
+    '<' => IanvsMarkdownMessage.taskScheduled.resolve(context),
+    '?' => IanvsMarkdownMessage.taskQuestion.resolve(context),
+    '!' => IanvsMarkdownMessage.taskImportant.resolve(context),
+    '*' => IanvsMarkdownMessage.taskStarred.resolve(context),
+    'i' => IanvsMarkdownMessage.taskInformation.resolve(context),
+    'I' => IanvsMarkdownMessage.taskIdea.resolve(context),
+    'l' => IanvsMarkdownMessage.taskLocation.resolve(context),
+    'b' => IanvsMarkdownMessage.taskBookmark.resolve(context),
+    'n' => IanvsMarkdownMessage.taskNote.resolve(context),
+    'p' => IanvsMarkdownMessage.taskPositive.resolve(context),
+    'c' => IanvsMarkdownMessage.taskNegative.resolve(context),
+    '"' || '“' => IanvsMarkdownMessage.taskQuote.resolve(context),
+    'S' => IanvsMarkdownMessage.taskSavings.resolve(context),
+    'u' => IanvsMarkdownMessage.taskUp.resolve(context),
+    'd' => IanvsMarkdownMessage.taskDown.resolve(context),
+    _ => IanvsMarkdownMessage.taskChecked.resolve(
+      context,
+      arguments: {'marker': marker},
+    ),
   };
 }
 

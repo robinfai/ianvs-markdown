@@ -1,3 +1,4 @@
+import 'localization.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart' show ValueListenable;
@@ -250,6 +251,8 @@ class IanvsMarkdown extends StatelessWidget {
       return fallbackBuilder?.call(context, decision) ??
           (blockSelectable
               ? SelectableText(
+                  contextMenuBuilder: (_, state) =>
+                      buildMarkdownSelectableContextMenu(context, state),
                   decision.text,
                   key: const ValueKey('ianvs-markdown-plain-fallback'),
                   style: style,
@@ -1808,7 +1811,7 @@ class _IanvsMarkdownReadingSelectionState
         .toList(growable: false);
     return AdaptiveTextSelectionToolbar.buttonItems(
       anchors: region.contextMenuAnchors,
-      buttonItems: items,
+      buttonItems: localizeMarkdownContextMenu(this.context, items),
     );
   }
 
@@ -1909,7 +1912,7 @@ class _MarkdownOutline extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: IconButton(
-                  tooltip: '展开文档大纲',
+                  tooltip: IanvsMarkdownMessage.expandOutline.resolve(context),
                   onPressed: onToggle,
                   icon: const Icon(Icons.toc_rounded, size: 19),
                   color: colors.textSecondary,
@@ -1927,7 +1930,7 @@ class _MarkdownOutline extends StatelessWidget {
                       child: Padding(
                         padding: const EdgeInsets.only(left: 4),
                         child: Text(
-                          '文档大纲',
+                          IanvsMarkdownMessage.documentOutline.resolve(context),
                           style: TextStyle(
                             color: colors.textSecondary,
                             fontSize: 11,
@@ -1937,7 +1940,9 @@ class _MarkdownOutline extends StatelessWidget {
                       ),
                     ),
                     IconButton(
-                      tooltip: '收起文档大纲',
+                      tooltip: IanvsMarkdownMessage.collapseOutline.resolve(
+                        context,
+                      ),
                       onPressed: onToggle,
                       icon: const Icon(
                         Icons.keyboard_double_arrow_left_rounded,
@@ -2131,7 +2136,9 @@ class _FoldableViewHeadingState extends State<_FoldableViewHeading> {
                     key: ValueKey(
                       'ianvs-markdown-heading-fold-${widget.identity}',
                     ),
-                    tooltip: widget.collapsed ? '展开标题内容' : '折叠标题内容',
+                    tooltip: widget.collapsed
+                        ? IanvsMarkdownMessage.expandHeading.resolve(context)
+                        : IanvsMarkdownMessage.collapseHeading.resolve(context),
                     onPressed: widget.onToggle,
                     icon: Icon(
                       widget.collapsed
@@ -2169,7 +2176,15 @@ class _FoldableViewHeadingState extends State<_FoldableViewHeading> {
                     Flexible(
                       fit: FlexFit.loose,
                       child: widget.selectable
-                          ? SelectableText(widget.text, style: widget.style)
+                          ? SelectableText(
+                              contextMenuBuilder: (_, state) =>
+                                  buildMarkdownSelectableContextMenu(
+                                    context,
+                                    state,
+                                  ),
+                              widget.text,
+                              style: widget.style,
+                            )
                           : Text(widget.text, style: widget.style),
                     ),
                   ],
@@ -2217,7 +2232,12 @@ class _IanvsMarkdownStandaloneHeadingBuilder extends MarkdownElementBuilder {
         ),
         padding: const EdgeInsets.only(left: 8),
         child: selectable
-            ? SelectableText(text, style: preferredStyle ?? parentStyle)
+            ? SelectableText(
+                contextMenuBuilder: (_, state) =>
+                    buildMarkdownSelectableContextMenu(context, state),
+                text,
+                style: preferredStyle ?? parentStyle,
+              )
             : Text(text, style: preferredStyle ?? parentStyle),
       ),
     );

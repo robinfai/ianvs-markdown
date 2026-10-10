@@ -1,5 +1,6 @@
 import 'dart:ui' show BoxHeightStyle;
 
+import '../localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -440,6 +441,8 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
         // ignore: deprecated_member_use
         onKey: (_, event) => _handleRawKey(event),
         child: TextField(
+          contextMenuBuilder: (_, state) =>
+              buildMarkdownTextContextMenu(context, state),
           key: const ValueKey('ianvs-markdown-source-field'),
           controller: widget.controller,
           focusNode: _focusNode,
