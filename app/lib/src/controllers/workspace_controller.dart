@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:path/path.dart' as p;
@@ -13,7 +14,11 @@ import '../services/markdown_file_service.dart';
 import '../services/workspace_session_store.dart';
 
 class WorkspaceController extends ChangeNotifier {
-  WorkspaceController({required this.fileService, required this.sessionStore}) {
+  WorkspaceController({
+    required this.fileService,
+    required this.sessionStore,
+    this.defaultWorkspaceDirectory,
+  }) {
     browser = FileBrowserController(fileService)..addListener(_schedulePersist);
   }
   late final FileBrowserController browser;
@@ -43,6 +48,11 @@ class WorkspaceController extends ChangeNotifier {
 
   final MarkdownFileService fileService;
   final WorkspaceSessionStore sessionStore;
+  final Future<String> Function()? defaultWorkspaceDirectory;
+  String? _cloudRoot;
+  String? workspaceNotice;
+  bool get isCloudWorkspace =>
+      _workspaceRoot != null && _workspaceRoot == _cloudRoot;
   final List<DocumentSession> _documents = <DocumentSession>[];
   final Map<String, StreamSubscription<FileSystemEvent>> _watchers =
       <String, StreamSubscription<FileSystemEvent>>{};
@@ -72,11 +82,17 @@ class WorkspaceController extends ChangeNotifier {
 
   Future<void> initialize() async {
     if (_initialized) return;
+    if (defaultWorkspaceDirectory != null) await _resolveDefaultWorkspace();
     try {
       final snapshot = await sessionStore.load();
       if (snapshot != null) {
+        // Tree preferences do not select a root or restore security scopes.
+        // Keep them available when a workspace is explicitly selected again.
         browser.restore(snapshot.browserState);
-        for (final favorite in snapshot.favoriteAccessTokens.entries) {
+        for (final favorite
+            in defaultWorkspaceDirectory == null
+                ? snapshot.favoriteAccessTokens.entries
+                : <MapEntry<String, String>>[]) {
           final path = await fileService.restorePersistentAccess(
             favorite.value,
           );
@@ -85,14 +101,19 @@ class WorkspaceController extends ChangeNotifier {
             if (path != favorite.key) browser.remap(favorite.key, path);
           }
         }
-        for (final grant in snapshot.operationGrants.entries) {
+        for (final grant
+            in defaultWorkspaceDirectory == null
+                ? snapshot.operationGrants.entries
+                : <MapEntry<String, String>>[]) {
           final restored = await fileService.restorePersistentAccess(
             grant.value,
           );
           if (restored != null) _operationGrants[restored] = grant.value;
         }
-        _workspaceRoot = snapshot.workspaceRoot;
-        _workspaceAccessToken = snapshot.workspaceAccessToken;
+        if (defaultWorkspaceDirectory == null) {
+          _workspaceRoot = snapshot.workspaceRoot;
+          _workspaceAccessToken = snapshot.workspaceAccessToken;
+        }
         if (_workspaceAccessToken case final token?) {
           _workspaceRoot =
               await fileService.restorePersistentAccess(token) ??
@@ -106,6 +127,18 @@ class WorkspaceController extends ChangeNotifier {
         for (final documentJson in snapshot.documents) {
           final restored = DocumentSession.fromJson(documentJson);
           var path = restored.path;
+          if (defaultWorkspaceDirectory != null &&
+              path != null &&
+              (_cloudRoot == null || !p.isWithin(_cloudRoot!, path))) {
+            if (!restored.controller.isDirty) {
+              restored.dispose();
+              continue;
+            }
+            // Retain unsaved edits as drafts, without silently reopening an
+            // external workspace or its previously granted security scope.
+            restored.path = path = null;
+            restored.accessToken = null;
+          }
           if (restored.accessToken case final token?) {
             path = await fileService.restorePersistentAccess(token) ?? path;
             restored.path = path;
@@ -225,6 +258,28 @@ class WorkspaceController extends ChangeNotifier {
     _workspaceAccessToken = await fileService.createPersistentAccessToken(
       _workspaceRoot!,
     );
+    _sidebarVisible = true;
+    workspaceNotice = null;
+    notifyListeners();
+    _schedulePersist();
+  }
+
+  Future<void> _resolveDefaultWorkspace() async {
+    try {
+      _cloudRoot = _workspaceRoot = await defaultWorkspaceDirectory!();
+      _workspaceAccessToken = null;
+      workspaceNotice = null;
+    } on Object catch (error) {
+      _workspaceRoot = null;
+      workspaceNotice = error is PlatformException
+          ? error.message
+          : 'iCloud Drive 暂不可用。请检查 iCloud 设置，或手动选择文件夹。';
+    }
+  }
+
+  Future<void> useDefaultWorkspace() async {
+    if (defaultWorkspaceDirectory == null) return;
+    await _resolveDefaultWorkspace();
     _sidebarVisible = true;
     notifyListeners();
     _schedulePersist();
@@ -823,7 +878,7 @@ in a lazy file tree and open in tabs.
 ## Edit without losing source
 
 Click any rendered block to edit its exact Markdown. Switch between Live
-Preview, Source, and Read from the centered toolbar control or the **View** menu.
+Preview, Source, and Read from the mode control beneath the tabs or the **View** menu.
 
 ## Navigate documents
 

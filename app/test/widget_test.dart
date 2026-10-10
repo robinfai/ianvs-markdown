@@ -242,9 +242,13 @@ void main() {
       const Color(0xff17191a),
     );
     expect(
-      find.descendant(of: sidebar, matching: find.text('Workspace')),
+      find.descendant(
+        of: sidebar,
+        matching: find.byKey(const ValueKey('window-app-title')),
+      ),
       findsOneWidget,
     );
+    expect(find.text('Workspace'), findsNothing);
     expect(
       find.descendant(of: sidebar, matching: find.text('Welcome.md')),
       findsNothing,
@@ -257,29 +261,18 @@ void main() {
     expect(find.byTooltip('New document (⌘N)'), findsOneWidget);
     expect(find.byTooltip('Hide outline'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Source: edit Markdown source'));
+    await tester.tap(find.byTooltip('Editor mode'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('editor-mode-source')));
     await tester.pumpAndSettle();
     expect(
-      tester
-          .widget<Semantics>(
-            find
-                .ancestor(
-                  of: find.byTooltip('Source: edit Markdown source'),
-                  matching: find.byWidgetPredicate(
-                    (widget) =>
-                        widget is Semantics &&
-                        widget.properties.selected != null,
-                  ),
-                )
-                .first,
-          )
-          .properties
-          .selected,
-      isTrue,
+      workspace.activeDocument!.controller.mode,
+      IanvsMarkdownEditorMode.source,
     );
-    await tester.tap(
-      find.byTooltip('Live Preview: edit with inline formatting'),
-    );
+    expect(find.byKey(const ValueKey('editor-mode-source')), findsNothing);
+    await tester.tap(find.byTooltip('Editor mode'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('editor-mode-livePreview')));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byTooltip('Hide outline'));

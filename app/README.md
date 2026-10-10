@@ -1,5 +1,99 @@
 # Linefold
 
+`app/` includes the macOS editor and an iOS reading preview. The normal
+`lib/main.dart` entry point selects the iOS reader on iPhone/iPad and keeps the
+existing desktop shell on macOS.
+
+## iOS reading preview
+
+The iOS version supports iPhone and iPad on iOS 15 or later. In another app,
+share a **file attachment** and choose **Linefold** (sometimes under **More** or
+**Open in**). Alternatively, use **打开文件** in Linefold to select one or more
+documents from Files/iCloud Drive. Imported copies remain available under
+**最近文档**, including after a restart. Linefold never edits the source file.
+
+With iCloud signing enabled, both apps default to the **iCloud · Linefold**
+workspace on every launch. They use the same `iCloud.work.ianvs.linefold`
+container and its `Documents` directory.
+On iPhone, **切换文件夹 → 选择其他文件夹…** opens a manually selected folder for
+this session. On Mac, use the sidebar folder button; its workspace menu returns
+to iCloud. External workspaces are not automatically reopened at startup.
+Unsaved desktop edits from an external workspace are recovered as untitled-path
+drafts, so selecting a new default never discards the text.
+
+iCloud container signing requires an Apple Developer team that supports iCloud;
+free Personal Teams cannot provision this capability. Both app targets must be
+signed by the same eligible team with this container registered. See
+[Apple's shared-container configuration](https://help.apple.com/xcode/mac/current/en.lproj/devcae40ccb9.html).
+An unavailable container is reported visibly. The iPhone retains incoming files
+locally until iCloud becomes available; existing imports migrate without deleting
+their local backups, overwriting cloud edits, or resurrecting deleted imports.
+Documents are read/written using file coordination, and evicted iCloud documents
+are listed before download and downloaded when opened. Recent history stays local.
+
+For a Personal Team, an explicit **local-storage** build remains available:
+
+```sh
+bash app/tool/build_ios_local.sh <development-team-id>
+```
+
+This produces `app/build/ios-device-install/Build/Products/Release-iphoneos/Runner.app`.
+It disables automatic iCloud container access and says so in the library; manual
+selection of an iCloud Drive folder still works. The cloud-enabled project files
+are preserved. Automatic cross-device sync cannot be validated with a Personal Team.
+
+- `.md`, `.markdown`, `.mdown`, `.mkd`, and `.txt`, including uppercase extensions
+- UTF-8 (with or without BOM), up to 5 MiB per document; empty files are supported
+- Markdown reading, selectable text, tables, code, formulas, native Mermaid
+  diagrams, a heading directory, in-document anchors, and web/email links
+- system light/dark appearance, portrait/landscape, and accessible text sizing
+- separate copies for same-named imports; corrupt/unsupported imports report an
+  error while other files in the batch continue opening
+
+The integration uses Apple's document **Open in** mechanism, not a text/URL
+Share Extension. The sending app must offer a file attachment. Remote images,
+adjacent image files, Wiki embeds, and links to other local files are not
+automatically imported; the existing renderer displays image/embed placeholders.
+This version is for reading; editing and saving back to the sending app are not
+exposed.
+
+The native importer coordinates access to file-provider URLs, reads while their
+security scope is active, then writes into the default workspace's
+`Imports/<UUID>/<filename>`. Copies are visible in Files under Linefold. Cold-launch URLs are received in
+`SceneDelegate.willConnectTo`; running-app deliveries use `openURLContexts`.
+The native queue is drained after the Flutter library is initialized, and a
+library scan recovers copies even if a launch was interrupted. Recent history
+uses relative paths so iOS container changes do not invalidate it.
+This follows [Apple's document-sharing integration](https://developer.apple.com/documentation/uikit/enabling-document-sharing)
+and [Flutter's UIScene lifecycle](https://docs.flutter.dev/release/breaking-changes/uiscenedelegate).
+
+From the repository root:
+
+```sh
+make test-ios-preview
+make build-ios-preview
+make run-ios DEVICE=<simulator-or-device-id>
+```
+
+The Mermaid SVG preprocessing library also builds for iOS through the shared
+native-asset hook. iOS bundles the unmodified OFL-licensed Noto Sans CJK SC Regular
+font for offline Chinese outlines (about 16 MB). LastResort placeholder glyphs
+and fonts without standard outline tables are excluded. Install the Rust targets for the devices you build:
+`rustup target add aarch64-apple-ios aarch64-apple-ios-sim` (and
+`x86_64-apple-ios` for an Intel simulator). Xcode and CocoaPods are required.
+For a physical iPhone, open `ios/Runner.xcworkspace`, select a development team
+for Runner, and build/run on the device. No signing identity is committed.
+The simulator build is at `build/ios/iphonesimulator/Runner.app`.
+
+Use `test/fixtures/ios-preview.md` for a device smoke test: open it while
+Linefold is terminated, send another file while Linefold is running, return to
+recent documents, relaunch, and check the Chinese Mermaid labels and anchors.
+Repeat from Files/iCloud Drive and the third-party sender used in production.
+Generate the iOS icon catalog from the shared artwork with
+`swift app/tool/generate_ios_app_icons.swift` from the repository root.
+
+## macOS editor
+
 `app/` is the file-first desktop editor built on top of the reusable
 `ianvs_markdown` package. Its file-first product structure keeps the useful
 parts of MarkText, with app chrome adapted to macOS toolbar, source-list,
@@ -119,6 +213,24 @@ cd app
 flutter pub get
 flutter run -d macos
 ```
+
+macOS builds use local ad-hoc signing by default, so `make run`, `make install`,
+and `flutter build macos` do not require an Apple Developer certificate. The app
+reports that automatic iCloud sync is disabled; you can still open local files
+or manually select an iCloud Drive folder. Sandbox, user-selected file access,
+and the Debug/Profile permissions needed by Flutter remain enabled.
+
+To enable automatic iCloud sync with an eligible Apple Developer team, copy
+`macos/Runner/Configs/Signing.local.xcconfig.example` to
+`macos/Runner/Configs/Signing.local.xcconfig`, then replace `YOUR_TEAM_ID` with
+your team ID. This ignored file enables iCloud and development signing for both
+Runner and its Quick Look extension, while preserving the extension's own
+sandbox-only entitlements. Open `macos/Runner.xcworkspace` in Xcode and build
+Runner once to provision signing. The team must have the
+`iCloud.work.ianvs.linefold` container configured for the app, as described in
+[Apple's container configuration guide](https://help.apple.com/xcode/mac/current/en.lproj/devcae40ccb9.html).
+Remove the local signing file to return to local builds. iOS signing is configured
+separately.
 
 To build a Release version for your Mac's architecture and install it into
 `/Applications/Linefold.app`, run `make install` from the repository root.

@@ -195,3 +195,104 @@ entries were not changed; the repaired `MATH-NOTES.md` checksum matches.
 现位于 `app/test/focus_geometry_test.dart`，保留 111 项检查，并修复了宿主
 填充输入框主题引起的焦点宽度偏移。后续结果以 [组件库迭代记录](../ROADMAP.md)
 为准；上面的验证记录保留当时的结果。
+
+## iOS reading preview — 2026-10-04
+
+Validated with Flutter 3.44.8 / Dart 3.12.2 and Xcode 27.0:
+
+- `flutter analyze` in `app/` and `packages/ianvs_mermaid/`: no issues.
+- Full app suite: 160 tests passed, one optional corpus test skipped.
+- `bash app/tool/test_native_markdown_import.sh`: native import checks passed.
+- iOS Simulator XCTest: app-owned copies survive source removal, duplicate names
+  remain separate, and reopening an imported copy does not duplicate it.
+- Rust SVG bridge: three tests passed; formatting checks passed.
+- iOS simulator Debug and unsigned iPhone Release builds succeeded.
+- On an iPhone 18 Pro / iOS 27 simulator, system file-URL delivery opened a
+  Markdown document from a terminated app and replaced it with a second
+  document while the app was running. Chinese text, tables, formulas, code and
+  Chinese Mermaid labels rendered successfully.
+- After reinstalling the updated simulator build and relaunching, both imported
+  documents remained visible in the recent library.
+
+Local logs and screenshots are under `app/build/ios-preview*` (generated,
+untracked artifacts). Physical-device signing and sharing from production
+third-party apps / iCloud providers still require device acceptance. The
+simulator file-URL test does not exercise a third-party share-sheet UI.
+
+## iOS Chinese glyphs and default iCloud workspace — 2026-10-04
+
+- A physical iPhone screenshot showed LastResort boxes for `阅读预览`. Scanning
+  `/System/Library/Fonts` alone did not provide reliable Chinese coverage.
+  Additional investigation with CoreText located iOS 27's `PingFangUI.ttc`, but
+  its faces have no `glyf`/`CFF `/`CFF2` tables; usvg accepted the font metadata
+  and silently emitted empty text. The new native glyph test reproduced that
+  second failure before the final fix.
+- iOS now embeds unmodified Noto Sans CJK SC Regular 2.004 under OFL 1.1, with
+  its license in the package and bundled Flutter notices. LastResort and fonts
+  without standard outline tables are excluded. Font-policy cache identity is
+  bumped to version 2. Desktop's preferred family remains unchanged.
+- Four Rust tests, seven Mermaid package tests (including seven production
+  visual references), and 163 app tests pass; one optional corpus test is
+  skipped. App static analysis reports no issues.
+- Three iOS XCTest cases pass: each of the eight Chinese label characters
+  produces a distinct nonempty outline; imported files remain owned copies;
+  cloud stubs are listed and coordinated reads/writes enforce the size limit.
+- The iOS 27 simulator displays both `分享文档 → Linefold → 阅读预览` and
+  `繁體：閱讀預覽` correctly in the production reader. Screenshot:
+  `app/build/ios-preview/mermaid-cjk-fixed.png`.
+- macOS and iOS share a container identifier and default-workspace resolver.
+  Tests cover choosing an external folder explicitly, returning to the default
+  on file delivery/startup, unavailable iCloud, and preserving unsaved drafts.
+- The iPhone local-storage Release build is signed and passes deep signature
+  verification. After reconnecting the paired iPhone 17, the final repair build
+  was installed and launched successfully on 2026-10-04. The on-device glyph
+  appearance has not been independently inspected; the rendering acceptance
+  above was performed in the simulator.
+- The current Personal Team cannot provision iCloud (confirmed by Xcode's
+  signing error). The standard projects retain iCloud configuration; the
+  explicit local build omits that capability and labels local storage honestly.
+  Actual cross-device iCloud synchronization remains unverified until an
+  eligible team/container and both devices are available.
+
+## Apple integration submission — 2026-10-10
+
+Code baseline: `603187c` (Mermaid `fe1e559`, header `32f0e86`, Apple reader and
+workspace `603187c`). The previously separate working-tree changes are now
+committed together with their tests, font license, and design evidence.
+
+Environment: unmodified Flutter 3.44.8 / Dart 3.12.2, macOS 27.0.1 arm64,
+Xcode 27.0 (27A266a), Rust 1.90.0. SDK Git status was clean before and after.
+
+- `CARGO_PROFILE_RELEASE_STRIP=none make check`: passed. Core 842, example 6,
+  app 274 (one optional external-corpus test skipped), Mermaid Flutter 9 /
+  Rust 4, adapter example 3, Quick Look Rust 8 / Swift 10, and native Markdown
+  import checks passed. Formatting and all package analyses passed.
+- Publication snapshot: 138 files, approximately 585 KB compressed, zero
+  warnings; included example and external smoke host passed without resolving
+  paths into this workspace. App, design screenshots and the CJK font remain
+  excluded from the core publication. Final document changes are also checked
+  by the PR's publication jobs.
+- `CARGO_PROFILE_RELEASE_STRIP=none FLUTTER_XCODE_ARCHS=arm64 flutter build
+  macos --debug` in `app/`: passed, using the default local signing configuration.
+- `CARGO_PROFILE_RELEASE_STRIP=none flutter build ios --simulator --debug
+  --no-codesign` in `app/`: passed.
+- Xcode XCTest on iPhone 18 Pro / iOS 27 simulator: 3 passed, 0 failures.
+  Tests verified eight distinct Chinese glyph outlines, imported copies after
+  source removal and duplicate names, and coordinated workspace I/O/stub listing.
+
+To repeat the simulator tests after the Flutter build, select an available
+simulator ID and run from `app/`:
+
+```sh
+CARGO_PROFILE_RELEASE_STRIP=none xcodebuild \
+  -workspace ios/Runner.xcworkspace -scheme Runner -configuration Debug \
+  -sdk iphonesimulator -destination 'platform=iOS Simulator,id=<simulator-id>' \
+  -derivedDataPath build/ios-xctest -parallel-testing-enabled NO \
+  CODE_SIGNING_ALLOWED=NO test
+```
+
+Local logs and the XCTest result bundle are under
+`build/roadmap/status-2026-10-10/` at the repository root. The iOS checks were
+local; the existing Native integrations workflow covers macOS. This run did
+not repeat visual QA, physical-device sharing, real iCloud cross-device sync,
+or the controlled performance benchmark. The earlier limitations remain open.

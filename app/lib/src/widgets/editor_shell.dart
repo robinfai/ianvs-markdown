@@ -264,10 +264,18 @@ class _EditorShellState extends State<EditorShell> {
                                         Expanded(
                                           child: LayoutBuilder(
                                             builder: (context, constraints) {
-                                              final inset =
-                                                  constraints.maxWidth < 500
-                                                  ? 24.0
-                                                  : 48.0;
+                                              // Center the same document column
+                                              // in Live, Source and Read, using
+                                              // the space between both panels.
+                                              final inset = math.max(
+                                                constraints.maxWidth < 500
+                                                    ? 24.0
+                                                    : 48.0,
+                                                (constraints.maxWidth -
+                                                        DesktopMetrics
+                                                            .documentMaxWidth) /
+                                                    2,
+                                              );
                                               return IanvsMarkdownLiveEditor(
                                                 key: ValueKey(document.id),
                                                 controller: document.controller,
@@ -294,7 +302,8 @@ class _EditorShellState extends State<EditorShell> {
                                                 showNavigationPane: false,
                                                 showOutlineInPreview: false,
                                                 showFrontMatter: false,
-                                                contentMaxWidth: 720,
+                                                contentMaxWidth: DesktopMetrics
+                                                    .documentMaxWidth,
                                                 padding: EdgeInsets.fromLTRB(
                                                   inset,
                                                   32,

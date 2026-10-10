@@ -1,4 +1,5 @@
 #include "../Flutter/ephemeral/Flutter-Generated.xcconfig"
+#include "../Runner/Configs/Signing.xcconfig"
 
 PRODUCT_NAME = LinefoldQuickLook
 PRODUCT_BUNDLE_IDENTIFIER = work.ianvs.linefold.QuickLook

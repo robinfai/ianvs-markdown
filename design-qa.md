@@ -1,79 +1,59 @@
-# Design QA — Ianvs Markdown Native macOS Editor Redesign
+# Design QA — Linefold compact header
 
-## Comparison target
+## Scope and source
 
-- Source visual truth: `/Users/robinfai/flutter_projects/ianvs-markdown/.product-design/redesign/visual-target-native-primary.png`
-- Drag/dirty interaction target: `/Users/robinfai/flutter_projects/ianvs-markdown/.product-design/redesign/visual-target-native-drag-unsaved.png`
-- Final native implementation capture: `/Users/robinfai/flutter_projects/ianvs-markdown/.product-design/redesign/implementation-native-final.jpeg`
-- Full-view comparison: `/Users/robinfai/flutter_projects/ianvs-markdown/.product-design/redesign/qa-reference-vs-implementation-final.png`
-- Focused chrome/document comparison: `/Users/robinfai/flutter_projects/ianvs-markdown/.product-design/redesign/qa-focused-chrome-and-document-final.png`
-- Annotated before/target comparison: `/Users/robinfai/flutter_projects/ianvs-markdown/.product-design/redesign/annotated-current-vs-native-target.png`
+The selected user attachment is `.product-design/header-redesign/selected-target.png`.
+The user's requested changes are a compact sidebar without “Workspace”, “Linefold” beside the native traffic lights, tabs above the document context and mode controls, and a centered document when the editor exceeds its maximum content width. The follow-up attachment `mode-menu-request.png` supersedes the segmented mode control: the user requested a vertically centered icon-and-text dropdown.
 
-## Viewport and normalization
+The previous unrelated QA report is preserved at `.product-design/header-redesign/previous-design-qa.md`.
 
-- Source pixels: `1536 × 1024`.
-- Native implementation pixels: `1225 × 768`, captured from the running Flutter macOS application including integrated window chrome.
-- Native viewport: `1225 × 768` capture surface; browser CSS size and `deviceScaleFactor` do not apply.
-- Normalization: the source was centered-cropped to the native implementation's `1225 × 768` aspect ratio and downsampled with Lanczos. Both normalized images were placed at equal size in the `2450 × 812` full-view comparison.
-- Focused comparison: identical `1225 × 390` top regions from the normalized source and implementation, combined into `2450 × 432`.
-- State: light theme, saved `Playground.md`, Preview selected, three visible tabs, first outline heading active, native title bar visible.
+## Visual comparison
 
-## Findings
+- Reference: 1556 × 1011 source pixels.
+- Native capture: 2400 × 1560 pixels, representing a 1200 × 780 point macOS window at 2×.
+- Both are normalized to 1200 × 780 using Lanczos; no application pixels are redrawn.
+- Full comparison: `.product-design/header-redesign/comparison-final-full.png`.
+- Header comparison: `.product-design/header-redesign/comparison-final-header.png`, identical top 180-point crops.
+- The two combined comparisons were opened and inspected together.
+- `native-final.png` is a fresh capture after the final mode-menu change and native regression checks. `native-mode-menu-open.png` shows all three choices with icons and the current-mode checkmark. `comparison-mode-menu.png` compares identical 600 × 354-pixel top-right regions of the before and after captures at 1:1 scale.
 
-No actionable P0, P1, or P2 differences remain.
+## Visual findings
 
-- Fonts and typography: both directions use macOS system sans-serif with compact system labels and an editorial document hierarchy. The implementation's 31-point title, 21.5-point section heading, 15-point body, 1.62 body line height, and SF Mono-compatible code treatment preserve the reference hierarchy and wrapping. Native rasterization and the implementation's slightly stronger title weight are acceptable platform variation.
-- Spacing and layout rhythm: the 372-point navigation pane, 760-point document measure, 112/96-point horizontal document padding, 62-point toolbar, 44-point tabs, hairline separators, and 32-point status bar reproduce the reference region proportions at the native capture size. The navigation pane collapses below 1040 points. No overlap, clipping, or overflow is visible.
-- Colors and visual tokens: warm white content, cool neutral chrome, charcoal text, muted gray labels, and restrained `#167B82` teal accents align with the reference. Teal is limited to active indicators, links, and state feedback; selected rows do not use large tinted capsules.
-- Image quality and asset fidelity: the design contains no raster product imagery or decorative illustration. Controls use the project's existing Flutter icon library with consistent optical sizes; no inline SVG, emoji, CSS-art equivalent, gradient, or placeholder asset was introduced.
-- Copy and content: the standalone editor now opens with “Ianvs Markdown Playground,” a concise product introduction, and realistic Markdown examples. New/Open/Save/Saved, mode labels, drag instructions, word/character counts, line-ending metadata, and tab names are coherent in context.
-- Icons and controls: New, Open, Save/Saved, overflow, close, dirty-dot, mode, and file icons share a flat native-toolbar treatment. Filled tonal/pill actions were removed; hover and pressed feedback uses quiet neutral surfaces and six-point control radii.
-- Interaction states: multi-tab creation/selection/close, open, edit, dirty state, save/save-as, and close confirmation remain functional. The canvas-only drag target keeps the navigation pane visible, uses a thin dashed outline, and exposes explicit supported extensions. The drag overlay and dirty indicator have widget-test coverage.
-- Accessibility and responsiveness: buttons retain tooltips and semantic labels, keyboard shortcuts remain available, tab close controls appear for active/hovered tabs, and the navigation pane collapses before it can crowd the editor. Text and controls remain readable at the minimum window size.
+No actionable P0–P2 visual discrepancy remains in the requested scope.
 
-## Comparison history
+- Structure and spacing: the sidebar starts with a 32-point app-name row, followed immediately by the existing project row and search. The redundant “Workspace” caption and 52-point empty spacer are gone. The main header is a 44-point tab strip over a 40-point context row.
+- Typography: the existing system font and document styles remain. Active tabs have stronger weight; inactive close buttons appear on hover or keyboard focus. Dirty documents retain their blue indicator.
+- Controls: sidebar toggle, tabs, open-document menu, New, and outline toggle occupy the first row. A single icon + current mode label + chevron sits at the right of the second row in a 32-point control. Its icon, text, and arrow share the same vertical center, with equal top/bottom gutters. The menu exposes Live, Source, and Read with icons and a current-mode checkmark. Keyboard navigation, focus restoration, and selected semantics are verified.
+- Context: the breadcrumb reflects the real workspace-relative path, external parent directory, or unsaved document state, with middle ellipsis and a full-path tooltip.
+- Document placement: all three modes use equal left/right insets within the editor pane, excluding both side panels. The existing 720-point maximum width remains. Narrow panes retain 24- or 48-point minimum gutters.
+- Color and assets: existing neutral surfaces, blue selection accents, sidebar colors, and project icons are reused. No decorative imagery or new asset set was needed.
+- Responsiveness: tests cover 1600 × 1000 and 840 × 560, all panel combinations, all editor modes, and 200% text. The narrow/large-text screenshots show no header overlap or overflow.
+- Expected differences: actual open documents and external paths differ from the reference. Document font metrics, table wrapping, and the existing maximum reading width were retained. Native traffic-light appearance depends on window activation; the purple Computer Use badge seen in some captures is an automation overlay.
 
-### Iteration 1 — blocked
+## Iteration history
 
-- [P2] Default expanded YAML properties pushed the first document heading substantially below the source's above-the-fold position.
-- [P2] The implementation sidebar and document inset were visibly narrower than the normalized source, weakening the intended editorial hierarchy.
-
-Fixes made:
-
-- Switched the default example to a clean document opening while retaining Markdown editing behavior.
-- Increased navigation width from 300 to 372 points, moved its collapse breakpoint from 860 to 1040 points, and increased document insets to 112/96 points.
-- Added the target's document title and introductory paragraph to realistic example content.
-
-Evidence: `/Users/robinfai/flutter_projects/ianvs-markdown/.product-design/redesign/qa-reference-vs-implementation-iteration-1.png` and `/Users/robinfai/flutter_projects/ianvs-markdown/.product-design/redesign/implementation-native-iteration-1b.jpeg`.
-
-### Iteration 2 — blocked
-
-- [P1] Hiding the front-matter card while leaving the demo YAML source active exposed the metadata block as oversized editable source text, materially changing the first screen.
-
-Fix made:
-
-- Removed the synthetic YAML header from the default playground document. Front-matter support remains in the package; the editor example now opens in the clean, reference-matched authoring state.
-
-Evidence: `/Users/robinfai/flutter_projects/ianvs-markdown/.product-design/redesign/implementation-native-iteration-2.jpeg`.
-
-### Iteration 3 — passed
-
-- The final same-size full-view and focused comparisons show aligned sidebar/content proportions, first-screen content order, toolbar density, tabs, type hierarchy, canvas width, accent restraint, and status-bar placement.
-- Remaining differences are expected: the source includes a synthetic `README.md` tab/files group while the live capture shows two newly created untitled documents; the native implementation renders real system glyph/font metrics; Computer Use contributes a small purple focus indicator outside the product UI at the upper-left edge.
-- No actionable P0/P1/P2 issue remains.
+1. The first visual pass put the modes too close to the context-row edges; constrained them to 32 points with gutters.
+2. Native titlebar handling consumed top-row clicks and tab drags. AppKit now reserves the app-name area for window dragging and routes the remaining header region to Flutter. Center clicks, sidebar/outline toggles, tab dragging, and native window zoom were exercised.
+3. The lazy tab list underestimated its length with many variable-width names. Selection reveal now uses measured tab widths. New and distant selected tabs are fully visible.
+4. Dragging a tab with an active tooltip produced a Flutter overlay layout error. Drag feedback now uses an independent visual proxy, with tooltips disabled during reorder.
+5. Native testing found a macOS accessibility-bridge crash when a modal document popup closed while the underlying document/scroll semantics changed. Delaying selection and changing semantics visibility did not reliably resolve it. The document menu now uses `MenuAnchor`, matching the project's existing design-system menu approach. The full formerly failing chain (new tab → reorder → close → GLOSSARY → feature-matrix via menu) succeeded in the rebuilt native application. No new crash report was created; the latest remains the earlier `Linefold-2026-09-30-123351.ips`. This verifies the app-level regression path, not a general Flutter engine fix.
+6. The user then requested a mode dropdown and flagged vertical text alignment. Replaced the segmented control with a centered icon/text/chevron button and MenuAnchor choices. Layout tests assert the button center matches the context row and that the text/icons share its center; native captures confirm the result.
 
 ## Verification
 
-- Target and implementation images were opened and judged together in both full-view and focused same-size comparison inputs.
-- `flutter analyze example/lib/main.dart example/test/widget_test.dart`: passed with no issues.
-- Root test suite: 742 passed.
-- Example test suite: 5 passed, including open/tab/save, dirty-state, and drag-overlay coverage.
-- macOS debug build: passed and launched successfully.
-- Native interaction checks: created multiple tabs, returned to the first tab, and verified toolbar/tab/status/editor layout in the running app.
-- No browser console applies to this native Flutter build; no launch or layout exception was observed.
+- `flutter test` in `app`: **152 passed, 1 skipped**.
+- The full passing suite includes header and editor-affordance checks for centering, breadcrumb updates on save, large text, long variable-width tabs, dragging, closing, mode-menu accessibility/keyboard selection, and read-mode content protection.
+- `flutter analyze` in `app`: **no issues**.
+- Dart format check for all changed Dart files: **passed, 0 changes**.
+- `git diff --check`: **passed**.
+- `flutter build macos --debug`: **passed**.
+- Native mode selection was exercised through the new menu: Live → Source by mouse, Source → Read by keyboard, and back to Live. Wide Live and both-panels-hidden captures were refreshed with the final implementation. Earlier wide Source/Read captures remain historical layout evidence.
+- The normal 1200 × 780-point window was restored with feature-matrix active in Live, both panels visible, and the sidebar scrolled back to the top. The native app-name double-click zoom also passed.
+- Dark/narrow/large-text captures were refreshed from the final full test run.
+- User document contents were not changed. Only disposable empty tabs were used for creation/close/reorder checks.
 
-## Follow-up polish
+## Final review
 
-- [P3] A future native menu pass could mirror New/Open/Save actions in the macOS menu bar and expose recent files without changing the current visual system.
+The final full-view, focused-header, and mode-menu before/after comparisons were reviewed at matched scales. Dark and narrow 200% text captures were inspected. No actionable P0–P2 issue remains in the requested header, centering, or mode-menu scope.
 
 final result: passed

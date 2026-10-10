@@ -21,6 +21,13 @@ void main(List<String> args) async {
         'x86_64-apple-darwin',
         'libianvs_svg.dylib',
       ),
+      (OS.iOS, Architecture.arm64) => (
+        config.iOS.targetSdk == IOSSdk.iPhoneSimulator
+            ? 'aarch64-apple-ios-sim'
+            : 'aarch64-apple-ios',
+        'libianvs_svg.dylib',
+      ),
+      (OS.iOS, Architecture.x64) => ('x86_64-apple-ios', 'libianvs_svg.dylib'),
       (OS.linux, Architecture.x64) => (
         'x86_64-unknown-linux-gnu',
         'libianvs_svg.so',
@@ -34,7 +41,7 @@ void main(List<String> args) async {
         'ianvs_svg.dll',
       ),
       _ => throw UnsupportedError(
-        'Mermaid vector preprocessing supports desktop targets only: '
+        'Unsupported Mermaid vector preprocessing target: '
         '${config.targetOS}/${config.targetArchitecture}',
       ),
     };
@@ -47,19 +54,31 @@ void main(List<String> args) async {
       '$cargoHome/bin/cargo${Platform.isWindows ? '.exe' : ''}',
     );
     final environment = <String, String>{};
-    if (config.targetOS == OS.macOS) {
+    if (config.targetOS == OS.macOS || config.targetOS == OS.iOS) {
       // Hooks retain Xcode's compiler PATH but filter out SDKROOT. Unlike the
       // /usr/bin shim, the toolchain's cc needs the SDK specified explicitly.
       final sdk = await Process.run('/usr/bin/xcrun', [
         '--sdk',
-        'macosx',
+        config.targetOS == OS.iOS ? config.iOS.targetSdk.type : 'macosx',
         '--show-sdk-path',
       ]);
       if (sdk.exitCode != 0) {
-        throw StateError('Cannot locate the macOS SDK: ${sdk.stderr}');
+        throw StateError('Cannot locate the Apple SDK: ${sdk.stderr}');
       }
       environment['SDKROOT'] = (sdk.stdout as String).trim();
-      environment['MACOSX_DEPLOYMENT_TARGET'] = '12.0';
+      // Cargo build scripts run on macOS even while the library targets iOS.
+      // Use Apple's shim for host links; Xcode's toolchain cc has no default
+      // macOS sysroot when invoked in an iPhone build environment.
+      if (config.targetOS == OS.iOS) {
+        environment['CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER'] = '/usr/bin/cc';
+        environment['CARGO_TARGET_X86_64_APPLE_DARWIN_LINKER'] = '/usr/bin/cc';
+      }
+      if (config.targetOS == OS.iOS) {
+        environment['IPHONEOS_DEPLOYMENT_TARGET'] =
+            '${config.iOS.targetVersion}.0';
+      } else {
+        environment['MACOSX_DEPLOYMENT_TARGET'] = '12.0';
+      }
       final compiler = config.cCompiler?.compiler.toFilePath();
       if (compiler != null) {
         environment['CC'] = compiler;
@@ -99,6 +118,7 @@ void main(List<String> args) async {
     output.dependencies.addAll([
       root.resolve('Cargo.toml'),
       root.resolve('Cargo.lock'),
+      root.resolve('fonts/NotoSansCJKsc-Regular.otf'),
       ...Directory.fromUri(
         root.resolve('src/'),
       ).listSync(recursive: true).whereType<File>().map((file) => file.uri),

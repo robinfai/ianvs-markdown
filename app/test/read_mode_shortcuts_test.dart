@@ -89,7 +89,9 @@ void main() {
         expect(controller.isDirty, isFalse);
         expect(controller.canUndo, isFalse);
         expect(controller.mode, IanvsMarkdownEditorMode.preview);
-        await tester.tap(find.text('Source'));
+        await tester.tap(find.byTooltip('Editor mode'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('editor-mode-source')));
         await tester.pumpAndSettle();
         final sourceField = tester.widget<TextField>(
           find.byKey(const ValueKey('ianvs-markdown-source-field')),
@@ -155,7 +157,9 @@ void main() {
         _mockNativeChannels(tester);
         final workspace = await _pumpReadApp(tester);
         final controller = workspace.activeDocument!.controller;
-        await tester.tap(find.text(mode));
+        await tester.tap(find.byTooltip('Editor mode'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(MenuItemButton, mode));
         await tester.pumpAndSettle();
         if (mode == 'Live') {
           await tester.tap(find.text('Alpha paragraph.'));
@@ -296,7 +300,9 @@ Future<WorkspaceController> _pumpReadApp(
     }
     document.controller.markSaved();
   }
-  await tester.tap(find.text('Read'));
+  await tester.tap(find.byTooltip('Editor mode'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const ValueKey('editor-mode-preview')));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Second paragraph.'));
   await tester.pumpAndSettle();

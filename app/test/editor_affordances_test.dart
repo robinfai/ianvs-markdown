@@ -2,6 +2,7 @@ import 'dart:ui' show Tristate;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:linefold/src/app.dart';
@@ -34,23 +35,45 @@ void main() {
     final workspace = await openApp(tester);
     final document = workspace.activeDocument!;
     final source = document.controller.text;
-    final live = tester.getSemantics(find.bySemanticsLabel('Live Preview'));
-    expect(live.getSemanticsData().flagsCollection.isButton, isTrue);
-    expect(live.flagsCollection.isSelected, Tristate.isTrue);
-    expect(live.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
-    expect(live.rect.height, greaterThanOrEqualTo(28));
-
-    final read = tester.getSemantics(find.bySemanticsLabel('Read'));
-    read.owner!.performAction(read.id, SemanticsAction.tap);
+    final trigger = tester.getSemantics(
+      find.bySemanticsLabel('Editor mode: Live Preview'),
+    );
+    expect(trigger.getSemanticsData().flagsCollection.isButton, isTrue);
+    expect(trigger.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
+    expect(trigger.rect.height, greaterThanOrEqualTo(28));
+    trigger.owner!.performAction(trigger.id, SemanticsAction.tap);
     await tester.pumpAndSettle();
-    expect(document.controller.mode, IanvsMarkdownEditorMode.preview);
     expect(
       tester
-          .getSemantics(find.bySemanticsLabel('Read'))
+          .getSemantics(find.bySemanticsLabel('Live Preview'))
+          .getSemanticsData()
           .flagsCollection
           .isSelected,
       Tristate.isTrue,
     );
+    final read = tester.getSemantics(find.bySemanticsLabel('Read'));
+    read.owner!.performAction(read.id, SemanticsAction.tap);
+    await tester.pumpAndSettle();
+    expect(document.controller.mode, IanvsMarkdownEditorMode.preview);
+    expect(find.bySemanticsLabel('Editor mode: Read'), findsOneWidget);
+    expect(find.byKey(const ValueKey('editor-mode-preview')), findsNothing);
+
+    // The trigger retains keyboard focus, and the menu opens on the current mode.
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Read'))
+          .getSemanticsData()
+          .flagsCollection
+          .isSelected,
+      Tristate.isTrue,
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(document.controller.mode, IanvsMarkdownEditorMode.source);
+    expect(find.bySemanticsLabel('Editor mode: Source'), findsOneWidget);
     expect(document.controller.text, source);
     expect(document.controller.isDirty, isFalse);
     await tester.pump(const Duration(milliseconds: 400));

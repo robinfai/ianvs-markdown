@@ -9,6 +9,7 @@ import 'services/file_association_service.dart';
 import 'services/incoming_files_service.dart';
 import 'services/markdown_file_service.dart';
 import 'services/workspace_session_store.dart';
+import 'services/apple_workspace_service.dart';
 import 'widgets/app_settings_dialog.dart';
 import 'widgets/editor_shell.dart';
 
@@ -32,8 +33,12 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
   late final WorkspaceController _workspace =
       widget.workspaceController ??
       WorkspaceController(
-        fileService: const DesktopMarkdownFileService(),
+        fileService: const DesktopMarkdownFileService(
+          workspace: AppleWorkspaceService(),
+        ),
         sessionStore: const DesktopWorkspaceSessionStore(),
+        defaultWorkspaceDirectory:
+            const AppleWorkspaceService().defaultDirectory,
       );
   late final FileAssociationController _fileAssociation =
       widget.fileAssociationController ??
@@ -45,11 +50,19 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
   var _themeMode = ThemeMode.system;
   var _settingsOpen = false;
   var _promptOpen = false;
+  StreamSubscription<void>? _cloudChanges;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    if (widget.workspaceController == null) {
+      _cloudChanges = const AppleWorkspaceService().changes.listen((_) {
+        if (_workspace.initialized && _workspace.isCloudWorkspace) {
+          unawaited(_workspace.browser.refresh());
+        }
+      });
+    }
     unawaited(_initialize());
   }
 
@@ -118,6 +131,7 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _fileAssociation.initialized) {
       unawaited(_fileAssociation.refresh());
+      if (_workspace.isCloudWorkspace) unawaited(_workspace.browser.refresh());
     }
   }
 
@@ -125,6 +139,7 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _incomingFiles.dispose();
+    _cloudChanges?.cancel();
     if (widget.fileAssociationController == null) _fileAssociation.dispose();
     if (widget.workspaceController == null) _workspace.dispose();
     super.dispose();

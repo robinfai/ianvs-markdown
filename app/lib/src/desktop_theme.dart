@@ -6,8 +6,10 @@ import 'models/workspace_layout.dart';
 
 /// Host layout metrics; shared control styling comes from Ianvs Design.
 abstract final class DesktopMetrics {
-  static const toolbarHeight = 52.0;
-  static const tabsHeight = 32.0;
+  static const windowTitleHeight = 32.0;
+  static const tabsHeight = 44.0;
+  static const documentContextHeight = 40.0;
+  static const documentMaxWidth = 720.0;
   static const sidebarWidth = WorkspaceLayout.defaultSidebarWidth;
   static const inspectorWidth = 224.0;
   static const controlRadius = 6.0;
