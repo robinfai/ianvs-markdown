@@ -1,0 +1,272 @@
+{
+  "sourceRevision": "0974263adb24f400eaaf8034af0011ab0ad46cf3",
+  "sdkRevision": "abaf9c523780a608bd46686fd5e53740a07077f8",
+  "sdkUnmodified": true,
+  "kind": "direct frontend + arm64 gen_snapshot diagnostic; not a full macOS bundle build",
+  "cases": [
+    {
+      "name": "text",
+      "sourceSha256": "be32dbe70baa29e75bd42ca6ff72d88b074b75c42a1afe1fc0ec14b45da4b367",
+      "frontend": {
+        "command": [
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/dart-sdk/bin/dartaotruntime",
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/dart-sdk/bin/snapshots/frontend_server_aot.dart.snapshot",
+          "--sdk-root",
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/artifacts/engine/common/flutter_patched_sdk_product/",
+          "--target=flutter",
+          "--aot",
+          "--tfa",
+          "--target-os",
+          "macos",
+          "-Ddart.vm.product=true",
+          "--packages",
+          "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-reduction-u8536g0r/host/.dart_tool/package_config.json",
+          "--output-dill",
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/roadmap/r3-01/aot-reduction/text.dill",
+          "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-reduction-u8536g0r/host/lib/text.dart"
+        ],
+        "exitCode": 0,
+        "timedOut": false,
+        "seconds": 4.194110665936023,
+        "log": "text-frontend.log",
+        "logSha256": "7a5245bce2b64cb134488064c34baaf10d41aa630b1f63d9bff1a0239c130b46"
+      },
+      "snapshot": {
+        "command": [
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/artifacts/engine/darwin-x64-release/gen_snapshot_arm64",
+          "--deterministic",
+          "--snapshot_kind=app-aot-assembly",
+          "--assembly=/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/roadmap/r3-01/aot-reduction/text.S",
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/roadmap/r3-01/aot-reduction/text.dill"
+        ],
+        "exitCode": 0,
+        "timedOut": false,
+        "seconds": 2.490695166052319,
+        "log": "text-snapshot.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "windowingAotFailure": false,
+      "passed": true
+    },
+    {
+      "name": "selection_area",
+      "sourceSha256": "60718a1e0a27ecaf894848613d7f97d07c23e85c9703d7759d68a856f0010eb4",
+      "frontend": {
+        "command": [
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/dart-sdk/bin/dartaotruntime",
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/dart-sdk/bin/snapshots/frontend_server_aot.dart.snapshot",
+          "--sdk-root",
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/artifacts/engine/common/flutter_patched_sdk_product/",
+          "--target=flutter",
+          "--aot",
+          "--tfa",
+          "--target-os",
+          "macos",
+          "-Ddart.vm.product=true",
+          "--packages",
+          "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-reduction-u8536g0r/host/.dart_tool/package_config.json",
+          "--output-dill",
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/roadmap/r3-01/aot-reduction/selection_area.dill",
+          "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-reduction-u8536g0r/host/lib/selection_area.dart"
+        ],
+        "exitCode": 0,
+        "timedOut": false,
+        "seconds": 4.485267333919182,
+        "log": "selection_area-frontend.log",
+        "logSha256": "eb2fe1c9bc37c8eac6e6fd1ecff896ea62189a4f74f9a47f9d9a617caf1f9fb7"
+      },
+      "snapshot": {
+        "command": [
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/artifacts/engine/darwin-x64-release/gen_snapshot_arm64",
+          "--deterministic",
+          "--snapshot_kind=app-aot-assembly",
+          "--assembly=/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/roadmap/r3-01/aot-reduction/selection_area.S",
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/roadmap/r3-01/aot-reduction/selection_area.dill"
+        ],
+        "exitCode": 0,
+        "timedOut": false,
+        "seconds": 3.02893645898439,
+        "log": "selection_area-snapshot.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "windowingAotFailure": false,
+      "passed": true
+    },
+    {
+      "name": "selectable_text",
+      "sourceSha256": "0e0f2a62f34bb294e70a4dc62d21ef847b44a5a274721432637c68b3028ceb4f",
+      "frontend": {
+        "command": [
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/dart-sdk/bin/dartaotruntime",
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/dart-sdk/bin/snapshots/frontend_server_aot.dart.snapshot",
+          "--sdk-root",
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/artifacts/engine/common/flutter_patched_sdk_product/",
+          "--target=flutter",
+          "--aot",
+          "--tfa",
+          "--target-os",
+          "macos",
+          "-Ddart.vm.product=true",
+          "--packages",
+          "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-reduction-u8536g0r/host/.dart_tool/package_config.json",
+          "--output-dill",
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/roadmap/r3-01/aot-reduction/selectable_text.dill",
+          "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-reduction-u8536g0r/host/lib/selectable_text.dart"
+        ],
+        "exitCode": 0,
+        "timedOut": false,
+        "seconds": 4.860471292049624,
+        "log": "selectable_text-frontend.log",
+        "logSha256": "4c603edd39d230ac3d2581feefc947b8aabd03d23b0b26a211b98a395d6193fb"
+      },
+      "snapshot": {
+        "command": [
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/artifacts/engine/darwin-x64-release/gen_snapshot_arm64",
+          "--deterministic",
+          "--snapshot_kind=app-aot-assembly",
+          "--assembly=/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/roadmap/r3-01/aot-reduction/selectable_text.S",
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/roadmap/r3-01/aot-reduction/selectable_text.dill"
+        ],
+        "exitCode": 0,
+        "timedOut": false,
+        "seconds": 3.4953716249438003,
+        "log": "selectable_text-snapshot.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "windowingAotFailure": false,
+      "passed": true
+    },
+    {
+      "name": "text_field",
+      "sourceSha256": "2017c52b0f6209fc41d0e984709366dbb9a94138a5ec4e975f0eb6bde578f338",
+      "frontend": {
+        "command": [
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/dart-sdk/bin/dartaotruntime",
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/dart-sdk/bin/snapshots/frontend_server_aot.dart.snapshot",
+          "--sdk-root",
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/artifacts/engine/common/flutter_patched_sdk_product/",
+          "--target=flutter",
+          "--aot",
+          "--tfa",
+          "--target-os",
+          "macos",
+          "-Ddart.vm.product=true",
+          "--packages",
+          "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-reduction-u8536g0r/host/.dart_tool/package_config.json",
+          "--output-dill",
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/roadmap/r3-01/aot-reduction/text_field.dill",
+          "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-reduction-u8536g0r/host/lib/text_field.dart"
+        ],
+        "exitCode": 0,
+        "timedOut": false,
+        "seconds": 4.935988917015493,
+        "log": "text_field-frontend.log",
+        "logSha256": "4468ef61ee4689b31fb311cc9f37fd958f6f6fd46d224c57cc609cb81fd32253"
+      },
+      "snapshot": {
+        "command": [
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/artifacts/engine/darwin-x64-release/gen_snapshot_arm64",
+          "--deterministic",
+          "--snapshot_kind=app-aot-assembly",
+          "--assembly=/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/roadmap/r3-01/aot-reduction/text_field.S",
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/roadmap/r3-01/aot-reduction/text_field.dill"
+        ],
+        "exitCode": 0,
+        "timedOut": false,
+        "seconds": 3.610774041037075,
+        "log": "text_field-snapshot.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "windowingAotFailure": false,
+      "passed": true
+    },
+    {
+      "name": "tooltip",
+      "sourceSha256": "9d959540699247b5eed5bdeb025d876c01ff07d35040deb3e038bc8c7b5dc974",
+      "frontend": {
+        "command": [
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/dart-sdk/bin/dartaotruntime",
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/dart-sdk/bin/snapshots/frontend_server_aot.dart.snapshot",
+          "--sdk-root",
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/artifacts/engine/common/flutter_patched_sdk_product/",
+          "--target=flutter",
+          "--aot",
+          "--tfa",
+          "--target-os",
+          "macos",
+          "-Ddart.vm.product=true",
+          "--packages",
+          "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-reduction-u8536g0r/host/.dart_tool/package_config.json",
+          "--output-dill",
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/roadmap/r3-01/aot-reduction/tooltip.dill",
+          "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-reduction-u8536g0r/host/lib/tooltip.dart"
+        ],
+        "exitCode": 0,
+        "timedOut": false,
+        "seconds": 4.159766500000842,
+        "log": "tooltip-frontend.log",
+        "logSha256": "9101a0b0ecfd4155ec192f69d19eadab571887b9d19f7d75590d3122576859ff"
+      },
+      "snapshot": {
+        "command": [
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/artifacts/engine/darwin-x64-release/gen_snapshot_arm64",
+          "--deterministic",
+          "--snapshot_kind=app-aot-assembly",
+          "--assembly=/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/roadmap/r3-01/aot-reduction/tooltip.S",
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/roadmap/r3-01/aot-reduction/tooltip.dill"
+        ],
+        "exitCode": 0,
+        "timedOut": false,
+        "seconds": 2.54892066703178,
+        "log": "tooltip-snapshot.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "windowingAotFailure": false,
+      "passed": true
+    },
+    {
+      "name": "combined",
+      "sourceSha256": "68d611cd44c59a9dd5f6518a905e6583e83c898af4ba3ce51d6f8da56181459d",
+      "frontend": {
+        "command": [
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/dart-sdk/bin/dartaotruntime",
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/dart-sdk/bin/snapshots/frontend_server_aot.dart.snapshot",
+          "--sdk-root",
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/artifacts/engine/common/flutter_patched_sdk_product/",
+          "--target=flutter",
+          "--aot",
+          "--tfa",
+          "--target-os",
+          "macos",
+          "-Ddart.vm.product=true",
+          "--packages",
+          "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-reduction-u8536g0r/host/.dart_tool/package_config.json",
+          "--output-dill",
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/roadmap/r3-01/aot-reduction/combined.dill",
+          "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-reduction-u8536g0r/host/lib/combined.dart"
+        ],
+        "exitCode": 0,
+        "timedOut": false,
+        "seconds": 5.116478290990926,
+        "log": "combined-frontend.log",
+        "logSha256": "af0c197a19493b75d6cfd80cda220ff24251851545fa4b1dd6a57818fcc74745"
+      },
+      "snapshot": {
+        "command": [
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/artifacts/engine/darwin-x64-release/gen_snapshot_arm64",
+          "--deterministic",
+          "--snapshot_kind=app-aot-assembly",
+          "--assembly=/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/roadmap/r3-01/aot-reduction/combined.S",
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/roadmap/r3-01/aot-reduction/combined.dill"
+        ],
+        "exitCode": 0,
+        "timedOut": false,
+        "seconds": 4.030259040999226,
+        "log": "combined-snapshot.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "windowingAotFailure": false,
+      "passed": true
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "checks": [
+    {
+      "name": "duplicate-label",
+      "command": [
+        "python3",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/tool/reproduce_macos_aot.py",
+        "--flutter",
+        "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/flutter",
+        "--source",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/benchmark/results/2026-10-10-aot-reduction/text.dart.txt",
+        "--label",
+        "replay-control"
+      ],
+      "exitCode": 1
+    },
+    {
+      "name": "conflicting-modes",
+      "command": [
+        "python3",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/tool/reproduce_macos_aot.py",
+        "--flutter",
+        "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/flutter",
+        "--source",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/benchmark/results/2026-10-10-aot-reduction/text.dart.txt",
+        "--label",
+        "reject-conflict",
+        "--dart-only",
+        "--component"
+      ],
+      "exitCode": 2
+    },
+    {
+      "name": "invalid-timeout",
+      "command": [
+        "python3",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/tool/reproduce_macos_aot.py",
+        "--flutter",
+        "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/flutter",
+        "--source",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/benchmark/results/2026-10-10-aot-reduction/text.dart.txt",
+        "--label",
+        "reject-timeout",
+        "--timeout",
+        "0"
+      ],
+      "exitCode": 2
+    },
+    {
+      "name": "patched-sdk",
+      "command": [
+        "python3",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/tool/reproduce_macos_aot.py",
+        "--flutter",
+        "/tmp/ianvs-r2-perf-9BCIxV/flutter/bin/flutter",
+        "--source",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/benchmark/results/2026-10-10-aot-reduction/text.dart.txt",
+        "--label",
+        "reject-patched"
+      ],
+      "exitCode": 2
+    }
+  ],
+  "existingEvidenceUnchanged": true
+}

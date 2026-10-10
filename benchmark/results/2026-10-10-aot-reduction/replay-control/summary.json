@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "startedAtUtc": "2026-10-10T09:52:12.606157+00:00",
+  "kind": "Flutter frontend + arm64 gen_snapshot",
+  "scope": "Compile only; no bundle, app launch or interaction acceptance",
+  "revision": "0974263adb24f400eaaf8034af0011ab0ad46cf3",
+  "sourceSha256": "be32dbe70baa29e75bd42ca6ff72d88b074b75c42a1afe1fc0ec14b45da4b367",
+  "componentInputsSha256": {},
+  "sdkRevision": "abaf9c523780a608bd46686fd5e53740a07077f8",
+  "sdkUnmodifiedBefore": true,
+  "sdkUnmodifiedAfter": true,
+  "host": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "architecture": "arm64",
+  "runnerSha256": "ff85c11ba5626cf8d9ede45e2c6c71a52693728c74839e1a78ede234a1c90149",
+  "steps": [
+    {
+      "command": [
+        "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/flutter",
+        "--version",
+        "--machine"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "seconds": 0.17964033305179328,
+      "log": "sdk-version.json",
+      "logSha256": "1aadc77c8dfcabc528e4802c6655fecaae08bdf0587f40d5d99b8eeae10e43af"
+    },
+    {
+      "command": [
+        "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/flutter",
+        "pub",
+        "get"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "seconds": 0.5554802089463919,
+      "log": "pub-get.log",
+      "logSha256": "c71cee5c6b633745c1b2631d0e0515f67cafe19e8034c713106bcb182f2d4d9c"
+    },
+    {
+      "command": [
+        "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/dart-sdk/bin/dartaotruntime",
+        "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/dart-sdk/bin/snapshots/frontend_server_aot.dart.snapshot",
+        "--sdk-root",
+        "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/artifacts/engine/common/flutter_patched_sdk_product/",
+        "--target=flutter",
+        "--aot",
+        "--tfa",
+        "--target-os",
+        "macos",
+        "-Ddart.vm.product=true",
+        "--packages",
+        "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-probe-5u2zakuf/host/.dart_tool/package_config.json",
+        "--output-dill",
+        "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-probe-5u2zakuf/host/probe.dill",
+        "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-probe-5u2zakuf/host/main.dart"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "seconds": 3.752638333942741,
+      "log": "frontend.log",
+      "logSha256": "28f1a989c6f9fd809fae2fe611f2b5929f124b994ef5e87e11fb21d6966d02b9"
+    },
+    {
+      "command": [
+        "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/artifacts/engine/darwin-x64-release/gen_snapshot_arm64",
+        "--deterministic",
+        "--snapshot_kind=app-aot-assembly",
+        "--assembly=/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-probe-5u2zakuf/host/probe.S",
+        "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-probe-5u2zakuf/host/probe.dill"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "seconds": 2.1882270419737324,
+      "log": "snapshot.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "errors": [],
+  "complete": true,
+  "passed": true,
+  "windowingAotFailure": false,
+  "flutter": {
+    "frameworkVersion": "3.47.7",
+    "channel": "[user-branch]",
+    "repositoryUrl": "https://github.com/flutter/flutter.git",
+    "frameworkRevision": "abaf9c523780a608bd46686fd5e53740a07077f8",
+    "frameworkCommitDate": "2026-10-08 09:51:21 -0700",
+    "engineRevision": "deb287481e3ce9468f3434937ced4240a70539ca",
+    "engineCommitDate": "2026-10-07 17:09:12.000Z",
+    "engineContentHash": "d8a2d6c768c334d53e16277f837970ffa1e2de81",
+    "engineBuildDate": "2026-10-08 01:51:44.552",
+    "dartSdkVersion": "3.13.5",
+    "devToolsVersion": "2.60.0",
+    "flutterVersion": "3.47.7",
+    "flutterRoot": "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7"
+  },
+  "frameworkAndComponentPathsVerified": true,
+  "kernelSha256": "cafa043a5994d2683c6bab24fe3b1a3b3ed607cde993ca6fb53aaf0c28c431d5",
+  "artifactSha256": "b31a510eadb4be61ec7c313eeb4d81d3a6617fbb0587b110c229080a950f0ef3",
+  "finishedAtUtc": "2026-10-10T09:52:19.398330+00:00"
+}

@@ -1,0 +1,52 @@
+{
+  "sourceRevision": "0974263adb24f400eaaf8034af0011ab0ad46cf3",
+  "sdkRevision": "abaf9c523780a608bd46686fd5e53740a07077f8",
+  "sdkUnmodified": true,
+  "kind": "direct frontend + arm64 gen_snapshot diagnostic; not a full macOS bundle build",
+  "cases": [
+    {
+      "name": "component_view",
+      "sourceSha256": "a4d6733e345fe5ce4ec9a471a64a3223e88b956eeb86c841b5a6f5987a3ae3ca",
+      "frontend": {
+        "command": [
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/dart-sdk/bin/dartaotruntime",
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/dart-sdk/bin/snapshots/frontend_server_aot.dart.snapshot",
+          "--sdk-root",
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/artifacts/engine/common/flutter_patched_sdk_product/",
+          "--target=flutter",
+          "--aot",
+          "--tfa",
+          "--target-os",
+          "macos",
+          "-Ddart.vm.product=true",
+          "--packages",
+          "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-reduction-u8536g0r/host/.dart_tool/package_config.json",
+          "--output-dill",
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/roadmap/r3-01/aot-reduction/component_view.dill",
+          "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-reduction-u8536g0r/host/lib/component_view.dart"
+        ],
+        "exitCode": 0,
+        "timedOut": false,
+        "seconds": 7.80086141708307,
+        "log": "component_view-frontend.log",
+        "logSha256": "e431c95671efb2247f9ab89808d90bf530e2bc64c65b1ef79247ccd904bc9199"
+      },
+      "snapshot": {
+        "command": [
+          "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/artifacts/engine/darwin-x64-release/gen_snapshot_arm64",
+          "--deterministic",
+          "--snapshot_kind=app-aot-assembly",
+          "--assembly=/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/roadmap/r3-01/aot-reduction/component_view.S",
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/roadmap/r3-01/aot-reduction/component_view.dill"
+        ],
+        "exitCode": -6,
+        "timedOut": false,
+        "seconds": 7.2867444169241935,
+        "log": "component_view-snapshot.log",
+        "logSha256": "10a1b2d1945bc149055da68cc3d6686b870a91fc0ff1a1125bdc3857cf3d127c"
+      },
+      "windowingAotFailure": true,
+      "passed": false
+    }
+  ]
+}

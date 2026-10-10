@@ -1,0 +1,2 @@
+import 'package:flutter/material.dart';
+void main() => runApp(MaterialApp(home: Scaffold(body: Column(children: [const SelectionArea(child: Text('Selectable content')), const TextField(), const Tooltip(message: 'AOT tooltip', child: Text('Hover')), PopupMenuButton<int>(itemBuilder: (_) => [const PopupMenuItem(value: 1, child: Text('Menu'))])]))));

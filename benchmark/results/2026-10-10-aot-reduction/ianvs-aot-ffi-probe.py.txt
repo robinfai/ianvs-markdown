@@ -1,0 +1,32 @@
+from pathlib import Path
+import hashlib,json,os,subprocess,sys
+sys.path.insert(0,str(Path.cwd()/'tool'))
+from check_macos_candidates import run
+info=json.loads(Path('build/roadmap/r3-01/reduction-host.json').read_text());sdk=Path(info['sdk']);out=Path('build/roadmap/r3-01/aot-reduction').resolve()
+source='''import 'dart:ffi';
+final class Rect extends Struct {
+  @Double()
+  external double left;
+  @Double()
+  external double top;
+  @Double()
+  external double width;
+  @Double()
+  external double height;
+}
+final class Size extends Struct {
+  @Double()
+  external double width;
+  @Double()
+  external double height;
+}
+Pointer<Rect> position(Pointer<Size> size, Pointer<Rect> parent, Pointer<Rect> output) => Pointer<Rect>.fromAddress(0);
+void main() {
+  final callback = NativeCallable<Pointer<Rect> Function(Pointer<Size>, Pointer<Rect>, Pointer<Rect>)>.isolateLocal(position);
+  print(callback.nativeFunction.address);
+  callback.close();
+}
+'''
+p=out/'ffi_callback.dart';p.write_text(source)
+r=run([str(sdk/'bin/cache/dart-sdk/bin/dart'),'compile','aot-snapshot',str(p),'-o',str(out/'ffi_callback.aot')],out,out/'ffi_callback.log',120,dict(os.environ))
+report={'sourceRevision':info['sourceRevision'],'sdkRevision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=sdk,text=True).strip(),'kind':'standalone Dart AOT compile only; executable not run','sourceSha256':hashlib.sha256(p.read_bytes()).hexdigest(),'compile':r,'passed':r['exitCode']==0 and (out/'ffi_callback.aot').exists()};(out/'ffi-summary.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report,indent=2))

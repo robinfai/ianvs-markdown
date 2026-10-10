@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "startedAtUtc": "2026-10-10T09:52:34.945281+00:00",
+  "kind": "standalone Dart AOT",
+  "scope": "Compile only; no bundle, app launch or interaction acceptance",
+  "revision": "0974263adb24f400eaaf8034af0011ab0ad46cf3",
+  "sourceSha256": "54008f9b23f99e1b356c988eef652e69008197fbd21e2d88957d547c24f603b2",
+  "componentInputsSha256": {},
+  "sdkRevision": "abaf9c523780a608bd46686fd5e53740a07077f8",
+  "sdkUnmodifiedBefore": true,
+  "sdkUnmodifiedAfter": true,
+  "host": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "architecture": "arm64",
+  "runnerSha256": "ff85c11ba5626cf8d9ede45e2c6c71a52693728c74839e1a78ede234a1c90149",
+  "steps": [
+    {
+      "command": [
+        "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/flutter",
+        "--version",
+        "--machine"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "seconds": 0.12708312494214624,
+      "log": "sdk-version.json",
+      "logSha256": "1aadc77c8dfcabc528e4802c6655fecaae08bdf0587f40d5d99b8eeae10e43af"
+    },
+    {
+      "command": [
+        "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/dart-sdk/bin/dart",
+        "compile",
+        "aot-snapshot",
+        "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-probe-25grr5pd/host/main.dart",
+        "-o",
+        "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-probe-25grr5pd/host/probe.aot"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "seconds": 1.4743095420999452,
+      "log": "dart-aot.log",
+      "logSha256": "c4e4cd93f75a04eabf6700208efce92c2dbc93b8ccbdfb5e8003cab74cb06da9"
+    }
+  ],
+  "errors": [],
+  "complete": true,
+  "passed": true,
+  "windowingAotFailure": false,
+  "flutter": {
+    "frameworkVersion": "3.47.7",
+    "channel": "[user-branch]",
+    "repositoryUrl": "https://github.com/flutter/flutter.git",
+    "frameworkRevision": "abaf9c523780a608bd46686fd5e53740a07077f8",
+    "frameworkCommitDate": "2026-10-08 09:51:21 -0700",
+    "engineRevision": "deb287481e3ce9468f3434937ced4240a70539ca",
+    "engineCommitDate": "2026-10-07 17:09:12.000Z",
+    "engineContentHash": "d8a2d6c768c334d53e16277f837970ffa1e2de81",
+    "engineBuildDate": "2026-10-08 01:51:44.552",
+    "dartSdkVersion": "3.13.5",
+    "devToolsVersion": "2.60.0",
+    "flutterVersion": "3.47.7",
+    "flutterRoot": "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7"
+  },
+  "artifactSha256": "1042e450d2c1129f60be278b4f34aac6b943867b88222d93efe973a81772ff4e",
+  "finishedAtUtc": "2026-10-10T09:52:36.606016+00:00"
+}

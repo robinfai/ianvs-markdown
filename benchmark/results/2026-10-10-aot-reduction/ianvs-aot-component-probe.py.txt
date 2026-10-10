@@ -1,0 +1,21 @@
+from pathlib import Path
+import hashlib,json,os,subprocess,sys
+sys.path.insert(0,str(Path.cwd()/'tool'))
+from check_macos_candidates import run
+info=json.loads(Path('build/roadmap/r3-01/reduction-host.json').read_text());host=Path(info['host']);sdk=Path(info['sdk']);out=Path('build/roadmap/r3-01/aot-reduction').resolve()
+assert not subprocess.check_output(['git','status','--porcelain','--untracked-files=no'],cwd=sdk,text=True).strip()
+assert not (out/'component-summary.json').exists()
+(host/'pubspec.yaml').write_text("name: ianvs_aot_probe\npublish_to: none\nenvironment:\n  sdk: ^3.12.0\ndependencies:\n  flutter:\n    sdk: flutter\n  ianvs_markdown:\n    path: "+str(Path.cwd())+"\nflutter:\n  uses-material-design: true\n")
+env=dict(os.environ,CARGO_PROFILE_RELEASE_STRIP='none',FLUTTER_XCODE_ARCHS='arm64')
+r=run([str(sdk/'bin/flutter'),'pub','get'],host,out/'component-pub.log',120,env);assert r['exitCode']==0
+for name in ['pubspec.yaml','pubspec.lock']:(out/('component-'+name)).write_bytes((host/name).read_bytes())
+source=Path('tool/fixtures/macos_view_aot.dart').read_text();p=host/'lib/component_view.dart';p.write_text(source);(out/'component_view.dart').write_text(source)
+dill=out/'component_view.dill';assembly=out/'component_view.S'
+cmd=[str(sdk/'bin/cache/dart-sdk/bin/dartaotruntime'),str(sdk/'bin/cache/dart-sdk/bin/snapshots/frontend_server_aot.dart.snapshot'),'--sdk-root',str(sdk/'bin/cache/artifacts/engine/common/flutter_patched_sdk_product')+'/', '--target=flutter','--aot','--tfa','--target-os','macos','-Ddart.vm.product=true','--packages',str(host/'.dart_tool/package_config.json'),'--output-dill',str(dill),str(p)]
+front=run(cmd,host,out/'component_view-frontend.log',120,env);case={'name':'component_view','sourceSha256':hashlib.sha256(p.read_bytes()).hexdigest(),'frontend':front}
+if front['exitCode']==0:
+ cmd=[str(sdk/'bin/cache/artifacts/engine/darwin-x64-release/gen_snapshot_arm64'),'--deterministic','--snapshot_kind=app-aot-assembly','--assembly='+str(assembly),str(dill)]
+ case['snapshot']=run(cmd,host,out/'component_view-snapshot.log',120,env);log=(out/'component_view-snapshot.log').read_text();case['windowingAotFailure']='Class with illegal cid, full-aot' in log and '_window_macos.dart' in log;case['passed']=case['snapshot']['exitCode']==0 and assembly.exists()
+assert not subprocess.check_output(['git','status','--porcelain','--untracked-files=no'],cwd=sdk,text=True).strip()
+report={'sourceRevision':info['sourceRevision'],'sdkRevision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=sdk,text=True).strip(),'sdkUnmodified':True,'kind':'direct frontend + arm64 gen_snapshot diagnostic; not a full macOS bundle build','cases':[case]}
+(out/'component-summary.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(case,indent=2))
