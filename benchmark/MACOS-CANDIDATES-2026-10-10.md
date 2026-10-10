@@ -32,6 +32,32 @@ Reading、Editor、Streaming 在三个 SDK 的两种模式均触发 `_window_mac
 没有启动这些候选产物，没有验证 macOS 12、x64、真实 IME、跨应用复制、VoiceOver 或其他平台。
 构建耗时受并行编译与缓存影响，不用于性能比较。R2 的 GUI 基准在全部构建结束后才启动。
 
+## Flutter 3.47.7 的 Reading 定向复测
+
+2026-10-10 补测未修改 Flutter 3.47.7 / Dart 3.13.5，SDK revision 为
+`abaf9c523780a608bd46686fd5e53740a07077f8`。官方
+[3.47.6…3.47.7 差异](https://github.com/flutter/flutter/compare/3.47.6...3.47.7)
+记录了 iOS OverlayPortal 无障碍修复和版本同步，不能由版本升级推断本问题已修复。
+[标签和比较结果](results/2026-10-10-platform-3477/)随原始证据归档。
+
+分别使用两个已提交的组件输入，各构建纯 Flutter 对照和 Reading 的 Profile/Release：
+
+| 组件输入 | 纯 Flutter 对照 | Reading | 证据 |
+| --- | --- | --- | --- |
+| 已合入的 `3234d44` | 两种模式通过 | 两种模式均 `_Rect` AOT 失败 | [摘要](results/2026-10-10-platform-3477/stock-3.47.7-reading/summary.json) |
+| PR #9 优化版本 `d882078` | 两种模式通过 | 两种模式均 `_Rect` AOT 失败 | [摘要](results/2026-10-10-platform-3477/stock-3.47.7-optimized-reading/summary.json) |
+
+新增 8 次构建中 4 次通过、4 次失败，两次执行均 `complete: true`、`passed: false`，
+没有超时或 runner 错误。`3234d44` 的全部输入哈希与上述 3.47.6 历史矩阵一致；
+`d882078` 包含 renderer 隔离、引用/标题解析和 Source 背景布局优化。
+每份输入哈希均与各自提交内容匹配，日志哈希已核验；每组使用独立临时宿主并在结束后清理。
+这表明已实施的 R2 优化没有消除该 Reading 构建失败，不能用旧源码失败替代此验证。
+
+此次没有在 3.47.7 重跑 Body、Editor、playground、Streaming，也未启动产物或执行设备交互；
+不把定向结果扩大为第四套完整矩阵。R3-01 仍在进行中，最低 SDK 与 CI 配置保持原约束。
+复测命令使用前述工具，增加 `--target reading --include-control`，每次使用新标签。
+全部 20 个证据文件见 [SHA256.json](results/2026-10-10-platform-3477/SHA256.json)，历史三 SDK 目录未覆盖。
+
 ## 复现与证据约束
 
 从仓库根目录执行，每次使用新标签与未修改 SDK。完整矩阵失败退出是本次已知结果：
