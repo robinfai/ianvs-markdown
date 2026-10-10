@@ -40,7 +40,7 @@
   "publicWidgetDeclarationByteIdentical": true,
   "publicWidgetDeclarationSha256": "6388dd939601494c09683316b35a1eb5a1be32fd276a9665bb35e91272f26640",
   "analyzeExitCode": 0,
-  "fullValidation": "pending",
+  "fullValidation": "passed; see full-validation.json",
   "implementationSha256": {
     "lib/src/editor/live_editor.dart": "88d64c5731ee664ab107529cdcba378038b8af93c5623b1f33ba83c41301eb62",
     "lib/src/editor/live_editor/navigation.dart": "5ed9227fb2bd91a6c074f4c5e07006397bad192fc7082b628b6a6dcef453c785",
