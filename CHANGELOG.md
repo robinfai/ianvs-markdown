@@ -1,5 +1,12 @@
 ## Unreleased
 
+- Ignore stale code-copy feedback after a source or handler change, disposal,
+  or a newer copy request. The original callback still receives captured source.
+- Add a streaming host example with explicit follow/pause scrolling and
+  document/revision/resource-scoped asynchronous diagram placeholders. Cover
+  growing fences, tables and links, selection invalidation, composing-safe
+  host appends and late success/error isolation using public APIs.
+
 - **Processing-budget migration:** preflight Markdown before controller
   references, document/YAML/headings, Live structure and clipboard HTML.
   Defaults now include 1,048,576 source UTF-16 units and 4,096 units per line,

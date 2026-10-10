@@ -71,10 +71,11 @@ test-ios-preview: test-native-import ## Check iOS reading, import handling, and 
 build-ios-preview: ## Build the iOS reading preview for the simulator
 	cd app && $(FLUTTER) build ios --simulator --debug --no-codesign
 
-build-examples: ## Build body, reading, editor and playground entries for macOS
+build-examples: ## Build body, reading, editor, streaming and playground entries for macOS
 	cd example && $(FLUTTER) build macos --debug --target lib/body.dart
 	cd example && $(FLUTTER) build macos --debug --target lib/reading.dart
 	cd example && $(FLUTTER) build macos --debug --target lib/editor.dart
+	cd example && $(FLUTTER) build macos --debug --target lib/streaming.dart
 	cd example && $(FLUTTER) build macos --debug --target lib/main.dart
 
 run-ios: ## Run on an iOS device or simulator (pass DEVICE=<device id>)

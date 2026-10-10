@@ -9,9 +9,12 @@ Linefold or the optional Mermaid backend.
 | `lib/body.dart` | A content-sized `IanvsMarkdown` inside a card; GFM/Obsidian switching | Scrolling, approved image widgets and link handling |
 | `lib/reading.dart` | `IanvsMarkdownView`, heading navigation/folding, document replacement and selection/copy | FocusNode, ScrollController, navigation notifier and clipboard writer |
 | `lib/editor.dart` | Three-mode Live editor with an independent toolbar, English/Chinese messages and custom shortcuts | Document identity, controller lifetime, captured/ordered asynchronous saves and persistence errors |
+| `lib/streaming.dart` | Fragment-by-fragment Markdown with a delayed diagram placeholder | Fragment merging, document identity, follow/pause scrolling and stale async results |
 | `lib/main.dart` | Existing full-syntax playground with light/dark themes | Controller, reset and save callback; resources use the safe fallback |
 
-All examples leave Mermaid as a code block unless the host supplies
+The streaming entry supplies a delayed text placeholder to demonstrate async
+lifecycle; it does not render Mermaid or load resources. Other examples leave
+Mermaid as a code block unless the host supplies
 `diagramBuilder`. The body example resolves exactly `asset:approved-logo` to a
 local Flutter widget. It blocks every other image URI and displays requested
 links instead of opening them. It does not fetch network resources.
@@ -25,6 +28,7 @@ flutter pub get
 flutter run -d macos -t lib/body.dart
 flutter run -d macos -t lib/reading.dart
 flutter run -d macos -t lib/editor.dart
+flutter run -d macos -t lib/streaming.dart
 # Existing playground; also available as `make run example` from the root.
 flutter run -d macos -t lib/main.dart
 ```
@@ -44,7 +48,7 @@ and host-owned FocusNode. F5 saves; Ctrl/⌘L changes the UI language. Failed
 writes remain errors rather than being acknowledged as saved.
 
 Run all example regressions with `flutter test`. From the repository root,
-`make build-examples` builds all four macOS Debug entries. `make check-package`
+`make build-examples` builds all five macOS Debug entries. `make check-package`
 runs the same example tests in a Pub-selected snapshot outside the repository,
 then checks a separately created host. This automated check does not replace
 real IME, cross-application clipboard or external-product acceptance.
@@ -64,3 +68,19 @@ R2-05: the editor entry observes `onRenderDecision` and shows a host-owned notic
 when large content uses simplified display. Full source is retained for editing,
 saving and history. The controller, renderer and Reading clipboard budgets are
 independent; see the [integration guide](../doc/INTEGRATION_GUIDE.md).
+
+In the streaming entry, press **Append fragment** repeatedly to grow an open
+Mermaid fence, a table and a reference link. The host follows the bottom until
+you scroll toward earlier content; **Follow new content** resumes following.
+Async placeholder height changes also follow only while enabled. **Switch
+document** discards that response, clears its selection and resets scroll to the
+top. No network request is made; the button represents an ordered transport
+fragment. The host must separately enforce payload limits, update frequency,
+ordering and cancellation for its real transport.
+
+`ExampleAsyncDiagram` captures `(documentId, revision, source)` and its loader.
+Every replacement clears old display data and increments a request generation;
+late successes and errors cannot overwrite the current preview, even after an
+A → B → A transition. Current failures can be retried. The example ignores
+obsolete completions; a production loader should also cancel expensive work
+where supported. See [the streaming contract](../doc/INTEGRATION_GUIDE.md#持续追加内容r2-03).

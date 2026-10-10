@@ -204,6 +204,7 @@ class _IanvsMarkdownCodeBlockState extends State<IanvsMarkdownCodeBlock> {
   Timer? _copiedTimer;
   var _expanded = false;
   var _copied = false;
+  var _copyGeneration = 0;
   var _hovered = false;
 
   int get _lineCount => markdownCodeLineCount(widget.source);
@@ -219,6 +220,10 @@ class _IanvsMarkdownCodeBlockState extends State<IanvsMarkdownCodeBlock> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.source != widget.source) {
       _expanded = false;
+    }
+    if (oldWidget.source != widget.source ||
+        oldWidget.onCopyCode != widget.onCopyCode) {
+      _copyGeneration += 1;
       _copied = false;
       _copiedTimer?.cancel();
     }
@@ -384,13 +389,14 @@ class _IanvsMarkdownCodeBlockState extends State<IanvsMarkdownCodeBlock> {
   }
 
   Future<void> _copy() async {
+    final generation = ++_copyGeneration;
     final handler = widget.onCopyCode;
     if (handler == null) {
       await Clipboard.setData(ClipboardData(text: widget.source));
     } else {
       await handler(widget.source);
     }
-    if (!mounted) return;
+    if (!mounted || generation != _copyGeneration) return;
     _copiedTimer?.cancel();
     setState(() => _copied = true);
     _copiedTimer = Timer(const Duration(seconds: 1), () {
