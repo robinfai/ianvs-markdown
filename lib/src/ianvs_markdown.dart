@@ -1,4 +1,5 @@
 import 'localization.dart';
+import 'keyboard.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart' show ValueListenable;
@@ -83,6 +84,8 @@ class IanvsMarkdown extends StatelessWidget {
     super.key,
     required this.data,
     this.selectable = true,
+    this.focusNode,
+    this.autofocus = false,
     this.documentSelection = true,
     this.clipboardWriter = writeIanvsMarkdownClipboard,
     this.styleSheet,
@@ -122,6 +125,11 @@ class IanvsMarkdown extends StatelessWidget {
 
   final String data;
   final bool selectable;
+
+  /// Optional host-owned focus for document selection. Not used by per-block
+  /// selection or when selection is disabled.
+  final FocusNode? focusNode;
+  final bool autofocus;
 
   /// Whether [selectable] uses one selection surface for the complete widget.
   ///
@@ -211,9 +219,17 @@ class IanvsMarkdown extends StatelessWidget {
         ),
       ),
     );
-    if (!useDocumentSelection) return content;
+    if (!useDocumentSelection) {
+      return MarkdownCommandTarget(
+        kind: MarkdownCommandKind.property,
+        onCommand: invokeMarkdownTextCommand,
+        child: content,
+      );
+    }
     return _IanvsMarkdownReadingSelection(
       enabled: true,
+      focusNode: focusNode,
+      autofocus: autofocus,
       markdown: data,
       richMarkdown: data,
       syntaxPreset: syntaxPreset,
@@ -1288,6 +1304,8 @@ class IanvsMarkdownView extends StatefulWidget {
     this.contentAlignment = Alignment.topCenter,
     this.maximumOutlineItems = 18,
     this.selectable = true,
+    this.focusNode,
+    this.autofocus = false,
     this.softLineBreak = true,
     this.styleSheet,
     this.onSelectionChanged,
@@ -1336,6 +1354,11 @@ class IanvsMarkdownView extends StatefulWidget {
   final AlignmentGeometry contentAlignment;
   final int maximumOutlineItems;
   final bool selectable;
+
+  /// Optional host-owned focus for document selection. Not used by per-block
+  /// selection or when selection is disabled.
+  final FocusNode? focusNode;
+  final bool autofocus;
   final bool softLineBreak;
   final MarkdownStyleSheet? styleSheet;
   final MarkdownOnSelectionChangedCallback? onSelectionChanged;
@@ -1549,6 +1572,8 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
             Expanded(
               child: _IanvsMarkdownReadingSelection(
                 enabled: widget.selectable,
+                focusNode: widget.focusNode,
+                autofocus: widget.autofocus,
                 markdown: widget.data,
                 richMarkdown: _document.body,
                 syntaxPreset: widget.syntaxPreset,
@@ -1652,6 +1677,8 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
 class _IanvsMarkdownReadingSelection extends StatefulWidget {
   const _IanvsMarkdownReadingSelection({
     required this.enabled,
+    this.focusNode,
+    this.autofocus = false,
     required this.markdown,
     required this.richMarkdown,
     required this.syntaxPreset,
@@ -1661,6 +1688,8 @@ class _IanvsMarkdownReadingSelection extends StatefulWidget {
   });
 
   final bool enabled;
+  final FocusNode? focusNode;
+  final bool autofocus;
   final String markdown;
   final String richMarkdown;
   final IanvsMarkdownSyntaxPreset syntaxPreset;
@@ -1677,9 +1706,7 @@ class _IanvsMarkdownReadingSelectionState
     extends State<_IanvsMarkdownReadingSelection> {
   final GlobalKey<SelectionAreaState> _selectionAreaKey =
       GlobalKey<SelectionAreaState>();
-  final FocusNode _focusNode = FocusNode(
-    debugLabel: 'Ianvs Markdown document selection',
-  );
+  late FocusNode _focusNode;
   final SelectionListenerNotifier _selectionNotifier =
       SelectionListenerNotifier();
   SelectedContent? _selectedContent;
@@ -1690,18 +1717,32 @@ class _IanvsMarkdownReadingSelectionState
   @override
   void initState() {
     super.initState();
+    _focusNode =
+        widget.focusNode ??
+        FocusNode(debugLabel: 'Ianvs Markdown document selection');
     HardwareKeyboard.instance.addHandler(_handleHardwareKey);
+    _autofocus();
   }
 
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
     _selectionNotifier.dispose();
-    _focusNode.dispose();
+    if (widget.focusNode == null) _focusNode.dispose();
     super.dispose();
   }
 
+  void _autofocus() {
+    if (!widget.autofocus || !widget.enabled) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && widget.autofocus && widget.enabled) {
+        _focusNode.requestFocus();
+      }
+    });
+  }
+
   bool _handleHardwareKey(KeyEvent event) {
+    if (markdownShortcutOwnsEvent(event)) return false;
     if (!widget.enabled || !_focusNode.hasFocus || event is! KeyDownEvent) {
       return false;
     }
@@ -1730,6 +1771,16 @@ class _IanvsMarkdownReadingSelectionState
   @override
   void didUpdateWidget(covariant _IanvsMarkdownReadingSelection oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.focusNode, widget.focusNode)) {
+      if (oldWidget.focusNode == null) _focusNode.dispose();
+      _focusNode =
+          widget.focusNode ??
+          FocusNode(debugLabel: 'Ianvs Markdown document selection');
+      _autofocus();
+    } else if ((!oldWidget.autofocus && widget.autofocus) ||
+        (!oldWidget.enabled && widget.enabled)) {
+      _autofocus();
+    }
     if (oldWidget.markdown != widget.markdown ||
         oldWidget.syntaxPreset != widget.syntaxPreset ||
         oldWidget.enabled != widget.enabled) {
@@ -1741,50 +1792,70 @@ class _IanvsMarkdownReadingSelectionState
   @override
   Widget build(BuildContext context) {
     if (!widget.enabled) return widget.child;
-    return Shortcuts(
-      shortcuts: const <ShortcutActivator, Intent>{
-        SingleActivator(LogicalKeyboardKey.keyA, meta: true):
-            SelectAllTextIntent(SelectionChangedCause.keyboard),
-        SingleActivator(LogicalKeyboardKey.keyA, control: true):
-            SelectAllTextIntent(SelectionChangedCause.keyboard),
-        SingleActivator(LogicalKeyboardKey.keyC, meta: true):
-            CopySelectionTextIntent.copy,
-        SingleActivator(LogicalKeyboardKey.keyC, control: true):
-            CopySelectionTextIntent.copy,
+    return MarkdownCommandTarget(
+      kind: MarkdownCommandKind.reading,
+      onCommand: (command, focused) {
+        // Embedded editable controls retain their native text selection/actions.
+        if (focused.findAncestorStateOfType<EditableTextState>() != null) {
+          return invokeMarkdownTextCommand(command, focused);
+        }
+        if (command == IanvsMarkdownCommand.selectAll) {
+          _selectAll(SelectionChangedCause.keyboard);
+          return true;
+        }
+        if (command == IanvsMarkdownCommand.copy) {
+          unawaited(_copySelection());
+          return true;
+        }
+        return false;
       },
-      child: Actions(
-        actions: <Type, Action<Intent>>{
-          SelectAllTextIntent: CallbackAction<SelectAllTextIntent>(
-            onInvoke: (intent) {
-              _selectAll(intent.cause);
-              return null;
-            },
-          ),
-          CopySelectionTextIntent: CallbackAction<CopySelectionTextIntent>(
-            onInvoke: (_) {
-              if (_hardwareCopyHandled) {
-                _hardwareCopyHandled = false;
-                return null;
-              }
-              unawaited(_copySelection());
-              return null;
-            },
-          ),
+      child: Shortcuts(
+        shortcuts: const <ShortcutActivator, Intent>{
+          SingleActivator(LogicalKeyboardKey.keyA, meta: true):
+              SelectAllTextIntent(SelectionChangedCause.keyboard),
+          SingleActivator(LogicalKeyboardKey.keyA, control: true):
+              SelectAllTextIntent(SelectionChangedCause.keyboard),
+          SingleActivator(LogicalKeyboardKey.keyC, meta: true):
+              CopySelectionTextIntent.copy,
+          SingleActivator(LogicalKeyboardKey.keyC, control: true):
+              CopySelectionTextIntent.copy,
         },
-        child: SelectionArea(
-          key: _selectionAreaKey,
-          focusNode: _focusNode,
-          onSelectionChanged: _handleSelectionChanged,
-          contextMenuBuilder: _buildContextMenu,
-          child: SelectionListener(
-            selectionNotifier: _selectionNotifier,
-            child: Listener(
-              behavior: HitTestBehavior.translucent,
-              onPointerDown: (_) {
-                _wholeDocumentSelected = false;
-                _focusNode.requestFocus();
+        child: Actions(
+          actions: <Type, Action<Intent>>{
+            SelectAllTextIntent: CallbackAction<SelectAllTextIntent>(
+              onInvoke: (intent) {
+                _selectAll(intent.cause);
+                return null;
               },
-              child: _IanvsMarkdownDocumentSelectionScope(child: widget.child),
+            ),
+            CopySelectionTextIntent: CallbackAction<CopySelectionTextIntent>(
+              onInvoke: (_) {
+                if (_hardwareCopyHandled) {
+                  _hardwareCopyHandled = false;
+                  return null;
+                }
+                unawaited(_copySelection());
+                return null;
+              },
+            ),
+          },
+          child: SelectionArea(
+            key: _selectionAreaKey,
+            focusNode: _focusNode,
+            onSelectionChanged: _handleSelectionChanged,
+            contextMenuBuilder: _buildContextMenu,
+            child: SelectionListener(
+              selectionNotifier: _selectionNotifier,
+              child: Listener(
+                behavior: HitTestBehavior.translucent,
+                onPointerDown: (_) {
+                  _wholeDocumentSelected = false;
+                  _focusNode.requestFocus();
+                },
+                child: _IanvsMarkdownDocumentSelectionScope(
+                  child: widget.child,
+                ),
+              ),
             ),
           ),
         ),

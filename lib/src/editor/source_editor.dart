@@ -1,6 +1,7 @@
 import 'dart:ui' show BoxHeightStyle;
 
 import '../localization.dart';
+import '../keyboard.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -101,6 +102,7 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
   // platform event before the outer Shortcuts widget can invoke them.
   // ignore: deprecated_member_use
   KeyEventResult _handleRawKey(RawKeyEvent event) {
+    if (markdownShortcutHandledRaw(event)) return KeyEventResult.handled;
     // ignore: deprecated_member_use
     final metaPressed = event.isMetaPressed;
     // ignore: deprecated_member_use
@@ -440,36 +442,46 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
         skipTraversal: true,
         // ignore: deprecated_member_use
         onKey: (_, event) => _handleRawKey(event),
-        child: TextField(
-          contextMenuBuilder: (_, state) =>
-              buildMarkdownTextContextMenu(context, state),
-          key: const ValueKey('ianvs-markdown-source-field'),
-          controller: widget.controller,
-          focusNode: _focusNode,
-          scrollController: _scrollController,
-          autofocus: widget.autofocus,
-          expands: true,
-          minLines: null,
-          maxLines: null,
-          keyboardType: TextInputType.multiline,
-          textInputAction: TextInputAction.newline,
-          smartDashesType: SmartDashesType.disabled,
-          smartQuotesType: SmartQuotesType.disabled,
-          autocorrect: false,
-          enableSuggestions: false,
-          inputFormatters: <TextInputFormatter>[
-            IanvsMarkdownEditingFormatter(),
-          ],
-          style: textStyle,
-          cursorColor: colors.accent,
-          decoration: InputDecoration(
-            hintText: widget.placeholder,
-            hintStyle: textStyle.copyWith(color: colors.textTertiary),
-            border: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            focusedBorder: InputBorder.none,
-            filled: false,
-            contentPadding: widget.padding,
+        child: MarkdownCommandTarget(
+          kind: MarkdownCommandKind.source,
+          onCommand: (command, focused) {
+            if (command != IanvsMarkdownCommand.deleteLine) return false;
+            widget.controller.deleteSelectedLines(
+              preferredCaretOffset: _preferredDeleteLineCaret(),
+            );
+            return true;
+          },
+          child: TextField(
+            contextMenuBuilder: (_, state) =>
+                buildMarkdownTextContextMenu(context, state),
+            key: const ValueKey('ianvs-markdown-source-field'),
+            controller: widget.controller,
+            focusNode: _focusNode,
+            scrollController: _scrollController,
+            autofocus: widget.autofocus,
+            expands: true,
+            minLines: null,
+            maxLines: null,
+            keyboardType: TextInputType.multiline,
+            textInputAction: TextInputAction.newline,
+            smartDashesType: SmartDashesType.disabled,
+            smartQuotesType: SmartQuotesType.disabled,
+            autocorrect: false,
+            enableSuggestions: false,
+            inputFormatters: <TextInputFormatter>[
+              IanvsMarkdownEditingFormatter(),
+            ],
+            style: textStyle,
+            cursorColor: colors.accent,
+            decoration: InputDecoration(
+              hintText: widget.placeholder,
+              hintStyle: textStyle.copyWith(color: colors.textTertiary),
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              filled: false,
+              contentPadding: widget.padding,
+            ),
           ),
         ),
       ),
@@ -481,6 +493,7 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
         children: [
           if (widget.showToolbar)
             IanvsMarkdownEditorToolbar(
+              focusNode: _focusNode,
               controller: widget.controller,
               onSaveRequested: widget.onSaveRequested,
               theme: colors,
