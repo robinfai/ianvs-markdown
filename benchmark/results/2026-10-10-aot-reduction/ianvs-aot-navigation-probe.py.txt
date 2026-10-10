@@ -1,0 +1,28 @@
+from pathlib import Path
+import json,os,subprocess,sys,hashlib
+sys.path.insert(0,str(Path.cwd()/'tool'))
+from check_macos_candidates import run
+info=json.loads(Path('build/roadmap/r3-01/reduction-host.json').read_text());host=Path(info['host']);sdk=Path(info['sdk']);out=Path('build/roadmap/r3-01/aot-reduction').resolve()
+assert not (out/'navigation-summary.json').exists()
+(host/'pubspec.yaml').write_bytes((out/'pure-pubspec.yaml').read_bytes());(host/'pubspec.lock').write_bytes((out/'pure-pubspec.lock').read_bytes())
+env=dict(os.environ,CARGO_PROFILE_RELEASE_STRIP='none',FLUTTER_XCODE_ARCHS='arm64')
+r=run([str(sdk/'bin/flutter'),'pub','get','--offline'],host,out/'navigation-pub.log',120,env);assert r['exitCode']==0
+variants={
+ 'ensure_visible': "Builder(builder: (context) => TextButton(onPressed: () => Scrollable.ensureVisible(context), child: const Text('Scroll')))",
+ 'find_editable_state': "Builder(builder: (context) => TextButton(onPressed: () => print(context.findAncestorStateOfType<EditableTextState>()), child: const Text('Find')))",
+ 'visit_ancestors': "Builder(builder: (context) => TextButton(onPressed: () => context.visitAncestorElements((element) { print(element.widget); return true; }), child: const Text('Visit')))",
+ 'inherited_widget': "Builder(builder: (context) => Text('${context.dependOnInheritedWidgetOfExactType<InheritedWidget>()}'))",
+}
+report={'sourceRevision':info['sourceRevision'],'sdkRevision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=sdk,text=True).strip(),'sdkUnmodified':True,'kind':'direct frontend + arm64 gen_snapshot diagnostic; not a full macOS bundle build','cases':[]}
+for label,body in variants.items():
+ source="import 'package:flutter/material.dart';\nvoid main() => runApp(MaterialApp(home: Scaffold(body: "+body+")));\n";p=host/'lib'/(label+'.dart');p.write_text(source);(out/(label+'.dart')).write_text(source)
+ dill=out/(label+'.dill');assembly=out/(label+'.S')
+ cmd=[str(sdk/'bin/cache/dart-sdk/bin/dartaotruntime'),str(sdk/'bin/cache/dart-sdk/bin/snapshots/frontend_server_aot.dart.snapshot'),'--sdk-root',str(sdk/'bin/cache/artifacts/engine/common/flutter_patched_sdk_product')+'/', '--target=flutter','--aot','--tfa','--target-os','macos','-Ddart.vm.product=true','--packages',str(host/'.dart_tool/package_config.json'),'--output-dill',str(dill),str(p)]
+ print('Compiling '+label,flush=True);front=run(cmd,host,out/(label+'-frontend.log'),120,env);case={'name':label,'sourceSha256':hashlib.sha256(p.read_bytes()).hexdigest(),'frontend':front}
+ if front['exitCode']==0 and dill.exists():
+  cmd=[str(sdk/'bin/cache/artifacts/engine/darwin-x64-release/gen_snapshot_arm64'),'--deterministic','--snapshot_kind=app-aot-assembly','--assembly='+str(assembly),str(dill)]
+  case['snapshot']=run(cmd,host,out/(label+'-snapshot.log'),120,env);log=(out/(label+'-snapshot.log')).read_text();case['windowingAotFailure']='Class with illegal cid, full-aot' in log and '_window_macos.dart' in log;case['passed']=case['snapshot']['exitCode']==0 and assembly.exists()
+ else:case['passed']=False
+ report['cases'].append(case);(out/'navigation-summary.json').write_text(json.dumps(report,indent=2)+'\n');print(label+': '+str(case['passed']),flush=True)
+ if case['passed']:dill.unlink(missing_ok=True);assembly.unlink(missing_ok=True)
+assert not subprocess.check_output(['git','status','--porcelain','--untracked-files=no'],cwd=sdk,text=True).strip()

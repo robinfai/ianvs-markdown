@@ -1,0 +1,2 @@
+import 'package:flutter/material.dart';
+void main() => runApp(MaterialApp(home: Scaffold(body: Builder(builder: (context) => TextButton(onPressed: () => print(context.findAncestorStateOfType<EditableTextState>()), child: const Text('Find'))))));

@@ -1,0 +1,22 @@
+{
+  "sourceRevision": "0974263adb24f400eaaf8034af0011ab0ad46cf3",
+  "sdkRevision": "abaf9c523780a608bd46686fd5e53740a07077f8",
+  "kind": "standalone Dart AOT compile only; executable not run",
+  "sourceSha256": "54008f9b23f99e1b356c988eef652e69008197fbd21e2d88957d547c24f603b2",
+  "compile": {
+    "command": [
+      "/private/tmp/ianvs-platform-sdk-z0zxkzz1/flutter-3.47.7/bin/cache/dart-sdk/bin/dart",
+      "compile",
+      "aot-snapshot",
+      "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/roadmap/r3-01/aot-reduction/ffi_callback.dart",
+      "-o",
+      "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/roadmap/r3-01/aot-reduction/ffi_callback.aot"
+    ],
+    "exitCode": 0,
+    "timedOut": false,
+    "seconds": 2.028103291988373,
+    "log": "ffi_callback.log",
+    "logSha256": "b16d1a028f403c87ec9ff3b94d9eb07994e191076065a6afaa20344bca19647b"
+  },
+  "passed": true
+}

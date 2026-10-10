@@ -134,3 +134,11 @@ REPRO
 实现 `0735d58` 在同一未修改 Flutter 3.47.7 / Dart 3.13.5、macOS arm64 上新增四次隔离构建：纯 Flutter 对照 Profile / Release 通过，Reading Profile / Release 仍为 `_window_macos.dart / _Rect` 的 `illegal cid, full-aot` 失败。源码 diff 为空，所有输入与日志哈希核验，临时宿主已按工具规则清理。
 
 这覆盖最终模块实现的 Reading 入口，不是重新运行全部 SDK / 入口矩阵。没有验证真实 IME、跨应用粘贴和 VoiceOver，R3-01 保持进行中。原始日志、SDK、锁文件和源码清单见 [本轮证据](results/2026-10-10-platform-live-modules/summary.json) 及 [SHA256 索引](results/2026-10-10-platform-live-modules/SHA256.json)。
+
+## 直接 AOT 编译的后续缩小复现
+
+在已合入 `0974263`、未修改 3.47.7 上，十个纯 Flutter 对照及一个独立 Dart FFI
+对照通过，公共 View 仍触发同签名快照错误；正式隔离工具重放确认纯文本/FFI 通过、
+View 失败。尚未找到纯 Flutter 的失败最小样例，不能据此认定单一控件或 FFI 回调为根因。
+这些直接编译不增加本报告的完整候选构建次数。详见
+[AOT 缩小复现记录](AOT-REDUCTION-2026-10-10.md) 及其可复验工具、原始证据。

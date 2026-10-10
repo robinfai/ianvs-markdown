@@ -1,0 +1,23 @@
+import 'dart:ffi';
+final class Rect extends Struct {
+  @Double()
+  external double left;
+  @Double()
+  external double top;
+  @Double()
+  external double width;
+  @Double()
+  external double height;
+}
+final class Size extends Struct {
+  @Double()
+  external double width;
+  @Double()
+  external double height;
+}
+Pointer<Rect> position(Pointer<Size> size, Pointer<Rect> parent, Pointer<Rect> output) => Pointer<Rect>.fromAddress(0);
+void main() {
+  final callback = NativeCallable<Pointer<Rect> Function(Pointer<Size>, Pointer<Rect>, Pointer<Rect>)>.isolateLocal(position);
+  print(callback.nativeFunction.address);
+  callback.close();
+}

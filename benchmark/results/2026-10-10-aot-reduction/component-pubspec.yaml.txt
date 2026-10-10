@@ -1,0 +1,11 @@
+name: ianvs_aot_probe
+publish_to: none
+environment:
+  sdk: ^3.12.0
+dependencies:
+  flutter:
+    sdk: flutter
+  ianvs_markdown:
+    path: /Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown
+flutter:
+  uses-material-design: true
