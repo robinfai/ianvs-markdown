@@ -1,5 +1,9 @@
 ## Unreleased
 
+- Separate Live editor table editing, selection navigation and source projection
+  into private modules in the same Dart library. Preserve the public widget,
+  document ownership, focus/IME, history and existing rendering algorithms;
+  document internal responsibilities and source-to-display data flow.
 - Reuse Source editor text geometry for quote and fenced-code backgrounds,
   keeping surfaces aligned with styled wrapping, scaling, RTL and scrolling
   without laying out duplicate plain-text paragraphs. Cache only current-source

@@ -1,0 +1,81 @@
+{
+  "measuredRevision": "0735d58bc3182fae354ec1e58a9861ff663d162d",
+  "validFullRuns": [
+    "r204-modules-1",
+    "r204-modules-3"
+  ],
+  "invalidRun": {
+    "label": "r204-modules-2",
+    "validatorRejection": "benchmark/results/2026-10-10-live-modules/r204-modules-2.json: incomplete or filtered evidence is not a full baseline",
+    "reason": "window lost active status; still visible; cause unknown"
+  },
+  "fullOperationRows": 42,
+  "exceededRows": [
+    {
+      "utf8Bytes": 1048576,
+      "budget": "default",
+      "operation": "readingToLive",
+      "baselineP95Ms": [
+        82.414,
+        82.263
+      ],
+      "candidateP95Ms": [
+        113.88,
+        81.092
+      ],
+      "sameEnvironmentWatchP95Ms": 104
+    },
+    {
+      "utf8Bytes": 1048576,
+      "budget": "unlimited-controlled-corpus",
+      "operation": "scroll",
+      "baselineP95Ms": [
+        85.468,
+        83.18
+      ],
+      "candidateP95Ms": [
+        114.222,
+        85.71
+      ],
+      "sameEnvironmentWatchP95Ms": 107
+    }
+  ],
+  "focusedDiagnostics": [
+    {
+      "operation": "readingToLive",
+      "budget": "default",
+      "before": "r204-probe-before-default.json",
+      "after": "r204-probe-after-default.json",
+      "sourceChanges": [
+        "lib/src/editor/live_editor.dart",
+        "lib/src/editor/live_editor/navigation.dart",
+        "lib/src/editor/live_editor/source_projection.dart",
+        "lib/src/editor/live_editor/table.dart"
+      ],
+      "traceAndEnvironmentValidation": "passed",
+      "filteredRunsRejectedAsFullBaselines": true,
+      "beforeP95Ms": 79.433,
+      "afterP95Ms": 85.092,
+      "originalWatchP95Ms": 104
+    },
+    {
+      "operation": "scroll",
+      "budget": "unlimited-controlled-corpus",
+      "before": "r204-probe-before-scroll.json",
+      "after": "r204-probe-after-scroll.json",
+      "sourceChanges": [
+        "lib/src/editor/live_editor.dart",
+        "lib/src/editor/live_editor/navigation.dart",
+        "lib/src/editor/live_editor/source_projection.dart",
+        "lib/src/editor/live_editor/table.dart"
+      ],
+      "traceAndEnvironmentValidation": "passed",
+      "filteredRunsRejectedAsFullBaselines": true,
+      "beforeP95Ms": 83.581,
+      "afterP95Ms": 85.342,
+      "originalWatchP95Ms": 107
+    }
+  ],
+  "assessment": "Two first-run observation exceedances retained. Neither reproduced in full run 3 or independent same-environment before/after focused probes; first-run excess coincides with build-frame rather than raster-frame duration. No reproducible material regression found; source of transient variation is not established. Observation lines were not changed; all valid full runs remain in paired-comparison.json.",
+  "scope": "Refactor acceptance only; not a performance improvement or portable latency guarantee."
+}

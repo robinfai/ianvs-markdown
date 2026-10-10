@@ -1,0 +1,53 @@
+{
+  "baseRevision": "1c02afd",
+  "chunks": {
+    "reference_source": {
+      "lines": 29,
+      "sha256": "79c6043a65680d3212b42f7f41aa816399381c1c55d34d433cb6b5f05241e807"
+    },
+    "hit_testing": {
+      "lines": 241,
+      "sha256": "ea19b8f41f401b8dcdb9af25548445cc0f1673f9ad98b81353921322e3fd1adc"
+    },
+    "caret_mapping": {
+      "lines": 83,
+      "sha256": "b8199f29baae3d64766d0a71659669f0ee7431e46db5176ec9688881e378f90b"
+    },
+    "quote_mapping": {
+      "lines": 47,
+      "sha256": "1f1f92d0e142947ac571c82ece614533ff8e59d191540abf3282eb78a5e60670"
+    },
+    "reference_widget": {
+      "lines": 31,
+      "sha256": "2cdfb92a2af17a01b0950168f02c582307c25c6c64d3909227424252e898ec2d"
+    },
+    "rendered_source": {
+      "lines": 79,
+      "sha256": "728976a278090239530b95c09a174223c5416b9004d7c956c620b5059026d108"
+    },
+    "projection_models": {
+      "lines": 905,
+      "sha256": "be3d891275e16cf3df098be18be2bca6ad78c4327e481a1f471d97291e065636"
+    },
+    "table_formatter": {
+      "lines": 3,
+      "sha256": "a47db40fb42d3b6ddd867036f2a3866dfeca8f068ff6a5851ebd89f35af2ce31"
+    }
+  },
+  "mechanism": "same-library part and named State extension",
+  "movedDeclarationsByteIdentical": true,
+  "remainingOwnerUnchangedExceptPartDirectiveAndTrailingWhitespace": true,
+  "publicWidgetDeclarationByteIdentical": true,
+  "publicWidgetDeclarationSha256": "6388dd939601494c09683316b35a1eb5a1be32fd276a9665bb35e91272f26640",
+  "analyzeExitCode": 0,
+  "fullValidation": "passed; see full-validation.json",
+  "implementationSha256": {
+    "lib/src/editor/live_editor.dart": "88d64c5731ee664ab107529cdcba378038b8af93c5623b1f33ba83c41301eb62",
+    "lib/src/editor/live_editor/navigation.dart": "5ed9227fb2bd91a6c074f4c5e07006397bad192fc7082b628b6a6dcef453c785",
+    "lib/src/editor/live_editor/source_projection.dart": "9720151a7979b54c170f7c721287d1a174ba179d5f36c048cee24cb514935351",
+    "lib/src/editor/live_editor/table.dart": "5f7da1a0f18fd64265d345f51d30eb2e1c0bce969a3c9706b25a7ee6aa22819c"
+  },
+  "logSha256": {
+    "projection-analyze.log.gz": "e64c8703b8a85bacb519454130baceb2811b67ad82cc8bb30965b4e626f5a74c"
+  }
+}

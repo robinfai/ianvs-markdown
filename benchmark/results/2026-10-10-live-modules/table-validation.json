@@ -1,0 +1,19 @@
+{
+  "baseRevision": "6c0e769f92e5c1c3c5409cc001024c5605fe857d",
+  "mechanism": "same-library Dart part",
+  "movedLines": 1835,
+  "movedDeclarationsByteIdentical": true,
+  "movedDeclarationsSha256": "31ce46330411953ff3e06a9bb29d82cdd436ad004015301e5ec73bc8278e73c5",
+  "tests": 492,
+  "testExitCode": 0,
+  "analyzeExitCode": 0,
+  "formatterChangedFiles": 0,
+  "implementationSha256": {
+    "lib/src/editor/live_editor.dart": "898f0a1da74ff346ee780024d19cfb52a34f8b3e241e1e6cf85e0089e0b6eb66",
+    "lib/src/editor/live_editor/table.dart": "6b4634e48f0608742c1b79e1c75457e6345582769ab5aad796c6dd8f8db021ad"
+  },
+  "logSha256": {
+    "table-analyze.log.gz": "f769832f3a58a9fd2d9e80cf3d00d93aa842ae34ca927342784b846b82baa2aa",
+    "table-tests.log.gz": "59b6f92ddcd4d71e85d3a056a61d4d22de4ebd4e7c8921ad24f3daaf74e079e3"
+  }
+}

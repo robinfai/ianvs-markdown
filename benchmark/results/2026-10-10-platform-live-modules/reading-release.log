@@ -1,0 +1,11 @@
+Building macOS application...                                   
+Xcode 27 no longer requires macOS binaries to support the x86_64 architecture. To build ARM-only macOS apps now, run: "flutter config --enable-macos-arm64-only". This will become the default behavior in a future Flutter release.
+Unexpected object (Class with illegal cid, full-aot): 0x10eebd9a1 Library:'package:flutter/src/widgets/_window_macos.dart' Class: _Rect@220353218
+Dart snapshot generator failed with exit code -6
+Target compile_macos_framework failed: Exception: AOT snapshotter exited with code -6
+Failed to package /private/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-macos-candidate-iopsk78b/repository/example.
+Command PhaseScriptExecution failed with a nonzero exit code
+
+** BUILD FAILED **
+
+Build process failed
