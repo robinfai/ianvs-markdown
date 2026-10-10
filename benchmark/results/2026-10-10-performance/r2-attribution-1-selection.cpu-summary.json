@@ -1,0 +1,572 @@
+{
+  "operation": "selection",
+  "sampleCount": 20,
+  "samplePeriodMicros": 1000,
+  "actionLatencyMs": 64663.452,
+  "componentFunctions": [
+    {
+      "name": "defaultMarkdownBindings",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/keyboard.dart"
+    },
+    {
+      "name": "defaultMarkdownBindings.commandKeys",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/keyboard.dart"
+    },
+    {
+      "name": "_focusedMarkdownScope",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/keyboard.dart"
+    },
+    {
+      "name": "ianvsMarkdownStyleSheet",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/ianvs_markdown.dart"
+    },
+    {
+      "name": "_tableCellInputFormatter",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/live_editor.dart"
+    },
+    {
+      "name": "_markdownNewlineModifiers",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_controller.dart"
+    },
+    {
+      "name": "_MarkdownNewlineModifierTracker.takeShiftForNewline",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_controller.dart"
+    },
+    {
+      "name": "_MarkdownNewlineModifierTracker._handleRawKey",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_controller.dart"
+    },
+    {
+      "name": "_handleRawKey._handleRawKey",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_controller.dart"
+    },
+    {
+      "name": "_MarkdownNewlineModifierTracker.ensureListening",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_controller.dart"
+    },
+    {
+      "name": "_markdownInlineWordPattern",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_controller.dart"
+    },
+    {
+      "name": "_sourceLineEnd",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_controller.dart"
+    },
+    {
+      "name": "_codeContentBlockAtCaret",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_controller.dart"
+    },
+    {
+      "name": "_isClosingFenceLine",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_controller.dart"
+    },
+    {
+      "name": "parseMarkdownBlocks",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_models.dart"
+    },
+    {
+      "name": "_isDisplayMathFence",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_models.dart"
+    },
+    {
+      "name": "_blockListMarker",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_models.dart"
+    },
+    {
+      "name": "_isThematicBreak",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_models.dart"
+    },
+    {
+      "name": "_htmlCdataStartPattern",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_models.dart"
+    },
+    {
+      "name": "_blockquoteChild",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_models.dart"
+    },
+    {
+      "name": "_htmlBlockStart",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_models.dart"
+    },
+    {
+      "name": "_isTaskList",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_models.dart"
+    },
+    {
+      "name": "_isInterruptingHtmlBlockStart",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_models.dart"
+    },
+    {
+      "name": "_isAtxHeading",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_models.dart"
+    },
+    {
+      "name": "_completeHtmlTagLinePattern",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_models.dart"
+    },
+    {
+      "name": "_htmlProcessingEndPattern",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_models.dart"
+    },
+    {
+      "name": "markdownBlockAtOffset",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_models.dart"
+    },
+    {
+      "name": "_rawHtmlBlockStartPattern",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_models.dart"
+    },
+    {
+      "name": "_htmlDeclarationStartPattern",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_models.dart"
+    },
+    {
+      "name": "_leadingIndentColumns",
+      "kind": "Dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_models.dart"
+    }
+  ],
+  "topInclusive": [
+    {
+      "name": "main",
+      "kind": "Native",
+      "inclusiveTicks": 16,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "FlutterEngineRunTask",
+      "kind": "Native",
+      "inclusiveTicks": 16,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "flutter::EmbedderEngine::RunTask(FlutterTask const*)",
+      "kind": "Native",
+      "inclusiveTicks": 16,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "Dart_InvokeClosure",
+      "kind": "Native",
+      "inclusiveTicks": 16,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "start",
+      "kind": "Native",
+      "inclusiveTicks": 16,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "NSApplicationMain",
+      "kind": "Native",
+      "inclusiveTicks": 16,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "-[NSApplication run]",
+      "kind": "Native",
+      "inclusiveTicks": 16,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "__CFRunLoopRun",
+      "kind": "Native",
+      "inclusiveTicks": 15,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "_CFRunLoopRunSpecificWithOptions",
+      "kind": "Native",
+      "inclusiveTicks": 15,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "_DPSNextEvent",
+      "kind": "Native",
+      "inclusiveTicks": 15,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "_DPSBlockUntilNextEventMatchingListInMode",
+      "kind": "Native",
+      "inclusiveTicks": 15,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "-[NSApplication(NSEventRouting) nextEventMatchingMask:untilDate:inMode:dequeue:]",
+      "kind": "Native",
+      "inclusiveTicks": 15,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "-[NSApplication(NSEventRouting) _nextEventMatchingEventMask:untilDate:inMode:dequeue:]",
+      "kind": "Native",
+      "inclusiveTicks": 15,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "RunCurrentEventLoopInMode",
+      "kind": "Native",
+      "inclusiveTicks": 15,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "ReceiveNextEventCommon",
+      "kind": "Native",
+      "inclusiveTicks": 15,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "_BlockUntilNextEventMatchingListInMode",
+      "kind": "Native",
+      "inclusiveTicks": 15,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "__60-[FlutterEngine postMainThreadTask:targetTimeInNanoseconds:]_block_invoke",
+      "kind": "Native",
+      "inclusiveTicks": 14,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "$s20InternalFlutterSwift0B7RunLoopCACyc33_D4CDF1FCA38C25E611593B39D16A3F51LlfcySvSgcfU_",
+      "kind": "Native",
+      "inclusiveTicks": 14,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "$s20InternalFlutterSwift0B7RunLoopC19performExpiredTasks33_D4CDF1FCA38C25E611593B39D16A3F51LLyyF",
+      "kind": "Native",
+      "inclusiveTicks": 14,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "$s20InternalFlutterSwift0B7RunLoopCACyc33_D4CDF1FCA38C25E611593B39D16A3F51LlfcySvSgcfU_To",
+      "kind": "Native",
+      "inclusiveTicks": 14,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "$sIeyB_Ieg_TR",
+      "kind": "Native",
+      "inclusiveTicks": 14,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "dart::DartEntry::InvokeCallable(dart::Thread*, dart::Function const&, dart::Array const&, dart::Array const&)",
+      "kind": "Native",
+      "inclusiveTicks": 14,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "kDartVmSnapshotInstructions",
+      "kind": "Native",
+      "inclusiveTicks": 14,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "__CFRunLoopDoSources0",
+      "kind": "Native",
+      "inclusiveTicks": 14,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "__CFRunLoopDoSource0",
+      "kind": "Native",
+      "inclusiveTicks": 14,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "__CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__",
+      "kind": "Native",
+      "inclusiveTicks": 14,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "flutter::EmbedderTaskRunner::PostTask(unsigned long long)",
+      "kind": "Native",
+      "inclusiveTicks": 9,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "dart.ui._invoke",
+      "kind": "Dart",
+      "inclusiveTicks": 8,
+      "exclusiveTicks": 0,
+      "source": "org-dartlang-sdk:///flutter/lib/ui/hooks.dart"
+    },
+    {
+      "name": "PlatformDispatcher._drawFrame",
+      "kind": "Dart",
+      "inclusiveTicks": 8,
+      "exclusiveTicks": 0,
+      "source": "org-dartlang-sdk:///flutter/lib/ui/platform_dispatcher.dart"
+    },
+    {
+      "name": "_MixinApplication150&BindingBase&GestureBinding&SchedulerBinding._handleDrawFrame",
+      "kind": "Dart",
+      "inclusiveTicks": 8,
+      "exclusiveTicks": 0,
+      "source": "file:///private/tmp/ianvs-r2-perf-9BCIxV/flutter/packages/flutter/lib/src/scheduler/binding.dart"
+    }
+  ],
+  "topExclusive": [
+    {
+      "name": "Breaks.step",
+      "kind": "Dart",
+      "inclusiveTicks": 3,
+      "exclusiveTicks": 3,
+      "source": "file:///Users/robinfai/.pub-cache/hosted/pub.dev/characters-1.4.1/lib/src/grapheme_clusters/breaks.dart"
+    },
+    {
+      "name": "flutter::DisplayListBuilder::drawText(std::__fl::shared_ptr<flutter::DlText> const&, float, float)",
+      "kind": "Native",
+      "inclusiveTicks": 3,
+      "exclusiveTicks": 1,
+      "source": ""
+    },
+    {
+      "name": "flutter::DisplayListBuilder::AdjustBoundsForPaint(impeller::TRect<float>&, flutter::DisplayListAttributeFlags)",
+      "kind": "Native",
+      "inclusiveTicks": 1,
+      "exclusiveTicks": 1,
+      "source": ""
+    },
+    {
+      "name": "impeller::TRect<float>::TransformBounds(impeller::Matrix const&) const",
+      "kind": "Native",
+      "inclusiveTicks": 1,
+      "exclusiveTicks": 1,
+      "source": ""
+    },
+    {
+      "name": "dart::BootstrapNatives::DN_StringBuffer_createStringFromUint16Array(dart::Thread*, dart::Zone*, dart::NativeArguments*)",
+      "kind": "Native",
+      "inclusiveTicks": 2,
+      "exclusiveTicks": 1,
+      "source": ""
+    },
+    {
+      "name": "dart::StackResource::~StackResource()",
+      "kind": "Native",
+      "inclusiveTicks": 1,
+      "exclusiveTicks": 1,
+      "source": ""
+    },
+    {
+      "name": "dart::GroupDebugger::VisitObjectPointers(dart::ObjectPointerVisitor*)",
+      "kind": "Native",
+      "inclusiveTicks": 1,
+      "exclusiveTicks": 1,
+      "source": ""
+    },
+    {
+      "name": "dart::MessageDeserializer::Deserialize()",
+      "kind": "Native",
+      "inclusiveTicks": 1,
+      "exclusiveTicks": 1,
+      "source": ""
+    },
+    {
+      "name": "dart::Object::InitializeObject(unsigned long, long, long, bool, unsigned long, unsigned long)",
+      "kind": "Native",
+      "inclusiveTicks": 1,
+      "exclusiveTicks": 1,
+      "source": ""
+    },
+    {
+      "name": "dart::Function::AreValidArgumentCounts(long, long, long, dart::String*) const",
+      "kind": "Native",
+      "inclusiveTicks": 1,
+      "exclusiveTicks": 1,
+      "source": ""
+    },
+    {
+      "name": "dart::Type::type_class() const",
+      "kind": "Native",
+      "inclusiveTicks": 1,
+      "exclusiveTicks": 1,
+      "source": ""
+    },
+    {
+      "name": "dart::TwoByteString::ConcatAll(dart::Array const&, long, long, long, dart::Heap::Space)",
+      "kind": "Native",
+      "inclusiveTicks": 1,
+      "exclusiveTicks": 1,
+      "source": ""
+    },
+    {
+      "name": "dart::Smi::HandleTag() const",
+      "kind": "Native",
+      "inclusiveTicks": 1,
+      "exclusiveTicks": 1,
+      "source": ""
+    },
+    {
+      "name": "dart::Scavenger::TryAllocateNewTLAB(dart::Thread*, long, bool)",
+      "kind": "Native",
+      "inclusiveTicks": 1,
+      "exclusiveTicks": 1,
+      "source": ""
+    },
+    {
+      "name": "StringCharacters.length",
+      "kind": "Dart",
+      "inclusiveTicks": 4,
+      "exclusiveTicks": 1,
+      "source": "file:///Users/robinfai/.pub-cache/hosted/pub.dev/characters-1.4.1/lib/src/characters_impl.dart"
+    },
+    {
+      "name": "_JsonStringifier.writeStringContent",
+      "kind": "Dart",
+      "inclusiveTicks": 4,
+      "exclusiveTicks": 1,
+      "source": "org-dartlang-sdk:///flutter/third_party/dart/sdk/lib/convert/json.dart"
+    },
+    {
+      "name": "_Utf8Encoder._fillBuffer",
+      "kind": "Dart",
+      "inclusiveTicks": 1,
+      "exclusiveTicks": 1,
+      "source": "org-dartlang-sdk:///flutter/third_party/dart/sdk/lib/convert/utf.dart"
+    },
+    {
+      "name": "[Stub] _iso_stub_AllocateArrayStub",
+      "kind": "Stub",
+      "inclusiveTicks": 1,
+      "exclusiveTicks": 1,
+      "source": ""
+    },
+    {
+      "name": "<unknown Dart function>",
+      "kind": "Collected",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "main",
+      "kind": "Native",
+      "inclusiveTicks": 16,
+      "exclusiveTicks": 0,
+      "source": ""
+    }
+  ]
+}

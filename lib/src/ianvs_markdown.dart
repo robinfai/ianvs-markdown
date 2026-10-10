@@ -14,6 +14,7 @@ import 'callout.dart';
 import 'code_block.dart';
 import 'code_surface.dart';
 import 'editor/editor_models.dart';
+import 'editor/editor_diagnostics.dart';
 import 'editor/markdown_code_ranges.dart';
 import 'emphasis.dart';
 import 'front_matter_card.dart';
@@ -635,23 +636,29 @@ class IanvsMarkdown extends StatelessWidget {
       ),
       IanvsMarkdownTagSyntax(),
     ];
-    final preparedData = _projectIrregularObsidianTables(
-      prepareObsidianMarkdownForRendering(
-        decision.text,
-        mode: obsidianMetadataMode,
+    final preparedData = IanvsMarkdownEditorDiagnostics.measure(
+      'body.prepare',
+      () => _projectIrregularObsidianTables(
+        prepareObsidianMarkdownForRendering(
+          decision.text,
+          mode: obsidianMetadataMode,
+        ),
       ),
     );
     final imageProjectedData =
         obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing
         ? projectObsidianReferenceImagesForLivePreview(preparedData)
         : preparedData;
-    final renderedData =
-        projectObsidianInlineLinkDestinationBackslashesForRendering(
-          projectObsidianCrossParagraphHighlightsForRendering(
-            imageProjectedData,
-          ),
-        );
-    final taskProjection = projectObsidianTaskMarkers(renderedData);
+    final renderedData = IanvsMarkdownEditorDiagnostics.measure(
+      'body.inlineProjection',
+      () => projectObsidianInlineLinkDestinationBackslashesForRendering(
+        projectObsidianCrossParagraphHighlightsForRendering(imageProjectedData),
+      ),
+    );
+    final taskProjection = IanvsMarkdownEditorDiagnostics.measure(
+      'body.taskProjection',
+      () => projectObsidianTaskMarkers(renderedData),
+    );
     final listIndentStep =
         (effectiveStyleSheet.listIndent ?? 24) +
         (effectiveStyleSheet.listBulletPadding?.horizontal ?? 4);
@@ -1456,10 +1463,13 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
     );
     _headings = _document.headings;
     _headingFoldModel = _document.parseDecision!.useMarkdown
-        ? IanvsMarkdownHeadingFoldModel.parse(
-            _document.body,
-            syntaxPreset: widget.syntaxPreset,
-            budget: null, // Preflight already covered the complete source.
+        ? IanvsMarkdownEditorDiagnostics.measure(
+            'view.folding',
+            () => IanvsMarkdownHeadingFoldModel.parse(
+              _document.body,
+              syntaxPreset: widget.syntaxPreset,
+              budget: null, // Preflight already covered the complete source.
+            ),
           )
         : IanvsMarkdownHeadingFoldModel.unparsed(
             _document.body,

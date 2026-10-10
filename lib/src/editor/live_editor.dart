@@ -531,9 +531,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
 
   void _refreshBlocks(String source) {
     IanvsMarkdownEditorDiagnostics.recordDocumentParse();
-    final decision = scanMarkdownForRendering(
-      source,
-      budget: widget.renderBudget,
+    final decision = IanvsMarkdownEditorDiagnostics.measure(
+      'live.preflight',
+      () => scanMarkdownForRendering(source, budget: widget.renderBudget),
     );
     _renderDecision = decision;
     if (widget.onRenderDecision != null) {
@@ -544,25 +544,40 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       });
     }
     _linkReferences = decision.useMarkdown
-        ? MarkdownLinkReferenceContext.parse(source, budget: null)
+        ? IanvsMarkdownEditorDiagnostics.measure(
+            'live.references',
+            () => MarkdownLinkReferenceContext.parse(source, budget: null),
+          )
         : MarkdownLinkReferenceContext.empty();
     _blockController.linkReferenceLabels = _linkReferences.labels;
     _crossParagraphHighlightLiteralRuns = decision.useMarkdown
-        ? ianvsMarkdownCrossParagraphHighlightLiteralRuns(source)
+        ? IanvsMarkdownEditorDiagnostics.measure(
+            'live.highlights',
+            () => ianvsMarkdownCrossParagraphHighlightLiteralRuns(source),
+          )
         : const [];
     _blockController.documentHighlightLiteralRuns =
         _crossParagraphHighlightLiteralRuns;
     _livePreviewFootnoteReferences = decision.useMarkdown
-        ? ianvsMarkdownLivePreviewFootnoteReferences(source)
+        ? IanvsMarkdownEditorDiagnostics.measure(
+            'live.footnotes',
+            () => ianvsMarkdownLivePreviewFootnoteReferences(source),
+          )
         : const [];
     _blocks = decision.useMarkdown
-        ? parseMarkdownBlocks(source, splitListItems: true)
+        ? IanvsMarkdownEditorDiagnostics.measure(
+            'live.blocks',
+            () => parseMarkdownBlocks(source, splitListItems: true),
+          )
         : const [];
     _headingFoldModel = decision.useMarkdown
-        ? IanvsMarkdownHeadingFoldModel.fromBlocks(
-            source,
-            _blocks,
-            budget: null,
+        ? IanvsMarkdownEditorDiagnostics.measure(
+            'live.headings',
+            () => IanvsMarkdownHeadingFoldModel.fromBlocks(
+              source,
+              _blocks,
+              budget: null,
+            ),
           )
         : IanvsMarkdownHeadingFoldModel.unparsed(
             source,

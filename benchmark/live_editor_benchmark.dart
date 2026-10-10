@@ -165,9 +165,11 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
       'timelineMicros': developer.Timeline.now,
     });
     final firstFrame = frameStamp;
+    IanvsMarkdownEditorDiagnostics.resetPhases();
     final parses = IanvsMarkdownEditorDiagnostics.documentParses;
     final watch = Stopwatch()..start();
     await callback();
+    final callbackMs = watch.elapsedMicroseconds / 1000;
     await nextFrame();
     watch.stop();
     final latency = watch.elapsedMicroseconds / 1000;
@@ -178,17 +180,27 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
       operation.durations.add(latency);
       operation.parses.add(parseCount);
       operation.rss.add(rss);
+      operation.callbackMs.add(callbackMs);
+      operation.frameWaitMs.add(latency - callbackMs);
       operation.frameIntervals.add((firstFrame, frameStamp));
+      if (IanvsMarkdownEditorDiagnostics.profilePhases) {
+        operation.phases.add(IanvsMarkdownEditorDiagnostics.phaseSnapshot());
+      }
     }
     trace({
       ...identity,
       'event': 'end',
       'timelineMicros': developer.Timeline.now,
       'latencyMs': latency,
+      'callbackMs': callbackMs,
+      'completionFrameWaitMs': latency - callbackMs,
+      'lifecycle': SchedulerBinding.instance.lifecycleState?.name ?? 'unknown',
       'documentParses': parseCount,
       'rssMiB': rss,
       'firstFrameMicros': firstFrame,
       'lastFrameMicros': frameStamp,
+      if (IanvsMarkdownEditorDiagnostics.profilePhases)
+        'phases': IanvsMarkdownEditorDiagnostics.phaseSnapshot(),
     });
   }
 
@@ -293,6 +305,18 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
               );
             },
             'typing': (i) async {
+              final original = controller!.value;
+              if (!original.selection.isValid ||
+                  !original.selection.isCollapsed) {
+                throw StateError(
+                  'Typing requires a collapsed source selection',
+                );
+              }
+              final expected = original.text.replaceRange(
+                original.selection.extentOffset,
+                original.selection.extentOffset,
+                'a',
+              );
               final editable = activeEditable();
               final value = editable.widget.controller.value;
               final offset = value.selection.extentOffset;
@@ -302,6 +326,9 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
                   selection: TextSelection.collapsed(offset: offset + 1),
                 ),
               );
+              if (controller!.text != expected) {
+                throw StateError('Typing did not preserve the source mapping');
+              }
             },
             'scroll': (i) async {
               final destination = i.isEven ? 0.0 : 300.0 + (i % 4) * 300;
@@ -356,6 +383,7 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
     return {
       'schemaVersion': 2,
       'processingBudgetPolicy': 'full-document-preflight-v1',
+      'phaseTimingsEnabled': IanvsMarkdownEditorDiagnostics.profilePhases,
       'corpusVersion': corpusVersion,
       'mode': 'profile',
       'warmupPerOperation': warmup,
@@ -390,7 +418,10 @@ class _Operation {
   final durations = <double>[];
   final parses = <double>[];
   final rss = <double>[];
+  final callbackMs = <double>[];
+  final frameWaitMs = <double>[];
   final frameIntervals = <(int, int)>[];
+  final phases = <Map<String, Object>>[];
 
   Map<String, Object> result(List<FrameTiming> allFrames) {
     // Both timestamps originate from the engine's raw frame clock. Assign
@@ -419,6 +450,9 @@ class _Operation {
       ]),
       'frameAttribution': 'engine-vsync-intervals',
       'rssMiB': distribution(rss),
+      'callbackMs': distribution(callbackMs),
+      'completionFrameWaitMs': distribution(frameWaitMs),
+      if (IanvsMarkdownEditorDiagnostics.profilePhases) 'phases': phases,
     };
   }
 }

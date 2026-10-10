@@ -10,6 +10,7 @@ import '../code_surface.dart';
 import '../inline_code.dart';
 import '../theme.dart';
 import 'editor_controller.dart';
+import 'editor_diagnostics.dart';
 import 'editor_models.dart';
 import 'editor_shortcuts.dart';
 import 'editor_toolbar.dart';
@@ -617,10 +618,13 @@ class _SourceQuoteBackgroundPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (!enabled || !controller.parseDecision.useMarkdown) return;
-    final ranges = parseMarkdownBlocks(controller.text)
-        .where((block) => block.type == IanvsMarkdownBlockType.blockquote)
-        .map((block) => TextRange(start: block.start, end: block.end))
-        .toList(growable: false);
+    final ranges = IanvsMarkdownEditorDiagnostics.measure(
+      'source.quoteRanges',
+      () => parseMarkdownBlocks(controller.text)
+          .where((block) => block.type == IanvsMarkdownBlockType.blockquote)
+          .map((block) => TextRange(start: block.start, end: block.end))
+          .toList(growable: false),
+    );
     if (ranges.isEmpty || size.isEmpty) return;
 
     final contentWidth = size.width - padding.horizontal;
@@ -630,7 +634,11 @@ class _SourceQuoteBackgroundPainter extends CustomPainter {
       textDirection: textDirection,
       textScaler: textScaler,
       textWidthBasis: TextWidthBasis.parent,
-    )..layout(maxWidth: contentWidth);
+    );
+    IanvsMarkdownEditorDiagnostics.measure(
+      'source.quoteLayout',
+      () => textPainter.layout(maxWidth: contentWidth),
+    );
     final positions = scrollController.positions;
     final scrollOffset = positions.isEmpty ? 0.0 : positions.last.pixels;
     final patternColor = (dark ? Colors.white : Colors.black).withValues(
@@ -712,7 +720,10 @@ class _SourceFencedCodeBackgroundPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (!enabled || !controller.parseDecision.useMarkdown) return;
-    final ranges = _markdownFencedCodeRanges(controller.text);
+    final ranges = IanvsMarkdownEditorDiagnostics.measure(
+      'source.codeRanges',
+      () => _markdownFencedCodeRanges(controller.text),
+    );
     if (ranges.isEmpty || size.isEmpty) return;
 
     final contentWidth = size.width - padding.horizontal;
@@ -722,7 +733,11 @@ class _SourceFencedCodeBackgroundPainter extends CustomPainter {
       textDirection: textDirection,
       textScaler: textScaler,
       textWidthBasis: TextWidthBasis.parent,
-    )..layout(maxWidth: contentWidth);
+    );
+    IanvsMarkdownEditorDiagnostics.measure(
+      'source.codeLayout',
+      () => textPainter.layout(maxWidth: contentWidth),
+    );
     final positions = scrollController.positions;
     final scrollOffset = positions.isEmpty ? 0.0 : positions.last.pixels;
     final outline = Paint()

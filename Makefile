@@ -94,7 +94,11 @@ test-quicklook: deps-integrations ## Test the native macOS Quick Look renderer a
 check-processing-budget: ## Check large-input preprocessing in killable processes
 	$(PYTHON) tool/check_processing_budget.py --flutter "$(FLUTTER)" --output build/processing-budget
 
-check-core: deps-core format-check-core analyze-core test test-example check-processing-budget ## Validate core without Apple or Mermaid integration checks
+.PHONY: test-tools
+test-tools: ## Validate performance evidence checks
+	$(PYTHON) -m unittest discover -s tool -p 'test_*.py'
+
+check-core: deps-core format-check-core analyze-core test test-example test-tools check-processing-budget ## Validate core without Apple or Mermaid integration checks
 
 check-integrations: deps-integrations format-check-integrations analyze-integrations test-app test-mermaid test-mermaid-example test-clipboard test-quicklook test-native-import ## Validate the app and native integrations (macOS)
 

@@ -1,0 +1,8 @@
+{"utf8Bytes": 10240, "budget": "default", "operation": "setup", "stage": "preparation", "index": 0, "event": "start", "timelineMicros": 852694049078}
+{"utf8Bytes": 10240, "budget": "default", "operation": "setup", "stage": "preparation", "index": 0, "event": "end", "timelineMicros": 852694217323, "latencyMs": 168.223, "documentParses": 1.0, "rssMiB": 183.421875, "firstFrameMicros": 0, "lastFrameMicros": 852694206711}
+{"utf8Bytes": 10240, "budget": "default", "operation": "initialDisplay", "stage": "warmup", "index": 0, "event": "start", "timelineMicros": 852694217376}
+{"utf8Bytes": 10240, "budget": "default", "operation": "initialDisplay", "stage": "warmup", "index": 0, "event": "end", "timelineMicros": 852694366929, "latencyMs": 149.542, "documentParses": 1.0, "rssMiB": 203.796875, "firstFrameMicros": 852694206711, "lastFrameMicros": 852694373372}
+{"utf8Bytes": 10240, "budget": "default", "operation": "initialDisplay", "stage": "sample", "index": 0, "event": "start", "timelineMicros": 852695467803}
+{"utf8Bytes": 10240, "budget": "default", "operation": "initialDisplay", "stage": "sample", "index": 0, "event": "end", "timelineMicros": 852695583771, "latencyMs": 115.888, "documentParses": 1.0, "rssMiB": 214.109375, "firstFrameMicros": 852695340051, "lastFrameMicros": 852695590058}
+{"utf8Bytes": 10240, "budget": "default", "operation": "initialDisplay", "stage": "sample", "index": 1, "event": "start", "timelineMicros": 852695583827}
+{"utf8Bytes": 10240, "budget": "default", "operation": "initialDisplay", "stage": "sample", "index": 1, "event": "end", "timelineMicros": 852695692710, "latencyMs": 108.859, "documentParses": 1.0, "rssMiB": 215.40625, "firstFrameMicros": 852695590058, "lastFrameMicros": 852695698398}

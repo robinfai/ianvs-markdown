@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import 'front_matter.dart';
+import 'editor/editor_diagnostics.dart';
 import 'render_budget.dart';
 import 'syntax_preset.dart';
 
@@ -50,7 +51,10 @@ final class IanvsMarkdownDocument {
       );
     }
     final frontMatter = parseFrontMatter
-        ? parseMarkdownFrontMatter(source)
+        ? IanvsMarkdownEditorDiagnostics.measure(
+            'document.frontMatter',
+            () => parseMarkdownFrontMatter(source),
+          )
         : MarkdownFrontMatterDocument(
             body: source,
             entries: const <MarkdownMetadataEntry>[],
@@ -60,10 +64,13 @@ final class IanvsMarkdownDocument {
       source: source,
       body: frontMatter.body,
       metadata: frontMatter.entries,
-      headings: parseMarkdownHeadings(
-        frontMatter.body,
-        maximumLevel: maximumHeadingLevel,
-        budget: null, // The complete source has already passed preflight.
+      headings: IanvsMarkdownEditorDiagnostics.measure(
+        'document.headings',
+        () => parseMarkdownHeadings(
+          frontMatter.body,
+          maximumLevel: maximumHeadingLevel,
+          budget: null, // The complete source has already passed preflight.
+        ),
       ),
       hasFrontMatter: frontMatter.hasFrontMatter,
       parseDecision: decision,

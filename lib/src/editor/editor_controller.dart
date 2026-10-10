@@ -17,6 +17,7 @@ import '../render_budget.dart';
 import '../strikethrough.dart';
 import '../wiki_link_reference.dart';
 import 'editor_models.dart';
+import 'editor_diagnostics.dart';
 import 'markdown_code_ranges.dart';
 import 'markdown_paste.dart';
 import 'reference_links.dart';
@@ -140,9 +141,15 @@ class IanvsMarkdownController extends TextEditingController {
   IanvsMarkdownRenderDecision get parseDecision => _parseDecision;
 
   void _refreshParseState(String source) {
-    _parseDecision = scanMarkdownForRendering(source, budget: parseBudget);
+    _parseDecision = IanvsMarkdownEditorDiagnostics.measure(
+      'controller.preflight',
+      () => scanMarkdownForRendering(source, budget: parseBudget),
+    );
     _linkReferences = _parseDecision.useMarkdown
-        ? MarkdownLinkReferenceContext.parse(source, budget: null)
+        ? IanvsMarkdownEditorDiagnostics.measure(
+            'controller.references',
+            () => MarkdownLinkReferenceContext.parse(source, budget: null),
+          )
         : MarkdownLinkReferenceContext.empty();
   }
 
@@ -822,12 +829,15 @@ class IanvsMarkdownController extends TextEditingController {
         withComposing: withComposing,
       );
     }
-    return buildMarkdownSourceTextSpan(
-      value,
-      style: style,
-      syntaxTheme: syntax,
-      withComposing: withComposing,
-      linkReferenceLabels: _linkReferences.labels,
+    return IanvsMarkdownEditorDiagnostics.measure(
+      'source.syntaxSpans',
+      () => buildMarkdownSourceTextSpan(
+        value,
+        style: style,
+        syntaxTheme: syntax,
+        withComposing: withComposing,
+        linkReferenceLabels: _linkReferences.labels,
+      ),
     );
   }
 

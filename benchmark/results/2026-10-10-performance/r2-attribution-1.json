@@ -1,0 +1,4486 @@
+{
+  "schemaVersion": 2,
+  "processingBudgetPolicy": "full-document-preflight-v1",
+  "phaseTimingsEnabled": true,
+  "corpusVersion": 1,
+  "mode": "profile",
+  "warmupPerOperation": 1,
+  "samplesPerOperation": 2,
+  "requestedSizes": [
+    10240,
+    102400,
+    1048576
+  ],
+  "requestedBudgets": [
+    "default",
+    "unlimited"
+  ],
+  "requestedOperations": [
+    "initialDisplay",
+    "selection",
+    "typing",
+    "scroll",
+    "liveToSource",
+    "sourceToReading",
+    "readingToLive"
+  ],
+  "fullBaseline": true,
+  "dart": "3.12.2 (stable) (Tue Jun 9 01:11:39 2026 -0700) on \"macos_arm64\"",
+  "os": "Version 27.0.1 (Build 26A434)",
+  "viewPhysicalWidth": 2360.0,
+  "viewPhysicalHeight": 1560.0,
+  "devicePixelRatio": 2.0,
+  "forceDocumentRefresh": false,
+  "complete": true,
+  "activeOperation": null,
+  "results": [
+    {
+      "utf8Bytes": 10240,
+      "utf16Units": 9360,
+      "lines": 117,
+      "blocks": 50,
+      "budget": "default",
+      "controllerUsesMarkdown": true,
+      "liveUsesMarkdown": true,
+      "readingUsesMarkdown": true,
+      "readingFallbackBytes": 0,
+      "operations": [
+        {
+          "operation": "initialDisplay",
+          "latencyMs": {
+            "count": 2,
+            "p50": 106.881,
+            "p95": 108.973,
+            "max": 108.973,
+            "raw": [
+              106.881,
+              108.973
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 1.0,
+            "p95": 1.0,
+            "max": 1.0,
+            "raw": [
+              1.0,
+              1.0
+            ]
+          },
+          "buildMs": {
+            "count": 6,
+            "p50": 41.182,
+            "p95": 50.113,
+            "max": 50.113,
+            "raw": [
+              50.113,
+              41.182,
+              1.678,
+              48.506,
+              43.492,
+              1.612
+            ]
+          },
+          "rasterMs": {
+            "count": 6,
+            "p50": 1.098,
+            "p95": 1.334,
+            "max": 1.334,
+            "raw": [
+              1.138,
+              1.082,
+              1.334,
+              1.098,
+              1.124,
+              1.019
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 205.5625,
+            "p95": 210.234375,
+            "max": 210.234375,
+            "raw": [
+              205.5625,
+              210.234375
+            ]
+          },
+          "phases": [
+            {
+              "controller.preflight": {
+                "microseconds": 324,
+                "calls": 1
+              },
+              "controller.references": {
+                "microseconds": 4009,
+                "calls": 1
+              },
+              "live.preflight": {
+                "microseconds": 283,
+                "calls": 1
+              },
+              "live.references": {
+                "microseconds": 3761,
+                "calls": 1
+              },
+              "live.highlights": {
+                "microseconds": 31,
+                "calls": 1
+              },
+              "live.footnotes": {
+                "microseconds": 5,
+                "calls": 1
+              },
+              "live.blocks": {
+                "microseconds": 258,
+                "calls": 1
+              },
+              "live.headings": {
+                "microseconds": 45,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 212,
+                "calls": 25
+              },
+              "body.inlineProjection": {
+                "microseconds": 17,
+                "calls": 25
+              },
+              "body.taskProjection": {
+                "microseconds": 57,
+                "calls": 25
+              }
+            },
+            {
+              "controller.preflight": {
+                "microseconds": 282,
+                "calls": 1
+              },
+              "controller.references": {
+                "microseconds": 3844,
+                "calls": 1
+              },
+              "live.preflight": {
+                "microseconds": 595,
+                "calls": 1
+              },
+              "live.references": {
+                "microseconds": 4581,
+                "calls": 1
+              },
+              "live.highlights": {
+                "microseconds": 31,
+                "calls": 1
+              },
+              "live.footnotes": {
+                "microseconds": 5,
+                "calls": 1
+              },
+              "live.blocks": {
+                "microseconds": 288,
+                "calls": 1
+              },
+              "live.headings": {
+                "microseconds": 53,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 143,
+                "calls": 25
+              },
+              "body.inlineProjection": {
+                "microseconds": 10,
+                "calls": 25
+              },
+              "body.taskProjection": {
+                "microseconds": 69,
+                "calls": 25
+              }
+            }
+          ]
+        },
+        {
+          "operation": "selection",
+          "latencyMs": {
+            "count": 2,
+            "p50": 44.242,
+            "p95": 45.92,
+            "max": 45.92,
+            "raw": [
+              45.92,
+              44.242
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 41.63,
+            "p95": 42.043,
+            "max": 42.043,
+            "raw": [
+              42.043,
+              41.63
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 1.087,
+            "p95": 1.155,
+            "max": 1.155,
+            "raw": [
+              1.155,
+              1.087
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 199.640625,
+            "p95": 207.203125,
+            "max": 207.203125,
+            "raw": [
+              199.640625,
+              207.203125
+            ]
+          },
+          "phases": [
+            {
+              "body.prepare": {
+                "microseconds": 56,
+                "calls": 12
+              },
+              "body.inlineProjection": {
+                "microseconds": 5,
+                "calls": 12
+              },
+              "body.taskProjection": {
+                "microseconds": 26,
+                "calls": 12
+              }
+            },
+            {
+              "body.prepare": {
+                "microseconds": 60,
+                "calls": 12
+              },
+              "body.inlineProjection": {
+                "microseconds": 4,
+                "calls": 12
+              },
+              "body.taskProjection": {
+                "microseconds": 26,
+                "calls": 12
+              }
+            }
+          ]
+        },
+        {
+          "operation": "typing",
+          "latencyMs": {
+            "count": 2,
+            "p50": 56.459,
+            "p95": 56.879,
+            "max": 56.879,
+            "raw": [
+              56.879,
+              56.459
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 1.0,
+            "p95": 1.0,
+            "max": 1.0,
+            "raw": [
+              1.0,
+              1.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 44.247,
+            "p95": 45.149,
+            "max": 45.149,
+            "raw": [
+              45.149,
+              44.247
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 1.204,
+            "p95": 1.36,
+            "max": 1.36,
+            "raw": [
+              1.36,
+              1.204
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 210.5,
+            "p95": 211.453125,
+            "max": 211.453125,
+            "raw": [
+              210.5,
+              211.453125
+            ]
+          },
+          "phases": [
+            {
+              "controller.preflight": {
+                "microseconds": 308,
+                "calls": 1
+              },
+              "controller.references": {
+                "microseconds": 4057,
+                "calls": 1
+              },
+              "live.preflight": {
+                "microseconds": 288,
+                "calls": 1
+              },
+              "live.references": {
+                "microseconds": 3830,
+                "calls": 1
+              },
+              "live.highlights": {
+                "microseconds": 28,
+                "calls": 1
+              },
+              "live.footnotes": {
+                "microseconds": 5,
+                "calls": 1
+              },
+              "live.blocks": {
+                "microseconds": 262,
+                "calls": 1
+              },
+              "live.headings": {
+                "microseconds": 68,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 69,
+                "calls": 12
+              },
+              "body.inlineProjection": {
+                "microseconds": 5,
+                "calls": 12
+              },
+              "body.taskProjection": {
+                "microseconds": 28,
+                "calls": 12
+              }
+            },
+            {
+              "controller.preflight": {
+                "microseconds": 466,
+                "calls": 1
+              },
+              "controller.references": {
+                "microseconds": 4983,
+                "calls": 1
+              },
+              "live.preflight": {
+                "microseconds": 240,
+                "calls": 1
+              },
+              "live.references": {
+                "microseconds": 3701,
+                "calls": 1
+              },
+              "live.highlights": {
+                "microseconds": 31,
+                "calls": 1
+              },
+              "live.footnotes": {
+                "microseconds": 5,
+                "calls": 1
+              },
+              "live.blocks": {
+                "microseconds": 257,
+                "calls": 1
+              },
+              "live.headings": {
+                "microseconds": 47,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 66,
+                "calls": 12
+              },
+              "body.inlineProjection": {
+                "microseconds": 6,
+                "calls": 12
+              },
+              "body.taskProjection": {
+                "microseconds": 26,
+                "calls": 12
+              }
+            }
+          ]
+        },
+        {
+          "operation": "scroll",
+          "latencyMs": {
+            "count": 2,
+            "p50": 5.843,
+            "p95": 45.674,
+            "max": 45.674,
+            "raw": [
+              45.674,
+              5.843
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 4.635,
+            "p95": 40.419,
+            "max": 40.419,
+            "raw": [
+              40.419,
+              4.635
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 1.029,
+            "p95": 3.546,
+            "max": 3.546,
+            "raw": [
+              3.546,
+              1.029
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 207.5625,
+            "p95": 210.90625,
+            "max": 210.90625,
+            "raw": [
+              207.5625,
+              210.90625
+            ]
+          },
+          "phases": [
+            {
+              "body.prepare": {
+                "microseconds": 24,
+                "calls": 5
+              },
+              "body.inlineProjection": {
+                "microseconds": 5,
+                "calls": 5
+              },
+              "body.taskProjection": {
+                "microseconds": 7,
+                "calls": 5
+              }
+            },
+            {
+              "body.prepare": {
+                "microseconds": 55,
+                "calls": 6
+              },
+              "body.inlineProjection": {
+                "microseconds": 1,
+                "calls": 6
+              },
+              "body.taskProjection": {
+                "microseconds": 12,
+                "calls": 6
+              }
+            }
+          ]
+        },
+        {
+          "operation": "liveToSource",
+          "latencyMs": {
+            "count": 2,
+            "p50": 9.527,
+            "p95": 19.025,
+            "max": 19.025,
+            "raw": [
+              19.025,
+              9.527
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 1,
+            "p50": 14.08,
+            "p95": 14.08,
+            "max": 14.08,
+            "raw": [
+              14.08
+            ]
+          },
+          "rasterMs": {
+            "count": 1,
+            "p50": 2.035,
+            "p95": 2.035,
+            "max": 2.035,
+            "raw": [
+              2.035
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 224.0625,
+            "p95": 237.875,
+            "max": 237.875,
+            "raw": [
+              224.0625,
+              237.875
+            ]
+          },
+          "phases": [
+            {
+              "source.syntaxSpans": {
+                "microseconds": 7586,
+                "calls": 1
+              },
+              "source.quoteRanges": {
+                "microseconds": 271,
+                "calls": 1
+              },
+              "source.codeRanges": {
+                "microseconds": 233,
+                "calls": 1
+              },
+              "source.codeLayout": {
+                "microseconds": 278,
+                "calls": 1
+              }
+            },
+            {
+              "source.syntaxSpans": {
+                "microseconds": 4476,
+                "calls": 1
+              },
+              "source.quoteRanges": {
+                "microseconds": 125,
+                "calls": 1
+              },
+              "source.codeRanges": {
+                "microseconds": 109,
+                "calls": 1
+              },
+              "source.codeLayout": {
+                "microseconds": 321,
+                "calls": 1
+              }
+            }
+          ]
+        },
+        {
+          "operation": "sourceToReading",
+          "latencyMs": {
+            "count": 2,
+            "p50": 29.089,
+            "p95": 32.59,
+            "max": 32.59,
+            "raw": [
+              32.59,
+              29.089
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 24.953,
+            "p95": 28.983,
+            "max": 28.983,
+            "raw": [
+              28.983,
+              24.953
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 1.745,
+            "p95": 2.126,
+            "max": 2.126,
+            "raw": [
+              2.126,
+              1.745
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 233.40625,
+            "p95": 237.875,
+            "max": 237.875,
+            "raw": [
+              233.40625,
+              237.875
+            ]
+          },
+          "phases": [
+            {
+              "document.frontMatter": {
+                "microseconds": 1,
+                "calls": 1
+              },
+              "document.headings": {
+                "microseconds": 5773,
+                "calls": 1
+              },
+              "view.folding": {
+                "microseconds": 267,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 2052,
+                "calls": 1
+              },
+              "body.inlineProjection": {
+                "microseconds": 60,
+                "calls": 1
+              },
+              "body.taskProjection": {
+                "microseconds": 178,
+                "calls": 1
+              }
+            },
+            {
+              "document.frontMatter": {
+                "microseconds": 1,
+                "calls": 1
+              },
+              "document.headings": {
+                "microseconds": 3782,
+                "calls": 1
+              },
+              "view.folding": {
+                "microseconds": 164,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 1927,
+                "calls": 1
+              },
+              "body.inlineProjection": {
+                "microseconds": 58,
+                "calls": 1
+              },
+              "body.taskProjection": {
+                "microseconds": 117,
+                "calls": 1
+              }
+            }
+          ]
+        },
+        {
+          "operation": "readingToLive",
+          "latencyMs": {
+            "count": 2,
+            "p50": 48.835,
+            "p95": 49.842,
+            "max": 49.842,
+            "raw": [
+              49.842,
+              48.835
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 3,
+            "p50": 45.242,
+            "p95": 47.078,
+            "max": 47.078,
+            "raw": [
+              47.078,
+              7.807,
+              45.242
+            ]
+          },
+          "rasterMs": {
+            "count": 3,
+            "p50": 1.175,
+            "p95": 1.192,
+            "max": 1.192,
+            "raw": [
+              1.091,
+              1.175,
+              1.192
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 232.96875,
+            "p95": 237.8125,
+            "max": 237.8125,
+            "raw": [
+              237.8125,
+              232.96875
+            ]
+          },
+          "phases": [
+            {
+              "body.prepare": {
+                "microseconds": 96,
+                "calls": 13
+              },
+              "body.inlineProjection": {
+                "microseconds": 7,
+                "calls": 13
+              },
+              "body.taskProjection": {
+                "microseconds": 28,
+                "calls": 13
+              }
+            },
+            {
+              "body.prepare": {
+                "microseconds": 54,
+                "calls": 13
+              },
+              "body.inlineProjection": {
+                "microseconds": 4,
+                "calls": 13
+              },
+              "body.taskProjection": {
+                "microseconds": 23,
+                "calls": 13
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "utf8Bytes": 10240,
+      "utf16Units": 9360,
+      "lines": 117,
+      "blocks": 50,
+      "budget": "unlimited-controlled-corpus",
+      "controllerUsesMarkdown": true,
+      "liveUsesMarkdown": true,
+      "readingUsesMarkdown": true,
+      "readingFallbackBytes": 0,
+      "operations": [
+        {
+          "operation": "initialDisplay",
+          "latencyMs": {
+            "count": 2,
+            "p50": 106.117,
+            "p95": 108.481,
+            "max": 108.481,
+            "raw": [
+              108.481,
+              106.117
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 1.0,
+            "p95": 1.0,
+            "max": 1.0,
+            "raw": [
+              1.0,
+              1.0
+            ]
+          },
+          "buildMs": {
+            "count": 6,
+            "p50": 43.461,
+            "p95": 48.956,
+            "max": 48.956,
+            "raw": [
+              48.956,
+              45.155,
+              1.786,
+              47.059,
+              43.461,
+              1.586
+            ]
+          },
+          "rasterMs": {
+            "count": 6,
+            "p50": 1.047,
+            "p95": 1.314,
+            "max": 1.314,
+            "raw": [
+              1.047,
+              1.094,
+              1.314,
+              1.014,
+              1.049,
+              1.045
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 230.21875,
+            "p95": 232.609375,
+            "max": 232.609375,
+            "raw": [
+              230.21875,
+              232.609375
+            ]
+          },
+          "phases": [
+            {
+              "controller.preflight": {
+                "microseconds": 0,
+                "calls": 1
+              },
+              "controller.references": {
+                "microseconds": 3897,
+                "calls": 1
+              },
+              "live.preflight": {
+                "microseconds": 0,
+                "calls": 1
+              },
+              "live.references": {
+                "microseconds": 3901,
+                "calls": 1
+              },
+              "live.highlights": {
+                "microseconds": 31,
+                "calls": 1
+              },
+              "live.footnotes": {
+                "microseconds": 5,
+                "calls": 1
+              },
+              "live.blocks": {
+                "microseconds": 295,
+                "calls": 1
+              },
+              "live.headings": {
+                "microseconds": 53,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 186,
+                "calls": 25
+              },
+              "body.inlineProjection": {
+                "microseconds": 9,
+                "calls": 25
+              },
+              "body.taskProjection": {
+                "microseconds": 50,
+                "calls": 25
+              }
+            },
+            {
+              "controller.preflight": {
+                "microseconds": 0,
+                "calls": 1
+              },
+              "controller.references": {
+                "microseconds": 3908,
+                "calls": 1
+              },
+              "live.preflight": {
+                "microseconds": 0,
+                "calls": 1
+              },
+              "live.references": {
+                "microseconds": 3756,
+                "calls": 1
+              },
+              "live.highlights": {
+                "microseconds": 31,
+                "calls": 1
+              },
+              "live.footnotes": {
+                "microseconds": 5,
+                "calls": 1
+              },
+              "live.blocks": {
+                "microseconds": 191,
+                "calls": 1
+              },
+              "live.headings": {
+                "microseconds": 48,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 134,
+                "calls": 25
+              },
+              "body.inlineProjection": {
+                "microseconds": 10,
+                "calls": 25
+              },
+              "body.taskProjection": {
+                "microseconds": 49,
+                "calls": 25
+              }
+            }
+          ]
+        },
+        {
+          "operation": "selection",
+          "latencyMs": {
+            "count": 2,
+            "p50": 47.551,
+            "p95": 48.248,
+            "max": 48.248,
+            "raw": [
+              47.551,
+              48.248
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 44.411,
+            "p95": 45.374,
+            "max": 45.374,
+            "raw": [
+              44.411,
+              45.374
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 1.039,
+            "p95": 1.129,
+            "max": 1.129,
+            "raw": [
+              1.039,
+              1.129
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 225.3125,
+            "p95": 234.78125,
+            "max": 234.78125,
+            "raw": [
+              225.3125,
+              234.78125
+            ]
+          },
+          "phases": [
+            {
+              "body.prepare": {
+                "microseconds": 66,
+                "calls": 12
+              },
+              "body.inlineProjection": {
+                "microseconds": 5,
+                "calls": 12
+              },
+              "body.taskProjection": {
+                "microseconds": 26,
+                "calls": 12
+              }
+            },
+            {
+              "body.prepare": {
+                "microseconds": 64,
+                "calls": 12
+              },
+              "body.inlineProjection": {
+                "microseconds": 4,
+                "calls": 12
+              },
+              "body.taskProjection": {
+                "microseconds": 25,
+                "calls": 12
+              }
+            }
+          ]
+        },
+        {
+          "operation": "typing",
+          "latencyMs": {
+            "count": 2,
+            "p50": 55.32,
+            "p95": 56.673,
+            "max": 56.673,
+            "raw": [
+              55.32,
+              56.673
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 1.0,
+            "p95": 1.0,
+            "max": 1.0,
+            "raw": [
+              1.0,
+              1.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 43.461,
+            "p95": 44.765,
+            "max": 44.765,
+            "raw": [
+              44.765,
+              43.461
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 1.194,
+            "p95": 1.194,
+            "max": 1.194,
+            "raw": [
+              1.194,
+              1.194
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 227.84375,
+            "p95": 232.25,
+            "max": 232.25,
+            "raw": [
+              227.84375,
+              232.25
+            ]
+          },
+          "phases": [
+            {
+              "controller.preflight": {
+                "microseconds": 0,
+                "calls": 1
+              },
+              "controller.references": {
+                "microseconds": 3950,
+                "calls": 1
+              },
+              "live.preflight": {
+                "microseconds": 0,
+                "calls": 1
+              },
+              "live.references": {
+                "microseconds": 3890,
+                "calls": 1
+              },
+              "live.highlights": {
+                "microseconds": 35,
+                "calls": 1
+              },
+              "live.footnotes": {
+                "microseconds": 5,
+                "calls": 1
+              },
+              "live.blocks": {
+                "microseconds": 273,
+                "calls": 1
+              },
+              "live.headings": {
+                "microseconds": 50,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 62,
+                "calls": 12
+              },
+              "body.inlineProjection": {
+                "microseconds": 5,
+                "calls": 12
+              },
+              "body.taskProjection": {
+                "microseconds": 25,
+                "calls": 12
+              }
+            },
+            {
+              "controller.preflight": {
+                "microseconds": 0,
+                "calls": 1
+              },
+              "controller.references": {
+                "microseconds": 3794,
+                "calls": 1
+              },
+              "live.preflight": {
+                "microseconds": 0,
+                "calls": 1
+              },
+              "live.references": {
+                "microseconds": 7002,
+                "calls": 1
+              },
+              "live.highlights": {
+                "microseconds": 33,
+                "calls": 1
+              },
+              "live.footnotes": {
+                "microseconds": 5,
+                "calls": 1
+              },
+              "live.blocks": {
+                "microseconds": 244,
+                "calls": 1
+              },
+              "live.headings": {
+                "microseconds": 45,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 67,
+                "calls": 12
+              },
+              "body.inlineProjection": {
+                "microseconds": 6,
+                "calls": 12
+              },
+              "body.taskProjection": {
+                "microseconds": 29,
+                "calls": 12
+              }
+            }
+          ]
+        },
+        {
+          "operation": "scroll",
+          "latencyMs": {
+            "count": 2,
+            "p50": 5.703,
+            "p95": 46.348,
+            "max": 46.348,
+            "raw": [
+              46.348,
+              5.703
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 4.588,
+            "p95": 40.99,
+            "max": 40.99,
+            "raw": [
+              40.99,
+              4.588
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 0.932,
+            "p95": 1.097,
+            "max": 1.097,
+            "raw": [
+              1.097,
+              0.932
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 219.3125,
+            "p95": 222.390625,
+            "max": 222.390625,
+            "raw": [
+              219.3125,
+              222.390625
+            ]
+          },
+          "phases": [
+            {
+              "body.prepare": {
+                "microseconds": 23,
+                "calls": 5
+              },
+              "body.inlineProjection": {
+                "microseconds": 5,
+                "calls": 5
+              },
+              "body.taskProjection": {
+                "microseconds": 8,
+                "calls": 5
+              }
+            },
+            {
+              "body.prepare": {
+                "microseconds": 27,
+                "calls": 6
+              },
+              "body.inlineProjection": {
+                "microseconds": 0,
+                "calls": 6
+              },
+              "body.taskProjection": {
+                "microseconds": 11,
+                "calls": 6
+              }
+            }
+          ]
+        },
+        {
+          "operation": "liveToSource",
+          "latencyMs": {
+            "count": 2,
+            "p50": 10.588,
+            "p95": 13.429,
+            "max": 13.429,
+            "raw": [
+              10.588,
+              13.429
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 8.18,
+            "p95": 9.563,
+            "max": 9.563,
+            "raw": [
+              8.18,
+              9.563
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 1.263,
+            "p95": 1.57,
+            "max": 1.57,
+            "raw": [
+              1.57,
+              1.263
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 227.328125,
+            "p95": 244.453125,
+            "max": 244.453125,
+            "raw": [
+              227.328125,
+              244.453125
+            ]
+          },
+          "phases": [
+            {
+              "source.syntaxSpans": {
+                "microseconds": 4671,
+                "calls": 1
+              },
+              "source.quoteRanges": {
+                "microseconds": 120,
+                "calls": 1
+              },
+              "source.codeRanges": {
+                "microseconds": 110,
+                "calls": 1
+              },
+              "source.codeLayout": {
+                "microseconds": 286,
+                "calls": 1
+              }
+            },
+            {
+              "source.syntaxSpans": {
+                "microseconds": 5715,
+                "calls": 1
+              },
+              "source.quoteRanges": {
+                "microseconds": 123,
+                "calls": 1
+              },
+              "source.codeRanges": {
+                "microseconds": 109,
+                "calls": 1
+              },
+              "source.codeLayout": {
+                "microseconds": 372,
+                "calls": 1
+              }
+            }
+          ]
+        },
+        {
+          "operation": "sourceToReading",
+          "latencyMs": {
+            "count": 2,
+            "p50": 30.121,
+            "p95": 31.347,
+            "max": 31.347,
+            "raw": [
+              30.121,
+              31.347
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 3,
+            "p50": 27.053,
+            "p95": 47.005,
+            "max": 47.005,
+            "raw": [
+              27.053,
+              47.005,
+              27.004
+            ]
+          },
+          "rasterMs": {
+            "count": 3,
+            "p50": 1.769,
+            "p95": 2.005,
+            "max": 2.005,
+            "raw": [
+              2.005,
+              1.131,
+              1.769
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 238.59375,
+            "p95": 239.625,
+            "max": 239.625,
+            "raw": [
+              239.625,
+              238.59375
+            ]
+          },
+          "phases": [
+            {
+              "document.frontMatter": {
+                "microseconds": 1,
+                "calls": 1
+              },
+              "document.headings": {
+                "microseconds": 3905,
+                "calls": 1
+              },
+              "view.folding": {
+                "microseconds": 176,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 2055,
+                "calls": 1
+              },
+              "body.inlineProjection": {
+                "microseconds": 54,
+                "calls": 1
+              },
+              "body.taskProjection": {
+                "microseconds": 118,
+                "calls": 1
+              }
+            },
+            {
+              "document.frontMatter": {
+                "microseconds": 1,
+                "calls": 1
+              },
+              "document.headings": {
+                "microseconds": 3901,
+                "calls": 1
+              },
+              "view.folding": {
+                "microseconds": 165,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 1936,
+                "calls": 1
+              },
+              "body.inlineProjection": {
+                "microseconds": 50,
+                "calls": 1
+              },
+              "body.taskProjection": {
+                "microseconds": 115,
+                "calls": 1
+              }
+            }
+          ]
+        },
+        {
+          "operation": "readingToLive",
+          "latencyMs": {
+            "count": 2,
+            "p50": 49.203,
+            "p95": 50.839,
+            "max": 50.839,
+            "raw": [
+              49.203,
+              50.839
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 1,
+            "p50": 44.859,
+            "p95": 44.859,
+            "max": 44.859,
+            "raw": [
+              44.859
+            ]
+          },
+          "rasterMs": {
+            "count": 1,
+            "p50": 1.208,
+            "p95": 1.208,
+            "max": 1.208,
+            "raw": [
+              1.208
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 238.625,
+            "p95": 243.5625,
+            "max": 243.5625,
+            "raw": [
+              243.5625,
+              238.625
+            ]
+          },
+          "phases": [
+            {
+              "body.prepare": {
+                "microseconds": 55,
+                "calls": 13
+              },
+              "body.inlineProjection": {
+                "microseconds": 4,
+                "calls": 13
+              },
+              "body.taskProjection": {
+                "microseconds": 23,
+                "calls": 13
+              }
+            },
+            {
+              "body.prepare": {
+                "microseconds": 55,
+                "calls": 13
+              },
+              "body.inlineProjection": {
+                "microseconds": 5,
+                "calls": 13
+              },
+              "body.taskProjection": {
+                "microseconds": 23,
+                "calls": 13
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "utf8Bytes": 102400,
+      "utf16Units": 93710,
+      "lines": 1162,
+      "blocks": 490,
+      "budget": "default",
+      "controllerUsesMarkdown": true,
+      "liveUsesMarkdown": true,
+      "readingUsesMarkdown": true,
+      "readingFallbackBytes": 0,
+      "operations": [
+        {
+          "operation": "initialDisplay",
+          "latencyMs": {
+            "count": 2,
+            "p50": 178.327,
+            "p95": 182.908,
+            "max": 182.908,
+            "raw": [
+              182.908,
+              178.327
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 1.0,
+            "p95": 1.0,
+            "max": 1.0,
+            "raw": [
+              1.0,
+              1.0
+            ]
+          },
+          "buildMs": {
+            "count": 6,
+            "p50": 41.303,
+            "p95": 85.288,
+            "max": 85.288,
+            "raw": [
+              83.606,
+              41.303,
+              1.512,
+              85.288,
+              41.391,
+              1.484
+            ]
+          },
+          "rasterMs": {
+            "count": 6,
+            "p50": 1.116,
+            "p95": 1.311,
+            "max": 1.311,
+            "raw": [
+              1.185,
+              1.18,
+              1.311,
+              1.116,
+              1.067,
+              0.982
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 240.40625,
+            "p95": 241.46875,
+            "max": 241.46875,
+            "raw": [
+              241.46875,
+              240.40625
+            ]
+          },
+          "phases": [
+            {
+              "controller.preflight": {
+                "microseconds": 1905,
+                "calls": 1
+              },
+              "controller.references": {
+                "microseconds": 38926,
+                "calls": 1
+              },
+              "live.preflight": {
+                "microseconds": 1534,
+                "calls": 1
+              },
+              "live.references": {
+                "microseconds": 35756,
+                "calls": 1
+              },
+              "live.highlights": {
+                "microseconds": 283,
+                "calls": 1
+              },
+              "live.footnotes": {
+                "microseconds": 47,
+                "calls": 1
+              },
+              "live.blocks": {
+                "microseconds": 1292,
+                "calls": 1
+              },
+              "live.headings": {
+                "microseconds": 390,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 111,
+                "calls": 25
+              },
+              "body.inlineProjection": {
+                "microseconds": 8,
+                "calls": 25
+              },
+              "body.taskProjection": {
+                "microseconds": 47,
+                "calls": 25
+              }
+            },
+            {
+              "controller.preflight": {
+                "microseconds": 1592,
+                "calls": 1
+              },
+              "controller.references": {
+                "microseconds": 35435,
+                "calls": 1
+              },
+              "live.preflight": {
+                "microseconds": 2677,
+                "calls": 1
+              },
+              "live.references": {
+                "microseconds": 35568,
+                "calls": 1
+              },
+              "live.highlights": {
+                "microseconds": 267,
+                "calls": 1
+              },
+              "live.footnotes": {
+                "microseconds": 47,
+                "calls": 1
+              },
+              "live.blocks": {
+                "microseconds": 1278,
+                "calls": 1
+              },
+              "live.headings": {
+                "microseconds": 389,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 105,
+                "calls": 25
+              },
+              "body.inlineProjection": {
+                "microseconds": 8,
+                "calls": 25
+              },
+              "body.taskProjection": {
+                "microseconds": 45,
+                "calls": 25
+              }
+            }
+          ]
+        },
+        {
+          "operation": "selection",
+          "latencyMs": {
+            "count": 2,
+            "p50": 46.097,
+            "p95": 50.68,
+            "max": 50.68,
+            "raw": [
+              50.68,
+              46.097
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 43.607,
+            "p95": 46.554,
+            "max": 46.554,
+            "raw": [
+              46.554,
+              43.607
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 1.052,
+            "p95": 1.138,
+            "max": 1.138,
+            "raw": [
+              1.138,
+              1.052
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 244.1875,
+            "p95": 244.25,
+            "max": 244.25,
+            "raw": [
+              244.1875,
+              244.25
+            ]
+          },
+          "phases": [
+            {
+              "body.prepare": {
+                "microseconds": 71,
+                "calls": 12
+              },
+              "body.inlineProjection": {
+                "microseconds": 7,
+                "calls": 12
+              },
+              "body.taskProjection": {
+                "microseconds": 28,
+                "calls": 12
+              }
+            },
+            {
+              "body.prepare": {
+                "microseconds": 59,
+                "calls": 12
+              },
+              "body.inlineProjection": {
+                "microseconds": 4,
+                "calls": 12
+              },
+              "body.taskProjection": {
+                "microseconds": 26,
+                "calls": 12
+              }
+            }
+          ]
+        },
+        {
+          "operation": "typing",
+          "latencyMs": {
+            "count": 2,
+            "p50": 127.456,
+            "p95": 132.612,
+            "max": 132.612,
+            "raw": [
+              132.612,
+              127.456
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 1.0,
+            "p95": 1.0,
+            "max": 1.0,
+            "raw": [
+              1.0,
+              1.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 45.108,
+            "p95": 45.535,
+            "max": 45.535,
+            "raw": [
+              45.108,
+              45.535
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 1.156,
+            "p95": 1.202,
+            "max": 1.202,
+            "raw": [
+              1.202,
+              1.156
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 249.609375,
+            "p95": 253.0625,
+            "max": 253.0625,
+            "raw": [
+              249.609375,
+              253.0625
+            ]
+          },
+          "phases": [
+            {
+              "controller.preflight": {
+                "microseconds": 1763,
+                "calls": 1
+              },
+              "controller.references": {
+                "microseconds": 37735,
+                "calls": 1
+              },
+              "live.preflight": {
+                "microseconds": 3837,
+                "calls": 1
+              },
+              "live.references": {
+                "microseconds": 37593,
+                "calls": 1
+              },
+              "live.highlights": {
+                "microseconds": 288,
+                "calls": 1
+              },
+              "live.footnotes": {
+                "microseconds": 59,
+                "calls": 1
+              },
+              "live.blocks": {
+                "microseconds": 1318,
+                "calls": 1
+              },
+              "live.headings": {
+                "microseconds": 416,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 88,
+                "calls": 12
+              },
+              "body.inlineProjection": {
+                "microseconds": 5,
+                "calls": 12
+              },
+              "body.taskProjection": {
+                "microseconds": 26,
+                "calls": 12
+              }
+            },
+            {
+              "controller.preflight": {
+                "microseconds": 1546,
+                "calls": 1
+              },
+              "controller.references": {
+                "microseconds": 37448,
+                "calls": 1
+              },
+              "live.preflight": {
+                "microseconds": 1591,
+                "calls": 1
+              },
+              "live.references": {
+                "microseconds": 36592,
+                "calls": 1
+              },
+              "live.highlights": {
+                "microseconds": 319,
+                "calls": 1
+              },
+              "live.footnotes": {
+                "microseconds": 61,
+                "calls": 1
+              },
+              "live.blocks": {
+                "microseconds": 1308,
+                "calls": 1
+              },
+              "live.headings": {
+                "microseconds": 445,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 98,
+                "calls": 12
+              },
+              "body.inlineProjection": {
+                "microseconds": 5,
+                "calls": 12
+              },
+              "body.taskProjection": {
+                "microseconds": 28,
+                "calls": 12
+              }
+            }
+          ]
+        },
+        {
+          "operation": "scroll",
+          "latencyMs": {
+            "count": 2,
+            "p50": 5.768,
+            "p95": 49.656,
+            "max": 49.656,
+            "raw": [
+              49.656,
+              5.768
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 4.605,
+            "p95": 41.109,
+            "max": 41.109,
+            "raw": [
+              41.109,
+              4.605
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 0.988,
+            "p95": 1.064,
+            "max": 1.064,
+            "raw": [
+              1.064,
+              0.988
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 241.78125,
+            "p95": 244.859375,
+            "max": 244.859375,
+            "raw": [
+              241.78125,
+              244.859375
+            ]
+          },
+          "phases": [
+            {
+              "body.prepare": {
+                "microseconds": 23,
+                "calls": 5
+              },
+              "body.inlineProjection": {
+                "microseconds": 6,
+                "calls": 5
+              },
+              "body.taskProjection": {
+                "microseconds": 8,
+                "calls": 5
+              }
+            },
+            {
+              "body.prepare": {
+                "microseconds": 23,
+                "calls": 6
+              },
+              "body.inlineProjection": {
+                "microseconds": 0,
+                "calls": 6
+              },
+              "body.taskProjection": {
+                "microseconds": 11,
+                "calls": 6
+              }
+            }
+          ]
+        },
+        {
+          "operation": "liveToSource",
+          "latencyMs": {
+            "count": 2,
+            "p50": 149.241,
+            "p95": 7323.074,
+            "max": 7323.074,
+            "raw": [
+              7323.074,
+              149.241
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 140.318,
+            "p95": 145.575,
+            "max": 145.575,
+            "raw": [
+              140.318,
+              145.575
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 1.334,
+            "p95": 4.941,
+            "max": 4.941,
+            "raw": [
+              4.941,
+              1.334
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 395.0625,
+            "p95": 416.484375,
+            "max": 416.484375,
+            "raw": [
+              395.0625,
+              416.484375
+            ]
+          },
+          "phases": [
+            {
+              "source.syntaxSpans": {
+                "microseconds": 43136,
+                "calls": 1
+              },
+              "source.quoteRanges": {
+                "microseconds": 1053,
+                "calls": 1
+              },
+              "source.codeRanges": {
+                "microseconds": 1688,
+                "calls": 1
+              },
+              "source.codeLayout": {
+                "microseconds": 26819,
+                "calls": 1
+              }
+            },
+            {
+              "source.syntaxSpans": {
+                "microseconds": 44391,
+                "calls": 1
+              },
+              "source.quoteRanges": {
+                "microseconds": 1132,
+                "calls": 1
+              },
+              "source.codeRanges": {
+                "microseconds": 787,
+                "calls": 1
+              },
+              "source.codeLayout": {
+                "microseconds": 26827,
+                "calls": 1
+              }
+            }
+          ]
+        },
+        {
+          "operation": "sourceToReading",
+          "latencyMs": {
+            "count": 2,
+            "p50": 291.158,
+            "p95": 291.601,
+            "max": 291.601,
+            "raw": [
+              291.601,
+              291.158
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 283.639,
+            "p95": 285.08,
+            "max": 285.08,
+            "raw": [
+              283.639,
+              285.08
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 9.551,
+            "p95": 10.374,
+            "max": 10.374,
+            "raw": [
+              10.374,
+              9.551
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 355.40625,
+            "p95": 439.296875,
+            "max": 439.296875,
+            "raw": [
+              355.40625,
+              439.296875
+            ]
+          },
+          "phases": [
+            {
+              "document.frontMatter": {
+                "microseconds": 1,
+                "calls": 1
+              },
+              "document.headings": {
+                "microseconds": 36381,
+                "calls": 1
+              },
+              "view.folding": {
+                "microseconds": 1528,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 18941,
+                "calls": 1
+              },
+              "body.inlineProjection": {
+                "microseconds": 568,
+                "calls": 1
+              },
+              "body.taskProjection": {
+                "microseconds": 1140,
+                "calls": 1
+              }
+            },
+            {
+              "document.frontMatter": {
+                "microseconds": 1,
+                "calls": 1
+              },
+              "document.headings": {
+                "microseconds": 38090,
+                "calls": 1
+              },
+              "view.folding": {
+                "microseconds": 1585,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 19903,
+                "calls": 1
+              },
+              "body.inlineProjection": {
+                "microseconds": 615,
+                "calls": 1
+              },
+              "body.taskProjection": {
+                "microseconds": 1148,
+                "calls": 1
+              }
+            }
+          ]
+        },
+        {
+          "operation": "readingToLive",
+          "latencyMs": {
+            "count": 2,
+            "p50": 72.42,
+            "p95": 80.136,
+            "max": 80.136,
+            "raw": [
+              80.136,
+              72.42
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 49.632,
+            "p95": 51.232,
+            "max": 51.232,
+            "raw": [
+              51.232,
+              49.632
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 1.091,
+            "p95": 1.227,
+            "max": 1.227,
+            "raw": [
+              1.227,
+              1.091
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 360.3125,
+            "p95": 442.765625,
+            "max": 442.765625,
+            "raw": [
+              360.3125,
+              442.765625
+            ]
+          },
+          "phases": [
+            {
+              "body.prepare": {
+                "microseconds": 65,
+                "calls": 13
+              },
+              "body.inlineProjection": {
+                "microseconds": 7,
+                "calls": 13
+              },
+              "body.taskProjection": {
+                "microseconds": 26,
+                "calls": 13
+              }
+            },
+            {
+              "body.prepare": {
+                "microseconds": 62,
+                "calls": 13
+              },
+              "body.inlineProjection": {
+                "microseconds": 5,
+                "calls": 13
+              },
+              "body.taskProjection": {
+                "microseconds": 25,
+                "calls": 13
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "utf8Bytes": 102400,
+      "utf16Units": 93710,
+      "lines": 1162,
+      "blocks": 490,
+      "budget": "unlimited-controlled-corpus",
+      "controllerUsesMarkdown": true,
+      "liveUsesMarkdown": true,
+      "readingUsesMarkdown": true,
+      "readingFallbackBytes": 0,
+      "operations": [
+        {
+          "operation": "initialDisplay",
+          "latencyMs": {
+            "count": 2,
+            "p50": 180.076,
+            "p95": 182.381,
+            "max": 182.381,
+            "raw": [
+              182.381,
+              180.076
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 1.0,
+            "p95": 1.0,
+            "max": 1.0,
+            "raw": [
+              1.0,
+              1.0
+            ]
+          },
+          "buildMs": {
+            "count": 6,
+            "p50": 43.806,
+            "p95": 85.95,
+            "max": 85.95,
+            "raw": [
+              85.257,
+              45.32,
+              2.062,
+              85.95,
+              43.806,
+              1.562
+            ]
+          },
+          "rasterMs": {
+            "count": 6,
+            "p50": 1.027,
+            "p95": 1.473,
+            "max": 1.473,
+            "raw": [
+              1.001,
+              1.17,
+              1.473,
+              1.065,
+              1.027,
+              0.984
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 421.453125,
+            "p95": 422.421875,
+            "max": 422.421875,
+            "raw": [
+              421.453125,
+              422.421875
+            ]
+          },
+          "phases": [
+            {
+              "controller.preflight": {
+                "microseconds": 0,
+                "calls": 1
+              },
+              "controller.references": {
+                "microseconds": 37327,
+                "calls": 1
+              },
+              "live.preflight": {
+                "microseconds": 0,
+                "calls": 1
+              },
+              "live.references": {
+                "microseconds": 37812,
+                "calls": 1
+              },
+              "live.highlights": {
+                "microseconds": 273,
+                "calls": 1
+              },
+              "live.footnotes": {
+                "microseconds": 48,
+                "calls": 1
+              },
+              "live.blocks": {
+                "microseconds": 1366,
+                "calls": 1
+              },
+              "live.headings": {
+                "microseconds": 414,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 145,
+                "calls": 25
+              },
+              "body.inlineProjection": {
+                "microseconds": 10,
+                "calls": 25
+              },
+              "body.taskProjection": {
+                "microseconds": 53,
+                "calls": 25
+              }
+            },
+            {
+              "controller.preflight": {
+                "microseconds": 0,
+                "calls": 1
+              },
+              "controller.references": {
+                "microseconds": 38718,
+                "calls": 1
+              },
+              "live.preflight": {
+                "microseconds": 0,
+                "calls": 1
+              },
+              "live.references": {
+                "microseconds": 37033,
+                "calls": 1
+              },
+              "live.highlights": {
+                "microseconds": 336,
+                "calls": 1
+              },
+              "live.footnotes": {
+                "microseconds": 48,
+                "calls": 1
+              },
+              "live.blocks": {
+                "microseconds": 1333,
+                "calls": 1
+              },
+              "live.headings": {
+                "microseconds": 414,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 125,
+                "calls": 25
+              },
+              "body.inlineProjection": {
+                "microseconds": 11,
+                "calls": 25
+              },
+              "body.taskProjection": {
+                "microseconds": 49,
+                "calls": 25
+              }
+            }
+          ]
+        },
+        {
+          "operation": "selection",
+          "latencyMs": {
+            "count": 2,
+            "p50": 44.171,
+            "p95": 57.522,
+            "max": 57.522,
+            "raw": [
+              57.522,
+              44.171
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 41.716,
+            "p95": 50.793,
+            "max": 50.793,
+            "raw": [
+              50.793,
+              41.716
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 0.977,
+            "p95": 1.029,
+            "max": 1.029,
+            "raw": [
+              0.977,
+              1.029
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 418.453125,
+            "p95": 423.109375,
+            "max": 423.109375,
+            "raw": [
+              418.453125,
+              423.109375
+            ]
+          },
+          "phases": [
+            {
+              "body.prepare": {
+                "microseconds": 72,
+                "calls": 12
+              },
+              "body.inlineProjection": {
+                "microseconds": 8,
+                "calls": 12
+              },
+              "body.taskProjection": {
+                "microseconds": 31,
+                "calls": 12
+              }
+            },
+            {
+              "body.prepare": {
+                "microseconds": 113,
+                "calls": 12
+              },
+              "body.inlineProjection": {
+                "microseconds": 4,
+                "calls": 12
+              },
+              "body.taskProjection": {
+                "microseconds": 23,
+                "calls": 12
+              }
+            }
+          ]
+        },
+        {
+          "operation": "typing",
+          "latencyMs": {
+            "count": 2,
+            "p50": 125.605,
+            "p95": 134.377,
+            "max": 134.377,
+            "raw": [
+              134.377,
+              125.605
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 1.0,
+            "p95": 1.0,
+            "max": 1.0,
+            "raw": [
+              1.0,
+              1.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 44.506,
+            "p95": 47.842,
+            "max": 47.842,
+            "raw": [
+              47.842,
+              44.506
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 1.197,
+            "p95": 1.269,
+            "max": 1.269,
+            "raw": [
+              1.269,
+              1.197
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 413.4375,
+            "p95": 415.515625,
+            "max": 415.515625,
+            "raw": [
+              413.4375,
+              415.515625
+            ]
+          },
+          "phases": [
+            {
+              "controller.preflight": {
+                "microseconds": 0,
+                "calls": 1
+              },
+              "controller.references": {
+                "microseconds": 37810,
+                "calls": 1
+              },
+              "live.preflight": {
+                "microseconds": 0,
+                "calls": 1
+              },
+              "live.references": {
+                "microseconds": 40052,
+                "calls": 1
+              },
+              "live.highlights": {
+                "microseconds": 330,
+                "calls": 1
+              },
+              "live.footnotes": {
+                "microseconds": 60,
+                "calls": 1
+              },
+              "live.blocks": {
+                "microseconds": 1441,
+                "calls": 1
+              },
+              "live.headings": {
+                "microseconds": 446,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 95,
+                "calls": 12
+              },
+              "body.inlineProjection": {
+                "microseconds": 5,
+                "calls": 12
+              },
+              "body.taskProjection": {
+                "microseconds": 28,
+                "calls": 12
+              }
+            },
+            {
+              "controller.preflight": {
+                "microseconds": 0,
+                "calls": 1
+              },
+              "controller.references": {
+                "microseconds": 37504,
+                "calls": 1
+              },
+              "live.preflight": {
+                "microseconds": 0,
+                "calls": 1
+              },
+              "live.references": {
+                "microseconds": 38823,
+                "calls": 1
+              },
+              "live.highlights": {
+                "microseconds": 288,
+                "calls": 1
+              },
+              "live.footnotes": {
+                "microseconds": 48,
+                "calls": 1
+              },
+              "live.blocks": {
+                "microseconds": 1300,
+                "calls": 1
+              },
+              "live.headings": {
+                "microseconds": 480,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 63,
+                "calls": 12
+              },
+              "body.inlineProjection": {
+                "microseconds": 5,
+                "calls": 12
+              },
+              "body.taskProjection": {
+                "microseconds": 24,
+                "calls": 12
+              }
+            }
+          ]
+        },
+        {
+          "operation": "scroll",
+          "latencyMs": {
+            "count": 2,
+            "p50": 6.221,
+            "p95": 45.123,
+            "max": 45.123,
+            "raw": [
+              45.123,
+              6.221
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 5.087,
+            "p95": 40.252,
+            "max": 40.252,
+            "raw": [
+              40.252,
+              5.087
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 1.191,
+            "p95": 1.276,
+            "max": 1.276,
+            "raw": [
+              1.191,
+              1.276
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 408.234375,
+            "p95": 411.25,
+            "max": 411.25,
+            "raw": [
+              408.234375,
+              411.25
+            ]
+          },
+          "phases": [
+            {
+              "body.prepare": {
+                "microseconds": 27,
+                "calls": 5
+              },
+              "body.inlineProjection": {
+                "microseconds": 6,
+                "calls": 5
+              },
+              "body.taskProjection": {
+                "microseconds": 10,
+                "calls": 5
+              }
+            },
+            {
+              "body.prepare": {
+                "microseconds": 23,
+                "calls": 6
+              },
+              "body.inlineProjection": {
+                "microseconds": 0,
+                "calls": 6
+              },
+              "body.taskProjection": {
+                "microseconds": 12,
+                "calls": 6
+              }
+            }
+          ]
+        },
+        {
+          "operation": "liveToSource",
+          "latencyMs": {
+            "count": 2,
+            "p50": 146.2,
+            "p95": 152.839,
+            "max": 152.839,
+            "raw": [
+              152.839,
+              146.2
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 143.69,
+            "p95": 145.017,
+            "max": 145.017,
+            "raw": [
+              145.017,
+              143.69
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 1.271,
+            "p95": 1.507,
+            "max": 1.507,
+            "raw": [
+              1.507,
+              1.271
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 433.921875,
+            "p95": 456.59375,
+            "max": 456.59375,
+            "raw": [
+              433.921875,
+              456.59375
+            ]
+          },
+          "phases": [
+            {
+              "source.syntaxSpans": {
+                "microseconds": 44428,
+                "calls": 1
+              },
+              "source.quoteRanges": {
+                "microseconds": 1216,
+                "calls": 1
+              },
+              "source.codeRanges": {
+                "microseconds": 816,
+                "calls": 1
+              },
+              "source.codeLayout": {
+                "microseconds": 26445,
+                "calls": 1
+              }
+            },
+            {
+              "source.syntaxSpans": {
+                "microseconds": 44725,
+                "calls": 1
+              },
+              "source.quoteRanges": {
+                "microseconds": 1111,
+                "calls": 1
+              },
+              "source.codeRanges": {
+                "microseconds": 803,
+                "calls": 1
+              },
+              "source.codeLayout": {
+                "microseconds": 24454,
+                "calls": 1
+              }
+            }
+          ]
+        },
+        {
+          "operation": "sourceToReading",
+          "latencyMs": {
+            "count": 2,
+            "p50": 302.742,
+            "p95": 317.775,
+            "max": 317.775,
+            "raw": [
+              302.742,
+              317.775
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 298.119,
+            "p95": 310.178,
+            "max": 310.178,
+            "raw": [
+              298.119,
+              310.178
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 10.005,
+            "p95": 10.092,
+            "max": 10.092,
+            "raw": [
+              10.005,
+              10.092
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 449.84375,
+            "p95": 452.34375,
+            "max": 452.34375,
+            "raw": [
+              449.84375,
+              452.34375
+            ]
+          },
+          "phases": [
+            {
+              "document.frontMatter": {
+                "microseconds": 1,
+                "calls": 1
+              },
+              "document.headings": {
+                "microseconds": 36000,
+                "calls": 1
+              },
+              "view.folding": {
+                "microseconds": 1402,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 19332,
+                "calls": 1
+              },
+              "body.inlineProjection": {
+                "microseconds": 628,
+                "calls": 1
+              },
+              "body.taskProjection": {
+                "microseconds": 1082,
+                "calls": 1
+              }
+            },
+            {
+              "document.frontMatter": {
+                "microseconds": 1,
+                "calls": 1
+              },
+              "document.headings": {
+                "microseconds": 35611,
+                "calls": 1
+              },
+              "view.folding": {
+                "microseconds": 1400,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 19120,
+                "calls": 1
+              },
+              "body.inlineProjection": {
+                "microseconds": 537,
+                "calls": 1
+              },
+              "body.taskProjection": {
+                "microseconds": 1136,
+                "calls": 1
+              }
+            }
+          ]
+        },
+        {
+          "operation": "readingToLive",
+          "latencyMs": {
+            "count": 2,
+            "p50": 76.442,
+            "p95": 78.242,
+            "max": 78.242,
+            "raw": [
+              78.242,
+              76.442
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 49.16,
+            "p95": 51.093,
+            "max": 51.093,
+            "raw": [
+              49.16,
+              51.093
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 0.965,
+            "p95": 1.049,
+            "max": 1.049,
+            "raw": [
+              1.049,
+              0.965
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 452.921875,
+            "p95": 454.671875,
+            "max": 454.671875,
+            "raw": [
+              454.671875,
+              452.921875
+            ]
+          },
+          "phases": [
+            {
+              "body.prepare": {
+                "microseconds": 57,
+                "calls": 13
+              },
+              "body.inlineProjection": {
+                "microseconds": 4,
+                "calls": 13
+              },
+              "body.taskProjection": {
+                "microseconds": 22,
+                "calls": 13
+              }
+            },
+            {
+              "body.prepare": {
+                "microseconds": 64,
+                "calls": 13
+              },
+              "body.inlineProjection": {
+                "microseconds": 5,
+                "calls": 13
+              },
+              "body.taskProjection": {
+                "microseconds": 22,
+                "calls": 13
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "utf8Bytes": 1048576,
+      "utf16Units": 959656,
+      "lines": 11897,
+      "blocks": 5010,
+      "budget": "default",
+      "controllerUsesMarkdown": false,
+      "liveUsesMarkdown": false,
+      "readingUsesMarkdown": false,
+      "readingFallbackBytes": 65536,
+      "operations": [
+        {
+          "operation": "initialDisplay",
+          "latencyMs": {
+            "count": 2,
+            "p50": 139.101,
+            "p95": 141.64,
+            "max": 141.64,
+            "raw": [
+              139.101,
+              141.64
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 1.0,
+            "p95": 1.0,
+            "max": 1.0,
+            "raw": [
+              1.0,
+              1.0
+            ]
+          },
+          "buildMs": {
+            "count": 6,
+            "p50": 11.49,
+            "p95": 77.792,
+            "max": 77.792,
+            "raw": [
+              77.792,
+              11.783,
+              0.088,
+              74.809,
+              11.49,
+              0.108
+            ]
+          },
+          "rasterMs": {
+            "count": 6,
+            "p50": 0.613,
+            "p95": 1.994,
+            "max": 1.994,
+            "raw": [
+              0.613,
+              1.994,
+              0.472,
+              0.653,
+              1.921,
+              0.451
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 1089.71875,
+            "p95": 1095.8125,
+            "max": 1095.8125,
+            "raw": [
+              1089.71875,
+              1095.8125
+            ]
+          },
+          "phases": [
+            {
+              "controller.preflight": {
+                "microseconds": 2464,
+                "calls": 1
+              },
+              "live.preflight": {
+                "microseconds": 2462,
+                "calls": 1
+              }
+            },
+            {
+              "controller.preflight": {
+                "microseconds": 2270,
+                "calls": 1
+              },
+              "live.preflight": {
+                "microseconds": 2386,
+                "calls": 1
+              }
+            }
+          ]
+        },
+        {
+          "operation": "selection",
+          "latencyMs": {
+            "count": 2,
+            "p50": 32.102,
+            "p95": 64663.452,
+            "max": 64663.452,
+            "raw": [
+              64663.452,
+              32.102
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 11.12,
+            "p95": 12.185,
+            "max": 12.185,
+            "raw": [
+              12.185,
+              11.12
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 1.973,
+            "p95": 5.785,
+            "max": 5.785,
+            "raw": [
+              5.785,
+              1.973
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 1110.578125,
+            "p95": 1113.453125,
+            "max": 1113.453125,
+            "raw": [
+              1110.578125,
+              1113.453125
+            ]
+          },
+          "phases": [
+            {},
+            {}
+          ]
+        },
+        {
+          "operation": "typing",
+          "latencyMs": {
+            "count": 2,
+            "p50": 348.57,
+            "p95": 377.908,
+            "max": 377.908,
+            "raw": [
+              348.57,
+              377.908
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 1.0,
+            "p95": 1.0,
+            "max": 1.0,
+            "raw": [
+              1.0,
+              1.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 338.028,
+            "p95": 369.603,
+            "max": 369.603,
+            "raw": [
+              338.028,
+              369.603
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 3.759,
+            "p95": 4.674,
+            "max": 4.674,
+            "raw": [
+              4.674,
+              3.759
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 1298.453125,
+            "p95": 1358.9375,
+            "max": 1358.9375,
+            "raw": [
+              1358.9375,
+              1298.453125
+            ]
+          },
+          "phases": [
+            {
+              "controller.preflight": {
+                "microseconds": 2583,
+                "calls": 1
+              },
+              "live.preflight": {
+                "microseconds": 2126,
+                "calls": 1
+              }
+            },
+            {
+              "controller.preflight": {
+                "microseconds": 2238,
+                "calls": 1
+              },
+              "live.preflight": {
+                "microseconds": 2204,
+                "calls": 1
+              }
+            }
+          ]
+        },
+        {
+          "operation": "scroll",
+          "latencyMs": {
+            "count": 2,
+            "p50": 8.857,
+            "p95": 11.546,
+            "max": 11.546,
+            "raw": [
+              11.546,
+              8.857
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 3,
+            "p50": 5.17,
+            "p95": 5.606,
+            "max": 5.606,
+            "raw": [
+              5.17,
+              5.606,
+              0.081
+            ]
+          },
+          "rasterMs": {
+            "count": 3,
+            "p50": 1.795,
+            "p95": 3.733,
+            "max": 3.733,
+            "raw": [
+              3.733,
+              1.795,
+              0.633
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 1298.140625,
+            "p95": 1300.59375,
+            "max": 1300.59375,
+            "raw": [
+              1298.140625,
+              1300.59375
+            ]
+          },
+          "phases": [
+            {},
+            {}
+          ]
+        },
+        {
+          "operation": "liveToSource",
+          "latencyMs": {
+            "count": 2,
+            "p50": 13.968,
+            "p95": 18.998,
+            "max": 18.998,
+            "raw": [
+              13.968,
+              18.998
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 11.667,
+            "p95": 12.251,
+            "max": 12.251,
+            "raw": [
+              12.251,
+              11.667
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 1.826,
+            "p95": 4.405,
+            "max": 4.405,
+            "raw": [
+              4.405,
+              1.826
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 1317.875,
+            "p95": 1333.421875,
+            "max": 1333.421875,
+            "raw": [
+              1317.875,
+              1333.421875
+            ]
+          },
+          "phases": [
+            {},
+            {}
+          ]
+        },
+        {
+          "operation": "sourceToReading",
+          "latencyMs": {
+            "count": 2,
+            "p50": 15.675,
+            "p95": 16.76,
+            "max": 16.76,
+            "raw": [
+              16.76,
+              15.675
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 9.536,
+            "p95": 10.52,
+            "max": 10.52,
+            "raw": [
+              10.52,
+              9.536
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 0.496,
+            "p95": 1.107,
+            "max": 1.107,
+            "raw": [
+              1.107,
+              0.496
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 1324.3125,
+            "p95": 1338.90625,
+            "max": 1338.90625,
+            "raw": [
+              1324.3125,
+              1338.90625
+            ]
+          },
+          "phases": [
+            {},
+            {}
+          ]
+        },
+        {
+          "operation": "readingToLive",
+          "latencyMs": {
+            "count": 2,
+            "p50": 70.929,
+            "p95": 71.738,
+            "max": 71.738,
+            "raw": [
+              71.738,
+              70.929
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 70.165,
+            "p95": 70.942,
+            "max": 70.942,
+            "raw": [
+              70.942,
+              70.165
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 0.771,
+            "p95": 0.859,
+            "max": 0.859,
+            "raw": [
+              0.859,
+              0.771
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 1336.546875,
+            "p95": 1347.046875,
+            "max": 1347.046875,
+            "raw": [
+              1336.546875,
+              1347.046875
+            ]
+          },
+          "phases": [
+            {},
+            {}
+          ]
+        }
+      ]
+    },
+    {
+      "utf8Bytes": 1048576,
+      "utf16Units": 959656,
+      "lines": 11897,
+      "blocks": 5010,
+      "budget": "unlimited-controlled-corpus",
+      "controllerUsesMarkdown": true,
+      "liveUsesMarkdown": true,
+      "readingUsesMarkdown": true,
+      "readingFallbackBytes": 0,
+      "operations": [
+        {
+          "operation": "initialDisplay",
+          "latencyMs": {
+            "count": 2,
+            "p50": 864.04,
+            "p95": 882.839,
+            "max": 882.839,
+            "raw": [
+              882.839,
+              864.04
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 1.0,
+            "p95": 1.0,
+            "max": 1.0,
+            "raw": [
+              1.0,
+              1.0
+            ]
+          },
+          "buildMs": {
+            "count": 6,
+            "p50": 43.213,
+            "p95": 443.974,
+            "max": 443.974,
+            "raw": [
+              443.974,
+              43.875,
+              1.706,
+              436.51,
+              43.213,
+              1.449
+            ]
+          },
+          "rasterMs": {
+            "count": 6,
+            "p50": 1.085,
+            "p95": 1.386,
+            "max": 1.386,
+            "raw": [
+              1.386,
+              1.125,
+              1.284,
+              1.085,
+              1.053,
+              0.956
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 1361.90625,
+            "p95": 1363.828125,
+            "max": 1363.828125,
+            "raw": [
+              1363.828125,
+              1361.90625
+            ]
+          },
+          "phases": [
+            {
+              "controller.preflight": {
+                "microseconds": 0,
+                "calls": 1
+              },
+              "controller.references": {
+                "microseconds": 377908,
+                "calls": 1
+              },
+              "live.preflight": {
+                "microseconds": 0,
+                "calls": 1
+              },
+              "live.references": {
+                "microseconds": 373818,
+                "calls": 1
+              },
+              "live.highlights": {
+                "microseconds": 3058,
+                "calls": 1
+              },
+              "live.footnotes": {
+                "microseconds": 475,
+                "calls": 1
+              },
+              "live.blocks": {
+                "microseconds": 12057,
+                "calls": 1
+              },
+              "live.headings": {
+                "microseconds": 4473,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 136,
+                "calls": 25
+              },
+              "body.inlineProjection": {
+                "microseconds": 9,
+                "calls": 25
+              },
+              "body.taskProjection": {
+                "microseconds": 47,
+                "calls": 25
+              }
+            },
+            {
+              "controller.preflight": {
+                "microseconds": 0,
+                "calls": 1
+              },
+              "controller.references": {
+                "microseconds": 367915,
+                "calls": 1
+              },
+              "live.preflight": {
+                "microseconds": 0,
+                "calls": 1
+              },
+              "live.references": {
+                "microseconds": 366573,
+                "calls": 1
+              },
+              "live.highlights": {
+                "microseconds": 2935,
+                "calls": 1
+              },
+              "live.footnotes": {
+                "microseconds": 474,
+                "calls": 1
+              },
+              "live.blocks": {
+                "microseconds": 11481,
+                "calls": 1
+              },
+              "live.headings": {
+                "microseconds": 5124,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 114,
+                "calls": 25
+              },
+              "body.inlineProjection": {
+                "microseconds": 8,
+                "calls": 25
+              },
+              "body.taskProjection": {
+                "microseconds": 61,
+                "calls": 25
+              }
+            }
+          ]
+        },
+        {
+          "operation": "selection",
+          "latencyMs": {
+            "count": 2,
+            "p50": 49.012,
+            "p95": 53.772,
+            "max": 53.772,
+            "raw": [
+              53.772,
+              49.012
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 45.012,
+            "p95": 46.39,
+            "max": 46.39,
+            "raw": [
+              45.012,
+              46.39
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 1.099,
+            "p95": 1.171,
+            "max": 1.171,
+            "raw": [
+              1.099,
+              1.171
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 1360.953125,
+            "p95": 1364.859375,
+            "max": 1364.859375,
+            "raw": [
+              1360.953125,
+              1364.859375
+            ]
+          },
+          "phases": [
+            {
+              "body.prepare": {
+                "microseconds": 86,
+                "calls": 12
+              },
+              "body.inlineProjection": {
+                "microseconds": 6,
+                "calls": 12
+              },
+              "body.taskProjection": {
+                "microseconds": 30,
+                "calls": 12
+              }
+            },
+            {
+              "body.prepare": {
+                "microseconds": 104,
+                "calls": 12
+              },
+              "body.inlineProjection": {
+                "microseconds": 5,
+                "calls": 12
+              },
+              "body.taskProjection": {
+                "microseconds": 29,
+                "calls": 12
+              }
+            }
+          ]
+        },
+        {
+          "operation": "typing",
+          "latencyMs": {
+            "count": 2,
+            "p50": 811.731,
+            "p95": 830.037,
+            "max": 830.037,
+            "raw": [
+              830.037,
+              811.731
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 1.0,
+            "p95": 1.0,
+            "max": 1.0,
+            "raw": [
+              1.0,
+              1.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 45.578,
+            "p95": 45.804,
+            "max": 45.804,
+            "raw": [
+              45.578,
+              45.804
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 1.555,
+            "p95": 1.743,
+            "max": 1.743,
+            "raw": [
+              1.555,
+              1.743
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 1365.359375,
+            "p95": 1370.921875,
+            "max": 1370.921875,
+            "raw": [
+              1365.359375,
+              1370.921875
+            ]
+          },
+          "phases": [
+            {
+              "controller.preflight": {
+                "microseconds": 0,
+                "calls": 1
+              },
+              "controller.references": {
+                "microseconds": 383668,
+                "calls": 1
+              },
+              "live.preflight": {
+                "microseconds": 0,
+                "calls": 1
+              },
+              "live.references": {
+                "microseconds": 370030,
+                "calls": 1
+              },
+              "live.highlights": {
+                "microseconds": 3233,
+                "calls": 1
+              },
+              "live.footnotes": {
+                "microseconds": 473,
+                "calls": 1
+              },
+              "live.blocks": {
+                "microseconds": 12206,
+                "calls": 1
+              },
+              "live.headings": {
+                "microseconds": 4435,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 60,
+                "calls": 12
+              },
+              "body.inlineProjection": {
+                "microseconds": 4,
+                "calls": 12
+              },
+              "body.taskProjection": {
+                "microseconds": 24,
+                "calls": 12
+              }
+            },
+            {
+              "controller.preflight": {
+                "microseconds": 0,
+                "calls": 1
+              },
+              "controller.references": {
+                "microseconds": 372925,
+                "calls": 1
+              },
+              "live.preflight": {
+                "microseconds": 0,
+                "calls": 1
+              },
+              "live.references": {
+                "microseconds": 361806,
+                "calls": 1
+              },
+              "live.highlights": {
+                "microseconds": 3057,
+                "calls": 1
+              },
+              "live.footnotes": {
+                "microseconds": 522,
+                "calls": 1
+              },
+              "live.blocks": {
+                "microseconds": 12184,
+                "calls": 1
+              },
+              "live.headings": {
+                "microseconds": 4581,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 63,
+                "calls": 12
+              },
+              "body.inlineProjection": {
+                "microseconds": 6,
+                "calls": 12
+              },
+              "body.taskProjection": {
+                "microseconds": 24,
+                "calls": 12
+              }
+            }
+          ]
+        },
+        {
+          "operation": "scroll",
+          "latencyMs": {
+            "count": 2,
+            "p50": 6.36,
+            "p95": 43.213,
+            "max": 43.213,
+            "raw": [
+              43.213,
+              6.36
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 5.189,
+            "p95": 41.259,
+            "max": 41.259,
+            "raw": [
+              41.259,
+              5.189
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 0.917,
+            "p95": 1.132,
+            "max": 1.132,
+            "raw": [
+              1.132,
+              0.917
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 1396.703125,
+            "p95": 1399.734375,
+            "max": 1399.734375,
+            "raw": [
+              1396.703125,
+              1399.734375
+            ]
+          },
+          "phases": [
+            {
+              "body.prepare": {
+                "microseconds": 23,
+                "calls": 5
+              },
+              "body.inlineProjection": {
+                "microseconds": 5,
+                "calls": 5
+              },
+              "body.taskProjection": {
+                "microseconds": 9,
+                "calls": 5
+              }
+            },
+            {
+              "body.prepare": {
+                "microseconds": 29,
+                "calls": 6
+              },
+              "body.inlineProjection": {
+                "microseconds": 0,
+                "calls": 6
+              },
+              "body.taskProjection": {
+                "microseconds": 11,
+                "calls": 6
+              }
+            }
+          ]
+        },
+        {
+          "operation": "liveToSource",
+          "latencyMs": {
+            "count": 2,
+            "p50": 6336.444,
+            "p95": 6419.468,
+            "max": 6419.468,
+            "raw": [
+              6336.444,
+              6419.468
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 6330.325,
+            "p95": 6406.681,
+            "max": 6406.681,
+            "raw": [
+              6330.325,
+              6406.681
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 5.395,
+            "p95": 9.122,
+            "max": 9.122,
+            "raw": [
+              5.395,
+              9.122
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 2021.0,
+            "p95": 2464.265625,
+            "max": 2464.265625,
+            "raw": [
+              2021.0,
+              2464.265625
+            ]
+          },
+          "phases": [
+            {
+              "source.syntaxSpans": {
+                "microseconds": 489911,
+                "calls": 1
+              },
+              "source.quoteRanges": {
+                "microseconds": 10325,
+                "calls": 1
+              },
+              "source.codeRanges": {
+                "microseconds": 8858,
+                "calls": 1
+              },
+              "source.codeLayout": {
+                "microseconds": 282410,
+                "calls": 1
+              }
+            },
+            {
+              "source.syntaxSpans": {
+                "microseconds": 471636,
+                "calls": 1
+              },
+              "source.quoteRanges": {
+                "microseconds": 10445,
+                "calls": 1
+              },
+              "source.codeRanges": {
+                "microseconds": 8470,
+                "calls": 1
+              },
+              "source.codeLayout": {
+                "microseconds": 318070,
+                "calls": 1
+              }
+            }
+          ]
+        },
+        {
+          "operation": "sourceToReading",
+          "latencyMs": {
+            "count": 2,
+            "p50": 3380.495,
+            "p95": 3637.906,
+            "max": 3637.906,
+            "raw": [
+              3637.906,
+              3380.495
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 3344.014,
+            "p95": 3586.712,
+            "max": 3586.712,
+            "raw": [
+              3586.712,
+              3344.014
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 94.929,
+            "p95": 132.614,
+            "max": 132.614,
+            "raw": [
+              132.614,
+              94.929
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 2385.265625,
+            "p95": 2536.09375,
+            "max": 2536.09375,
+            "raw": [
+              2536.09375,
+              2385.265625
+            ]
+          },
+          "phases": [
+            {
+              "document.frontMatter": {
+                "microseconds": 1,
+                "calls": 1
+              },
+              "document.headings": {
+                "microseconds": 716479,
+                "calls": 1
+              },
+              "view.folding": {
+                "microseconds": 15997,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 194541,
+                "calls": 1
+              },
+              "body.inlineProjection": {
+                "microseconds": 6035,
+                "calls": 1
+              },
+              "body.taskProjection": {
+                "microseconds": 11406,
+                "calls": 1
+              }
+            },
+            {
+              "document.frontMatter": {
+                "microseconds": 1,
+                "calls": 1
+              },
+              "document.headings": {
+                "microseconds": 384043,
+                "calls": 1
+              },
+              "view.folding": {
+                "microseconds": 16313,
+                "calls": 1
+              },
+              "body.prepare": {
+                "microseconds": 197013,
+                "calls": 1
+              },
+              "body.inlineProjection": {
+                "microseconds": 6220,
+                "calls": 1
+              },
+              "body.taskProjection": {
+                "microseconds": 11803,
+                "calls": 1
+              }
+            }
+          ]
+        },
+        {
+          "operation": "readingToLive",
+          "latencyMs": {
+            "count": 2,
+            "p50": 556.222,
+            "p95": 894.375,
+            "max": 894.375,
+            "raw": [
+              894.375,
+              556.222
+            ]
+          },
+          "documentParses": {
+            "count": 2,
+            "p50": 0.0,
+            "p95": 0.0,
+            "max": 0.0,
+            "raw": [
+              0.0,
+              0.0
+            ]
+          },
+          "buildMs": {
+            "count": 2,
+            "p50": 86.829,
+            "p95": 88.156,
+            "max": 88.156,
+            "raw": [
+              88.156,
+              86.829
+            ]
+          },
+          "rasterMs": {
+            "count": 2,
+            "p50": 1.264,
+            "p95": 1.903,
+            "max": 1.903,
+            "raw": [
+              1.903,
+              1.264
+            ]
+          },
+          "frameAttribution": "engine-vsync-intervals",
+          "rssMiB": {
+            "count": 2,
+            "p50": 1858.015625,
+            "p95": 2395.515625,
+            "max": 2395.515625,
+            "raw": [
+              1858.015625,
+              2395.515625
+            ]
+          },
+          "phases": [
+            {
+              "body.prepare": {
+                "microseconds": 61,
+                "calls": 13
+              },
+              "body.inlineProjection": {
+                "microseconds": 5,
+                "calls": 13
+              },
+              "body.taskProjection": {
+                "microseconds": 24,
+                "calls": 13
+              }
+            },
+            {
+              "body.prepare": {
+                "microseconds": 58,
+                "calls": 13
+              },
+              "body.inlineProjection": {
+                "microseconds": 4,
+                "calls": 13
+              },
+              "body.taskProjection": {
+                "microseconds": 24,
+                "calls": 13
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "operationTimeoutSeconds": 900,
+  "sampleTimeoutSeconds": 120,
+  "lastSample": {
+    "utf8Bytes": 1048576,
+    "budget": "unlimited",
+    "operation": "readingToLive",
+    "stage": "sample",
+    "index": 1,
+    "event": "end",
+    "timelineMicros": 853034746729,
+    "latencyMs": 556.222,
+    "documentParses": 0.0,
+    "rssMiB": 2395.515625,
+    "firstFrameMicros": 853030826458,
+    "lastFrameMicros": 853034376516,
+    "phases": {
+      "body.prepare": {
+        "microseconds": 58,
+        "calls": 13
+      },
+      "body.inlineProjection": {
+        "microseconds": 4,
+        "calls": 13
+      },
+      "body.taskProjection": {
+        "microseconds": 24,
+        "calls": 13
+      }
+    }
+  },
+  "sampleTraceFile": "r2-attribution-1.samples.jsonl",
+  "sampleTraceSha256": "b79563dca55b605650ce0fcbfdb5684539cbfa2c4433a86de9fb446d2872361e",
+  "wallSeconds": 240.7311695839744,
+  "runFinishedAtUtc": "2026-10-10T05:11:29.174949+00:00",
+  "runnerSha256": "d1ab0753a8d274683b2ee9b53e088f6a19139213da654450e75ecd59effcae35",
+  "revision": "dba969de21f2caf3f375a740a2e64226e091896b",
+  "trackedDiffSha256": "68fd203547412a41f0f006e719d1c371bab262bb87611b5f18a2209d79f5e91c",
+  "sourceFilesSha256": {
+    "lib/ianvs_markdown.dart": "4717d9a878593198dab46aba89e460c7d064c633b101aeeee21cc37bd9ef4daa",
+    "lib/src/blocked_image.dart": "e92a5d2af3935d1a549f9b96cafebb0513a1539ef39d95805ac5dfbd37b7a627",
+    "lib/src/callout.dart": "bee2b168e63d78028dd610cb9650599401e59de447903795574fc2fe3a7cf904",
+    "lib/src/code_block.dart": "e45bc9752455150ce4a5a6643fab348d7b086b15607538b27f1f4191ab9d318a",
+    "lib/src/code_surface.dart": "cf32f71e0bd6d2889d83bfbd70d0af4606777e91beeeaa4d19ef9fc7e9fca1de",
+    "lib/src/editor/editor_controller.dart": "61acfc0d5b46a82490273d10960f31b78a6783ef08d2e85c1f6fbe24ee5d36c1",
+    "lib/src/editor/editor_diagnostics.dart": "cf8fa1bed61246603600d5b35a43283806cc8add7d092734618688f8a5cf0666",
+    "lib/src/editor/editor_models.dart": "be569da9a9b93052dc3728f8a2b12f18be02e951282e2fd69000a254c97952f7",
+    "lib/src/editor/editor_shortcuts.dart": "bdc0676fbf7bb862cd410040920cb18943b1765246de0c811f88320d1b995e43",
+    "lib/src/editor/editor_toolbar.dart": "e9f0e46babbbae31686544d341d94994615c7bd0b72f4a6cfd6e2b601ac9042b",
+    "lib/src/editor/live_editor.dart": "bfb0a63fa56e2705971b751543b086aa54f6a7fd44b5502b193fd05153361fa8",
+    "lib/src/editor/markdown_code_ranges.dart": "05f9833b8a5443b1ed8780fb4dc368b3cd106931d57c7ec5979029dc8a116688",
+    "lib/src/editor/markdown_paste.dart": "b15e67f356c31674df91b193ce72c84c5d58a4ac634c3d57fbe8edbcae3a0f8e",
+    "lib/src/editor/reference_links.dart": "3088d5fe17c589db4148bf9adac3f8183a16fe5b69226becd210b605a15c6b42",
+    "lib/src/editor/source_editor.dart": "bbd1bc37042d3c9a547342958c444b6f0910befc3deb63c8de019572a2657990",
+    "lib/src/emphasis.dart": "5bdc393917dfa0155bd39b394ff815f721cdab7e844002e6994ecb9a2189c94b",
+    "lib/src/footnote_syntax.dart": "0f0ff84f714befe38e182a4a7fc76740bd4077994310179856e221dab3970252",
+    "lib/src/front_matter.dart": "f6ee4b2da15b99c3a8b09f05d7b6dfc6060d0a27ca45f3c4855807b0f43c947d",
+    "lib/src/front_matter_card.dart": "bf5f1d7c391b09dd80e4b9d83ae1eab1675afc1a547afd6b685182454ea15f05",
+    "lib/src/heading_folding.dart": "26e651bf766becbbaa01a4504d272d68c0e9c88766800ac41cea08d0d331ee7e",
+    "lib/src/highlight.dart": "8816caedb541ffa0f8f82adb793d7a556d792b7a16eb253fe983c432c53ba76c",
+    "lib/src/html_blockquote.dart": "cf1e5dd26fc40ba1e9382dc0c4b98251193ee7b6386a63186a6b147b66fc6ada",
+    "lib/src/html_button.dart": "cd6051ce57b512fb29543bf0f92e45b674988157d34a9a76b6e097f6093218f1",
+    "lib/src/html_center.dart": "f180d4af039a43d48aa0c4d0b55d95a6f176cf8055fc5dd606470b03b386b055",
+    "lib/src/html_checkbox.dart": "36976a762c3b42f7c3246e468b35546ada7eed927fbce39b23e0ee63e02a1e7d",
+    "lib/src/html_date_input.dart": "38f47eb59836f42ebb0e6081138a8a9b8fe70649895eb6ebedd587bab3274160",
+    "lib/src/html_definition_list.dart": "18335a1729074cf1adbff8d6ba144b13b8d4eb942de203f1230052ab1b3225ac",
+    "lib/src/html_details.dart": "06cc32b910ae3c92452c4328dce7904d6ae082dd6fb3c7ed0d76a347633678a2",
+    "lib/src/html_fieldset.dart": "810f2c1fff5e316ca1de42dad4968a66d6899ca24bddf7cd7630f18c97ea92c3",
+    "lib/src/html_figure.dart": "5d14795bbf7866b103dbf66539ce9e81e96c1b03a4fdf2b245faa6398fa433b5",
+    "lib/src/html_hr.dart": "db3808b279207bdca438d8b93891fcfdcd2c1ce3dd00bcc038bf56e0d916c3fe",
+    "lib/src/html_meter.dart": "f4fc90aecdff4739074343c5a2bf4c8790b02ac03da07f0682d5470ef441c0d2",
+    "lib/src/html_number_input.dart": "29256b91ecfd5da868d43c3fdaed04f0259ccc6d03fd07e78e852314ffb4bba3",
+    "lib/src/html_ordered_list.dart": "b7cba5190585c4da4996a5792ccbecd588bf35dd2a2fc122c94c79dd2150df35",
+    "lib/src/html_password_input.dart": "ce2be1602243962a9736beec7e1db0cecd459ffd033af8c9aacaaab93effddc6",
+    "lib/src/html_pre.dart": "47509c4286a427a7013e29004ff6b65b8717bb50642c4060d30ec282024fa9b0",
+    "lib/src/html_progress.dart": "35ed4ba18ac503255a2e3022b2b12cb73daca34cd56f76759ee0065d84ee4bab",
+    "lib/src/html_radio_group.dart": "2e19f2f694ef25056e61a47005df2f84cb684ac706675422cb22d1fae8844dc8",
+    "lib/src/html_range_input.dart": "54f5ad95b8c2f01671e848f0bf809a051466af160d63844978157fc51f62587d",
+    "lib/src/html_ruby.dart": "18fb6766ba19b8b00f1bb90a3931eba8545614a6ecabc648a45d8f2cb8459b0a",
+    "lib/src/html_select.dart": "1d52f223cf710ccd481f6d111995c2d93994967e6c9090482666bfc1a802f92e",
+    "lib/src/html_table.dart": "aa9524b1cae2298ddcb75fd7d722079d0afb2e2c12db1d5108a1197dcd9d0d10",
+    "lib/src/html_temporal_input.dart": "bea804ac2b4eadcc151e5e6464b997925cdf68ea1fd16238e5a9bccb2f4b48d1",
+    "lib/src/html_text_input.dart": "821fc2d8fdb99218fc3312ecb3718d574903b37f85cf1c5c9b0313177b6c1102",
+    "lib/src/html_textarea.dart": "f721ba475750c4c1d53a862d13eb611302856d2dce3b57cc400668330ee21a11",
+    "lib/src/html_time_input.dart": "def7530d1faea0862ee4737a4542cb18c2ac6be0a277f4a2415cdbed91369a70",
+    "lib/src/html_unordered_list.dart": "1c25614cce2aed8b8d65aae2452a2a3d9dafd113863fba5c17e48668508fbc9a",
+    "lib/src/ianvs_markdown.dart": "796eb71d32f0fe9095667f5fe09fcd026fb3576cb54216a67dfadf7fb4d5274f",
+    "lib/src/inline_code.dart": "391e300068a48c800018c7c0a65098990e86f033df622d6e3cf051c5aac4fe3a",
+    "lib/src/inline_link.dart": "b457ed9ab562abd9e10a0191ee749e80f65de598e8b38be0af373b9316a2089d",
+    "lib/src/keyboard.dart": "5fb3a1c96370f44676949c6c59432a1783be3037b6d724e27d772283d4e6baba",
+    "lib/src/list_guide.dart": "ab0d542ff7636c0f77b673e4ef7769f5f669bc6ff528dace2b8c51125862d733",
+    "lib/src/localization.dart": "969852acf7aafd309d9ad8850db75fe3d6d2236cc0c16428ddcb688051521a75",
+    "lib/src/markdown_document.dart": "4b3a0ef5f8460aa75b9d0f0a9a25300730d11f5361cf0bf3e89b52442e275a2f",
+    "lib/src/markdown_link_source.dart": "ac2500fdf9863ae604b5d6ef590568dea1d0cee03cca9931a7f8461b9f5e2894",
+    "lib/src/markdown_list_syntax.dart": "7f4f8a7c5a0c7a4fd1e53f595d80536190fccd842fd87ff16cd6072327a568a7",
+    "lib/src/markdown_table_syntax.dart": "6c678deceb47cf6b6437f829b259b4b1b30d64d06ab4fff819ead119025ad5a1",
+    "lib/src/math.dart": "314d704a708aec5a8cf447e10a339b5a5b006b63a561861e719661df9d07a229",
+    "lib/src/obsidian_autolink.dart": "19ba84c275290dbe50a5c84fa7ce694397592a6719f0f2ab308fa0c2778f158e",
+    "lib/src/obsidian_html.dart": "eb7a0286107f90fd0ba0ef886f7e94f67606f74a60e181ae052291a36abf4ea4",
+    "lib/src/obsidian_image.dart": "5aa391233da69b3c33defe320630b9a3b511b394b483a1eb827fb048fa1e8648",
+    "lib/src/obsidian_inline.dart": "35d4f460b6fc22a8828e93a9dd35b1d67a37dd0f640481586d94a0cd26a32659",
+    "lib/src/obsidian_metadata.dart": "46b52438baef8305c21f08a08830a0a4f74e459cf890579e6770bfb294098658",
+    "lib/src/render_budget.dart": "9be9993ea8f7548d0d5d926acdee7ce49a9c2efc43cd84b96e5a9942ce151ddf",
+    "lib/src/rich_clipboard.dart": "b533a659e3aca652aacbf1e813f08a56f30edd3b2d7f4e76c105e98b70f51415",
+    "lib/src/scroll_fade_region.dart": "a3972a9b032322b0ecf9e8172cc2bda7bc24d8773ac0e05f1613da18c537b6f5",
+    "lib/src/strikethrough.dart": "e6a0d34ffe1e16974e7a1c78fd2cb2df305ef846b7774526d10bf58dc6506850",
+    "lib/src/syntax_preset.dart": "bc0ca751f1d33b24dc56ba488bb0ce5464ca0eecf4a56c8cc4ee7c501c235a3f",
+    "lib/src/task_checkbox.dart": "d2d3c6bacf3f3f6a4d6ccb695b95d05c24d256d0b70c4c20fdb0f45c9c725df1",
+    "lib/src/task_syntax.dart": "c6eac21ae9669d08d92d2989352e48e36b9408109544c9bc6f0f59558480e623",
+    "lib/src/theme.dart": "e298934cc85ce2f59199f9c153dd5bce98536e7d42e391f845e56ee32f635ef5",
+    "lib/src/wiki_embed.dart": "b98eccb72b10c2040c4d51ca26a78d779b28356c7e907e567358732737eb0344",
+    "lib/src/wiki_link_reference.dart": "6083e8e3a67ea7299c56d089e2fb5f8512901e6fc1d6db7dd94b598bcf5c0b9f"
+  },
+  "runStartedAtUtc": "2026-10-10T05:07:28.443656+00:00",
+  "host": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "cpu": "Apple M4 Pro",
+  "flutter": {
+    "frameworkVersion": "3.44.8",
+    "channel": "stable",
+    "repositoryUrl": "https://github.com/flutter/flutter.git",
+    "frameworkRevision": "058e0af2c2b57e369d905a03ac9748b0ebf543c6",
+    "frameworkCommitDate": "2026-07-23 10:56:21 -0700",
+    "engineRevision": "0cd610717bde95fd88343c64f81c11ba4e5c0010",
+    "engineCommitDate": "2026-07-23 16:11:34.000Z",
+    "engineContentHash": "13ffd72b2f9a5ca4db2a74ea52d5353ec2e8f939",
+    "engineBuildDate": "2026-07-24 00:36:29.809",
+    "dartSdkVersion": "3.12.2",
+    "devToolsVersion": "2.57.0",
+    "flutterVersion": "3.44.8",
+    "flutterRoot": "/private/tmp/ianvs-r2-perf-9BCIxV/flutter"
+  },
+  "corpusGeneratorSha256": "2e148ea6c5ed73c05b823d46010dcbf9fd3758f88f0e552bf99ba1441b597116",
+  "editorSha256": "bfb0a63fa56e2705971b751543b086aa54f6a7fd44b5502b193fd05153361fa8",
+  "harnessSha256": "0ed83bc29c7bb033227c04e8add6edf107dbb2682965d3a9810d31e4e9881fbf",
+  "experimentalWindowingWorkaround": true,
+  "frameworkFeatureFileSha256": "668ce492866ec9eb7e6404ce4ab3599c0f978eba33a036ca9c48e9dbd89ae44a",
+  "frameworkPackagePathVerified": true,
+  "frameworkFeatureDiff": "diff --git a/packages/flutter/lib/src/foundation/_features.dart b/packages/flutter/lib/src/foundation/_features.dart\nindex cbd290f467b..0e4f220bfb9 100644\n--- a/packages/flutter/lib/src/foundation/_features.dart\n+++ b/packages/flutter/lib/src/foundation/_features.dart\n@@ -20,7 +20,7 @@ import 'package:meta/meta.dart';\n ///\n /// See: https://github.com/flutter/flutter/issues/30701.\n @internal\n-bool isWindowingEnabled = debugEnabledFeatureFlags.contains('windowing');\n+bool isWindowingEnabled = false;\n \n /// Whether the accessibility evaluations feature is enabled for the current\n /// application.\n"
+}
