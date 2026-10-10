@@ -8,7 +8,7 @@ use std::{
 };
 use usvg::{fontdb, FontResolver};
 
-const VERSION: &str = "ianvs-svg/1;usvg/0.45.1;font-policy/1";
+const VERSION: &str = "ianvs-svg/1;usvg/0.45.1;font-policy/2";
 const MAX_INPUT: usize = 8 * 1024 * 1024;
 const MAX_OUTPUT: usize = 16 * 1024 * 1024;
 
@@ -19,20 +19,35 @@ struct Fonts {
 }
 
 // Font discovery happens once, on the Dart rendering worker, never the UI
-// isolate. Font files remain on the user's system and are not redistributed.
+// isolate. Desktop uses system fonts; iOS embeds an unmodified OFL-licensed CJK
+// font because recent iOS system fonts can require Apple's private renderer.
 fn fonts() -> Result<&'static Fonts, String> {
     static FONTS: OnceLock<Result<Fonts, String>> = OnceLock::new();
     FONTS
         .get_or_init(|| {
             let mut db = fontdb::Database::new();
+            #[cfg(target_os = "ios")]
+            db.load_font_data(include_bytes!("../fonts/NotoSansCJKsc-Regular.otf").to_vec());
             db.load_system_fonts();
+            // fontdb's automatic discovery covers macOS but not iOS. These
+            // read-only system fonts are available inside the iOS sandbox.
+            #[cfg(target_os = "ios")]
+            db.load_fonts_dir("/System/Library/Fonts");
+            remove_unsupported_fonts(&mut db);
             let candidates = [
+                if cfg!(target_os = "ios") {
+                    "Noto Sans CJK SC"
+                } else {
+                    "Hiragino Sans GB"
+                },
                 "Hiragino Sans GB",
                 "PingFang SC",
                 "Microsoft YaHei",
                 "Noto Sans CJK SC",
                 "Noto Sans",
                 "Arial",
+                "Helvetica Neue",
+                "Helvetica",
                 "DejaVu Sans",
             ];
             let family = candidates
@@ -44,7 +59,7 @@ fn fonts() -> Result<&'static Fonts, String> {
                     })
                     .is_some()
                 })
-                .ok_or("No usable system fonts found for Mermaid diagrams")?
+                .ok_or("No usable outline fonts found for Mermaid diagrams")?
                 .to_string();
             db.set_sans_serif_family(&family);
             db.set_serif_family(&family);
@@ -76,6 +91,38 @@ fn fonts() -> Result<&'static Fonts, String> {
         })
         .as_ref()
         .map_err(Clone::clone)
+}
+
+fn remove_unsupported_fonts(db: &mut fontdb::Database) {
+    // LastResort claims coverage of all Unicode, but its glyphs are diagnostic
+    // boxes. It must never satisfy usvg's character-coverage fallback check.
+    let ids: Vec<_> =
+        db.faces()
+            .filter(|face| {
+                face.post_script_name.to_lowercase().contains("lastresort")
+                    || face.families.iter().any(|(name, _)| {
+                        name.to_lowercase().replace(' ', "").contains("lastresort")
+                    })
+                    || !db
+                        .with_face_data(face.id, has_outline_tables)
+                        .unwrap_or(false)
+            })
+            .map(|face| face.id)
+            .collect();
+    for id in ids {
+        db.remove_face(id);
+    }
+}
+
+fn has_outline_tables(data: &[u8], index: u32) -> bool {
+    // iOS 27's PingFangUI contains names/cmaps but no standard glyph outlines.
+    // fontdb accepts it, but usvg silently drops text selected from these faces.
+    let Ok(face) = ttf_parser::RawFace::parse(data, index) else {
+        return false;
+    };
+    [b"glyf", b"CFF ", b"CFF2"]
+        .iter()
+        .any(|tag| face.table(ttf_parser::Tag::from_bytes(tag)).is_some())
 }
 
 fn environment() -> Result<Value, String> {
@@ -125,13 +172,23 @@ fn preprocess(svg: &str, max_output: usize) -> Result<Value, String> {
     check_features(svg, false)?;
     let fonts = fonts()?;
     let missing = Mutex::new(Vec::new());
+    let missing_families = Mutex::new(Vec::new());
     let select_font = FontResolver::default_font_selector();
     let select_fallback = FontResolver::default_fallback_selector();
     let options = usvg::Options {
         fontdb: fonts.db.clone(),
         font_family: fonts.family.clone(),
         font_resolver: FontResolver {
-            select_font,
+            select_font: Box::new(|font, db| {
+                let id = select_font(font, db);
+                if id.is_none() {
+                    missing_families
+                        .lock()
+                        .unwrap()
+                        .push(format!("{:?}", font.families()));
+                }
+                id
+            }),
             select_fallback: Box::new(|c, excluded, db| {
                 let id = select_fallback(c, excluded, db);
                 if id.is_none() {
@@ -148,6 +205,12 @@ fn preprocess(svg: &str, max_output: usize) -> Result<Value, String> {
         ..Default::default()
     };
     let tree = usvg::Tree::from_str(svg, &options).map_err(|e| e.to_string())?;
+    if !missing_families.lock().unwrap().is_empty() {
+        return Err(format!(
+            "No usable fonts for Mermaid text: {:?}",
+            missing_families.lock().unwrap()
+        ));
+    }
     let missing = missing.lock().unwrap();
     if !missing.is_empty() {
         return Err(format!(
@@ -222,6 +285,26 @@ mod tests {
         assert!(svg.matches("<path").count() >= 3);
         assert!(svg.len() > 1000, "Text outlines must not disappear");
         assert_eq!(output["width"], 300.0);
+    }
+
+    #[test]
+    fn phone_preview_labels_have_real_glyphs() {
+        let fonts = fonts().unwrap();
+        for c in "分享文档阅读预览简体中文繁體中文".chars() {
+            let output = preprocess(
+                &format!("<svg width='60' height='60'><text x='5' y='30'>{c}</text></svg>"),
+                MAX_OUTPUT,
+            )
+            .unwrap();
+            assert!(
+                output["svg"].as_str().unwrap().contains("<path"),
+                "No outline for {c}"
+            );
+        }
+        assert!(!fonts
+            .db
+            .faces()
+            .any(|face| face.post_script_name.to_lowercase().contains("lastresort")));
     }
 
     #[test]

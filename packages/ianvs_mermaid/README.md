@@ -14,7 +14,7 @@ Install Rust/Cargo and the Rust target for the build architecture. The Dart
 `hook/build.dart` compiles the locked Rust crate and declares a bundled code asset.
 Flutter handles copying and signing it. The existing macOS merman library
 normalization remains in `tool/normalize_macos.sh`; merman is still the diagram
-engine. End users need neither Cargo nor a font bundle.
+engine. End users do not need Cargo or separately installed fonts on iOS.
 
 After adding this build hook to an existing checkout, run `flutter clean` and
 `flutter pub get` once in `app/` and `packages/ianvs_mermaid/example/` to discard old native-asset
@@ -24,7 +24,8 @@ concurrently with another Flutter command against the same application.
 macOS arm64 is verified in a signed Release build. The hook also maps macOS x64,
 Linux arm64/x64, and Windows x64 Rust targets; those platforms require their
 matching build toolchain, merman packaging and integration validation before
-release. Mobile and web targets are explicitly unsupported by this bridge.
+release. iOS arm64 devices and arm64/x64 simulators are supported; Android and web
+targets are unsupported by this bridge.
 
 ## Worker, cache and fonts
 
@@ -46,11 +47,18 @@ and the selected family/system font inventory fingerprint. Fonts are a process
 snapshot; restart after installing/changing system fonts. `cache:` configures
 the worker cache limits; it does not share a mutable cache across isolates.
 
-`fontdb` discovers installed fonts on the target OS. It chooses an installed
-family from Hiragino Sans GB, PingFang SC, Microsoft YaHei, Noto Sans CJK SC,
-Noto Sans, Arial, or DejaVu Sans and uses usvg's per-character fallback across
-the discovered database. Missing glyphs fail explicitly. No proprietary system
-fonts are copied or redistributed. Non-macOS deployments must provision suitable
+`fontdb` discovers installed fonts on the target OS. iOS embeds an unmodified
+Noto Sans CJK SC Regular under the SIL Open Font License (see `rust/fonts/` and
+the package LICENSE), adding about 16 MB to the native library. It is the first
+iOS family and fallback candidate, so Chinese diagrams work offline without
+depending on optional system fonts. Desktop retains its existing font preference.
+
+Fonts lacking `glyf`, `CFF ` or `CFF2` outline tables are excluded. For example,
+iOS 27's PingFangUI can be located with CoreText and accepted by fontdb, but lacks
+these tables; selecting it makes usvg silently omit the text. LastResort is also
+excluded because its boxes must not count as real Unicode coverage. Missing
+families and glyphs fail explicitly. No proprietary system fonts are copied or
+redistributed. Other non-macOS deployments must provision suitable
 licensed Latin/CJK fonts and validate the resulting metrics and glyph coverage.
 Custom engine openers must be isolate-sendable; use `libraryPath` in native tests
 rather than capturing a pre-opened FFI engine.
