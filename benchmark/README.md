@@ -45,6 +45,16 @@ Each action also records callback duration, the subsequent frame wait and app
 lifecycle state. Preserve slow/outlier samples: a long wait with few UI CPU
 samples does not alone prove that Markdown parsing blocked the UI.
 
+The macOS harness requires `native-window-stable-v1`: the window must be active,
+visible, unhidden, unminimized and on the active Space. Native notifications track
+state changes, including a loss/regain between action snapshots; a change after
+startup immediately invalidates the run even when hidden windows stop producing
+frames. The initial window dimensions and generation are retained, and every raw
+action start/end must match them. Startup allows ten seconds for activation.
+Snapshot calls are outside measured latency and frame intervals. Keep the window
+in front throughout each run; do not resize it or run builds concurrently. This
+guard does not detect unrelated background CPU load or thermal throttling.
+
 R2 compares real source versions with the shipped selection optimization enabled
 in both. Freeze the measurement code before running at least two serial, fresh
 process baselines with default 5 warmups / 20 samples and all six cases / seven

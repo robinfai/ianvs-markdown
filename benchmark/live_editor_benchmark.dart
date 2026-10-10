@@ -8,6 +8,7 @@ import 'dart:ui' show FramePhase;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:ianvs_markdown/src/editor/editor_diagnostics.dart';
 
@@ -79,12 +80,14 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
   var generation = 0;
   var currentSize = 0;
   var currentBudget = '';
+  final environment = _BenchmarkEnvironment();
 
   @override
   void initState() {
     super.initState();
     SchedulerBinding.instance.addTimingsCallback(frames.addAll);
-    WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(run()));
+    // Query native state even if an occluded window never produces a frame.
+    unawaited(run());
   }
 
   @override
@@ -159,10 +162,12 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
       'stage': stage,
       'index': index,
     };
+    final before = await environment.check();
     trace({
       ...identity,
       'event': 'start',
       'timelineMicros': developer.Timeline.now,
+      'windowEnvironment': before,
     });
     final firstFrame = frameStamp;
     IanvsMarkdownEditorDiagnostics.resetPhases();
@@ -176,15 +181,19 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
     final parseCount = (IanvsMarkdownEditorDiagnostics.documentParses - parses)
         .toDouble();
     final rss = ProcessInfo.currentRss / (1024 * 1024);
+    final lastFrame = frameStamp;
+    final phaseSnapshot = IanvsMarkdownEditorDiagnostics.phaseSnapshot();
+    // Keep method-channel overhead outside the latency and frame intervals.
+    final after = await environment.check();
     if (stage == 'sample') {
       operation.durations.add(latency);
       operation.parses.add(parseCount);
       operation.rss.add(rss);
       operation.callbackMs.add(callbackMs);
       operation.frameWaitMs.add(latency - callbackMs);
-      operation.frameIntervals.add((firstFrame, frameStamp));
+      operation.frameIntervals.add((firstFrame, lastFrame));
       if (IanvsMarkdownEditorDiagnostics.profilePhases) {
-        operation.phases.add(IanvsMarkdownEditorDiagnostics.phaseSnapshot());
+        operation.phases.add(phaseSnapshot);
       }
     }
     trace({
@@ -198,9 +207,9 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
       'documentParses': parseCount,
       'rssMiB': rss,
       'firstFrameMicros': firstFrame,
-      'lastFrameMicros': frameStamp,
-      if (IanvsMarkdownEditorDiagnostics.profilePhases)
-        'phases': IanvsMarkdownEditorDiagnostics.phaseSnapshot(),
+      'lastFrameMicros': lastFrame,
+      'windowEnvironment': after,
+      if (IanvsMarkdownEditorDiagnostics.profilePhases) 'phases': phaseSnapshot,
     });
   }
 
@@ -260,6 +269,8 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
   Future<void> run() async {
     final results = <Map<String, Object>>[];
     try {
+      await environment.initialize();
+      await nextFrame();
       for (final size in selectedSizes) {
         final source = benchmarkCorpus(size);
         currentSize = size;
@@ -364,6 +375,7 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
           checkpoint('caseComplete');
         }
       }
+      await environment.check();
       print(
         'IANVS_BENCHMARK_RESULT: ${jsonEncode(snapshot(results, complete: true))}',
       );
@@ -384,6 +396,8 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
       'schemaVersion': 2,
       'processingBudgetPolicy': 'full-document-preflight-v1',
       'phaseTimingsEnabled': IanvsMarkdownEditorDiagnostics.profilePhases,
+      'environmentPolicy': 'native-window-stable-v1',
+      'initialWindowEnvironment': environment.initial,
       'corpusVersion': corpusVersion,
       'mode': 'profile',
       'warmupPerOperation': warmup,
@@ -408,6 +422,57 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
       'results': results,
       'errors': failures,
     };
+  }
+}
+
+class _BenchmarkEnvironment {
+  static const channel = MethodChannel('ianvs_markdown/benchmark_environment');
+  Map<String, Object?>? initial;
+
+  Future<Map<String, Object?>> read() async =>
+      (await channel.invokeMapMethod<String, Object?>('snapshot')) ??
+      (throw StateError('Missing native benchmark environment'));
+
+  bool valid(Map<String, Object?> state) =>
+      state['active'] == true &&
+      state['visible'] == true &&
+      state['occlusionVisible'] == true &&
+      state['onActiveSpace'] == true &&
+      state['miniaturized'] == false &&
+      state['appHidden'] == false;
+
+  Future<void> initialize() async {
+    channel.setMethodCallHandler((call) async {
+      if (call.method != 'changed' || initial == null) return;
+      final state = Map<String, Object?>.from(call.arguments as Map);
+      if (!valid(state) || !mapEquals(initial, state)) {
+        // A hidden/locked window may stop frames. Fail from the native event
+        // rather than waiting for the action's next frame or outer watchdog.
+        print('IANVS_BENCHMARK_ERROR: Benchmark window changed: $state');
+        exit(1);
+      }
+    });
+    final watch = Stopwatch()..start();
+    Map<String, Object?>? previous;
+    while (watch.elapsed < const Duration(seconds: 10)) {
+      final state = await read();
+      if (valid(state) && previous != null && mapEquals(previous, state)) {
+        initial = state;
+        return;
+      }
+      previous = state;
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    }
+    throw StateError('Benchmark window unavailable at startup: $previous');
+  }
+
+  Future<Map<String, Object?>> check() async {
+    final state = await read();
+    // The native generation detects a loss/regain between these snapshots.
+    if (!valid(state) || !mapEquals(initial, state)) {
+      throw StateError('Benchmark window changed during run: $state');
+    }
+    return state;
   }
 }
 
