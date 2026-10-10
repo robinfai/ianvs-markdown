@@ -1,6 +1,6 @@
 # 公共 API 与行为契约
 
-适用范围：2026-10-08 的仓库版本（`0.3.1` + `Unreleased`）。本文件对应 R1-01 / R1-02 / R2-02，说明已有行为与接入边界；后续修改预设、预算或默认行为时必须同步更新。平台范围见 [构建与交互证据](PLATFORM_SUPPORT.md)，不能从 Dart 类型可用推断平台支持。
+适用范围：2026-10-10 的仓库版本（`0.3.1` + `Unreleased`）。本文件对应 R1-01 / R1-02 / R2-02 及 R1-03 已交付的文案配置；R1-03 快捷键覆盖仍在实施。后续修改预设、预算或默认行为时必须同步更新。平台范围见 [构建与交互证据](PLATFORM_SUPPORT.md)，不能从 Dart 类型可用推断平台支持。
 
 ## 四种入口
 
@@ -17,6 +17,7 @@
 | 焦点对象 | 阅读选择内部管理 | 阅读选择内部管理 | 可注入 `focusNode`，另有 `autofocus` | 可注入 `focusNode`，另有 `autofocus` |
 | 渲染预算 | 整个正文的 `renderBudget` 与 `fallbackBuilder` | 正文预算与 `fallbackBuilder`；预解析范围另见下文 | 无 `renderBudget` | 渲染块使用 `renderBudget`，Reading 传给 View；无公开 `fallbackBuilder`，Source 不受该预算约束 |
 | 主题 | `theme` / ThemeExtension；`styleSheet` 与 `styleSheetTheme` | `theme` / ThemeExtension；`styleSheet` | `theme` / ThemeExtension 与组件源码样式 | `theme` / ThemeExtension；`styleSheet` 用于渲染面 |
+| 界面文案 | 外层 `IanvsMarkdownLocalization`，中/英文与逐条覆盖 | 同正文，含大纲及折叠 | 同正文，含工具栏与文本选择菜单 | 同正文，含导航、表格与各模式 |
 | Front matter / 大纲 | 没有完整文档容器 | `showFrontMatter: false`、`showOutline: true`、`enableHeadingFolding: false` | 原样编辑 YAML；无阅读大纲 | `showFrontMatter: false`、`showOutlineInPreview: true`、`showNavigationPane: false`、`enableHeadingFolding: false` |
 | 模式切换 | 无 | 无 | 控件始终是源码编辑器；工具栏可以改变 Controller.mode，宿主负责切换显示 | 监听 Controller.mode 并切换实际界面 |
 | 文本变化通知 | 宿主更新 `data` | 宿主更新 `data` | `onChanged` 只报告文本变化 | `onChanged` 报告文本变化，`onModeChanged` 报告模式变化 |
@@ -26,6 +27,16 @@
 
 源码依据：[正文与 View](../lib/src/ianvs_markdown.dart)、[Source](../lib/src/editor/source_editor.dart)、[Live](../lib/src/editor/live_editor.dart)。
 行为证据：[标准 View](../test/standard_view_test.dart)、[标题范围](../test/heading_folding_test.dart)、[标准语法](../test/standard_syntax_test.dart)、[正文/View](../test/ianvs_markdown_test.dart)、[Live](../test/live_editor_test.dart)、[宿主契约](../test/host_contract_test.dart)。矩阵描述支持范围，不能把同名参数视为相同的处理路径。
+
+## 界面文案（R1-03 首批交付）
+
+`IanvsMarkdownLocalization` 是可嵌套的文案作用域，四种入口及独立辅助 Widget 从最近的作用域读取 `IanvsMarkdownStrings`。不提供作用域时使用 `.legacy()`，保留现有中英文混合标签；`.chinese()` / `.english()` 显式选择完整的内置界面文案。`overrides` 按 `IanvsMarkdownMessage` 覆盖单条消息，未覆盖项回退到所选语言；更新时替换配置对象，传入的 map 应保持不可变。
+
+模板只替换一次 `{label}` / `{index}` / `{count}` 等命名参数，参数中的花括号不继续求值。文档正文、原始 YAML 键值、代码语言名称、显式 Callout 标题和宿主传入的标签保持原样。解析器生成的元数据标签带 `useDefaultLabel: true`；宿主直接构造 `MarkdownMetadataEntry` 默认不翻译其 `label`。`FrontMatterCard.title` 仍返回旧默认字符串，但省略构造参数时界面可使用作用域文案；显式传入同名字符串也会保留。
+
+文案覆盖包括工具栏、导航/折叠、表格控件、属性、任务语义标签、代码复制/降级、图片查看器、默认 Callout 标题和文本选择菜单。选择菜单在 Overlay 中从所属组件读取配置；图片弹窗捕获主题作用域。回调、源码、选区/历史与复制数据不因改文案而改变。默认文本菜单保留 Flutter 的系统原生路径；显式自定义菜单文案时使用 Flutter 自适应菜单。浏览器原生菜单及 Flutter 自有日期弹窗的整体 locale 仍由宿主的浏览器/MaterialLocalizations 配置负责。
+
+快捷键策略不由文案作用域改变；R1-03 的命令覆盖、焦点恢复及 IME 验收仍须独立完成。接入见 [指南](INTEGRATION_GUIDE.md#界面文案与作用域)，回归见 [localization_test.dart](../test/localization_test.dart)。
 
 ## 原文、选择与更新
 
@@ -104,7 +115,7 @@ final legacy = IanvsMarkdownController(text: initialMarkdown, historyPolicy: nul
 
 ## 公共导出承诺与分层
 
-入口是 `package:ianvs_markdown/ianvs_markdown.dart`。本次用 Dart AST 审查其直接导出及 show/hide 规则，并用 Flutter 编译探针核对全部符号。清单包括 165 个项目符号和 11 个第三方重导出；不包含实例成员清单。
+入口是 `package:ianvs_markdown/ianvs_markdown.dart`。R1-01 用 Dart AST 审查直接导出及 show/hide 规则，并用 Flutter 编译探针核对符号；后续新增的文案三种类型由公共入口 widget 回归验证。清单现在包括 168 个项目符号和 11 个第三方重导出；不包含实例成员清单。
 
 | 使用面 | 范围 | 兼容约束 |
 | --- | --- | --- |
@@ -184,6 +195,10 @@ final legacy = IanvsMarkdownController(text: initialMarkdown, historyPolicy: nul
 ### [lib/src/markdown_document.dart](../lib/src/markdown_document.dart)
 
 `IanvsMarkdownDocument`、`IanvsMarkdownHeading`、`parseMarkdownHeadings`
+
+### [lib/src/localization.dart](../lib/src/localization.dart)
+
+`IanvsMarkdownLocalization`、`IanvsMarkdownStrings`、`IanvsMarkdownMessage`
 
 ### [lib/src/math.dart](../lib/src/math.dart)
 

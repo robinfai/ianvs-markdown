@@ -1,5 +1,13 @@
 ## Unreleased
 
+- Add scoped Chinese, English and host-overridden interface messages through
+  `IanvsMarkdownLocalization`, `IanvsMarkdownStrings` and `IanvsMarkdownMessage`.
+  Cover toolbars, outline/folding, tables, properties, task semantics, code,
+  images, default callout titles and selection menus, including overlays.
+  Preserve legacy labels and native text menus unless explicitly configured;
+  document text, explicit host labels and clipboard callbacks remain unchanged.
+- Mark parser-generated metadata labels with `useDefaultLabel` so the UI can
+  translate them while leaving explicitly supplied labels intact.
 - Skip full GFM reference-context parsing when source has no opening bracket,
   allowing long reference-free lines to be opened, edited and restored without
   entering that parser path. Inputs containing brackets keep parser authority.

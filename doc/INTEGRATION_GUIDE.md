@@ -52,12 +52,38 @@ IanvsMarkdownLiveEditor(
 
 图片、链接、Wiki 和图表的加载权限、路径解析、大小与缓存由宿主处理。默认组件不自动访问网络或本地文件。阅读态复制的 plain text 与 HTML 是不同表示：整文档 plain text 保留原始 Markdown，部分阅读选择根据语义片段重建；不要把阅读选择回调当作精确源码选区。
 
+## 界面文案与作用域
+
+在要配置的组件外放置文案作用域，无需修改内部工具栏。四种入口以及独立代码块、属性卡等辅助组件使用同一配置；嵌套作用域可以为同一页面的不同文档选择不同语言。
+
+```dart
+IanvsMarkdownLocalization(
+  strings: const IanvsMarkdownStrings.english(
+    overrides: {
+      IanvsMarkdownMessage.save: 'Save note',
+      IanvsMarkdownMessage.copy: 'Copy source',
+      IanvsMarkdownMessage.dragRow: 'Move row {index}',
+    },
+  ),
+  child: IanvsMarkdownLiveEditor(
+    controller: session.controller,
+    onSaveRequested: session.persist,
+  ),
+)
+```
+
+内置 `.chinese()` / `.english()` 可显式切换；没有作用域时保留现有默认文案。只覆盖少数旧文案时使用 `.legacy(overrides: ...)`。替换 `strings` 对象会更新后代控件，map 使用 `const` 或其他不可变实例。模板参数是字面文本，值中出现的 `{...}` 不会继续展开。
+
+文案作用域不改变 Controller、焦点对象、保存/复制回调或文档语言。文档内容、自定义 Callout 标题和宿主显式提供的属性标签不会被翻译；UI 仅翻译解析器标记为默认标签的属性。保持 `FrontMatterCard.title` 省略即可使用作用域标题，显式 `title` / `itemCountLabel` 优先。
+
+选择菜单从所属编辑器/阅读组件捕获文案，图片弹窗保留作用域。未配置的 iOS 文本菜单仍采用 Flutter 系统原生菜单；显式配置菜单文案时使用 Flutter 自适应菜单。浏览器原生菜单和 Flutter 日期弹窗的整体本地化还应配置宿主的 locale / MaterialLocalizations。自定义 Widget builder 返回的界面由宿主自己翻译。
+
 ## 当前差异与后续任务
 
 | 缺口 | 归属 | 当前接入方式 |
 | --- | --- | --- |
 | Live / Source 尚无标准 GFM 编辑预设 | R1-02 范围决策；后续独立扩展 | 标准只读内容使用正文或 View 的 `syntaxPreset: standard`；编辑仍按 Obsidian 契约 |
-| 文案与部分内部按键映射不能统一覆盖 | R1-03 | 可隐藏工具栏；`enableModeShortcuts` 仅关闭模式键，不代表禁用全部命令 |
+| 文案已有统一作用域，内部按键映射尚不能统一覆盖 | R1-03 进行中 | 文案按上节配置；可隐藏工具栏，`enableModeShortcuts` 仅关闭模式键，不代表禁用全部命令 |
 | 注入 clipboard writer 仍保留原生依赖 | R1-04 | 把它当作行为注入；按实际平台构建验证，拆包另行决策 |
 | 升级后的默认历史会裁剪旧快照 | R2-02 已实现，升级时核对配置 | 阅读 [容量与迁移契约](API_CONTRACTS.md#撤销历史容量r2-02)；需要旧行为时显式设置 `historyPolicy: null` |
 | View 追加数据重置滚动，异步结果没有组件级文档身份 | R2-03 | 宿主管理文档/版本与加载状态，当前不承诺完整流式接入能力 |

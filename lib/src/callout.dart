@@ -3,6 +3,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import 'markdown_list_syntax.dart';
+import 'localization.dart';
 import 'theme.dart';
 
 typedef IanvsMarkdownCalloutBodyBuilder =
@@ -94,6 +95,9 @@ class IanvsMarkdownCalloutSyntax extends md.BlockSyntax {
     return md.Element('ianvs-callout', const <md.Node>[])
       ..attributes['data-type'] = header.type
       ..attributes['data-title'] = header.title
+      ..attributes['data-default-title'] = header.explicitTitle.isEmpty
+          ? 'true'
+          : 'false'
       ..attributes['data-fold'] = header.fold
       ..attributes['data-body'] = bodyLines.join('\n');
   }
@@ -138,7 +142,13 @@ class IanvsMarkdownCalloutBuilder extends MarkdownElementBuilder {
   ) {
     return IanvsMarkdownCallout(
       type: element.attributes['data-type'] ?? 'note',
-      title: element.attributes['data-title'] ?? 'Note',
+      title: element.attributes['data-default-title'] == 'true'
+          ? localizeMarkdownCalloutTitle(
+              context,
+              element.attributes['data-type'] ?? 'note',
+              element.attributes['data-title'] ?? 'Note',
+            )
+          : element.attributes['data-title'] ?? 'Note',
       body: element.attributes['data-body'] ?? '',
       fold: element.attributes['data-fold'] ?? '',
       bodyBuilder: bodyBuilder,

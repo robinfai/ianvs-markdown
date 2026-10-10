@@ -1,3 +1,4 @@
+import 'localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -148,6 +149,8 @@ class _IanvsMarkdownHtmlTextInputState
                   _selectAll,
             },
             child: TextField(
+              contextMenuBuilder: (_, state) =>
+                  buildMarkdownTextContextMenu(context, state),
               controller: _controller,
               focusNode: _focusNode,
               keyboardType: _keyboardType,

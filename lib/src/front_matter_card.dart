@@ -1,3 +1,4 @@
+import 'localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -138,7 +139,7 @@ class IanvsMarkdownFrontMatterCard extends StatefulWidget {
     super.key,
     required this.entries,
     this.theme,
-    this.title = '笔记属性',
+    String? title,
     this.formatLabel = 'YAML',
     this.itemCountLabel,
     this.compact = false,
@@ -151,11 +152,16 @@ class IanvsMarkdownFrontMatterCard extends StatefulWidget {
     this.onDateChanged,
     this.onListChanged,
     this.onKeyChanged,
-  });
+    // Keep the public `title` argument and distinguish omitted from explicit.
+    // ignore: prefer_initializing_formals
+  }) : _title = title;
 
   final List<MarkdownMetadataEntry> entries;
   final IanvsMarkdownThemeData? theme;
-  final String title;
+  final String? _title;
+
+  /// Explicit host title, or the legacy default when no title was supplied.
+  String get title => _title ?? '笔记属性';
   final String formatLabel;
   final String Function(int count)? itemCountLabel;
   final bool compact;
@@ -224,7 +230,8 @@ class _IanvsMarkdownFrontMatterCardState
               ),
               const SizedBox(width: 8),
               Text(
-                widget.title,
+                widget._title ??
+                    IanvsMarkdownMessage.properties.resolve(context),
                 style: TextStyle(
                   color: colors.textPrimary,
                   fontSize: 12,
@@ -251,7 +258,10 @@ class _IanvsMarkdownFrontMatterCardState
               const Spacer(),
               Text(
                 widget.itemCountLabel?.call(widget.entries.length) ??
-                    '${widget.entries.length} 项',
+                    IanvsMarkdownMessage.itemCount.resolve(
+                      context,
+                      arguments: {'count': widget.entries.length},
+                    ),
                 style: TextStyle(
                   color: colors.textTertiary,
                   fontSize: 10.5,
@@ -261,7 +271,9 @@ class _IanvsMarkdownFrontMatterCardState
               if (canExpand) ...[
                 const SizedBox(width: 4),
                 IconButton(
-                  tooltip: _expanded ? '收起元数据' : '展开全部元数据',
+                  tooltip: _expanded
+                      ? IanvsMarkdownMessage.collapseMetadata.resolve(context)
+                      : IanvsMarkdownMessage.expandMetadata.resolve(context),
                   onPressed: () => setState(() => _expanded = !_expanded),
                   icon: Icon(
                     _expanded
@@ -328,6 +340,8 @@ class _IanvsMarkdownFrontMatterCardState
       children: [
         if (widget.showDocumentTitle && titleEntry != null) ...[
           SelectableText(
+            contextMenuBuilder: (_, state) =>
+                buildMarkdownSelectableContextMenu(context, state),
             titleEntry.value,
             style: TextStyle(
               color: colors.textPrimary,
@@ -406,7 +420,7 @@ class _IanvsMarkdownFrontMatterCardState
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              '添加笔记属性',
+                              IanvsMarkdownMessage.addProperty.resolve(context),
                               key: const ValueKey(
                                 'ianvs-markdown-front-matter-add-hint',
                               ),
@@ -653,6 +667,8 @@ class _ObsidianEditableKeyState extends State<_ObsidianEditableKey> {
     return Focus(
       onKeyEvent: _handleKeyEvent,
       child: TextField(
+        contextMenuBuilder: (_, state) =>
+            buildMarkdownTextContextMenu(context, state),
         key: ValueKey(
           'ianvs-markdown-front-matter-key-input-${widget.entry.key}',
         ),
@@ -762,7 +778,8 @@ class _ObsidianMetadataValue extends StatelessWidget {
         child: Semantics(
           checked: checked,
           enabled: onBooleanChanged != null,
-          label: '${entry.key}: ${checked ? '已启用' : '未启用'}',
+          label:
+              '${entry.key}: ${checked ? IanvsMarkdownMessage.enabled.resolve(context) : IanvsMarkdownMessage.disabled.resolve(context)}',
           child: InkWell(
             key: ValueKey('ianvs-markdown-front-matter-boolean-${entry.key}'),
             onTap: onBooleanChanged == null
@@ -855,7 +872,9 @@ class _ObsidianMetadataValue extends StatelessWidget {
         entry: entry,
         colors: colors,
         tag: tags,
-        hintText: tags ? '添加标签' : '添加别名',
+        hintText: tags
+            ? IanvsMarkdownMessage.addTag.resolve(context)
+            : IanvsMarkdownMessage.addAlias.resolve(context),
         onChanged: onListChanged!,
       );
     }
@@ -896,7 +915,7 @@ class _ObsidianMetadataValue extends StatelessWidget {
         entry.type == MarkdownMetadataValueType.empty || entry.value.isEmpty;
     final object = entry.type == MarkdownMetadataValueType.object;
     return Text(
-      empty ? '没有值' : entry.value,
+      empty ? IanvsMarkdownMessage.noValue.resolve(context) : entry.value,
       key: valueKey,
       style: TextStyle(
         color: empty
@@ -1061,6 +1080,8 @@ class _ObsidianEditableListValueState
             child: Focus(
               onKeyEvent: _handleKeyEvent,
               child: TextField(
+                contextMenuBuilder: (_, state) =>
+                    buildMarkdownTextContextMenu(context, state),
                 key: ValueKey(
                   'ianvs-markdown-front-matter-list-input-${widget.entry.key}',
                 ),
@@ -1289,6 +1310,8 @@ class _ObsidianEditableDateValueState
           onKeyEvent: (node, event) =>
               _handleKeyEvent(node, event, undoController),
           child: TextField(
+            contextMenuBuilder: (_, state) =>
+                buildMarkdownTextContextMenu(context, state),
             key: ValueKey(
               'ianvs-markdown-front-matter-date-$keySuffix-${widget.entry.key}',
             ),
@@ -1343,7 +1366,7 @@ class _ObsidianEditableDateValueState
             'ianvs-markdown-front-matter-date-picker-${widget.entry.key}',
           ),
           onPressed: _showDatePicker,
-          tooltip: '选择日期',
+          tooltip: IanvsMarkdownMessage.chooseDate.resolve(context),
           visualDensity: VisualDensity.compact,
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints.tightFor(width: 20, height: 20),
@@ -1355,7 +1378,7 @@ class _ObsidianEditableDateValueState
         ),
         const SizedBox(width: 3),
         _segment(
-          label: '年',
+          label: IanvsMarkdownMessage.year.resolve(context),
           keySuffix: 'year',
           width: 34,
           maximumLength: 4,
@@ -1365,7 +1388,7 @@ class _ObsidianEditableDateValueState
         ),
         Text(' / ', style: separatorStyle),
         _segment(
-          label: '月',
+          label: IanvsMarkdownMessage.month.resolve(context),
           keySuffix: 'month',
           width: 20,
           maximumLength: 2,
@@ -1375,7 +1398,7 @@ class _ObsidianEditableDateValueState
         ),
         Text(' / ', style: separatorStyle),
         _segment(
-          label: '日',
+          label: IanvsMarkdownMessage.day.resolve(context),
           keySuffix: 'day',
           width: 20,
           maximumLength: 2,
@@ -1520,6 +1543,8 @@ class _ObsidianEditableNumberValueState
     return Focus(
       onKeyEvent: _handleKeyEvent,
       child: TextField(
+        contextMenuBuilder: (_, state) =>
+            buildMarkdownTextContextMenu(context, state),
         key: ValueKey(
           'ianvs-markdown-front-matter-number-input-${widget.entry.key}',
         ),
@@ -1671,6 +1696,8 @@ class _ObsidianEditableTextValueState
     return Focus(
       onKeyEvent: _handleKeyEvent,
       child: TextField(
+        contextMenuBuilder: (_, state) =>
+            buildMarkdownTextContextMenu(context, state),
         key: ValueKey('ianvs-markdown-front-matter-input-${widget.entry.key}'),
         controller: _controller,
         undoController: _undoController,
@@ -1695,7 +1722,9 @@ class _ObsidianEditableTextValueState
         cursorColor: widget.colors.accent,
         decoration: InputDecoration(
           isDense: true,
-          hintText: widget.entry.value.isEmpty ? '没有值' : null,
+          hintText: widget.entry.value.isEmpty
+              ? IanvsMarkdownMessage.noValue.resolve(context)
+              : null,
           hintStyle: TextStyle(
             color: widget.colors.textTertiary,
             fontSize: 11.5,
@@ -1781,7 +1810,10 @@ class _ObsidianMetadataChip extends StatelessWidget {
               else
                 Semantics(
                   button: true,
-                  label: '删除 $label',
+                  label: IanvsMarkdownMessage.removeValue.resolve(
+                    context,
+                    arguments: {'label': label},
+                  ),
                   child: InkWell(
                     key: removeKey,
                     onTap: onRemove,
@@ -1930,7 +1962,9 @@ class _MetadataEntryTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            entry.label,
+            entry.useDefaultLabel
+                ? localizeMarkdownPropertyLabel(context, entry.key, entry.label)
+                : entry.label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -1968,6 +2002,8 @@ class _MetadataEntryTile extends StatelessWidget {
             )
           else
             SelectableText(
+              contextMenuBuilder: (_, state) =>
+                  buildMarkdownSelectableContextMenu(context, state),
               entry.value,
               style: TextStyle(
                 color: colors.textPrimary,

@@ -1,3 +1,4 @@
+import 'localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
@@ -864,7 +865,10 @@ final class IanvsMarkdownEditingMetadataBuilder extends MarkdownElementBuilder {
                   ),
               ],
             ),
-      semanticsLabel: 'Obsidian $kind editing metadata',
+      semanticsLabel: IanvsMarkdownMessage.editingMetadata.resolve(
+        context,
+        arguments: {'kind': kind},
+      ),
     );
     return block ? Align(alignment: Alignment.centerLeft, child: text) : text;
   }

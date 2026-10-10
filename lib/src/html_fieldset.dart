@@ -1,3 +1,4 @@
+import 'localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
@@ -102,6 +103,8 @@ class IanvsMarkdownHtmlFieldsetBuilder extends MarkdownElementBuilder {
     final colors = IanvsMarkdownThemeData.resolve(context, theme);
     if (presentation == IanvsMarkdownHtmlFieldsetPresentation.editing) {
       return SelectableText(
+        contextMenuBuilder: (_, state) =>
+            buildMarkdownSelectableContextMenu(context, state),
         element.attributes['data-source'] ?? '',
         key: const ValueKey('ianvs-markdown-html-fieldset-source'),
         onTap: onTap,

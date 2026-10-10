@@ -1,3 +1,4 @@
+import 'localization.dart';
 import 'package:flutter/material.dart';
 
 import 'theme.dart';
@@ -24,7 +25,7 @@ class IanvsMarkdownBlockedImage extends StatelessWidget {
     final source = switch (scheme) {
       'http' ||
       'https' when uri.host.trim().isNotEmpty => uri.host.toLowerCase(),
-      '' => 'local',
+      '' => IanvsMarkdownMessage.localSource.resolve(context),
       _ => scheme,
     };
     final altText = alt?.trim();
@@ -50,7 +51,10 @@ class IanvsMarkdownBlockedImage extends StatelessWidget {
             Flexible(
               child: Text(
                 [
-                  'Image blocked · $source',
+                  IanvsMarkdownMessage.imageBlocked.resolve(
+                    context,
+                    arguments: {'source': source},
+                  ),
                   if (altText != null && altText.isNotEmpty) altText,
                 ].join('\n'),
                 maxLines: 2,

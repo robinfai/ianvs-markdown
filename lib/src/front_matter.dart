@@ -42,10 +42,15 @@ final class MarkdownMetadataEntry {
     this.sourceValueEnd,
     this.keyEditable = false,
     this.listValuesEditable = false,
+    this.useDefaultLabel = false,
   });
 
   final String key;
   final String label;
+
+  /// True for parser-generated property labels, which UI can localize.
+  /// Explicit labels supplied by hosts remain unchanged by default.
+  final bool useDefaultLabel;
   final String value;
   final List<String> items;
   final MarkdownMetadataValueType type;
@@ -179,6 +184,7 @@ void _collectMetadata(
       MarkdownMetadataEntry(
         key: key,
         label: _metadataLabel(key),
+        useDefaultLabel: true,
         value: displayValue,
         items: items,
         type: type,

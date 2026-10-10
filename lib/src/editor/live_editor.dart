@@ -1,3 +1,4 @@
+import '../localization.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show BoxHeightStyle, PointerDeviceKind;
@@ -3325,7 +3326,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       cursor: SystemMouseCursors.text,
       child: Semantics(
         button: true,
-        label: 'Edit blank Markdown line',
+        label: IanvsMarkdownMessage.editBlankLine.resolve(context),
         child: GestureDetector(
           key: ValueKey('ianvs-markdown-gap-${block.end}'),
           behavior: HitTestBehavior.opaque,
@@ -3827,6 +3828,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         (styleSheet.p ?? const TextStyle(fontSize: 14.5, height: 1.58))
             .copyWith(color: colors.textPrimary);
     final editor = TextField(
+      contextMenuBuilder: (_, state) =>
+          buildMarkdownTextContextMenu(context, state),
       key: _activeEditorKey,
       controller: _blockController,
       focusNode: _focusNode,
@@ -4089,6 +4092,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       sourceProjections,
     );
     final textEditor = TextField(
+      contextMenuBuilder: (_, state) =>
+          buildMarkdownTextContextMenu(context, state),
       key: _activeEditorKey,
       controller: _blockController,
       focusNode: _focusNode,
@@ -4653,7 +4658,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       cursor: SystemMouseCursors.text,
       child: Semantics(
         button: true,
-        label: 'Edit Markdown block',
+        label: IanvsMarkdownMessage.editBlock.resolve(context),
         child: Listener(
           key: _renderedBlockTapKeys[block.start],
           behavior: HitTestBehavior.translucent,
@@ -5605,6 +5610,11 @@ class _LivePreviewIndentedCode extends StatelessWidget {
                     child: lines[index].isEmpty
                         ? const SizedBox(height: 21)
                         : SelectableText(
+                            contextMenuBuilder: (_, state) =>
+                                buildMarkdownSelectableContextMenu(
+                                  context,
+                                  state,
+                                ),
                             _indentedCodeContentLine(lines[index]),
                             style: style,
                             onTap: onTap,
@@ -6209,7 +6219,9 @@ class _LiveHeadingFoldFrameState extends State<_LiveHeadingFoldFrame> {
                   key: ValueKey(
                     'ianvs-markdown-live-heading-fold-${widget.identity}',
                   ),
-                  tooltip: widget.collapsed ? '展开标题内容' : '折叠标题内容',
+                  tooltip: widget.collapsed
+                      ? IanvsMarkdownMessage.expandHeading.resolve(context)
+                      : IanvsMarkdownMessage.collapseHeading.resolve(context),
                   onPressed: widget.onToggle,
                   icon: Icon(
                     widget.collapsed
@@ -7076,7 +7088,7 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
       child: Semantics(
         container: true,
         explicitChildNodes: true,
-        label: 'Editable Markdown table',
+        label: IanvsMarkdownMessage.editableTable.resolve(context),
         child: Stack(
           clipBehavior: Clip.none,
           children: [
@@ -7149,6 +7161,11 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                                       _clearTableSelection();
                                     },
                                     child: TextField(
+                                      contextMenuBuilder: (_, state) =>
+                                          buildMarkdownTextContextMenu(
+                                            context,
+                                            state,
+                                          ),
                                       key: ValueKey(
                                         'ianvs-markdown-table-${cell.key}',
                                       ),
@@ -7340,7 +7357,7 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                 key: const ValueKey('ianvs-markdown-table-add-column'),
                 colors: widget.colors,
                 visible: showControls,
-                tooltip: '在右侧新增列',
+                tooltip: IanvsMarkdownMessage.addColumn.resolve(context),
                 icon: Icons.add_rounded,
                 onPressed: _addColumn,
               ),
@@ -7354,7 +7371,7 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                 key: const ValueKey('ianvs-markdown-table-add-row'),
                 colors: widget.colors,
                 visible: showControls,
-                tooltip: '在下方新增行',
+                tooltip: IanvsMarkdownMessage.addRow.resolve(context),
                 icon: Icons.add_rounded,
                 onPressed: _addRow,
               ),
@@ -7499,8 +7516,14 @@ class _TableDragHandleState extends State<_TableDragHandle> {
     };
     final visible = widget.active || _hovering;
     final label = widget.axis == _TableDragAxis.row
-        ? '拖动表格第 ${widget.index + 1} 行'
-        : '拖动表格第 ${widget.index + 1} 列';
+        ? IanvsMarkdownMessage.dragRow.resolve(
+            context,
+            arguments: {'index': widget.index + 1},
+          )
+        : IanvsMarkdownMessage.dragColumn.resolve(
+            context,
+            arguments: {'index': widget.index + 1},
+          );
     final icon = Icon(Icons.drag_indicator_rounded, size: 14);
     final orientedIcon = widget.axis == _TableDragAxis.row
         ? icon
@@ -8090,11 +8113,14 @@ class _EditorNavigationPane extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(18, 22, 18, 24),
               children: [
-                _NavigationSectionLabel(label: 'MODE', colors: colors),
+                _NavigationSectionLabel(
+                  label: IanvsMarkdownMessage.modeSection.resolve(context),
+                  colors: colors,
+                ),
                 const SizedBox(height: 10),
                 _EditorModeTile(
-                  tooltip: '实时预览',
-                  label: 'Preview',
+                  tooltip: IanvsMarkdownMessage.livePreview.resolve(context),
+                  label: IanvsMarkdownMessage.previewLabel.resolve(context),
                   shortcut: '⌘1',
                   icon: Icons.visibility_outlined,
                   selected: mode == IanvsMarkdownEditorMode.livePreview,
@@ -8103,8 +8129,8 @@ class _EditorNavigationPane extends StatelessWidget {
                       onModeSelected(IanvsMarkdownEditorMode.livePreview),
                 ),
                 _EditorModeTile(
-                  tooltip: '源码模式',
-                  label: 'Source',
+                  tooltip: IanvsMarkdownMessage.sourceMode.resolve(context),
+                  label: IanvsMarkdownMessage.sourceLabel.resolve(context),
                   shortcut: '⌘2',
                   icon: Icons.code_rounded,
                   selected: mode == IanvsMarkdownEditorMode.source,
@@ -8112,8 +8138,8 @@ class _EditorNavigationPane extends StatelessWidget {
                   onTap: () => onModeSelected(IanvsMarkdownEditorMode.source),
                 ),
                 _EditorModeTile(
-                  tooltip: '阅读模式',
-                  label: 'Read',
+                  tooltip: IanvsMarkdownMessage.readingMode.resolve(context),
+                  label: IanvsMarkdownMessage.readLabel.resolve(context),
                   shortcut: '⌘3',
                   icon: Icons.menu_book_outlined,
                   selected: mode == IanvsMarkdownEditorMode.preview,
@@ -8124,7 +8150,10 @@ class _EditorNavigationPane extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   child: Divider(height: 1, color: colors.border),
                 ),
-                _NavigationSectionLabel(label: 'OUTLINE', colors: colors),
+                _NavigationSectionLabel(
+                  label: IanvsMarkdownMessage.outlineSection.resolve(context),
+                  colors: colors,
+                ),
                 const SizedBox(height: 10),
                 for (final heading in headings)
                   _EditorOutlineTile(
