@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flutter/services.dart';
 import 'package:ianvs_design/ianvs_design.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
+import 'package:path/path.dart' as p;
 
 import '../controllers/workspace_controller.dart';
 import '../models/document_session.dart';
@@ -11,6 +13,8 @@ import '../desktop_theme.dart';
 import '../desktop_typography.dart';
 import '../app_icons.dart';
 import 'file_context_menu.dart';
+import 'middle_ellipsis_text.dart';
+import 'window_app_title.dart';
 
 class TitleTabsBar extends StatelessWidget {
   const TitleTabsBar({
@@ -30,95 +34,201 @@ class TitleTabsBar extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Padding(
-            padding: EdgeInsets.only(
-              left: Platform.isMacOS && !workspace.sidebarVisible ? 70 : 0,
-            ),
-            child: IanvsToolbar(
-              height: DesktopMetrics.toolbarHeight,
-              leading: _HeaderIconButton(
-                tooltip: workspace.sidebarVisible
-                    ? 'Hide sidebar'
-                    : 'Show sidebar',
-                icon: AppIcons.sidebar,
-                selected: workspace.sidebarVisible,
-                onPressed: workspace.toggleSidebar,
-              ),
-              title: Center(child: _EditorModePicker(workspace: workspace)),
-              actions: [
-                _HeaderIconButton(
-                  tooltip: workspace.outlineVisible
-                      ? 'Hide outline'
-                      : 'Show outline',
-                  icon: AppIcons.outline,
-                  selected: workspace.outlineVisible,
-                  onPressed: workspace.toggleOutline,
-                ),
-              ],
-            ),
-          ),
           SizedBox(
+            key: const ValueKey('document-tabs-row'),
             height: math.max(
               DesktopMetrics.tabsHeight,
               MediaQuery.textScalerOf(context).scale(15) + 12,
             ),
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: workspace.sidebarVisible ? 12 : 0,
+                right: 12,
+              ),
+              child: Row(
+                children: [
+                  if (!workspace.sidebarVisible)
+                    SizedBox(
+                      width: Platform.isMacOS ? 168 : 100,
+                      child: const Align(
+                        alignment: Alignment.topLeft,
+                        child: WindowAppTitle(),
+                      ),
+                    ),
+                  _HeaderIconButton(
+                    tooltip: workspace.sidebarVisible
+                        ? 'Hide sidebar'
+                        : 'Show sidebar',
+                    icon: AppIcons.sidebar,
+                    selected: workspace.sidebarVisible,
+                    onPressed: workspace.toggleSidebar,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _DocumentTabs(
+                      workspace: workspace,
+                      onClose: onClose,
+                    ),
+                  ),
+                  _OpenDocumentsMenu(workspace: workspace),
+                  _HeaderIconButton(
+                    key: const ValueKey('new-document-button'),
+                    tooltip: 'New document (⌘N)',
+                    icon: AppIcons.add,
+                    onPressed: workspace.newDocument,
+                  ),
+                  const SizedBox(width: 8),
+                  _HeaderIconButton(
+                    tooltip: workspace.outlineVisible
+                        ? 'Hide outline'
+                        : 'Show outline',
+                    icon: AppIcons.outline,
+                    selected: workspace.outlineVisible,
+                    onPressed: workspace.toggleOutline,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Container(
+            key: const ValueKey('document-context-row'),
+            height: math.max(
+              DesktopMetrics.documentContextHeight,
+              MediaQuery.textScalerOf(context).scale(16) + 12,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(color: colors.borderSoft),
+                bottom: BorderSide(color: colors.borderSoft),
+              ),
+            ),
             child: Row(
               children: [
-                Expanded(
-                  child: _DocumentTabs(workspace: workspace, onClose: onClose),
-                ),
-                _HeaderIconButton(
-                  key: const ValueKey('new-document-button'),
-                  tooltip: 'New document (⌘N)',
-                  icon: AppIcons.add,
-                  onPressed: workspace.newDocument,
-                ),
-                PopupMenuButton<int>(
-                  tooltip: 'All open documents',
-                  icon: const Icon(AppIcons.tabs, size: 16),
-                  constraints: const BoxConstraints(
-                    minWidth: 220,
-                    maxWidth: 340,
-                  ),
-                  onSelected: workspace.selectDocument,
-                  itemBuilder: (context) => [
-                    for (var i = 0; i < workspace.documents.length; i++)
-                      PopupMenuItem(
-                        height: 28,
-                        value: i,
-                        child: Row(
-                          children: [
-                            SizedBox(
-                              width: 22,
-                              child: i == workspace.activeIndex
-                                  ? const Icon(AppIcons.check, size: 14)
-                                  : null,
-                            ),
-                            Expanded(
-                              child: Text(
-                                workspace.documents[i].name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (i < 9) ...[
-                              const SizedBox(width: 16),
-                              Text(
-                                '⌘${i + 1}',
-                                style: DesktopTypography.subheadline.copyWith(
-                                  color: colors.textTertiary,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
+                Expanded(child: _DocumentLocation(workspace: workspace)),
+                const SizedBox(width: 16),
+                _EditorModePicker(workspace: workspace),
               ],
             ),
           ),
-          const Divider(),
+        ],
+      ),
+    );
+  }
+}
+
+class _OpenDocumentsMenu extends StatefulWidget {
+  const _OpenDocumentsMenu({required this.workspace});
+
+  final WorkspaceController workspace;
+
+  @override
+  State<_OpenDocumentsMenu> createState() => _OpenDocumentsMenuState();
+}
+
+class _OpenDocumentsMenuState extends State<_OpenDocumentsMenu> {
+  final _focus = FocusNode();
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final workspace = widget.workspace;
+    return MenuAnchor(
+      childFocusNode: _focus,
+      consumeOutsideTap: true,
+      alignmentOffset: const Offset(0, 4),
+      style: MenuStyle(
+        alignment: AlignmentDirectional.bottomEnd,
+        minimumSize: const WidgetStatePropertyAll(Size(220, 0)),
+        maximumSize: WidgetStatePropertyAll(
+          Size(340, MediaQuery.sizeOf(context).height - 64),
+        ),
+      ),
+      menuChildren: [
+        for (var i = 0; i < workspace.documents.length; i++)
+          MenuItemButton(
+            key: ValueKey('document-menu-${workspace.documents[i].id}'),
+            onPressed: () => workspace.selectDocument(i),
+            style: const ButtonStyle(
+              minimumSize: WidgetStatePropertyAll(Size(0, 28)),
+              padding: WidgetStatePropertyAll(
+                EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              ),
+            ),
+            leadingIcon: SizedBox(
+              width: 16,
+              child: i == workspace.activeIndex
+                  ? const Icon(AppIcons.check, size: 14)
+                  : null,
+            ),
+            trailingIcon: i < 9
+                ? Text(
+                    '⌘${i + 1}',
+                    style: DesktopTypography.subheadline.copyWith(
+                      color: context.ianvs.subtle,
+                    ),
+                  )
+                : null,
+            child: Text(
+              workspace.documents[i].name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+      builder: (context, controller, child) => IconButton(
+        tooltip: 'All open documents',
+        focusNode: _focus,
+        icon: const Icon(AppIcons.tabs, size: 16),
+        color: context.ianvs.muted,
+        padding: const EdgeInsets.all(6),
+        style: const ButtonStyle(
+          minimumSize: WidgetStatePropertyAll(Size(32, 32)),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        onPressed: () =>
+            controller.isOpen ? controller.close() : controller.open(),
+      ),
+    );
+  }
+}
+
+class _DocumentLocation extends StatelessWidget {
+  const _DocumentLocation({required this.workspace});
+
+  final WorkspaceController workspace;
+
+  @override
+  Widget build(BuildContext context) {
+    final document = workspace.activeDocument!;
+    final root = workspace.workspaceRoot;
+    final path = document.path;
+    final location = path == null
+        ? 'Unsaved / ${document.name}'
+        : root != null && p.isWithin(root, path)
+        ? '${p.basename(root)} / ${p.relative(path, from: root)}'
+        : '${p.basename(p.dirname(path))} / ${document.name}';
+    final colors = IanvsMarkdownThemeData.resolve(context);
+    return Tooltip(
+      message: path ?? 'Unsaved document',
+      child: Row(
+        children: [
+          Icon(AppIcons.document, size: 14, color: colors.textSecondary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: MiddleEllipsisText(
+              location,
+              key: const ValueKey('document-location'),
+              style: DesktopTypography.callout.copyWith(
+                color: colors.textSecondary,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -131,14 +241,16 @@ double _tabWidth(BuildContext context, DocumentSession document) {
   final painter = TextPainter(
     text: TextSpan(
       text: document.name,
-      style: DefaultTextStyle.of(context).style.merge(_tabTextStyle),
+      style: DefaultTextStyle.of(
+        context,
+      ).style.merge(_tabTextStyle.copyWith(fontWeight: FontWeight.w600)),
     ),
     textDirection: Directionality.of(context),
     textScaler: MediaQuery.textScalerOf(context),
     locale: Localizations.maybeLocaleOf(context),
     maxLines: 1,
   )..layout();
-  final width = (painter.width.ceilToDouble() + 42).clamp(92.0, 220.0);
+  final width = (painter.width.ceilToDouble() + 48).clamp(92.0, 220.0);
   painter.dispose();
   return width;
 }
@@ -155,6 +267,7 @@ class _DocumentTabs extends StatefulWidget {
 class _DocumentTabsState extends State<_DocumentTabs> {
   final _scrollController = ScrollController();
   double? _viewportWidth;
+  bool _reordering = false;
 
   @override
   void initState() {
@@ -176,20 +289,30 @@ class _DocumentTabsState extends State<_DocumentTabs> {
 
   void _revealSelection() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scrollController.hasClients) return;
+      if (!mounted || !_scrollController.hasClients || _reordering) return;
       final workspace = widget.workspace;
       if (workspace.activeDocument == null) return;
-      final start = workspace.documents
+      final widths = workspace.documents
+          .map((document) => _tabWidth(context, document))
+          .toList();
+      final start = widths
           .take(workspace.activeIndex)
-          .fold(0.0, (sum, document) => sum + _tabWidth(context, document));
-      final end = start + _tabWidth(context, workspace.activeDocument!);
+          .fold(0.0, (sum, width) => sum + width);
+      final end = start + widths[workspace.activeIndex];
       final position = _scrollController.position;
       final offset = start < position.pixels
           ? start
           : end > position.pixels + position.viewportDimension
           ? end - position.viewportDimension
           : position.pixels;
-      _scrollController.jumpTo(offset.clamp(0.0, position.maxScrollExtent));
+      // Lazy lists estimate their scroll extent from the visible children.
+      // Use the measured total so distant, wider tabs can be revealed fully.
+      final maxOffset = math.max(
+        0.0,
+        widths.fold(0.0, (sum, width) => sum + width) -
+            position.viewportDimension,
+      );
+      _scrollController.jumpTo(offset.clamp(0.0, maxOffset));
     });
   }
 
@@ -206,37 +329,69 @@ class _DocumentTabsState extends State<_DocumentTabs> {
         _viewportWidth = constraints.maxWidth;
         _revealSelection();
       }
-      return ReorderableListView.builder(
-        scrollController: _scrollController,
-        scrollDirection: Axis.horizontal,
-        buildDefaultDragHandles: false,
-        itemCount: widget.workspace.documents.length,
-        onReorderItem: widget.workspace.reorderDocument,
-        itemBuilder: (context, index) {
-          final document = widget.workspace.documents[index];
-          return ReorderableDragStartListener(
-            key: ValueKey(document.id),
-            index: index,
-            child: FileContextMenu(
-              path: document.path,
-              actions: [
-                FileMenuAction('Save', () async {
-                  await widget.workspace.saveDocument(document);
-                }),
-                FileMenuAction('Save As…', () async {
-                  await widget.workspace.saveDocument(document, saveAs: true);
-                }),
-                FileMenuAction('Close Tab', () => widget.onClose(document)),
-              ],
-              child: _DocumentTab(
-                document: document,
-                selected: index == widget.workspace.activeIndex,
-                onSelected: () => widget.workspace.selectDocument(index),
-                onClose: () => widget.onClose(document),
+      return TooltipVisibility(
+        visible: !_reordering,
+        child: ReorderableListView.builder(
+          scrollController: _scrollController,
+          scrollDirection: Axis.horizontal,
+          buildDefaultDragHandles: false,
+          itemCount: widget.workspace.documents.length,
+          onReorderStart: (_) {
+            Tooltip.dismissAllToolTips();
+            setState(() => _reordering = true);
+          },
+          onReorderEnd: (_) {
+            setState(() => _reordering = false);
+            _revealSelection();
+          },
+          // Keep drag visuals separate from the live tab's tooltips and
+          // accessibility nodes.
+          proxyDecorator: (_, index, animation) {
+            final document = widget.workspace.documents[index];
+            return ExcludeSemantics(
+              child: IgnorePointer(
+                child: TooltipVisibility(
+                  visible: false,
+                  child: Material(
+                    elevation: 2,
+                    child: _DocumentTab(
+                      document: document,
+                      selected: index == widget.workspace.activeIndex,
+                      onSelected: () {},
+                      onClose: () {},
+                    ),
+                  ),
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+          onReorderItem: widget.workspace.reorderDocument,
+          itemBuilder: (context, index) {
+            final document = widget.workspace.documents[index];
+            return ReorderableDragStartListener(
+              key: ValueKey(document.id),
+              index: index,
+              child: FileContextMenu(
+                path: document.path,
+                actions: [
+                  FileMenuAction('Save', () async {
+                    await widget.workspace.saveDocument(document);
+                  }),
+                  FileMenuAction('Save As…', () async {
+                    await widget.workspace.saveDocument(document, saveAs: true);
+                  }),
+                  FileMenuAction('Close Tab', () => widget.onClose(document)),
+                ],
+                child: _DocumentTab(
+                  document: document,
+                  selected: index == widget.workspace.activeIndex,
+                  onSelected: () => widget.workspace.selectDocument(index),
+                  onClose: () => widget.onClose(document),
+                ),
+              ),
+            );
+          },
+        ),
       );
     },
   );
@@ -261,6 +416,7 @@ class _DocumentTab extends StatefulWidget {
 
 class _DocumentTabState extends State<_DocumentTab> {
   var _hovered = false;
+  var _focused = false;
 
   @override
   Widget build(BuildContext context) {
@@ -281,6 +437,7 @@ class _DocumentTabState extends State<_DocumentTab> {
               : Colors.transparent,
           child: InkWell(
             onTap: widget.onSelected,
+            onFocusChange: (focused) => setState(() => _focused = focused),
             child: Container(
               width: width,
               padding: const EdgeInsets.only(left: 9, right: 3),
@@ -302,13 +459,14 @@ class _DocumentTabState extends State<_DocumentTab> {
                         color: selected
                             ? colors.textPrimary
                             : colors.textSecondary,
+                        fontWeight: selected ? FontWeight.w600 : null,
                       ),
                     ),
                   ),
                   ValueListenableBuilder<bool>(
                     valueListenable: document.controller.dirtyListenable,
                     builder: (context, dirty, _) =>
-                        dirty && !selected && !_hovered
+                        dirty && !selected && !_hovered && !_focused
                         ? SizedBox(
                             width: 28,
                             height: 28,
@@ -324,15 +482,22 @@ class _DocumentTabState extends State<_DocumentTab> {
                               ),
                             ),
                           )
-                        : IconButton(
-                            tooltip: 'Close ${document.name}',
-                            onPressed: widget.onClose,
-                            icon: const Icon(AppIcons.close, size: 12),
-                            color: colors.textTertiary,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints.tightFor(
-                              width: 28,
-                              height: 28,
+                        : Visibility(
+                            visible: selected || _hovered || _focused,
+                            maintainSize: true,
+                            maintainState: true,
+                            maintainAnimation: true,
+                            maintainSemantics: true,
+                            child: IconButton(
+                              tooltip: 'Close ${document.name}',
+                              onPressed: widget.onClose,
+                              icon: const Icon(AppIcons.close, size: 12),
+                              color: colors.textTertiary,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints.tightFor(
+                                width: 28,
+                                height: 28,
+                              ),
                             ),
                           ),
                   ),
@@ -346,58 +511,122 @@ class _DocumentTabState extends State<_DocumentTab> {
   }
 }
 
-class _EditorModePicker extends StatelessWidget {
+extension on IanvsMarkdownEditorMode {
+  String get label => switch (this) {
+    IanvsMarkdownEditorMode.livePreview => 'Live',
+    IanvsMarkdownEditorMode.source => 'Source',
+    IanvsMarkdownEditorMode.preview => 'Read',
+  };
+
+  String get accessibleLabel =>
+      this == IanvsMarkdownEditorMode.livePreview ? 'Live Preview' : label;
+
+  IconData get icon => switch (this) {
+    IanvsMarkdownEditorMode.livePreview => AppIcons.liveMode,
+    IanvsMarkdownEditorMode.source => AppIcons.sourceMode,
+    IanvsMarkdownEditorMode.preview => AppIcons.readMode,
+  };
+}
+
+class _EditorModePicker extends StatefulWidget {
   const _EditorModePicker({required this.workspace});
   final WorkspaceController workspace;
 
   @override
-  Widget build(BuildContext context) =>
-      ValueListenableBuilder<IanvsMarkdownEditorMode>(
-        valueListenable: workspace.activeDocument!.controller.modeListenable,
-        builder: (context, selected, _) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: SegmentedButton<IanvsMarkdownEditorMode>(
-            showSelectedIcon: false,
-            style: ButtonStyle(
-              minimumSize: const WidgetStatePropertyAll(Size(0, 32)),
-              padding: const WidgetStatePropertyAll(
-                EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+  State<_EditorModePicker> createState() => _EditorModePickerState();
+}
+
+class _EditorModePickerState extends State<_EditorModePicker> {
+  final _focus = FocusNode();
+  final _menu = MenuController();
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(
+    BuildContext context,
+  ) => ValueListenableBuilder<IanvsMarkdownEditorMode>(
+    valueListenable: widget.workspace.activeDocument!.controller.modeListenable,
+    builder: (context, selected, _) => MenuAnchor(
+      controller: _menu,
+      childFocusNode: _focus,
+      consumeOutsideTap: true,
+      alignmentOffset: const Offset(0, 4),
+      style: const MenuStyle(
+        alignment: AlignmentDirectional.bottomEnd,
+        minimumSize: WidgetStatePropertyAll(Size(168, 0)),
+      ),
+      menuChildren: [
+        for (final mode in IanvsMarkdownEditorMode.values)
+          MenuItemButton(
+            key: ValueKey('editor-mode-${mode.name}'),
+            autofocus: mode == selected,
+            leadingIcon: Icon(mode.icon, size: 16),
+            trailingIcon: SizedBox(
+              width: 16,
+              child: mode == selected
+                  ? const Icon(AppIcons.check, size: 14)
+                  : null,
+            ),
+            onPressed: () => widget.workspace.setMode(mode),
+            child: Semantics(
+              selected: mode == selected,
+              child: Text(mode.label, semanticsLabel: mode.accessibleLabel),
+            ),
+          ),
+      ],
+      builder: (context, controller, child) => CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.arrowDown): controller.open,
+        },
+        child: Tooltip(
+          message: 'Editor mode',
+          excludeFromSemantics: true,
+          child: SizedBox(
+            height: math.max(
+              32,
+              MediaQuery.textScalerOf(context).scale(16) + 8,
+            ),
+            child: TextButton(
+              key: const ValueKey('editor-mode-button'),
+              focusNode: _focus,
+              onPressed: () =>
+                  controller.isOpen ? controller.close() : controller.open(),
+              style: ButtonStyle(
+                minimumSize: const WidgetStatePropertyAll(Size(104, 32)),
+                padding: const WidgetStatePropertyAll(
+                  EdgeInsets.symmetric(horizontal: 10),
+                ),
+                alignment: Alignment.center,
+                visualDensity: VisualDensity.standard,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                textStyle: WidgetStatePropertyAll(DesktopTypography.callout),
+                foregroundColor: WidgetStatePropertyAll(context.ianvs.muted),
               ),
-              textStyle: WidgetStatePropertyAll(
-                Theme.of(context).textTheme.bodyMedium,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Icon(selected.icon, size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    selected.label,
+                    semanticsLabel: 'Editor mode: ${selected.accessibleLabel}',
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(AppIcons.tabs, size: 14),
+                ],
               ),
             ),
-            segments: const [
-              ButtonSegment(
-                value: IanvsMarkdownEditorMode.livePreview,
-                label: Tooltip(
-                  message: 'Live Preview: edit with inline formatting',
-                  excludeFromSemantics: true,
-                  child: Text('Live', semanticsLabel: 'Live Preview'),
-                ),
-              ),
-              ButtonSegment(
-                value: IanvsMarkdownEditorMode.source,
-                label: Tooltip(
-                  message: 'Source: edit Markdown source',
-                  excludeFromSemantics: true,
-                  child: Text('Source'),
-                ),
-              ),
-              ButtonSegment(
-                value: IanvsMarkdownEditorMode.preview,
-                label: Tooltip(
-                  message: 'Read: preview without editing',
-                  excludeFromSemantics: true,
-                  child: Text('Read'),
-                ),
-              ),
-            ],
-            selected: {selected},
-            onSelectionChanged: (modes) => workspace.setMode(modes.single),
           ),
         ),
-      );
+      ),
+    ),
+  );
 }
 
 class _HeaderIconButton extends StatelessWidget {

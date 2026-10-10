@@ -17,7 +17,8 @@ class MainFlutterWindow: NSWindow {
     self.titleVisibility = .hidden
     self.titlebarAppearsTransparent = true
     self.styleMask.insert(.fullSizeContentView)
-    self.isMovableByWindowBackground = true
+    self.isMovableByWindowBackground = false
+    self.acceptsMouseMovedEvents = true
     self.minSize = NSSize(width: 840, height: 560)
     self.setContentSize(NSSize(width: 1200, height: 780))
     self.center()
@@ -31,6 +32,23 @@ class MainFlutterWindow: NSWindow {
     registerDesktopIntegration(with: flutterViewController)
 
     super.awakeFromNib()
+  }
+
+  override func sendEvent(_ event: NSEvent) {
+    // AppKit otherwise consumes clicks in Flutter's top row as titlebar drags.
+    // Update before mouse-down so WindowServer uses the correct drag region.
+    // The first 168 points retain the native buttons and app-name drag area.
+    let point = event.locationInWindow
+    let isHeaderControl = NSRect(
+      x: 168, y: frame.height - 44, width: frame.width - 168, height: 44
+    ).contains(point)
+    switch event.type {
+    case .mouseMoved, .mouseEntered, .mouseExited, .leftMouseDown, .rightMouseDown:
+      isMovable = !isHeaderControl
+    default:
+      break
+    }
+    super.sendEvent(event)
   }
 
   private func registerDesktopIntegration(with controller: FlutterViewController) {

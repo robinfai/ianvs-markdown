@@ -13,6 +13,7 @@ import '../desktop_typography.dart';
 import '../services/markdown_file_service.dart';
 import 'file_context_menu.dart';
 import 'middle_ellipsis_text.dart';
+import 'window_app_title.dart';
 
 const _background = Color(0xff17191a);
 final _secondary = IanvsTokens.dark.muted;
@@ -253,14 +254,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: DesktopMetrics.toolbarHeight),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(15, 19, 12, 7),
-                child: Text(
-                  'Workspace',
-                  style: TextStyle(fontSize: 11, color: _secondary),
-                ),
-              ),
+              const WindowAppTitle(),
               _dropTarget(
                 root,
                 FileContextMenu(

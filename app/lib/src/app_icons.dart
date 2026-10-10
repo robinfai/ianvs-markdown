@@ -16,4 +16,7 @@ abstract final class AppIcons {
   static const tabs = Icons.keyboard_arrow_down;
   static const check = Icons.check;
   static const info = Icons.info_outline;
+  static const liveMode = Icons.edit_outlined;
+  static const sourceMode = Icons.code;
+  static const readMode = Icons.menu_book_outlined;
 }
