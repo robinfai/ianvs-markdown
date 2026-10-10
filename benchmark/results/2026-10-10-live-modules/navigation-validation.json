@@ -1,0 +1,40 @@
+{
+  "baseRevision": "875590a",
+  "chunks": {
+    "navigation_methods": {
+      "lines": 900,
+      "sha256": "3cece5f65255884e12504a84ce52a8a2179a0cd03d30fde5a662a14bc553e2d5"
+    },
+    "character_navigation": {
+      "lines": 31,
+      "sha256": "01815752203466284afeadef0ed5414a2681094e3b0ca01527f4ab46f56e6cc9"
+    },
+    "fold_bridge": {
+      "lines": 12,
+      "sha256": "c0ac3ce24e26d59945b713b068345701bbc51b48b50c77fcfb909ec14210e961"
+    },
+    "navigation_widgets": {
+      "lines": 306,
+      "sha256": "ef1d6a21b066ef281654fb33b1354819cc7ce601f83c19361c221c6c59ded39e"
+    },
+    "selection_transforms": {
+      "lines": 116,
+      "sha256": "ebe1527228b5c9fda039c84479400ca0904eb81f56544503b9d7df12d6453f40"
+    }
+  },
+  "mechanism": "same-library part and named State extension",
+  "movedDeclarationsByteIdentical": true,
+  "tests": 492,
+  "testExitCode": 0,
+  "analyzeExitCode": 0,
+  "formatterChanges": "owner trailing blank line removed; moved declarations unchanged",
+  "implementationSha256": {
+    "lib/src/editor/live_editor.dart": "c3fb55005f97148f1c4f806f872239c2285ff3b59a47d8868a6b967098a54a60",
+    "lib/src/editor/live_editor/navigation.dart": "5ed9227fb2bd91a6c074f4c5e07006397bad192fc7082b628b6a6dcef453c785",
+    "lib/src/editor/live_editor/table.dart": "6b4634e48f0608742c1b79e1c75457e6345582769ab5aad796c6dd8f8db021ad"
+  },
+  "logSha256": {
+    "navigation-tests.log.gz": "945d36f885f4340869e6b2e9fc974b6a228a6ee2ef43c4dce5c09dcf05958af5",
+    "navigation-analyze.log.gz": "1e91f24c26184710a90907b9a6e8ab6c5ac5b95e9118c08e2af53a270a7332ac"
+  }
+}
