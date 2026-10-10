@@ -60,7 +60,7 @@ CARGO_PROFILE_RELEASE_STRIP=none FLUTTER_XCODE_ARCHS=arm64 flutter build macos -
 
 最小阅读入口的 Release 构建曾在未修改 SDK 的 `_window_macos.dart / _Rect` 出现 `illegal cid, full-aot`；该入口的失败不被历史 playground Release 成功抵消。本轮没有用补丁 SDK 把它记为通过。新入口的最低 SDK、Profile/Release 候选与真实交互仍需要逐入口记录。
 
-R2-01 在 `dba969d` 基线上也复现基准入口的未修改 SDK Profile AOT 失败；临时 SDK 的 windowing 补丁仅用于诊断。基准完整采样另因锁屏/前台激活失败中断，属于性能测量环境失效，不据此推断已发布组件的渲染故障或扩展平台支持范围。归档证据见 [R2-01 报告](../benchmark/PERFORMANCE-2026-10-10.md)。
+R2-01 在 `dba969d` 基线上也复现基准入口的未修改 SDK Profile AOT 失败；临时 SDK 的 windowing 补丁仅用于诊断。早期基准完整采样曾因锁屏/前台激活失败中断；解锁并增加原生窗口校验后，一轮完整基线通过，另两轮因运行中失去前台而排除。这些中断属于性能测量环境失效，不据此推断已发布组件的渲染故障或扩展平台支持范围。归档证据见 [R2-01 报告](../benchmark/PERFORMANCE-2026-10-10.md)。
 
 原生剪贴板适配器是独立源码包，当前未发布。其自动测试验证同一 item 双格式、不可用/初始化失败/写入失败时完整 Markdown 回退，以及最终写入失败的错误传播；没有触碰系统剪贴板。Linefold 与 Mermaid 宿主显式接入后仍需在候选版本执行真实跨应用粘贴，不能用这些单元回归扩大平台支持声明。
 

@@ -36,11 +36,11 @@ Apple M4 Pro / macOS 27.0.1 arm64，Flutter 3.44.8 / Dart 3.12.2。未修改 SDK
 
 用户已确认解锁，基准小规模启动检查完成。新增原生窗口校验策略 `native-window-stable-v1`：启动最多等待 10 秒，之后每次动作前后记录前台、可见、隐藏、最小化、Space、窗口尺寸与变化代数。原生状态变化主动通知 Dart，即使窗口停止产帧也立即使本次运行失效；短暂离开后返回也不能恢复为有效样本。校验调用不计入动作耗时与帧区间。10 项证据校验器测试和 Dart 分析通过；[隐藏窗口实测](results/2026-10-10-performance/r2-environment-rejection.json)正确返回 `complete: false` / `fullBaseline: false`，错误包含 `visible: false`、`appHidden: true` 和代数变化，日志与 trace 同目录保留。此防护不检测其他后台负载或温度，完整运行时仍避免并行构建。
 
-优化前源码固定在独立测量快照 `8d50d0d`（`c7d8f5d` 加相同的窗口校验与证据工具，`lib/` 未改动）；候选分支保持已完成的 renderer 修复。两次新完整基线使用 `r2-visible-before-1` / `r2-visible-before-2` 新标签串行启动，旧锁屏样本不复用。待两次运行结束并通过逐样本校验后，补充观察线与结果。
+优化前源码固定在独立测量快照 `8d50d0d`（`c7d8f5d` 加相同的窗口校验与证据工具，`lib/` 未改动）；候选分支保持已完成的 renderer 修复。两次新完整基线使用 `r2-visible-before-1` / `r2-visible-before-2` 新标签串行启动，旧锁屏样本不复用。各次结果和补跑情况见下文；只有两次完整有效结果都通过逐样本校验后才生成观察线。
 
 `r2-visible-before-1` 已完成且通过 `read_run` 逐样本校验：6 场景、42 操作、840 个正式样本，5 次预热 / 20 次测量，耗时 727.0 秒，无错误；归档后的 JSON 和 trace 再次校验通过。[第一轮原始结果](results/2026-10-10-performance/r2-visible-before-1.json)中，1 MiB 无预算输入 / Live→Source / Source→Reading 的 P95 为 836.8 / 6350.0 / 11302.8 ms。这是一轮优化前结果，尚不能生成重复基线观察线或声称优化收益。
 
-`r2-visible-before-2` 在 1 MiB 无预算 Source→Reading 的正式样本索引 5 开始后收到 `active: false`、`generation: 2`，立即终止；其余窗口可见性标记仍正常，电脑控制随后确认桌面可访问，不能把这次中断写作锁屏。[第二轮失败记录](results/2026-10-10-performance/r2-visible-before-2.json)及 trace / 日志保留，`complete` 和 `fullBaseline` 均为 false。以新标签 `r2-visible-before-3` 补跑完整独立进程，保留第一轮有效结果，不拼接失败轮的部分样本。
+`r2-visible-before-2` 在 1 MiB 无预算 Source→Reading 的正式样本索引 5 开始后收到 `active: false`、`generation: 2`，立即终止；其余窗口可见性标记仍正常，电脑控制随后确认桌面可访问，不能把这次中断写作锁屏。[第二轮失败记录](results/2026-10-10-performance/r2-visible-before-2.json)及 trace / 日志保留，`complete` 和 `fullBaseline` 均为 false。随后以新标签 `r2-visible-before-3` 补跑完整独立进程。该次在 1 MiB 无预算模式切换预热索引 3 又收到 `active: false` / `generation: 3` 并终止，耗时 331.1 秒；[第三次记录](results/2026-10-10-performance/r2-visible-before-3.json)同样为不完整。保留第一轮有效结果，不拼接失败轮的部分样本。再次复测前需具备约 12 分钟连续前台窗口，已向用户确认该条件；当前没有运行 GUI 基准。
 
 1. 在有效 GUI 环境中用保留的优化前源码重新建立基线，固定环境和测量代码，关闭阶段计时，串行运行两个独立进程：每项 5 次预热 / 20 个样本、六个场景、七种操作。逐样本验证后生成同环境观察线，再实施后续热点优化。
 2. 对引用/标题解析、持续渲染的标签状态、Source 文本与背景排版分别实施可回归的改动；每项有正确性与失效条件说明。预算语义和完整原文保持一致。
@@ -49,3 +49,15 @@ Apple M4 Pro / macOS 27.0.1 arm64，Flutter 3.44.8 / Dart 3.12.2。未修改 SDK
 5. 完整 `make check`、发布快照、双 SDK Core / Native CI 后更新任务状态；原始证据、性能边界和剩余平台验收随提交保留。
 
 当前已交付归因工具、诊断/失败证据和渲染器状态隔离修复；正式基线/目标表、解析与排版优化、相关缓存失效规则、配对收益验证和最终验收尚未交付。不能据此把 R2-01 标为完成。
+
+## 当前有效证据与继续条件
+
+| 标签 | 结果 | 是否纳入重复基线 |
+| --- | --- | --- |
+| `r2-visible-before-1` | 完整 42/42 项、840 个正式样本，原始 trace/哈希/环境/解析次数校验通过 | 是，唯一有效完整轮 |
+| `r2-visible-before-2` | 正式模式切换中失去前台，立即终止 | 否 |
+| `r2-visible-before-3` | 模式切换预热中失去前台，立即终止 | 否 |
+
+保留优化前测量 worktree 的 `8d50d0d`，临时补丁 SDK、语料和测量输入均不改动。新一次使用未用过的标签；顺利完成后，将它与 `r2-visible-before-1` 交给 `tool/analyze_performance_runs.py`，再归档观察线。观察线、解析/Source 优化、两次候选复测和最终验收仍未完成，R2-01 保持进行中。整合分支 `51877f4` 的双 SDK Core / Native CI 已全部通过；后续文档与证据提交以其最新 Checks 为准。
+
+性能进程结束后，对已整合 R2-03 的 `5eb6afb` 实现运行完整 `make check`，退出 0：核心 960、示例 20、Python 10、预算 32 组、app 274（1 项历史可选语料跳过）、剪贴板 6、Mermaid Flutter 9 / Rust 4、原生示例 3、Quick Look Rust 8 / Swift 10、原生导入通过。包快照 159 文件、651 KB，dry-run 无警告，包内示例和仓库外接入通过、无工作区路径泄漏；最终库及示例实现哈希与受测快照一致。证据见 [验证摘要](results/2026-10-10-performance/merged-validation.json)、[完整日志](results/2026-10-10-performance/merged-check.log.gz) 和 [包摘要](results/2026-10-10-performance/merged-package-summary.json)。同一提交的双 SDK Core / Native 远端检查均成功。该轮非 GUI 回归不能替代第二轮完整基线、候选配对或真实平台交互。
