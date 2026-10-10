@@ -17,7 +17,7 @@ Core 的最低 SDK 与较新 SDK 组合都固定在 [CI 工作流](https://githu
 
 ## macOS 候选构建
 
-最小宿主使用 [example](../example/README.md)，核心仍包含 `super_clipboard` 原生插件依赖。首次普通 Profile 构建因 `proc-macro-error` 无法加载 `proc_macro_error_attr` 失败。使用仓库已有的 macOS 27 构建环境配置重试，未修改 Flutter 或第三方包源码：
+以下为基线 `e131698` 的历史候选构建，使用 [example](../example/README.md)，当时核心仍包含 `super_clipboard` 原生插件依赖。R1-04 已将它移到可选适配器，历史大小和成功结果不能替代新入口的候选构建。首次普通 Profile 构建因 `proc-macro-error` 无法加载 `proc_macro_error_attr` 失败。使用仓库已有的 macOS 27 构建环境配置重试，未修改 Flutter 或第三方包源码：
 
 ```sh
 cd example
@@ -32,7 +32,7 @@ CARGO_PROFILE_RELEASE_STRIP=none FLUTTER_XCODE_ARCHS=arm64 flutter build macos -
 
 源码基线为 `e131698`。本次只验证构建，没有安装、发布或完成真实输入法/剪贴板/无障碍验收。SDK 在验证前后均无源码改动；这次 3.44.8 的结果不替代最低 3.44.0 的独立 Profile/Release 验收。
 
-构建过程还提示 `irondash_engine_context` 和 `super_native_extensions` 尚未采用 macOS Swift Package Manager，当前使用 CocoaPods 路径。R1-04 评估剪贴板适配层时需要一起核对；这里只记录当前构建提示，不推断未来 Flutter 的截止版本。
+构建过程还提示 `irondash_engine_context` 和 `super_native_extensions` 尚未采用 macOS Swift Package Manager，使用 CocoaPods 路径。R1-04 拆分后，这一要求属于显式接入原生剪贴板适配器的宿主；这里只记录当前构建提示，不推断未来 Flutter 的截止版本。
 
 示例声明 macOS 12 最低部署目标，并未因此证明已在 macOS 12 真机运行。R0 profile 性能基准使用的临时 windowing 补丁，仅用于受控性能归因，不能作为未修改 SDK 的候选版本验收。历史记录见 [R0 报告](https://github.com/robinfai/ianvs-markdown/blob/main/benchmark/ACCEPTANCE-2026-10-07.md)。
 
@@ -49,7 +49,17 @@ CARGO_PROFILE_RELEASE_STRIP=none FLUTTER_XCODE_ARCHS=arm64 flutter build macos -
 | Android | 构建与运行待验收 | 待验收 | 触摸选择、软键盘与 IME 待验收 | 待验收 | TalkBack 待验收 |
 | Web | 编译、资源注入与浏览器运行待验收 | 待验收 | 浏览器 IME 与触摸待验收 | 权限、HTML/纯文本复制待验收 | 浏览器键盘与读屏待验收 |
 
-图片、文件链接与图表的具体权限由宿主控制；注入 builder 只提供入口，不自动证明对应平台的 I/O、解码或渲染能力。传入 `clipboardWriter` 可替换复制行为，但不能删除包级原生构建依赖。
+图片、文件链接与图表的具体权限由宿主控制；注入 builder 只提供入口，不自动证明对应平台的 I/O、解码或渲染能力。R1-04 后核心默认通过 Flutter 写 Markdown 纯文本，不包含原生剪贴板插件；需要双格式输出的宿主显式选择适配器。移除依赖不能代替系统复制权限、跨应用粘贴或真实设备验收。
+
+## R1-04 依赖拆分与新的构建边界
+
+同一 Flutter 3.44.8、macOS 27.0.1 arm64 环境的三个临时阅读宿主 Debug 对照中，移除原生后端后不再解析/注册 `device_info_plus`、`irondash_engine_context` 和 `super_native_extensions`。默认原生、注入纯文本但保留依赖、移除后端三组均完成项目首次和重复 Debug 构建。具体数值、缓存范围及迁移见 [依赖决策](CLIPBOARD_DEPENDENCY_DECISION.md)。
+
+实际拆分实现通过完整 `make check`：核心 902、核心示例 9、剪贴板适配器 5、app 274（可选语料跳过 1），原有 Mermaid / Quick Look / 文件导入检查通过；146 文件、约 616 KB 的 Pub 快照零警告，包外示例和新宿主依赖图均不包含原生后端。对核心 example 执行 `flutter clean` 后，`make build-examples` 的 `body.dart`、`reading.dart`、`editor.dart`、`main.dart` 四个 macOS Debug 入口全部成功，未注册 macOS 插件，产物框架仅有 App 和 FlutterMacOS。CI 已纳入这四个入口与显式使用原生剪贴板的 Mermaid 宿主；远端结果按相应 PR 的 Checks 单独确认。
+
+最小阅读入口的 Release 构建曾在未修改 SDK 的 `_window_macos.dart / _Rect` 出现 `illegal cid, full-aot`；该入口的失败不被历史 playground Release 成功抵消。本轮没有用补丁 SDK 把它记为通过。新入口的最低 SDK、Profile/Release 候选与真实交互仍需要逐入口记录。
+
+原生剪贴板适配器是独立源码包，当前未发布。其自动测试验证同一 item 双格式、不可用/初始化失败/写入失败时完整 Markdown 回退，以及最终写入失败的错误传播；没有触碰系统剪贴板。Linefold 与 Mermaid 宿主显式接入后仍需在候选版本执行真实跨应用粘贴，不能用这些单元回归扩大平台支持声明。
 
 ## Linefold iOS 宿主证据的范围
 

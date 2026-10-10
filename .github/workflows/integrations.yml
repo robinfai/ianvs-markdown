@@ -8,6 +8,7 @@ on:
       - 'example/**'
       - 'app/**'
       - 'packages/ianvs_mermaid/**'
+      - 'packages/ianvs_markdown_clipboard/**'
       - 'demos/**'
       - 'pubspec.*'
       - 'analysis_options.yaml'
@@ -45,9 +46,9 @@ jobs:
           sw_vers
       - name: Host and native regressions
         run: make check-integrations
-      - name: Build both example hosts
+      - name: Build all core entries and the native adapter host
         run: |
-          (cd example && flutter build macos --debug)
+          make build-examples
           (cd packages/ianvs_mermaid/example && flutter build macos --debug)
       - name: Save native rendering evidence
         if: always()

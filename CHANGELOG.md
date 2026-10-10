@@ -1,5 +1,17 @@
 ## Unreleased
 
+- **Clipboard migration:** remove `super_clipboard` from the core dependency
+  graph. The existing default writer now writes complete Markdown plain text
+  through Flutter; payload types and injected writers keep their contracts.
+  Hosts needing native Markdown + HTML output must opt into the new source
+  adapter `ianvs_markdown_clipboard`. Linefold and the native Mermaid example
+  explicitly use it to preserve their output. See the integration guide before
+  upgrading; no new package version has been published.
+- Add independently runnable body, document-reader and full-editor examples,
+  including approved resources, copy/navigation, captured asynchronous saves,
+  localization and host shortcuts. Verify all entries in external Pub snapshot
+  tests and macOS Debug builds; clean obsolete native references from the core
+  example project.
 - Add `IanvsMarkdownShortcuts` and `IanvsMarkdownCommand` for scoped command
   remapping, disabling and explicit host key reservations across reading,
   Source/Live editors, table cells and properties. Preserve local editing and

@@ -66,8 +66,11 @@ def check_resolved_paths(package, snapshot):
         path = Path(unquote(uri.path)).resolve()
         if path.is_relative_to(ROOT):
             raise RuntimeError(f"Snapshot leaked original workspace: {path}")
-        if item["name"] in {"ianvs_mermaid", "merman"}:
-            raise RuntimeError("Minimal host resolved an optional Mermaid backend")
+        if item["name"] in {
+            "ianvs_mermaid", "merman", "ianvs_markdown_clipboard",
+            "super_clipboard", "super_native_extensions", "irondash_engine_context",
+        }:
+            raise RuntimeError(f"Minimal host resolved an optional native backend: {item['name']}")
         if item["name"] == "ianvs_markdown":
             core_root = path
     if core_root != snapshot.resolve():

@@ -5,13 +5,13 @@ INSTALL_DIR ?= /Applications
 PYTHON ?= python3
 
 CORE_DART = lib test example/lib example/test tool/package_smoke_test.dart benchmark
-INTEGRATION_DART = app/lib app/test packages/ianvs_mermaid/lib packages/ianvs_mermaid/hook packages/ianvs_mermaid/test packages/ianvs_mermaid/example/lib packages/ianvs_mermaid/example/test
+INTEGRATION_DART = app/lib app/test packages/ianvs_mermaid/lib packages/ianvs_mermaid/hook packages/ianvs_mermaid/test packages/ianvs_mermaid/example/lib packages/ianvs_mermaid/example/test packages/ianvs_markdown_clipboard/lib packages/ianvs_markdown_clipboard/test
 
 .DEFAULT_GOAL := help
 # Flutter resolves dependencies and writes generated files in each package.
 .NOTPARALLEL:
 
-.PHONY: help deps deps-core deps-integrations format format-check format-check-core format-check-integrations analyze analyze-core analyze-integrations test test-example test-app test-mermaid test-mermaid-example test-quicklook test-native-import test-ios-preview build-ios-preview run-ios check check-core check-integrations check-package benchmark run example run-app install clean publish-dry-run
+.PHONY: help deps deps-core deps-integrations format format-check format-check-core format-check-integrations analyze analyze-core analyze-integrations test test-example test-app test-mermaid test-mermaid-example test-quicklook test-native-import test-ios-preview build-ios-preview build-examples run-ios check check-core check-integrations check-package benchmark run example run-app install clean publish-dry-run
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -21,8 +21,9 @@ deps: deps-core deps-integrations ## Install all repository dependencies
 deps-core: ## Install core package and minimal example dependencies
 	$(FLUTTER) pub get
 
-deps-integrations: ## Install app and optional Mermaid dependencies
+deps-integrations: ## Install app and optional native adapter dependencies
 	cd packages/ianvs_mermaid && $(FLUTTER) pub get
+	cd packages/ianvs_markdown_clipboard && $(FLUTTER) pub get
 	cd app && $(FLUTTER) pub get
 
 format: ## Format Dart source and test files
@@ -42,16 +43,21 @@ analyze-core: ## Analyze only core and minimal example code
 	$(FLUTTER) analyze lib test tool/package_smoke_test.dart benchmark
 	cd example && $(FLUTTER) analyze
 
-analyze-integrations: ## Analyze the app and optional Mermaid integration
+analyze-integrations: ## Analyze the app and optional native integrations
 	cd app && $(FLUTTER) analyze
 	cd packages/ianvs_mermaid && $(FLUTTER) analyze
 	cd packages/ianvs_mermaid/example && $(FLUTTER) analyze
+	cd packages/ianvs_markdown_clipboard && $(FLUTTER) analyze
 
 test: ## Run package tests
 	$(FLUTTER) test
 
 test-example: ## Run example application tests
 	cd example && $(FLUTTER) test
+
+.PHONY: test-clipboard
+test-clipboard: ## Run the optional native clipboard adapter contracts
+	cd packages/ianvs_markdown_clipboard && $(FLUTTER) test
 
 test-app: ## Run desktop application tests
 	cd app && $(FLUTTER) test
@@ -64,6 +70,12 @@ test-ios-preview: test-native-import ## Check iOS reading, import handling, and 
 
 build-ios-preview: ## Build the iOS reading preview for the simulator
 	cd app && $(FLUTTER) build ios --simulator --debug --no-codesign
+
+build-examples: ## Build body, reading, editor and playground entries for macOS
+	cd example && $(FLUTTER) build macos --debug --target lib/body.dart
+	cd example && $(FLUTTER) build macos --debug --target lib/reading.dart
+	cd example && $(FLUTTER) build macos --debug --target lib/editor.dart
+	cd example && $(FLUTTER) build macos --debug --target lib/main.dart
 
 run-ios: ## Run on an iOS device or simulator (pass DEVICE=<device id>)
 	cd app && $(FLUTTER) run $(if $(DEVICE),-d $(DEVICE),)
@@ -81,7 +93,7 @@ test-quicklook: deps-integrations ## Test the native macOS Quick Look renderer a
 
 check-core: deps-core format-check-core analyze-core test test-example ## Validate core without Apple or Mermaid integration checks
 
-check-integrations: deps-integrations format-check-integrations analyze-integrations test-app test-mermaid test-mermaid-example test-quicklook test-native-import ## Validate the app and native integrations (macOS)
+check-integrations: deps-integrations format-check-integrations analyze-integrations test-app test-mermaid test-mermaid-example test-clipboard test-quicklook test-native-import ## Validate the app and native integrations (macOS)
 
 check-package: ## Test the actual Pub snapshot in an external Flutter host
 	$(PYTHON) tool/check_package.py --flutter "$(FLUTTER)" --dart "$(DART)"

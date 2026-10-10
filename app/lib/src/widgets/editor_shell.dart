@@ -5,6 +5,7 @@ import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
+import 'package:ianvs_markdown_clipboard/ianvs_markdown_clipboard.dart';
 import 'package:ianvs_mermaid/ianvs_mermaid.dart';
 import 'package:path/path.dart' as p;
 
@@ -279,6 +280,11 @@ class _EditorShellState extends State<EditorShell> {
                                               return IanvsMarkdownLiveEditor(
                                                 key: ValueKey(document.id),
                                                 controller: document.controller,
+                                                clipboardWriter: (data) =>
+                                                    writeIanvsMarkdownRichClipboard(
+                                                      markdown: data.markdown,
+                                                      html: data.html,
+                                                    ),
                                                 onTapLink: (_, href, _) =>
                                                     _guard(
                                                       () => DocumentLinkService(

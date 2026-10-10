@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
+import 'package:ianvs_markdown_clipboard/ianvs_markdown_clipboard.dart';
 import 'package:ianvs_mermaid/ianvs_mermaid.dart';
 
 import '../widgets/document_diagram.dart';
@@ -392,6 +393,10 @@ class _PreviewReaderState extends State<_PreviewReader> {
             ? const Center(child: Text('这是一个空文档'))
             : IanvsMarkdownView(
                 data: widget.contents,
+                clipboardWriter: (data) => writeIanvsMarkdownRichClipboard(
+                  markdown: data.markdown,
+                  html: data.html,
+                ),
                 showOutline: false,
                 headingNavigation: _navigation,
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),

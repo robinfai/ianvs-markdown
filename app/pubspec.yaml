@@ -17,6 +17,8 @@ dependencies:
     path: ../packages/ianvs_mermaid
   ianvs_markdown:
     path: ../
+  ianvs_markdown_clipboard:
+    path: ../packages/ianvs_markdown_clipboard
   path: ^1.9.1
   path_provider: ^2.1.5
 

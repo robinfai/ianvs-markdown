@@ -1,16 +1,17 @@
 # Component development and validation
 
 Use Flutter 3.44.0 / Dart 3.12.0 or newer, Python 3.10+, and Make. Core widget
-tests do not require the optional Mermaid backend or Apple extensions. The
-clipboard dependency retains its own native plugin requirements when building
-a desktop application. On Linux, the Flutter test runtime needs `libglu1-mesa`.
+tests and examples do not depend on the optional Mermaid or native clipboard
+backends. Those adapters retain their native toolchain requirements when a host
+chooses them. On Linux, the Flutter test runtime needs `libglu1-mesa`.
 
 ## Local checks
 
 ```sh
 make check-core          # dependency resolution, formatting, analysis, tests
 make check-package       # actual publication snapshot and external host
-make check-integrations  # macOS: app, Mermaid, its example, Quick Look
+make check-integrations  # macOS: app, native clipboard, Mermaid, Quick Look
+make build-examples      # macOS Debug: body, reading, editor, playground
 make check               # all three groups
 make publish-dry-run     # core + snapshot + workspace Pub validation; no upload
 ```
@@ -43,11 +44,14 @@ that log format. It copies only those files into a system temporary directory,
 validates the pristine snapshot with **zero warnings**, compares its file list
 and SHA-256 hashes, then resolves and tests the included example and a new host.
 Resolved package paths must not point into the original workspace or include
-the optional Mermaid backend.
+either optional native backend. Native clipboard packages leaking into the
+core example or external host cause the snapshot check to fail.
 
 The new host imports the public library, renders Markdown, edits source, invokes
 the save callback, undoes the change, and switches to reading mode. This is a
-widget integration check; the native CI separately builds both macOS examples.
+widget integration check; the snapshot also runs all three integration-entry
+regressions. Native CI separately builds all four core entries and the Mermaid
+host, which opts into the native clipboard adapter.
 The core archive excludes `app/`, `packages/`, `demos/`, benchmarks and internal
 maintenance scripts. Pub's own ignore behavior is described in the
 [official publishing guide](https://dart.dev/tools/pub/publishing).

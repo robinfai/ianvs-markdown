@@ -4,9 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 import 'package:markdown/markdown.dart' as md;
-import 'package:super_clipboard/super_clipboard.dart';
 
-/// The two representations written by every Reading-mode copy operation.
+/// The two representations provided to every Reading-mode clipboard writer.
 final class IanvsMarkdownClipboardData {
   const IanvsMarkdownClipboardData({
     required this.markdown,
@@ -24,33 +23,16 @@ final class IanvsMarkdownClipboardData {
   final String html;
 }
 
-/// Writes Markdown and rich HTML representations to the system clipboard.
+/// Receives Markdown and rich HTML representations for host-controlled output.
 typedef IanvsMarkdownClipboardWriter =
     Future<void> Function(IanvsMarkdownClipboardData data);
 
-/// Default clipboard writer used by Reading mode.
+/// Default pure-Flutter clipboard writer used by Reading mode.
 ///
-/// Platforms without multi-format clipboard support fall back to Flutter's
-/// plain-text clipboard API, so copying remains functional.
-Future<void> writeIanvsMarkdownClipboard(
-  IanvsMarkdownClipboardData data,
-) async {
-  try {
-    final clipboard = SystemClipboard.instance;
-    if (clipboard != null) {
-      // Keep both representations on the same pasteboard item so the paste
-      // target can choose semantic HTML or Markdown-compatible plain text.
-      final item = DataWriterItem()
-        ..add(Formats.plainText(data.markdown))
-        ..add(Formats.htmlText(data.html));
-      await clipboard.write(<DataWriterItem>[item]);
-      return;
-    }
-  } on Object {
-    // Missing or unavailable native clipboard plugins must not make Copy fail.
-  }
-  await Clipboard.setData(ClipboardData(text: data.markdown));
-}
+/// Writes the complete Markdown representation as plain text. To also write
+/// HTML, inject a writer such as the optional ianvs_markdown_clipboard adapter.
+Future<void> writeIanvsMarkdownClipboard(IanvsMarkdownClipboardData data) =>
+    Clipboard.setData(ClipboardData(text: data.markdown));
 
 /// Converts Markdown to a safe HTML clipboard fragment.
 String ianvsMarkdownClipboardHtml(String markdown) {

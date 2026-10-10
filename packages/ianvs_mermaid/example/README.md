@@ -4,6 +4,8 @@ This optional host injects `MermaidView` through the Markdown editor's
 `diagramBuilder`, while preserving Controller, mode, save, and theme examples.
 Its `imageBuilder` explicitly enables HTTP/HTTPS images. These are host choices;
 the [minimal core example](../../../example/) keeps the safe resource defaults.
+It also explicitly selects `ianvs_markdown_clipboard` for native Markdown/HTML
+copy; the core renderer now defaults to Markdown plain text without that plugin.
 
 Install Flutter, Rust/Cargo, and the Rust target for your Mac architecture. See
 the [adapter requirements](../README.md) for other platforms and font support.

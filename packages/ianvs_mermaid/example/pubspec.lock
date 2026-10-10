@@ -207,6 +207,13 @@ packages:
       relative: true
     source: path
     version: "0.3.1"
+  ianvs_markdown_clipboard:
+    dependency: "direct main"
+    description:
+      path: "../../ianvs_markdown_clipboard"
+      relative: true
+    source: path
+    version: "0.1.0"
   ianvs_mermaid:
     dependency: "direct main"
     description:
