@@ -253,3 +253,46 @@ simulator file-URL test does not exercise a third-party share-sheet UI.
   explicit local build omits that capability and labels local storage honestly.
   Actual cross-device iCloud synchronization remains unverified until an
   eligible team/container and both devices are available.
+
+## Apple integration submission — 2026-10-10
+
+Code baseline: `603187c` (Mermaid `fe1e559`, header `32f0e86`, Apple reader and
+workspace `603187c`). The previously separate working-tree changes are now
+committed together with their tests, font license, and design evidence.
+
+Environment: unmodified Flutter 3.44.8 / Dart 3.12.2, macOS 27.0.1 arm64,
+Xcode 27.0 (27A266a), Rust 1.90.0. SDK Git status was clean before and after.
+
+- `CARGO_PROFILE_RELEASE_STRIP=none make check`: passed. Core 842, example 6,
+  app 274 (one optional external-corpus test skipped), Mermaid Flutter 9 /
+  Rust 4, adapter example 3, Quick Look Rust 8 / Swift 10, and native Markdown
+  import checks passed. Formatting and all package analyses passed.
+- Publication snapshot: 138 files, approximately 585 KB compressed, zero
+  warnings; included example and external smoke host passed without resolving
+  paths into this workspace. App, design screenshots and the CJK font remain
+  excluded from the core publication. Final document changes are also checked
+  by the PR's publication jobs.
+- `CARGO_PROFILE_RELEASE_STRIP=none FLUTTER_XCODE_ARCHS=arm64 flutter build
+  macos --debug` in `app/`: passed, using the default local signing configuration.
+- `CARGO_PROFILE_RELEASE_STRIP=none flutter build ios --simulator --debug
+  --no-codesign` in `app/`: passed.
+- Xcode XCTest on iPhone 18 Pro / iOS 27 simulator: 3 passed, 0 failures.
+  Tests verified eight distinct Chinese glyph outlines, imported copies after
+  source removal and duplicate names, and coordinated workspace I/O/stub listing.
+
+To repeat the simulator tests after the Flutter build, select an available
+simulator ID and run from `app/`:
+
+```sh
+CARGO_PROFILE_RELEASE_STRIP=none xcodebuild \
+  -workspace ios/Runner.xcworkspace -scheme Runner -configuration Debug \
+  -sdk iphonesimulator -destination 'platform=iOS Simulator,id=<simulator-id>' \
+  -derivedDataPath build/ios-xctest -parallel-testing-enabled NO \
+  CODE_SIGNING_ALLOWED=NO test
+```
+
+Local logs and the XCTest result bundle are under
+`build/roadmap/status-2026-10-10/` at the repository root. The iOS checks were
+local; the existing Native integrations workflow covers macOS. This run did
+not repeat visual QA, physical-device sharing, real iCloud cross-device sync,
+or the controlled performance benchmark. The earlier limitations remain open.

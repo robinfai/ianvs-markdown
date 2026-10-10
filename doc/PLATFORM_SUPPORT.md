@@ -1,6 +1,6 @@
 # 平台能力与构建证据
 
-更新：2026-10-08。对应 R3-01 的首批盘点，任务尚未完成。范围是 Flutter Markdown 组件库；Linefold 宿主已有界面或某个平台的项目目录不等于核心库完成该平台验收。发布版本仍为 0.3.1，本轮代码在 Unreleased。
+更新：2026-10-10。对应 R3-01 的持续盘点，任务尚未完成。范围是 Flutter Markdown 组件库；Linefold 宿主已有界面或某个平台的项目目录不等于核心库完成该平台验收。发布版本仍为 0.3.1，本轮代码在 Unreleased。
 
 ## 当前证据
 
@@ -11,6 +11,7 @@
 | macOS CI，Flutter 3.44.8 | App/可选 Mermaid/Quick Look 回归；核心与 Mermaid 两个示例 Debug 构建 | [R1 最终 Native](https://github.com/robinfai/ianvs-markdown/actions/runs/37721970026)；runner 为 macos-15，实际运行环境以日志为准 |
 | 本机 macOS 27.0.1、arm64，Flutter 3.44.8 / Dart 3.12.2 | R2 核心 842 项、示例 6 项；176 个公共符号编译、发布快照及包外宿主通过 | 基于 `e131698`；未修改日常 Flutter SDK |
 | 本机 macOS 27.0.1、Xcode 27.0 (27A266a)、Rust 1.90.0 | 最小 macOS 示例 Profile / Release 候选构建 | 结果见下节；构建通过不等于完成真机交互验收 |
+| 本机 macOS 27.0.1、arm64，Flutter 3.44.8 / Dart 3.12.2，2026-10-10 | 完整 `make check`、Linefold macOS Debug / iOS Simulator Debug 构建通过 | 代码对应 `603187c`；核心 842、示例 6、app 274（跳过 1 项可选语料）；Mermaid Flutter 9 / Rust 4、原生示例 3、Quick Look Rust 8 / Swift 10 和原生导入通过。宿主构建不替代平台交互验收 |
 
 Core 的最低 SDK 与较新 SDK 组合都固定在 [CI 工作流](https://github.com/robinfai/ianvs-markdown/blob/main/.github/workflows/core.yml)，原生回归使用 [独立工作流](https://github.com/robinfai/ianvs-markdown/blob/main/.github/workflows/integrations.yml)。SDK 升级需重新验收，不能用某一次本地通过替换整个矩阵。
 
@@ -44,11 +45,23 @@ CARGO_PROFILE_RELEASE_STRIP=none FLUTTER_XCODE_ARCHS=arm64 flutter build macos -
 | macOS | widget 回归、示例 Debug 构建通过；候选构建见上节 | Source / Live / Reading、保存、撤销、模式切换自动回归通过 | 真实输入法组合、候选窗、焦点切换待验收；鼠标测试不能代表触摸 | GFM/原文转换与注入 writer 回归通过；跨应用原生粘贴待验收 | 已有语义节点测试；VoiceOver 实机验收待补 |
 | Linux | Linux runner 上的 widget 回归通过；桌面构建待验收 | 桌面交互待验收 | 待验收 | 原生插件构建与跨应用粘贴待验收 | 待验收 |
 | Windows | 构建与运行待验收 | 待验收 | 待验收 | 待验收 | 待验收 |
-| iOS | 核心最小宿主构建与运行待验收 | 待验收 | 触摸选择、软键盘与 IME 待验收 | 待验收 | VoiceOver 待验收 |
+| iOS | Linefold 阅读宿主已有模拟器构建/运行记录，详见下节；核心独立最小宿主待验收 | 阅读宿主未开放编辑；完整编辑待验收 | 触摸选择、软键盘与 IME 待验收 | 待验收 | VoiceOver 待验收 |
 | Android | 构建与运行待验收 | 待验收 | 触摸选择、软键盘与 IME 待验收 | 待验收 | TalkBack 待验收 |
 | Web | 编译、资源注入与浏览器运行待验收 | 待验收 | 浏览器 IME 与触摸待验收 | 权限、HTML/纯文本复制待验收 | 浏览器键盘与读屏待验收 |
 
 图片、文件链接与图表的具体权限由宿主控制；注入 builder 只提供入口，不自动证明对应平台的 I/O、解码或渲染能力。传入 `clipboardWriter` 可替换复制行为，但不能删除包级原生构建依赖。
+
+## Linefold iOS 宿主证据的范围
+
+本次提交纳入 [iOS 阅读入口](https://github.com/robinfai/ianvs-markdown/blob/603187c46b3308719df97c0c060f72cafb330a39/app/lib/src/preview/preview_app.dart)、原生文件导入与共享 Apple 工作区。此前保留在工作区的 [2026-10-04 验证记录](https://github.com/robinfai/ianvs-markdown/blob/603187c46b3308719df97c0c060f72cafb330a39/app/RENDERING-VALIDATION.md) 包括模拟器 Debug/无签名 iPhone Release 构建、冷启动和运行中文件 URL 交付、原生 XCTest，以及模拟器中文图表检查。这些是有日期的宿主历史记录，不作为 2026-10-10 重新执行的设备验收。
+
+2026-10-10 在未修改的 Flutter 3.44.8 / Xcode 27.0 上重新运行 Linefold macOS Debug 与 iOS Simulator Debug 构建，均通过；iOS 使用 `--simulator --debug --no-codesign`。两次构建设置 `CARGO_PROFILE_RELEASE_STRIP=none`，macOS 另外设置 `FLUTTER_XCODE_ARCHS=arm64`。iOS 原生剪贴板依赖仍通过 CocoaPods 集成，构建提示尚未采用 Swift Package Manager；这继续作为 R1-04 的依赖成本依据，不推断未来工具链的支持期限。
+
+同日 iPhone 18 Pro / iOS 27 模拟器 XCTest 三项通过：八个中文字符生成不同且非空的轮廓、导入副本在源文件删除后保留且同名隔离、工作区远端占位文件枚举与协调读写。它验证原生逻辑和字形轮廓，不代替真机分享界面、读屏或人工视觉检查。目前 CI 的 Native integrations 仍是 macOS job，iOS 构建和 XCTest 为本机证据。
+
+物理 iPhone 的本地存储版本曾完成签名、安装和启动；原记录明确未独立检查真机中文字形。第三方发送应用/文件提供方的完整分享流程、真机触摸与读屏仍需验收。自动跨设备 iCloud 同步还需要能够配置共享容器的开发者团队，Personal Team 本地版本不提供这项证据。
+
+Linefold 使用仓库内核心路径依赖，因此不算 R3-02 的仓库外只读宿主。Mermaid 的字体及原生构建证据只适用于适配器，不扩大核心编辑器的平台承诺。
 
 ## 可选 Mermaid 适配器
 
@@ -59,7 +72,8 @@ CARGO_PROFILE_RELEASE_STRIP=none FLUTTER_XCODE_ARCHS=arm64 flutter build macos -
 | macOS arm64 / x64 | 是 | macOS CI 的 Rust、Dart、图形回归及适配器示例 Debug 构建通过；未分别完成两个架构的发行验收 |
 | Linux x64 / arm64 | 是 | 尚无该平台的完整原生构建和图形验收记录 |
 | Windows x64 | 是 | 尚无该平台的完整原生构建和图形验收记录 |
-| 其他桌面架构、iOS、Android、Web | 无目标映射 | 不应按当前适配器可用平台接入；有实际需求后独立实现与验收 |
+| iOS arm64 设备、arm64 / x64 模拟器 | 是 | 已增加 hook 目标及 SDK 配置；iOS 内嵌 OFL 中文字体。2026-10-10 arm64 模拟器 Debug 构建通过，历史图形证据见上节；各架构及真机图形发行验收未全部完成 |
+| 其他桌面架构、Android、Web | 无目标映射 | 不应按当前适配器可用平台接入；有实际需求后独立实现与验收 |
 
 ## 后续执行与退出标准
 
