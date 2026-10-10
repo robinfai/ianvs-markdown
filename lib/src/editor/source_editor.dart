@@ -25,6 +25,7 @@ class IanvsMarkdownEditor extends StatefulWidget {
     this.scrollController,
     this.autofocus = false,
     this.showToolbar = true,
+    this.highlightSyntax = true,
     this.enableModeShortcuts = true,
     this.placeholder,
     this.padding = const EdgeInsets.fromLTRB(20, 18, 20, 40),
@@ -38,6 +39,10 @@ class IanvsMarkdownEditor extends StatefulWidget {
   final ScrollController? scrollController;
   final bool autofocus;
   final bool showToolbar;
+
+  /// False keeps full source editing while disabling Markdown syntax styling
+  /// and background parsing. The controller's own parse budget also applies.
+  final bool highlightSyntax;
 
   /// Whether the editor binds its mode-switching shortcuts.
   final bool enableModeShortcuts;
@@ -421,10 +426,9 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
     final direction = Directionality.of(context);
     final resolvedPadding = widget.padding.resolve(direction);
     final textScaler = MediaQuery.textScalerOf(context);
-    widget.controller.syntaxTheme = ianvsMarkdownSyntaxTheme(
-      colors,
-      dark: dark,
-    );
+    widget.controller.syntaxTheme = widget.highlightSyntax
+        ? ianvsMarkdownSyntaxTheme(colors, dark: dark)
+        : null;
     final textStyle = TextStyle(
       color: colors.textPrimary,
       fontFamily: colors.monoFontFamily,
@@ -469,7 +473,9 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
             autocorrect: false,
             enableSuggestions: false,
             inputFormatters: <TextInputFormatter>[
-              IanvsMarkdownEditingFormatter(),
+              IanvsMarkdownEditingFormatter(
+                budget: widget.controller.parseBudget,
+              ),
             ],
             style: textStyle,
             cursorColor: colors.accent,
@@ -512,6 +518,7 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
                         'ianvs-markdown-source-quote-backgrounds',
                       ),
                       painter: _SourceQuoteBackgroundPainter(
+                        enabled: widget.highlightSyntax,
                         controller: widget.controller,
                         scrollController: _scrollController,
                         style: textStyle,
@@ -533,6 +540,7 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
                         'ianvs-markdown-source-code-backgrounds',
                       ),
                       painter: _SourceFencedCodeBackgroundPainter(
+                        enabled: widget.highlightSyntax,
                         controller: widget.controller,
                         scrollController: _scrollController,
                         style: textStyle,
@@ -585,6 +593,7 @@ int _sourceLineEnd(String text, int offset) {
 class _SourceQuoteBackgroundPainter extends CustomPainter {
   _SourceQuoteBackgroundPainter({
     required this.controller,
+    required this.enabled,
     required this.scrollController,
     required this.style,
     required this.padding,
@@ -596,6 +605,7 @@ class _SourceQuoteBackgroundPainter extends CustomPainter {
   }) : super(repaint: repaint);
 
   final IanvsMarkdownController controller;
+  final bool enabled;
   final ScrollController scrollController;
   final TextStyle style;
   final EdgeInsets padding;
@@ -606,6 +616,7 @@ class _SourceQuoteBackgroundPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (!enabled || !controller.parseDecision.useMarkdown) return;
     final ranges = parseMarkdownBlocks(controller.text)
         .where((block) => block.type == IanvsMarkdownBlockType.blockquote)
         .map((block) => TextRange(start: block.start, end: block.end))
@@ -662,7 +673,8 @@ class _SourceQuoteBackgroundPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _SourceQuoteBackgroundPainter oldDelegate) {
-    return oldDelegate.controller != controller ||
+    return oldDelegate.enabled != enabled ||
+        oldDelegate.controller != controller ||
         oldDelegate.scrollController != scrollController ||
         oldDelegate.style != style ||
         oldDelegate.padding != padding ||
@@ -676,6 +688,7 @@ class _SourceQuoteBackgroundPainter extends CustomPainter {
 class _SourceFencedCodeBackgroundPainter extends CustomPainter {
   _SourceFencedCodeBackgroundPainter({
     required this.controller,
+    required this.enabled,
     required this.scrollController,
     required this.style,
     required this.padding,
@@ -687,6 +700,7 @@ class _SourceFencedCodeBackgroundPainter extends CustomPainter {
   }) : super(repaint: repaint);
 
   final IanvsMarkdownController controller;
+  final bool enabled;
   final ScrollController scrollController;
   final TextStyle style;
   final EdgeInsets padding;
@@ -697,6 +711,7 @@ class _SourceFencedCodeBackgroundPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (!enabled || !controller.parseDecision.useMarkdown) return;
     final ranges = _markdownFencedCodeRanges(controller.text);
     if (ranges.isEmpty || size.isEmpty) return;
 
@@ -766,7 +781,8 @@ class _SourceFencedCodeBackgroundPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _SourceFencedCodeBackgroundPainter oldDelegate) {
-    return oldDelegate.controller != controller ||
+    return oldDelegate.enabled != enabled ||
+        oldDelegate.controller != controller ||
         oldDelegate.scrollController != scrollController ||
         oldDelegate.style != style ||
         oldDelegate.padding != padding ||

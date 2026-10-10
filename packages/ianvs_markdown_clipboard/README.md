@@ -34,6 +34,12 @@ preserving the existing Markdown-copy behavior for plain-text destinations.
 This writer applies to document reading selections; Source mode retains
 Flutter's editable-text copy behavior.
 
+When the core rejects HTML conversion under `clipboardBudget`, `data.html` is
+empty and `data.hasHtml` is false. This adapter then writes the complete plain
+text through Flutter without initializing the native backend. It never publishes
+an empty HTML representation that a destination could prefer over valid text.
+The payload's `budgetExceeded` remains available to the host for status handling.
+
 On the currently verified macOS path, native compilation needs Xcode,
 CocoaPods and Rust/Cargo. Other plugin targets are not automatically verified
 by the adapter. [Platform evidence](../../doc/PLATFORM_SUPPORT.md) and

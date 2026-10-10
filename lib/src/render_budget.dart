@@ -1,20 +1,32 @@
 import 'syntax_preset.dart';
 
-/// Limits the amount of Markdown syntax parsed by a renderer.
+/// Input limits checked before Markdown preprocessing, rendering or copying.
 ///
-/// When the syntax token limit is exceeded, [scanMarkdownForRendering] returns
+/// When an input limit is exceeded, [scanMarkdownForRendering] returns
 /// a UTF-8 bounded plain-text prefix. This protects interactive rendering from
-/// pathological documents while keeping ordinary large prose intact.
+/// oversized documents. These are input bounds, not latency or heap limits.
+/// UTF-16 lengths use Dart string offsets; fallback bytes use UTF-8 scalars.
 final class IanvsMarkdownRenderBudget {
   const IanvsMarkdownRenderBudget({
     this.maxSyntaxTokens = 4096,
     this.maxFallbackBytes = 64 * 1024,
+    this.maxSourceCodeUnits = 1024 * 1024,
+    this.maxLineCodeUnits = 4 * 1024,
   }) : assert(maxSyntaxTokens >= 0),
-       assert(maxFallbackBytes >= 0);
+       assert(maxFallbackBytes >= 0),
+       assert(maxSourceCodeUnits >= 0),
+       assert(maxLineCodeUnits >= 0);
 
   final int maxSyntaxTokens;
   final int maxFallbackBytes;
+  final int maxSourceCodeUnits;
+
+  /// Longest LF-delimited line, excluding a CR immediately before LF.
+  /// A lone CR counts as content because not every parser splits on it.
+  final int maxLineCodeUnits;
 }
+
+enum IanvsMarkdownBudgetExceeded { sourceLength, lineLength, syntaxTokens }
 
 final class IanvsMarkdownRenderDecision {
   const IanvsMarkdownRenderDecision({
@@ -22,21 +34,34 @@ final class IanvsMarkdownRenderDecision {
     required this.useMarkdown,
     required this.syntaxTokens,
     required this.truncated,
+    this.budgetExceeded,
   });
 
   final String text;
   final bool useMarkdown;
   final int syntaxTokens;
   final bool truncated;
+  final IanvsMarkdownBudgetExceeded? budgetExceeded;
 }
 
 IanvsMarkdownRenderDecision scanMarkdownForRendering(
   String source, {
-  required IanvsMarkdownRenderBudget budget,
+  required IanvsMarkdownRenderBudget? budget,
   IanvsMarkdownSyntaxPreset syntaxPreset = IanvsMarkdownSyntaxPreset.obsidian,
 }) {
+  if (budget == null) {
+    return IanvsMarkdownRenderDecision(
+      text: source,
+      useMarkdown: true,
+      syntaxTokens: 0,
+      truncated: false,
+    );
+  }
   var tokens = 0;
-  var syntaxExceeded = false;
+  var exceeded = source.length > budget.maxSourceCodeUnits
+      ? IanvsMarkdownBudgetExceeded.sourceLength
+      : null;
+  var lineCodeUnits = 0;
   final lineScanner = _MarkdownLineScanner();
   final fallback = StringBuffer();
   var fallbackBytes = 0;
@@ -55,20 +80,34 @@ IanvsMarkdownRenderDecision scanMarkdownForRendering(
         fallbackNextIndex += scalar.codeUnits;
       }
     }
-    if (!syntaxExceeded) {
+    if (exceeded == null) {
+      if (codeUnit == 0x0a) {
+        lineCodeUnits = 0;
+      } else if (!(codeUnit == 0x0d &&
+          index + 1 < source.length &&
+          source.codeUnitAt(index + 1) == 0x0a)) {
+        lineCodeUnits += 1;
+      }
+      if (lineCodeUnits > budget.maxLineCodeUnits) {
+        exceeded = IanvsMarkdownBudgetExceeded.lineLength;
+      }
       tokens += lineScanner.consume(codeUnit);
       if (_isMarkdownSyntaxCodeUnit(codeUnit, syntaxPreset)) tokens += 1;
-      if (tokens > budget.maxSyntaxTokens) syntaxExceeded = true;
+      if (tokens > budget.maxSyntaxTokens) {
+        exceeded ??= IanvsMarkdownBudgetExceeded.syntaxTokens;
+      }
     }
-    if (syntaxExceeded && fallbackFull) break;
+    if (exceeded != null && fallbackFull) break;
   }
 
-  if (!syntaxExceeded) {
+  if (exceeded == null) {
     tokens += lineScanner.finish();
-    syntaxExceeded = tokens > budget.maxSyntaxTokens;
+    if (tokens > budget.maxSyntaxTokens) {
+      exceeded = IanvsMarkdownBudgetExceeded.syntaxTokens;
+    }
   }
 
-  if (!syntaxExceeded) {
+  if (exceeded == null) {
     return IanvsMarkdownRenderDecision(
       text: source,
       useMarkdown: true,
@@ -82,6 +121,7 @@ IanvsMarkdownRenderDecision scanMarkdownForRendering(
     useMarkdown: false,
     syntaxTokens: tokens,
     truncated: fallbackNextIndex < source.length,
+    budgetExceeded: exceeded,
   );
 }
 

@@ -3,6 +3,7 @@ import 'package:markdown/markdown.dart' as md;
 
 import 'editor/editor_models.dart';
 import 'markdown_document.dart';
+import 'render_budget.dart';
 import 'syntax_preset.dart';
 
 /// Keeps heading-fold state independent from Markdown source mutations.
@@ -84,7 +85,19 @@ final class IanvsMarkdownHeadingFoldModel {
     required this.source,
     required this.blocks,
     required this.sections,
+    this.budgetExceeded,
   });
+
+  /// An unparsed source-preserving model with no headings or block projection.
+  factory IanvsMarkdownHeadingFoldModel.unparsed(
+    String source, {
+    IanvsMarkdownBudgetExceeded? budgetExceeded,
+  }) => IanvsMarkdownHeadingFoldModel._(
+    source: source,
+    blocks: const [],
+    sections: const [],
+    budgetExceeded: budgetExceeded,
+  );
 
   /// Uses top-level GFM headings in [IanvsMarkdownSyntaxPreset.standard].
   /// Non-heading content is retained as opaque ranges in that preset;
@@ -93,25 +106,46 @@ final class IanvsMarkdownHeadingFoldModel {
     String source, {
     bool splitListItems = false,
     IanvsMarkdownSyntaxPreset syntaxPreset = IanvsMarkdownSyntaxPreset.obsidian,
+    IanvsMarkdownRenderBudget? budget = const IanvsMarkdownRenderBudget(),
   }) {
+    final decision = scanMarkdownForRendering(
+      source,
+      budget: budget,
+      syntaxPreset: syntaxPreset,
+    );
+    if (!decision.useMarkdown) {
+      return IanvsMarkdownHeadingFoldModel.unparsed(
+        source,
+        budgetExceeded: decision.budgetExceeded,
+      );
+    }
     if (syntaxPreset == IanvsMarkdownSyntaxPreset.standard) {
       return _parseStandardHeadingModel(source);
     }
     return IanvsMarkdownHeadingFoldModel.fromBlocks(
       source,
       parseMarkdownBlocks(source, splitListItems: splitListItems),
+      budget: null,
     );
   }
 
   factory IanvsMarkdownHeadingFoldModel.fromBlocks(
     String source,
-    List<IanvsMarkdownBlock> blocks,
-  ) {
+    List<IanvsMarkdownBlock> blocks, {
+    IanvsMarkdownRenderBudget? budget = const IanvsMarkdownRenderBudget(),
+  }) {
+    final decision = scanMarkdownForRendering(source, budget: budget);
+    if (!decision.useMarkdown) {
+      return IanvsMarkdownHeadingFoldModel.unparsed(
+        source,
+        budgetExceeded: decision.budgetExceeded,
+      );
+    }
     final headings = <_ParsedHeading>[];
     for (var index = 0; index < blocks.length; index += 1) {
       final block = blocks[index];
       if (block.type != IanvsMarkdownBlockType.heading) continue;
-      final parsed = parseMarkdownHeadings(block.source);
+      final parsed = parseMarkdownHeadings(block.source, budget: null);
       if (parsed.isEmpty) continue;
       headings.add((
         blockIndex: index,
@@ -174,6 +208,7 @@ final class IanvsMarkdownHeadingFoldModel {
   final String source;
   final List<IanvsMarkdownBlock> blocks;
   final List<IanvsMarkdownHeadingSection> sections;
+  final IanvsMarkdownBudgetExceeded? budgetExceeded;
 
   Set<String> get identities =>
       sections.map((section) => section.identity).toSet();

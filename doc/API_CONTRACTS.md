@@ -1,6 +1,6 @@
 # 公共 API 与行为契约
 
-适用范围：2026-10-10 的仓库版本（`0.3.1` + `Unreleased`）。本文件对应 R1-01 / R1-02 / R2-02、R1-03 文案/命令/焦点及 R1-04 剪贴板默认行为迁移。后续修改预设、预算或默认行为时必须同步更新。平台范围见 [构建与交互证据](PLATFORM_SUPPORT.md)，不能从 Dart 类型可用推断平台支持。
+适用范围：2026-10-10 的仓库版本（`0.3.1` + `Unreleased`）。本文件对应 R1-01 / R1-02 / R2-02、R1-03 文案/命令/焦点、R1-04 剪贴板默认行为迁移及 R2-05 预解析/复制预算。后续修改预设、预算或默认行为时必须同步更新。平台范围见 [构建与交互证据](PLATFORM_SUPPORT.md)，不能从 Dart 类型可用推断平台支持。
 
 ## 四种入口
 
@@ -15,7 +15,7 @@
 | 选择 | 默认单文档跨块选择；可用 `documentSelection: false` 退回块级选择；`selectable: false` 关闭 | 默认跨块选择；可用 `selectable: false` 关闭 | Controller 的原文选区 | Live/Source 使用源码选区；Reading 使用阅读态选择 |
 | 滚动对象 | 由外层宿主提供滚动布局 | 参数 `controller` 的类型是 **`ScrollController`** | 参数 `scrollController` | 参数 `scrollController`，随模式使用 |
 | 焦点对象 | 整文档选择可注入 `focusNode` / `autofocus`；块级选择不使用它们 | 可注入 `focusNode` / `autofocus`，需启用 `selectable` | 可注入 `focusNode`，另有 `autofocus` | 可注入 `focusNode`，另有 `autofocus` |
-| 渲染预算 | 整个正文的 `renderBudget` 与 `fallbackBuilder` | 正文预算与 `fallbackBuilder`；预解析范围另见下文 | 无 `renderBudget` | 渲染块使用 `renderBudget`，Reading 传给 View；无公开 `fallbackBuilder`，Source 不受该预算约束 |
+| 解析/渲染预算 | 整个正文的 `renderBudget` 与 `fallbackBuilder` | 原文预解析和显示预算；`fallbackBuilder` | Controller 的 `parseBudget` 保护引用和高亮；完整原文排版 | 全文结构使用 `renderBudget`；超限 Live 使用完整源码编辑；`onRenderDecision` 可观察；Reading 传给 View |
 | 主题 | `theme` / ThemeExtension；`styleSheet` 与 `styleSheetTheme` | `theme` / ThemeExtension；`styleSheet` | `theme` / ThemeExtension 与组件源码样式 | `theme` / ThemeExtension；`styleSheet` 用于渲染面 |
 | 界面文案 | 外层 `IanvsMarkdownLocalization`，中/英文与逐条覆盖 | 同正文，含大纲及折叠 | 同正文，含工具栏与文本选择菜单 | 同正文，含导航、表格与各模式 |
 | Front matter / 大纲 | 没有完整文档容器 | `showFrontMatter: false`、`showOutline: true`、`enableHeadingFolding: false` | 原样编辑 YAML；无阅读大纲 | `showFrontMatter: false`、`showOutlineInPreview: true`、`showNavigationPane: false`、`enableHeadingFolding: false` |
@@ -77,20 +77,25 @@ Live 与 Source 在本轮继续使用 Obsidian 编辑语义。**暂不向 Live �
 
 ## 预算与资源
 
-默认 `IanvsMarkdownRenderBudget` 为 4096 个语法 token、64 KiB UTF-8 降级文本。`renderBudget: null` 显式关闭相应渲染预算。它不是整个文档大小、内存、布局时间、资源解码或全部预解析的总量上限。
+默认 `IanvsMarkdownRenderBudget` 同时限制全文 1,048,576 个 UTF-16 单元、每行 4,096 个 UTF-16 单元、4,096 个语法 token，以及最多 64 KiB UTF-8 的显示降级前缀。长度与 token 在昂贵解析前检查，限额本身允许通过，超过才降级。按 LF 分行，CRLF 中的 CR 不计入行长；单独的 CR 计入行长，以覆盖仍按 LF 分行的解析器。全文长度优先报告，之后按扫描时首次超限报告行长或 token；`budgetExceeded` 不代表其他限额都未超出。
 
-| 入口 | 计量与降级范围 |
-| --- | --- |
-| 正文 | 使用所选预设扫描传入 `data`，超限后调用 `fallbackBuilder`，不调用渲染资源 builder |
-| View | 使用所选预设扫描正文以决定大纲可用性；显示正文（开启折叠时为折叠投影）由内部正文组件再扫描和降级。Obsidian 元数据卡不计入正文预算，standard 的 YAML 计入原文 |
-| Live | 渲染块分别使用预算，Reading 传给 View；不能把每块额度解释为全文件总额 |
-| Source | 无渲染预算参数，排版完整可编辑原文 |
+| 入口 | 预算与可观察结果 | 超限行为 |
+| --- | --- | --- |
+| 正文 | `renderBudget`；`fallbackBuilder(context, decision)` | 不调用 Markdown/宿主 builder，展示有界纯文本 |
+| View / Document | `renderBudget` / `IanvsMarkdownDocument.parse(budget: ...)`；`fallbackBuilder` / `parseDecision` | 在 YAML、标题、大纲与折叠解析前检查完整原文；保留原始 `body`，元数据与标题为空，显示包括 YAML 的原文前缀 |
+| Controller / Source | 构造时固定 `parseBudget`；`parseDecision` 在文本改变时更新；原有 Controller 监听可观察 | 跳过引用和语法高亮；Source 背景也跳过结构解析，仍完整编辑/保存原文。选择和 composing 变化复用决定，撤销/重做重新判断实际文本 |
+| Live | `renderBudget` 在引用、跨段高亮、脚注、块与标题之前检查全文；`onRenderDecision` 在帧后报告最新决定 | Live 保留 Controller.mode 并改用完整源码编辑；不创建部分块映射。缩短后恢复 Live，组合输入期间延后恢复；保留焦点、输入连接及选择。Reading 由 View 降级 |
+| 标题/折叠解析辅助函数 | `parseMarkdownHeadings`、`HeadingFoldModel.parse/fromBlocks` 的 `budget`；折叠模型的 `budgetExceeded` | 标题列表为空；折叠模型保留原文且没有块和标题。直接调用 `parseMarkdownHeadings` 时可先用公开扫描函数获取原因 |
+| 阅读复制 / 独立转换 | 三种渲染入口的 `clipboardBudget`、转换函数的 `budget`；payload 的 `budgetExceeded`、`hasHtml`，或 HTML 函数的 `onBudgetExceeded` | 检查原文、额外 HTML 来源及所选文本；超限跳过 Markdown 和 DOM 转换。整篇保留精确原文，局部保留完整可见所选纯文本，`html` 为空 |
+| Markdown 输入格式器 | `IanvsMarkdownEditingFormatter(budget: ...)`；Source / Live 的输入格式器使用 Controller 的预算 | 旧值或新值超限时不改写输入，IME composing 总是原样通过 |
 
-UTF-8 降级边界不切开有效 Unicode 码点；小于下一个码点所需字节时停止。宿主设置 `renderBudget: null` 意味着承担该渲染路径的完整负载，不能据此宣称其他路径有独立保护。
+Controller 创建早于 Widget，因此 `parseBudget` 与 `renderBudget` 独立；需要相同策略时由宿主传入同一对象。`clipboardBudget` 独立于显示额度，小显示前缀不要求小复制额度。每个参数都可用 `null` 显式关闭该操作的保护，不会隐式关闭其他预算。独立转换函数同样默认有预算；`ianvsMarkdownDocumentClipboardData` 是保留完整原文及降级原因的整篇复制入口。HTML 转换继续按 GFM 语义处理，不复刻自定义 Widget。
 
-View 在正文渲染预算判断前解析文档，Live 在各块渲染前维护全文结构；Source 排版完整源码。富文本复制还会转换 Markdown/HTML。历史使用下文单独的 R2-02 容量策略；预解析和复制预算由 R2-05 跟进，不能把渲染预算描述成这些路径的完整保护。
+UTF-8 显示前缀不切开有效 Unicode 码点；无效代理单元在显示中使用替换字符，原始文档和复制字符串不改写。`maxFallbackBytes` 只作用于显示，不能用它截断存储、保存或复制。
 
-图片默认显示占位，不自动读取文件或网络；图片、Wiki 嵌入、链接导航和图表后端的权限、解码、缓存及过期结果由宿主负责。R1-04 将 `super_clipboard` 移到可选适配器；核心默认 writer 通过 Flutter 只写完整 Markdown，HTML 仍提供给自定义 writer。现有类型和函数签名保留，默认输出格式有显式变更，见 [迁移说明](INTEGRATION_GUIDE.md#剪贴板迁移r1-04)。参考 [剪贴板](../lib/src/rich_clipboard.dart)、[预算](../lib/src/render_budget.dart)。
+输入限额不是进程内存或硬性执行时间限制；它限制送入内置昂贵解析器的输入，不保护任意宿主 builder、自定义语法、图片解码，也不限制完整源码的 Flutter 排版或操作系统复制负载。直接调用低层源码投影/扫描工具的宿主仍需先预算输入；不能把所有公共辅助函数视为一个受控 AST 服务。Source 和 Live 降级后的完整文本排版仍需 R2-01 归因验收；历史使用独立的 R2-02 策略。
+
+图片默认显示占位，不自动读取文件或网络；图片、Wiki 嵌入、链接导航和图表后端的权限、解码、缓存及过期结果由宿主负责。R1-04 将 `super_clipboard` 移到可选适配器；核心默认 writer 通过 Flutter 只写完整 Markdown，预算允许时提供 HTML；`hasHtml == false` 的 writer 必须省略 HTML 格式，可选适配器已处理该路径。现有必填参数保留，默认输出格式有显式变更，见 [迁移说明](INTEGRATION_GUIDE.md#剪贴板迁移r1-04)。参考 [剪贴板](../lib/src/rich_clipboard.dart)、[预算](../lib/src/render_budget.dart)。
 
 ## 撤销历史容量（R2-02）
 
@@ -127,7 +132,7 @@ final legacy = IanvsMarkdownController(text: initialMarkdown, historyPolicy: nul
 
 ## 公共导出承诺与分层
 
-入口是 `package:ianvs_markdown/ianvs_markdown.dart`。R1-01 用 Dart AST 审查直接导出及 show/hide 规则，并用 Flutter 编译探针核对符号；后续新增的文案及键盘五种类型由公共入口 widget 回归验证。清单现在包括 170 个项目符号和 11 个第三方重导出；不包含实例成员清单。
+入口是 `package:ianvs_markdown/ianvs_markdown.dart`。R1-01 用 Dart AST 审查直接导出及 show/hide 规则，并用 Flutter 编译探针核对符号；后续新增的文案及键盘五种类型由公共入口 widget 回归验证。清单现在包括 172 个项目符号和 11 个第三方重导出；不包含实例成员清单。
 
 | 使用面 | 范围 | 兼容约束 |
 | --- | --- | --- |
@@ -234,11 +239,11 @@ final legacy = IanvsMarkdownController(text: initialMarkdown, historyPolicy: nul
 
 ### [lib/src/render_budget.dart](../lib/src/render_budget.dart)
 
-`IanvsMarkdownRenderBudget`、`IanvsMarkdownRenderDecision`、`scanMarkdownForRendering`
+`IanvsMarkdownRenderBudget`、`IanvsMarkdownRenderDecision`、`IanvsMarkdownBudgetExceeded`、`scanMarkdownForRendering`
 
 ### [lib/src/rich_clipboard.dart](../lib/src/rich_clipboard.dart)
 
-`IanvsMarkdownClipboardData`、`IanvsMarkdownClipboardWriter`、`ianvsMarkdownClipboardHtml`、`ianvsMarkdownSelectionClipboardData`、`ianvsPlainTextClipboardHtml`、`writeIanvsMarkdownClipboard`
+`IanvsMarkdownClipboardData`、`IanvsMarkdownClipboardWriter`、`ianvsMarkdownDocumentClipboardData`、`ianvsMarkdownClipboardHtml`、`ianvsMarkdownSelectionClipboardData`、`ianvsPlainTextClipboardHtml`、`writeIanvsMarkdownClipboard`
 
 ### [lib/src/strikethrough.dart](../lib/src/strikethrough.dart)
 

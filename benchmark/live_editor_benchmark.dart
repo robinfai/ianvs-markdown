@@ -102,6 +102,7 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
                   controller: controller!,
                   scrollController: scroll,
                   renderBudget: budget,
+                  clipboardBudget: budget,
                   autofocus: true,
                   showToolbar: false,
                   enableHeadingFolding: true,
@@ -117,7 +118,7 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
 
   Future<void> replaceDocument(String source) async {
     final old = controller;
-    controller = IanvsMarkdownController(text: source);
+    controller = IanvsMarkdownController(text: source, parseBudget: budget);
     editorKey = GlobalKey();
     setState(() => generation += 1);
     await nextFrame();
@@ -266,6 +267,8 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
             'lines': '\n'.allMatches(source).length + 1,
             'blocks': parseMarkdownBlocks(source, splitListItems: true).length,
             'budget': full ? 'unlimited-controlled-corpus' : 'default',
+            'controllerUsesMarkdown': full || decision.useMarkdown,
+            'liveUsesMarkdown': full || decision.useMarkdown,
             'readingUsesMarkdown': full || decision.useMarkdown,
             'readingFallbackBytes': full || decision.useMarkdown
                 ? 0
@@ -352,6 +355,7 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
     final view = WidgetsBinding.instance.platformDispatcher.views.first;
     return {
       'schemaVersion': 2,
+      'processingBudgetPolicy': 'full-document-preflight-v1',
       'corpusVersion': corpusVersion,
       'mode': 'profile',
       'warmupPerOperation': warmup,

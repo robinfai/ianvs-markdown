@@ -25,6 +25,12 @@ Future<void> writeClipboardWithFallback({
   required ClipboardWriter? Function() nativeClipboard,
   required Future<void> Function(ClipboardData) plainText,
 }) async {
+  // An empty HTML representation means conversion was deliberately skipped.
+  // Do not publish a preferred-but-empty rich format to native paste targets.
+  if (html.isEmpty) {
+    await plainText(ClipboardData(text: markdown));
+    return;
+  }
   try {
     final clipboard = nativeClipboard();
     if (clipboard != null) {

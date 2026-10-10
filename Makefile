@@ -11,7 +11,7 @@ INTEGRATION_DART = app/lib app/test packages/ianvs_mermaid/lib packages/ianvs_me
 # Flutter resolves dependencies and writes generated files in each package.
 .NOTPARALLEL:
 
-.PHONY: help deps deps-core deps-integrations format format-check format-check-core format-check-integrations analyze analyze-core analyze-integrations test test-example test-app test-mermaid test-mermaid-example test-quicklook test-native-import test-ios-preview build-ios-preview build-examples run-ios check check-core check-integrations check-package benchmark run example run-app install clean publish-dry-run
+.PHONY: help deps deps-core deps-integrations format format-check format-check-core format-check-integrations analyze analyze-core analyze-integrations test test-example test-app test-mermaid test-mermaid-example test-quicklook test-native-import test-ios-preview build-ios-preview build-examples run-ios check check-core check-integrations check-package check-processing-budget test-clipboard benchmark run example run-app install clean publish-dry-run
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -91,7 +91,10 @@ test-quicklook: deps-integrations ## Test the native macOS Quick Look renderer a
 	cargo fmt --check --manifest-path app/macos/QuickLook/renderer/Cargo.toml
 	bash app/tool/test_native_quicklook.sh
 
-check-core: deps-core format-check-core analyze-core test test-example ## Validate core without Apple or Mermaid integration checks
+check-processing-budget: ## Check large-input preprocessing in killable processes
+	$(PYTHON) tool/check_processing_budget.py --flutter "$(FLUTTER)" --output build/processing-budget
+
+check-core: deps-core format-check-core analyze-core test test-example check-processing-budget ## Validate core without Apple or Mermaid integration checks
 
 check-integrations: deps-integrations format-check-integrations analyze-integrations test-app test-mermaid test-mermaid-example test-clipboard test-quicklook test-native-import ## Validate the app and native integrations (macOS)
 

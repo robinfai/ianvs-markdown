@@ -137,10 +137,10 @@ Column(children: [
 | 接入 | 0.3.1 / 拆分前 | 当前候选实现 |
 | --- | --- | --- |
 | 不提供 `clipboardWriter` | 尝试原生 Markdown + HTML，失败后纯文本回退 | Flutter 直接写入完整 Markdown 纯文本；没有原生剪贴板依赖 |
-| 已有自定义 writer | 收到 `IanvsMarkdownClipboardData` | 类型、Markdown/HTML 字段及调用契约不变 |
+| 已有自定义 writer | 收到 `IanvsMarkdownClipboardData` | 必填字段保留；R2-05 超限时 HTML 为空，writer 应检查 `hasHtml` |
 | 需要原有原生双格式输出 | 默认提供 | 显式接入 `ianvs_markdown_clipboard` 并传入 writer |
 
-完整文档全选仍保留原文（含 YAML、换行与 Unicode），局部选择仍生成语义 Markdown。`writeIanvsMarkdownClipboard(data)` 签名保留，现在等价于 Flutter 的纯文本写入；写入失败继续向调用方报告。HTML 转换和预算限制没有因依赖拆分自动消失，见 R2-05。
+完整文档全选仍保留原文（含 YAML、换行与 Unicode），局部选择在预算内生成语义 Markdown，超限时保留完整所选纯文本。`writeIanvsMarkdownClipboard(data)` 签名保留，现在等价于 Flutter 的纯文本写入；写入失败继续向调用方报告。R2-05 增加独立 `clipboardBudget`；未生成 HTML 时 writer 应省略该格式，避免富文本粘贴目标选择一个空表示。
 
 原生适配器当前通过源码接入，尚未发布 registry 版本。依赖声明见 [适配器说明](https://github.com/robinfai/ianvs-markdown/tree/main/packages/ianvs_markdown_clipboard)。已有富文本宿主使用：
 
@@ -155,9 +155,35 @@ IanvsMarkdownView(data: source, clipboardWriter: writeRich);
 // IanvsMarkdown 和 IanvsMarkdownLiveEditor 使用相同参数。
 ```
 
-适配器把两种表示放入同一原生 item，原生后端不可用或写入失败时回退完整 Markdown，回退失败则报告错误。Source/文本框的复制属于 Flutter 原生编辑行为，不经过阅读 writer。Linefold 桌面/iOS 阅读和 Mermaid 示例已显式接入，以保留已有输出格式。
+有 HTML 时适配器把两种表示放入同一原生 item；HTML 为空时直接写完整纯文本且不初始化原生后端。原生后端不可用或写入失败时回退完整 Markdown，回退失败则报告错误。Source/文本框的复制属于 Flutter 原生编辑行为，不经过阅读 writer。Linefold 桌面/iOS 阅读和 Mermaid 示例已显式接入，以保留已有输出格式。
 
 旧 macOS 宿主如果移除了最后一个 CocoaPods 插件，需要清理旧 Pods 工程引用后再做干净构建；仍使用其他插件的宿主不能一并移除它们的配置。核心示例的迁移可作参考。依赖图、成本、方案权衡与构建限制见 [决策报告](CLIPBOARD_DEPENDENCY_DECISION.md)。
+
+## 预解析与复制预算迁移（R2-05）
+
+旧的语法 token 限额继续生效，并新增全文和单行长度边界。需要统一策略的宿主应在 Controller 创建时就配置它，不能等 Widget 创建后再保护已经发生的预解析：
+
+```dart
+const budget = IanvsMarkdownRenderBudget(
+  maxSourceCodeUnits: 1024 * 1024,
+  maxLineCodeUnits: 4096,
+);
+final controller = IanvsMarkdownController(text: source, parseBudget: budget);
+final editor = IanvsMarkdownLiveEditor(
+  controller: controller,
+  renderBudget: budget,
+  clipboardBudget: budget,
+  onRenderDecision: (decision) {
+    // 帧后回调；宿主可依据 decision.budgetExceeded 显示提示。
+  },
+);
+```
+
+每个预算的 `null` 只关闭对应处理；信任一个文档后关闭渲染额度，不会自动允许无限 HTML 转换或 Controller 预解析。正文/View 的 `fallbackBuilder`、Controller 的 `parseDecision` 及复制 payload 的 `budgetExceeded` 可区分行长、全文长度或语法额度超限。编辑样例已显示宿主提示。
+
+拒绝预解析时，View 不再提前抽取 YAML，而显示包括 YAML 的原始前缀；完整复制仍保留原文。自定义 writer 必须检查 `hasHtml`：超限时 `html == ''` 表示未生成 HTML，不是可以发布的空富文本格式。使用本仓库可选 writer 的宿主无需额外分支。局部选择降级为所选纯文本，语义格式不再可用，原因随 payload 交给宿主。Source 的原生文本编辑复制不经过阅读 writer。
+
+这些额度不限制完整源码排版、保存总量、图片或自定义 builder；宿主仍负责总量、权限及持久化。详细矩阵见 [API 预算契约](API_CONTRACTS.md#预算与资源)。
 
 ## 当前差异与后续任务
 
@@ -168,6 +194,6 @@ IanvsMarkdownView(data: source, clipboardWriter: writeRich);
 | 默认复制改为纯文本，原生富文本改为显式适配器 | R1-04 | 按上文迁移；核心没有原生剪贴板依赖，适配器仍需验证所用平台 |
 | 升级后的默认历史会裁剪旧快照 | R2-02 已实现，升级时核对配置 | 阅读 [容量与迁移契约](API_CONTRACTS.md#撤销历史容量r2-02)；需要旧行为时显式设置 `historyPolicy: null` |
 | View 追加数据重置滚动，异步结果没有组件级文档身份 | R2-03 | 宿主管理文档/版本与加载状态，当前不承诺完整流式接入能力 |
-| 渲染预算未覆盖全部预解析/复制/排版 | R2-01、R2-05 | 按已测负载使用；区分默认降级和无预算完整渲染 |
+| 预解析与复制已有独立预算，完整源码排版仍未完成性能验收 | R2-05 / R2-01 | 按下方配置解析、渲染、复制额度；排版耗时不能用预算检查替代 |
 
 证据：[宿主行为回归](../test/host_contract_test.dart)、[会话示例测试](../example/test/document_session_test.dart)、[外部包接入检查](https://github.com/robinfai/ianvs-markdown/blob/main/tool/package_smoke_test.dart)。维护脚本在源码仓库提供，不属于发布包依赖；发布内容与实例接入还需执行 `make check-package`。

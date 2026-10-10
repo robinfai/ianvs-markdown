@@ -1,0 +1,524 @@
+{
+  "schema": 1,
+  "revision": "659df1572deae00538b7924d113224b2e140daec",
+  "trackedDiffSha256": "73d75324bc3e911e9e326594d38abf38b798d28ee9485c2ad5fd4be6ea9d044c",
+  "flutter": "Flutter 3.44.8 \u2022 channel stable \u2022 https://github.com/flutter/flutter.git\nFramework \u2022 revision 058e0af2c2 (3 months ago) \u2022 2026-07-23 10:56:21 -0700\nEngine \u2022 hash 13ffd72b2f9a5ca4db2a74ea52d5353ec2e8f939 (revision 0cd610717b) (2 months ago) \u2022 2026-07-23 16:11:34.000Z\nTools \u2022 Dart 3.12.2 \u2022 DevTools 2.57.0",
+  "probeSha256": "c2ef10a0bd82e1031a35972d279efff4c2132453bc6e0d52d9774972efd6cfe4",
+  "mode": "Flutter test diagnostic, not profile performance baseline",
+  "startupTimeoutSeconds": 60,
+  "operationTimeoutSeconds": 5,
+  "rows": [
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 18671,
+          "resultLength": 1048577,
+          "sourceCodeUnits": 1048576,
+          "rejected": true
+        }
+      ],
+      "passed": true,
+      "case": "bracket/controller",
+      "log": "bracket-controller.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 15687,
+          "resultLength": 0,
+          "sourceCodeUnits": 1048576,
+          "rejected": true
+        }
+      ],
+      "passed": true,
+      "case": "bracket/document",
+      "log": "bracket-document.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 13915,
+          "resultLength": 0,
+          "sourceCodeUnits": 1048576,
+          "rejected": true
+        }
+      ],
+      "passed": true,
+      "case": "bracket/html",
+      "log": "bracket-html.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 9376,
+          "resultLength": 4,
+          "sourceCodeUnits": 1048576,
+          "rejected": true
+        }
+      ],
+      "passed": true,
+      "case": "bracket/partial",
+      "log": "bracket-partial.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 18906,
+          "resultLength": 1048577,
+          "sourceCodeUnits": 1048576,
+          "rejected": true
+        }
+      ],
+      "passed": true,
+      "case": "plain/controller",
+      "log": "plain-controller.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 17507,
+          "resultLength": 0,
+          "sourceCodeUnits": 1048576,
+          "rejected": true
+        }
+      ],
+      "passed": true,
+      "case": "plain/document",
+      "log": "plain-document.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 15266,
+          "resultLength": 0,
+          "sourceCodeUnits": 1048576,
+          "rejected": true
+        }
+      ],
+      "passed": true,
+      "case": "plain/html",
+      "log": "plain-html.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 9601,
+          "resultLength": 4,
+          "sourceCodeUnits": 1048576,
+          "rejected": true
+        }
+      ],
+      "passed": true,
+      "case": "plain/partial",
+      "log": "plain-partial.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 20403,
+          "resultLength": 1048573,
+          "sourceCodeUnits": 1048572,
+          "rejected": true
+        }
+      ],
+      "passed": true,
+      "case": "dense/controller",
+      "log": "dense-controller.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 15229,
+          "resultLength": 0,
+          "sourceCodeUnits": 1048572,
+          "rejected": true
+        }
+      ],
+      "passed": true,
+      "case": "dense/document",
+      "log": "dense-document.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 14087,
+          "resultLength": 0,
+          "sourceCodeUnits": 1048572,
+          "rejected": true
+        }
+      ],
+      "passed": true,
+      "case": "dense/html",
+      "log": "dense-html.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 9093,
+          "resultLength": 1,
+          "sourceCodeUnits": 1048572,
+          "rejected": true
+        }
+      ],
+      "passed": true,
+      "case": "dense/partial",
+      "log": "dense-partial.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 37474,
+          "resultLength": 1048577,
+          "sourceCodeUnits": 1048576,
+          "rejected": false
+        }
+      ],
+      "passed": true,
+      "case": "lines/controller",
+      "log": "lines-controller.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 209998,
+          "resultLength": 0,
+          "sourceCodeUnits": 1048576,
+          "rejected": false
+        }
+      ],
+      "passed": true,
+      "case": "lines/document",
+      "log": "lines-document.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 257430,
+          "resultLength": 1048583,
+          "sourceCodeUnits": 1048576,
+          "rejected": false
+        }
+      ],
+      "passed": true,
+      "case": "lines/html",
+      "log": "lines-html.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 143123,
+          "resultLength": 4,
+          "sourceCodeUnits": 1048576,
+          "rejected": false
+        }
+      ],
+      "passed": true,
+      "case": "lines/partial",
+      "log": "lines-partial.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 1345430,
+          "resultLength": 4097,
+          "sourceCodeUnits": 4096,
+          "rejected": false
+        }
+      ],
+      "passed": true,
+      "case": "line_boundary/controller",
+      "log": "line_boundary-controller.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 709198,
+          "resultLength": 0,
+          "sourceCodeUnits": 4096,
+          "rejected": false
+        }
+      ],
+      "passed": true,
+      "case": "line_boundary/document",
+      "log": "line_boundary-document.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 731590,
+          "resultLength": 4104,
+          "sourceCodeUnits": 4096,
+          "rejected": false
+        }
+      ],
+      "passed": true,
+      "case": "line_boundary/html",
+      "log": "line_boundary-html.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 377055,
+          "resultLength": 4,
+          "sourceCodeUnits": 4096,
+          "rejected": false
+        }
+      ],
+      "passed": true,
+      "case": "line_boundary/partial",
+      "log": "line_boundary-partial.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 13363,
+          "resultLength": 4098,
+          "sourceCodeUnits": 4097,
+          "rejected": true
+        }
+      ],
+      "passed": true,
+      "case": "line_overflow/controller",
+      "log": "line_overflow-controller.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 9291,
+          "resultLength": 0,
+          "sourceCodeUnits": 4097,
+          "rejected": true
+        }
+      ],
+      "passed": true,
+      "case": "line_overflow/document",
+      "log": "line_overflow-document.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 7184,
+          "resultLength": 0,
+          "sourceCodeUnits": 4097,
+          "rejected": true
+        }
+      ],
+      "passed": true,
+      "case": "line_overflow/html",
+      "log": "line_overflow-html.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 5678,
+          "resultLength": 4,
+          "sourceCodeUnits": 4097,
+          "rejected": true
+        }
+      ],
+      "passed": true,
+      "case": "line_overflow/partial",
+      "log": "line_overflow-partial.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 19959,
+          "resultLength": 1048577,
+          "sourceCodeUnits": 1048576,
+          "rejected": true
+        }
+      ],
+      "passed": true,
+      "case": "carriage_returns/controller",
+      "log": "carriage_returns-controller.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 16880,
+          "resultLength": 0,
+          "sourceCodeUnits": 1048576,
+          "rejected": true
+        }
+      ],
+      "passed": true,
+      "case": "carriage_returns/document",
+      "log": "carriage_returns-document.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 15459,
+          "resultLength": 0,
+          "sourceCodeUnits": 1048576,
+          "rejected": true
+        }
+      ],
+      "passed": true,
+      "case": "carriage_returns/html",
+      "log": "carriage_returns-html.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 14803,
+          "resultLength": 4,
+          "sourceCodeUnits": 1048576,
+          "rejected": true
+        }
+      ],
+      "passed": true,
+      "case": "carriage_returns/partial",
+      "log": "carriage_returns-partial.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 338585,
+          "resultLength": 1048387,
+          "sourceCodeUnits": 1048386,
+          "rejected": false
+        }
+      ],
+      "passed": true,
+      "case": "bracket_lines/controller",
+      "log": "bracket_lines-controller.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 248475,
+          "resultLength": 0,
+          "sourceCodeUnits": 1048386,
+          "rejected": false
+        }
+      ],
+      "passed": true,
+      "case": "bracket_lines/document",
+      "log": "bracket_lines-document.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 278153,
+          "resultLength": 1048393,
+          "sourceCodeUnits": 1048386,
+          "rejected": false
+        }
+      ],
+      "passed": true,
+      "case": "bracket_lines/html",
+      "log": "bracket_lines-html.log"
+    },
+    {
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "results": [
+        {
+          "microseconds": 158583,
+          "resultLength": 4,
+          "sourceCodeUnits": 1048386,
+          "rejected": false
+        }
+      ],
+      "passed": true,
+      "case": "bracket_lines/partial",
+      "log": "bracket_lines-partial.log"
+    }
+  ]
+}
