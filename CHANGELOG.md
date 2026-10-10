@@ -1,5 +1,10 @@
 ## Unreleased
 
+- Collect document link references with GFM block parsing, avoiding unrelated
+  inline work on each edit. Build outlines by parsing only heading inlines
+  after collecting forward definitions; retain full parsing when footnote
+  syntax may affect document-wide numbering. Keep source, budgets and public
+  results unchanged, without introducing a cross-document parse cache.
 - Isolate custom block-tag registration per renderer and rebuild, preventing a
   block builder in one document from changing another document's inline layout.
   Keep public builder/style types and host-controlled resource loading; document

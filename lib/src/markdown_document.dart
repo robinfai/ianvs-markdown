@@ -98,7 +98,15 @@ List<IanvsMarkdownHeading> parseMarkdownHeadings(
     return const [];
   }
   final document = md.Document(extensionSet: md.ExtensionSet.gitHubFlavored);
-  final nodes = document.parseLines(const LineSplitter().convert(source));
+  final lines = const LineSplitter().convert(source);
+  // Footnote numbers depend on references throughout the document, including
+  // ordinary paragraphs and headings excluded by maximumLevel. Keep the full
+  // parser whenever footnote syntax may be present. Otherwise block parsing
+  // collects forward link definitions before parsing only heading inlines.
+  final parseWholeDocument = source.contains('[^');
+  final nodes = parseWholeDocument
+      ? document.parseLines(lines)
+      : md.BlockParser(lines.map(md.Line.new).toList(), document).parseLines();
   final result = <IanvsMarkdownHeading>[];
   for (final node in nodes) {
     if (node is! md.Element || node.tag.length != 2) continue;
@@ -111,8 +119,16 @@ List<IanvsMarkdownHeading> parseMarkdownHeadings(
       'h6' => 6,
       _ => null,
     };
-    final text = node.textContent.trim();
-    if (level == null || level > maximumLevel || text.isEmpty) continue;
+    if (level == null || level > maximumLevel) continue;
+    final text =
+        (parseWholeDocument
+                ? node.textContent
+                : document
+                      .parseInline(node.textContent)
+                      .map((inline) => inline.textContent)
+                      .join())
+            .trim();
+    if (text.isEmpty) continue;
     result.add(IanvsMarkdownHeading(level: level, text: text));
   }
   return List<IanvsMarkdownHeading>.unmodifiable(result);

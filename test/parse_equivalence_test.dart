@@ -27,6 +27,16 @@ final _fixtures = <String>[
   '# A[^note]\n\n[^note]: body\n\n# B[^note]',
   '\n\n[only]: /definition\n\n',
   '[bad]: <unclosed\n\n# Real',
+  'Body[^a].\n\n# Heading[^b]\n\n[^a]: First\n[^b]: Second',
+  '###### Excluded[^a]\n\n# Included[^b]\n\n[^a]: First\n[^b]: Second',
+  '# Repeat[^a] and missing[^missing]\n\n[^a]: First\n\n# Again[^a]',
+  '> Quote[^a]\n\n# Heading[^b]\n\n[^a]: First\n[^b]: Second',
+  '# [Forward][ref]\n\n[^unused]: [ref]: /inside-footnote',
+  '```\n[^fake]: hidden\n```\n\n# [Forward][ref]\n\n[ref]: /real',
+  '# Forward ![image][ref]\n\n[ref]: /image.png "Image title"',
+  '# Escaped \\*marker\\* and &#x1f600;\n\n[ref]: /unused',
+  'Setext [forward]\nand **bold**\n---\n\n[forward]: /destination',
+  '\\[^escaped]: /ordinary-reference\n\n# [^undefined]',
 ];
 
 Map<String, (String, String, String?)> _references(
@@ -80,6 +90,10 @@ void main() {
   test('cross-block edits and growing delimiters use the current source', () {
     const versions = [
       '# [Heading][ref]\n\n[ref]: /old',
+      'Body[^a].\n\n# [Heading][ref][^b]\n\n[ref]: /old\n'
+          '[^a]: First\n[^b]: Second',
+      '# [Heading][ref][^b]\n\n[ref]: /old\n[^b]: Second',
+      '# [Heading][ref]\n\n[ref]: /new',
       '# [Heading][ref]\n\n[ref]: /new "Changed"',
       '# [Heading][missing]\n\n[ref]: /new "Changed"',
       '```\n# [Heading][ref]\n\n[ref]: /new "Changed"',
@@ -100,5 +114,30 @@ void main() {
         _headings(source, 6),
       );
     }
+  });
+
+  test('reference extraction keeps definitions around dense inline syntax', () {
+    final paragraph = List.filled(
+      120,
+      '**bold** [link][target] ![image](asset.png) `code` &amp;',
+    ).join(' ');
+    final source =
+        '# [Title][target]\n\n$paragraph\n\n'
+        '[target]: <docs/a b> "first"\n[TARGET]: /ignored';
+    final upstream = md.Document(extensionSet: md.ExtensionSet.gitHubFlavored)
+      ..parseLines(source.split('\n'));
+    expect(
+      _references(
+        MarkdownLinkReferenceContext.parse(source, budget: null).references,
+      ),
+      _references(upstream.linkReferences),
+    );
+    expect(
+      parseMarkdownHeadings(
+        source,
+        budget: null,
+      ).map((heading) => (heading.level, heading.text)).toList(),
+      _headings(source, 6),
+    );
   });
 }
