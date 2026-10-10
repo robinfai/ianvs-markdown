@@ -60,9 +60,9 @@ Controller 计算替换；原生粘贴、word movement/selection/deletion 和拖
 3. 导航与投影完成后运行完整 `make check`、包快照/外部宿主、公共符号及双 SDK / Native CI；确认新增内部文件进入发布快照。
 4. 使用 R2-01 已通过的 `r2-candidate-1` / `r2-candidate-3` 作为同实现的前置性能结果，固定 SDK/harness/窗口和预算行为，运行两次完整后置候选并显式声明所有迁移文件。
 
-三个职责模块均已迁移；完整回归及包外验证通过，两轮后置性能与最终 CI 尚待收口，R2-04 保持进行中。
+三个职责模块均已迁移，完整回归、包外验证和受测版本 CI 通过。两轮有效性能与额外旧/新对照完成，首轮两项观察线波动保留并经复测调查；验收判断及限制见 [R2-04 验收报告](../benchmark/LIVE-MODULES-2026-10-10.md)。
 本次职责分离不声明性能改善。R2-01 已记录的完整 Source 段落排版成本及 R3-01 平台限制继续有效。
 
 ## 完整回归结果
 
-实现 `f33ea43` 在未修改 Flutter 3.44.8 / Dart 3.12.2 上完整 `make check` 通过：核心 967、示例 20、Python 10、预算 32 组、app 274（1 项历史可选语料跳过），剪贴板/原生回归通过。Pub 快照 164 文件、658 KB、零警告；新增三个 part 均在快照，87 个库/示例文件哈希与受测实现一致，仓库外接入通过。详见 [验证摘要](../benchmark/results/2026-10-10-live-modules/full-validation.json)。
+实现 `f33ea43` 在未修改 Flutter 3.44.8 / Dart 3.12.2 上完整 `make check` 通过：核心 967、示例 20、Python 10、预算 32 组、app 274（1 项历史可选语料跳过），剪贴板/原生回归通过。Pub 快照 164 文件、658 KB、零警告；新增三个 part 均在快照，87 个 Dart 文件及 1 份 renderer 许可证哈希与受测实现一致，仓库外接入通过。详见 [验证摘要](../benchmark/results/2026-10-10-live-modules/full-validation.json)。

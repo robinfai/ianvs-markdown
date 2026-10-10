@@ -129,6 +129,10 @@
   "logSha256": {
     "full-check.log.gz": "09ad7b4f99947d2ac58d66f09ec70616ad1a4b0cd17cbeb4600a8be5827a6dc1"
   },
-  "performanceAcceptance": "pending two full post-refactor candidates",
-  "ci": "pending latest reviewed head"
+  "performanceAcceptance": "accepted with two first-run observation exceedances retained and investigated; see performance-validation.json",
+  "ci": "measured 0735d58 passed dual-SDK Core and Native; latest PR head gates required before merge",
+  "publishedFileCounts": {
+    "dart": 87,
+    "rendererLicense": 1
+  }
 }

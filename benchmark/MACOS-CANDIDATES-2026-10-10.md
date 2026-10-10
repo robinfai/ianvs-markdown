@@ -128,3 +128,9 @@ REPRO
 
 所有证据文件的索引为 [SHA256.json](results/2026-10-10-platform-candidates/SHA256.json)。
 源码输入、工具版本、SDK、锁文件与失败记录共同限定这次结论，后续复测新增目录而不覆盖历史。
+
+## R2-04 模块拆分后的 Reading 复核
+
+实现 `0735d58` 在同一未修改 Flutter 3.47.7 / Dart 3.13.5、macOS arm64 上新增四次隔离构建：纯 Flutter 对照 Profile / Release 通过，Reading Profile / Release 仍为 `_window_macos.dart / _Rect` 的 `illegal cid, full-aot` 失败。源码 diff 为空，所有输入与日志哈希核验，临时宿主已按工具规则清理。
+
+这覆盖最终模块实现的 Reading 入口，不是重新运行全部 SDK / 入口矩阵。没有验证真实 IME、跨应用粘贴和 VoiceOver，R3-01 保持进行中。原始日志、SDK、锁文件和源码清单见 [本轮证据](results/2026-10-10-platform-live-modules/summary.json) 及 [SHA256 索引](results/2026-10-10-platform-live-modules/SHA256.json)。
