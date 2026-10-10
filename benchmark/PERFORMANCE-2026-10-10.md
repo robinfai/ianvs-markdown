@@ -42,7 +42,12 @@ Apple M4 Pro / macOS 27.0.1 arm64，Flutter 3.44.8 / Dart 3.12.2。未修改 SDK
 
 `r2-visible-before-2` 在 1 MiB 无预算 Source→Reading 的正式样本索引 5 开始后收到 `active: false`、`generation: 2`，立即终止；其余窗口可见性标记仍正常，电脑控制随后确认桌面可访问，不能把这次中断写作锁屏。[第二轮失败记录](results/2026-10-10-performance/r2-visible-before-2.json)及 trace / 日志保留，`complete` 和 `fullBaseline` 均为 false。随后以新标签 `r2-visible-before-3` 补跑完整独立进程。该次在 1 MiB 无预算模式切换预热索引 3 又收到 `active: false` / `generation: 3` 并终止，耗时 331.1 秒；[第三次记录](results/2026-10-10-performance/r2-visible-before-3.json)同样为不完整。保留第一轮有效结果，不拼接失败轮的部分样本。再次复测前需具备约 12 分钟连续前台窗口，已向用户确认该条件；当前没有运行 GUI 基准。
 
-用户确认可保持前台，完整回归和三套 SDK 候选构建结束后，以新标签 `r2-visible-before-4` 再次运行。该次在 1 MiB 无预算 Source→Reading 正式样本索引 13 开始后收到 `active: false` / `generation: 2`，于 634.1 秒结束；[第四次记录](results/2026-10-10-performance/r2-visible-before-4.json)仍为 `complete: false` / `fullBaseline: false`。电脑控制随后可以读取桌面应用，无法据此确定失焦来源或断言中断时曾锁屏。原始 trace 与日志已归档，校验器正确拒绝；有效完整基线仍只有第一轮。当前没有 GUI 基准运行。
+用户确认可保持前台，完整回归和三套 SDK 候选构建结束后，以新标签 `r2-visible-before-4` 再次运行。该次在 1 MiB 无预算 Source→Reading 正式样本索引 13 开始后收到 `active: false` / `generation: 2`，于 634.1 秒结束；[第四次记录](results/2026-10-10-performance/r2-visible-before-4.json)仍为 `complete: false` / `fullBaseline: false`。电脑控制随后可以读取桌面应用，无法据此确定失焦来源或断言中断时曾锁屏。原始 trace 与日志已归档，校验器正确拒绝；有效完整基线仍只有第一轮。用户随后反馈可能出现系统弹窗，但未确认具体原因；不能据此归因为锁屏。第五次独立基线使用新标签补跑，结果见下。
+
+`r2-visible-before-5` 在 100 KiB 无预算模式切换预热完成后收到 `active: false` /
+`generation: 2`，运行 140.4 秒后终止；[第五次记录](results/2026-10-10-performance/r2-visible-before-5.json)
+及 trace / 日志已保存，校验器拒绝不完整结果。随后桌面可访问，未确认锁屏或抢占焦点的应用。
+下一次采样期间暂停其他提交、审批和桌面工具操作，以排除工具交互的干扰；固定测量输入不变。
 
 1. 在有效 GUI 环境中用保留的优化前源码重新建立基线，固定环境和测量代码，关闭阶段计时，串行运行两个独立进程：每项 5 次预热 / 20 个样本、六个场景、七种操作。逐样本验证后生成同环境观察线，再实施后续热点优化。
 2. 对引用/标题解析、持续渲染的标签状态、Source 文本与背景排版分别实施可回归的改动；每项有正确性与失效条件说明。预算语义和完整原文保持一致。
@@ -115,6 +120,7 @@ Source 整段可编辑文本本身的排版仍存在，不把这次背景复用�
 | `r2-visible-before-2` | 正式模式切换中失去前台，立即终止 | 否 |
 | `r2-visible-before-3` | 模式切换预热中失去前台，立即终止 | 否 |
 | `r2-visible-before-4` | 最后一组正式样本索引 13 失去前台，634.1 秒后结束 | 否 |
+| `r2-visible-before-5` | 100 KiB 无预算模式切换预热后失去前台，140.4 秒后结束 | 否 |
 
 保留优化前测量 worktree 的 `8d50d0d`，临时补丁 SDK、语料和测量输入均不改动。新一次使用未用过的标签；顺利完成后，将它与 `r2-visible-before-1` 交给 `tool/analyze_performance_runs.py`，再归档观察线。观察线、两次候选复测和最终验收仍未完成；已实现的解析、renderer 与 Source 背景改动仍待配对验证，R2-01 保持进行中。整合分支 `51877f4` 的双 SDK Core / Native CI 已全部通过；后续文档与证据提交以其最新 Checks 为准。
 
