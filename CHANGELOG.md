@@ -4,6 +4,12 @@
   block builder in one document from changing another document's inline layout.
   Keep public builder/style types and host-controlled resource loading; document
   the internal derived renderer and its upstream license/maintenance boundary.
+- Ignore stale code-copy feedback after a source or handler change, disposal,
+  or a newer copy request. The original callback still receives captured source.
+- Add a streaming host example with explicit follow/pause scrolling and
+  document/revision/resource-scoped asynchronous diagram placeholders. Cover
+  growing fences, tables and links, selection invalidation, composing-safe
+  host appends and late success/error isolation using public APIs.
 
 - **Processing-budget migration:** preflight Markdown before controller
   references, document/YAML/headings, Live structure and clipboard HTML.
