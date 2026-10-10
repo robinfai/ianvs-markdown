@@ -1,5 +1,8 @@
 part of '../live_editor.dart';
 
+final TextInputFormatter _tableCellInputFormatter =
+    FilteringTextInputFormatter.deny(RegExp(r'[\r\n|]'));
+
 TextEditingValue? _tablePlainPasteValue(
   TextEditingValue value,
   String pastedText,

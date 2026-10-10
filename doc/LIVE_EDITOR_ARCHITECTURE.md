@@ -12,7 +12,7 @@ R2-04 从 `6c0e769` 开始，公共入口仍是 `IanvsMarkdownLiveEditor`。
 | `live_editor.dart` 的 State | 文档监听、块刷新、活动编辑表面、焦点/IME、历史提交及模式切换 | 拥有生命周期，按原有顺序协调局部变化和重建 |
 | `live_editor/table.dart` | 表格解析/序列化、单元格输入/选择、键盘与粘贴、结构控件和拖拽 | 单元格以源码范围定位；通过既有回调提交给 State，不自行持久化文档 |
 | `live_editor/navigation.dart` | 字词、行、跨块和折叠范围的导航/扩选决策；导航 UI | 读取 State 的块、选区和实际编辑几何，调用所有者的激活入口；不接管生命周期 |
-| 源码投影（下一步） | 隐藏标记、引用/脚注、行内资源的展示与准确源码偏移 | 投影仅用于展示和命中映射，不能截断或覆盖原文 |
+| `live_editor/source_projection.dart` | 隐藏标记、引用/脚注、行内资源的展示与准确源码偏移 | 投影仅用于展示和命中映射，不能截断或覆盖原文 |
 
 ```mermaid
 flowchart LR
@@ -45,6 +45,14 @@ Controller 计算替换；原生粘贴、word movement/selection/deletion 和拖
 
 它直接读取同一 State 的块、折叠、当前编辑范围和 `RenderEditable` 几何，更新导航锚点，并调用 `_activateDocumentCaret` / `_activateSelectionSurface` 等所有者入口。它没有独立生命周期或持久化副本。键盘路由、组合输入保护、活动表面激活及 `setState` 留在主 State；私有 extension 是职责组织边界，不声明模块间已消除耦合。
 
+## 源码投影与命中映射
+
+`_LiveEditorSourceProjection` 承接展示源码变换、引用定义视图、渲染几何命中以及点击到源码选区的映射。私有模型描述隐藏标记、行内公式/链接、引用行和脚注的源范围；`_BlockEditingController` 根据局部文本、selection/composing 生成展示 span，保留所有源字符的映射。共迁移 1,415 行原声明，不改变高亮、字体或间距。
+
+活动块的投影配置、输入回调、焦点申请和 Controller 生命周期仍在所有者中，按原时序把当前文档信息传给展示层。投影结果只用于渲染和命中；点击返回源偏移，仍由 State 激活表面和同步文档。`_renderedBlockSource` 中的转义和引用补全不会回写原始 Markdown。
+
+表格专用 `_tableCellInputFormatter` 的 3 行声明同步归入 table part，通用替换偏移继续留在所有者。所有迁移块正文逐字相同；State 与私有 extension 的调用改由静态解析，行为及性能仍需回归验证。
+
 ## 分步验证
 
 1. 表格声明逐字迁移到同 library 的 part；格式器零修改，静态分析通过。迁移前后哈希和声明正文对照保留在 R2-04 证据中。
@@ -52,5 +60,5 @@ Controller 计算替换；原生粘贴、word movement/selection/deletion 和拖
 3. 导航与投影完成后运行完整 `make check`、包快照/外部宿主、公共符号及双 SDK / Native CI；确认新增内部文件进入发布快照。
 4. 使用 R2-01 已通过的 `r2-candidate-1` / `r2-candidate-3` 作为同实现的前置性能结果，固定 SDK/harness/窗口和预算行为，运行两次完整后置候选并显式声明所有迁移文件。
 
-表格及选区导航迁移已实施；源码投影和最终完整验收仍待完成，R2-04 保持进行中。
+三个职责模块均已迁移；完整回归、包外验证和两轮后置性能尚待收口，R2-04 保持进行中。
 本次职责分离不声明性能改善。R2-01 已记录的完整 Source 段落排版成本及 R3-01 平台限制继续有效。
