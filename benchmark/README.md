@@ -21,10 +21,16 @@ and raw measurements are retained in each JSON result.
 
 Each operation has 5 warmups and 20 measured samples by default. Use `--warmup`
 and `--samples` to change them; compare runs with the same values. Run both
-default budgets and `renderBudget: null` against only this controlled corpus.
-The result identifies whether Reading mode uses Markdown or the bounded plain
-text fallback. Live Preview budgets apply per rendered block. Those workloads
-must not be combined into one performance claim.
+default budgets and disabled processing/rendering/copy budgets against only
+this controlled corpus. Since R2-05 the harness passes the selected policy to
+Controller `parseBudget`, widget `renderBudget` and `clipboardBudget` explicitly.
+Results identify whether Controller/Live/Reading can process full Markdown:
+over-budget Live edits complete plain source, while Reading shows a bounded
+prefix. `processingBudgetPolicy: full-document-preflight-v1` marks this behavior.
+The pre-R2-05 default workload used per-block Live budgets; its archived timings
+are historical and cannot substitute for a new baseline. The comparison tool
+already requires matching source and harness hashes. This change has not rerun
+the profile baseline; R2-01 performs the new matched measurements.
 
 ## Measurements
 

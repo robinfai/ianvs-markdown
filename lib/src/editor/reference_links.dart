@@ -1,6 +1,7 @@
 import 'package:markdown/markdown.dart' as md;
 
 import '../markdown_link_source.dart';
+import '../render_budget.dart';
 
 final class MarkdownLinkReferenceDefinition {
   const MarkdownLinkReferenceDefinition({
@@ -18,9 +19,11 @@ final class MarkdownLinkReferenceDefinition {
 /// nodes. Live Preview uses this to project otherwise parser-hidden definition
 /// blocks without treating mixed paragraphs as metadata.
 List<MarkdownLinkReferenceDefinition> parseMarkdownLinkReferenceDefinitions(
-  String source,
-) {
-  if (!source.contains('[')) {
+  String source, {
+  IanvsMarkdownRenderBudget? budget = const IanvsMarkdownRenderBudget(),
+}) {
+  if (!source.contains('[') ||
+      !scanMarkdownForRendering(source, budget: budget).useMarkdown) {
     return const <MarkdownLinkReferenceDefinition>[];
   }
   final document = md.Document(extensionSet: md.ExtensionSet.gitHubFlavored);
@@ -72,10 +75,19 @@ Map<String, String> _rawMarkdownLinkReferenceLabels(String source) {
 final class MarkdownLinkReferenceContext {
   MarkdownLinkReferenceContext._(this.references);
 
-  factory MarkdownLinkReferenceContext.parse(String source) {
+  factory MarkdownLinkReferenceContext.empty() =>
+      MarkdownLinkReferenceContext._(const {});
+
+  factory MarkdownLinkReferenceContext.parse(
+    String source, {
+    IanvsMarkdownRenderBudget? budget = const IanvsMarkdownRenderBudget(),
+  }) {
     // Every Markdown reference definition requires a literal opening bracket.
     // Avoid a full GFM parse for ordinary prose, including very long lines.
-    if (!source.contains('[')) return MarkdownLinkReferenceContext._(const {});
+    if (!source.contains('[') ||
+        !scanMarkdownForRendering(source, budget: budget).useMarkdown) {
+      return MarkdownLinkReferenceContext.empty();
+    }
     final document = md.Document(extensionSet: md.ExtensionSet.gitHubFlavored);
     document.parseLines(source.split('\n'));
     return MarkdownLinkReferenceContext._(

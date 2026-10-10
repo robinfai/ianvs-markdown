@@ -17,6 +17,39 @@ Future<void> controlKey(WidgetTester tester, LogicalKeyboardKey key) async {
 
 void main() {
   testWidgets(
+    'editor reports simplified display and saves the complete source',
+    (tester) async {
+      String? saved;
+      await tester.pumpWidget(
+        EditorExampleApp(write: (_, source) async => saved = source),
+      );
+      await tester.pumpAndSettle();
+      final editor = tester.widget<IanvsMarkdownLiveEditor>(
+        find.byType(IanvsMarkdownLiveEditor),
+      );
+      final source = '[${'a' * 4096}\r\n中文😀';
+      editor.controller.text = source;
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Large document: simplified display'),
+        findsOneWidget,
+      );
+      expect(editor.controller.text, source);
+      await tester.tap(find.byTooltip('Save draft'));
+      await tester.pumpAndSettle();
+      expect(saved, source);
+      editor.controller.text = '# Small again';
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Large document: simplified display'),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets(
     'body example switches syntax and handles only approved resources',
     (tester) async {
       await tester.pumpWidget(const BodyExampleApp());

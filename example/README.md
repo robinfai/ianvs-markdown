@@ -59,3 +59,8 @@ That optional example requires Rust and a supported native platform, and opts
 into `ianvs_markdown_clipboard` to keep native Markdown + HTML copy. These core
 examples resolve neither native backend. Existing hosts that need rich copy
 must follow the [clipboard migration](../doc/INTEGRATION_GUIDE.md#剪贴板迁移r1-04).
+
+R2-05: the editor entry observes `onRenderDecision` and shows a host-owned notice
+when large content uses simplified display. Full source is retained for editing,
+saving and history. The controller, renderer and Reading clipboard budgets are
+independent; see the [integration guide](../doc/INTEGRATION_GUIDE.md).

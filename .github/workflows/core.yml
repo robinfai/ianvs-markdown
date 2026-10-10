@@ -49,12 +49,14 @@ jobs:
         run: make check-core FORMAT_DART="${{ steps.formatter.outputs.dart }}"
       - name: Publication contents and external host
         run: make check-package
-      - name: Save package validation evidence
+      - name: Save package and budget validation evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: package-check-${{ matrix.flutter }}
-          path: build/package-check/
+          path: |
+            build/package-check/
+            build/processing-budget/
           if-no-files-found: ignore
 
   required:

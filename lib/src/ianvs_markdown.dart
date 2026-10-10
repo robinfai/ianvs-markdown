@@ -88,6 +88,7 @@ class IanvsMarkdown extends StatelessWidget {
     this.autofocus = false,
     this.documentSelection = true,
     this.clipboardWriter = writeIanvsMarkdownClipboard,
+    this.clipboardBudget = const IanvsMarkdownRenderBudget(),
     this.styleSheet,
     this.styleSheetTheme = MarkdownStyleSheetBaseTheme.material,
     this.onSelectionChanged,
@@ -140,6 +141,7 @@ class IanvsMarkdown extends StatelessWidget {
 
   /// Writes the Markdown and rich HTML produced by a document-level Copy.
   final IanvsMarkdownClipboardWriter clipboardWriter;
+  final IanvsMarkdownRenderBudget? clipboardBudget;
   final MarkdownStyleSheet? styleSheet;
   final MarkdownStyleSheetBaseTheme styleSheetTheme;
   final MarkdownOnSelectionChangedCallback? onSelectionChanged;
@@ -234,6 +236,7 @@ class IanvsMarkdown extends StatelessWidget {
       richMarkdown: data,
       syntaxPreset: syntaxPreset,
       clipboardWriter: clipboardWriter,
+      clipboardBudget: clipboardBudget,
       onSelectionChanged: onSelectionChanged,
       child: content,
     );
@@ -245,19 +248,11 @@ class IanvsMarkdown extends StatelessWidget {
     required bool blockSelectable,
   }) {
     final colors = IanvsMarkdownThemeData.resolve(context, theme);
-    final budget = renderBudget;
-    final decision = budget == null
-        ? IanvsMarkdownRenderDecision(
-            text: data,
-            useMarkdown: true,
-            syntaxTokens: 0,
-            truncated: false,
-          )
-        : scanMarkdownForRendering(
-            data,
-            budget: budget,
-            syntaxPreset: syntaxPreset,
-          );
+    final decision = scanMarkdownForRendering(
+      data,
+      budget: renderBudget,
+      syntaxPreset: syntaxPreset,
+    );
     if (!decision.useMarkdown) {
       final style = TextStyle(
         color: colors.textPrimary,
@@ -1322,6 +1317,7 @@ class IanvsMarkdownView extends StatefulWidget {
     this.enableFileLinkChips = false,
     this.onHeadingSelected,
     this.clipboardWriter = writeIanvsMarkdownClipboard,
+    this.clipboardBudget = const IanvsMarkdownRenderBudget(),
     this.theme,
   });
 
@@ -1377,9 +1373,10 @@ class IanvsMarkdownView extends StatefulWidget {
 
   /// Writes the plain Markdown and rich HTML representations created by Copy.
   ///
-  /// The default publishes both formats to the system clipboard. Override this
-  /// only when the host owns clipboard policy or needs to observe copy events.
+  /// The default writes complete Markdown as plain text. An optional native
+  /// writer can also publish HTML when conversion passes [clipboardBudget].
   final IanvsMarkdownClipboardWriter clipboardWriter;
+  final IanvsMarkdownRenderBudget? clipboardBudget;
   final IanvsMarkdownThemeData? theme;
 
   @override
@@ -1454,22 +1451,20 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
       widget.data,
       parseFrontMatter:
           widget.syntaxPreset == IanvsMarkdownSyntaxPreset.obsidian,
-    );
-    final budget = widget.renderBudget;
-    final canRenderHeadings =
-        budget == null ||
-        scanMarkdownForRendering(
-          _document.body,
-          budget: budget,
-          syntaxPreset: widget.syntaxPreset,
-        ).useMarkdown;
-    _headings = canRenderHeadings
-        ? _document.headings
-        : const <IanvsMarkdownHeading>[];
-    _headingFoldModel = IanvsMarkdownHeadingFoldModel.parse(
-      _document.body,
+      budget: widget.renderBudget,
       syntaxPreset: widget.syntaxPreset,
     );
+    _headings = _document.headings;
+    _headingFoldModel = _document.parseDecision!.useMarkdown
+        ? IanvsMarkdownHeadingFoldModel.parse(
+            _document.body,
+            syntaxPreset: widget.syntaxPreset,
+            budget: null, // Preflight already covered the complete source.
+          )
+        : IanvsMarkdownHeadingFoldModel.unparsed(
+            _document.body,
+            budgetExceeded: _document.parseDecision!.budgetExceeded,
+          );
     _headingFoldController.retainIdentities(_headingFoldModel.identities);
   }
 
@@ -1578,6 +1573,7 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
                 richMarkdown: _document.body,
                 syntaxPreset: widget.syntaxPreset,
                 clipboardWriter: widget.clipboardWriter,
+                clipboardBudget: widget.clipboardBudget,
                 onSelectionChanged: widget.onSelectionChanged,
                 child: SingleChildScrollView(
                   key: const ValueKey('ianvs-markdown-scroll-view'),
@@ -1683,6 +1679,7 @@ class _IanvsMarkdownReadingSelection extends StatefulWidget {
     required this.richMarkdown,
     required this.syntaxPreset,
     required this.clipboardWriter,
+    required this.clipboardBudget,
     required this.onSelectionChanged,
     required this.child,
   });
@@ -1694,6 +1691,7 @@ class _IanvsMarkdownReadingSelection extends StatefulWidget {
   final String richMarkdown;
   final IanvsMarkdownSyntaxPreset syntaxPreset;
   final IanvsMarkdownClipboardWriter clipboardWriter;
+  final IanvsMarkdownRenderBudget? clipboardBudget;
   final MarkdownOnSelectionChangedCallback? onSelectionChanged;
   final Widget child;
 
@@ -1757,7 +1755,8 @@ class _IanvsMarkdownReadingSelectionState
       return true;
     }
     if (event.logicalKey == LogicalKeyboardKey.keyC &&
-        _selectedContent?.plainText.isNotEmpty == true) {
+        ((_wholeDocumentSelected && widget.markdown.isNotEmpty) ||
+            _selectedContent?.plainText.isNotEmpty == true)) {
       _hardwareCopyHandled = true;
       unawaited(_copySelection());
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1910,9 +1909,19 @@ class _IanvsMarkdownReadingSelectionState
   }
 
   Future<void> _copySelection() async {
+    if (_wholeDocumentSelected) {
+      if (widget.markdown.isEmpty) return;
+      await widget.clipboardWriter(
+        ianvsMarkdownDocumentClipboardData(
+          widget.markdown,
+          richMarkdown: widget.richMarkdown,
+          budget: widget.clipboardBudget,
+        ),
+      );
+      return;
+    }
     final selectedText = _selectedContent?.plainText;
     if (selectedText == null || selectedText.isEmpty) return;
-    final wholeDocument = _wholeDocumentSelected;
     final range = _selectionNotifier.registered
         ? _selectionNotifier.selection.range
         : null;
@@ -1921,21 +1930,13 @@ class _IanvsMarkdownReadingSelectionState
         : range.startOffset < range.endOffset
         ? range.startOffset
         : range.endOffset;
-    final partial = wholeDocument
-        ? null
-        : ianvsMarkdownSelectionClipboardData(
-            widget.richMarkdown,
-            selectedText,
-            preferredStart: preferredStart,
-          );
-    await widget.clipboardWriter(
-      IanvsMarkdownClipboardData(
-        markdown: wholeDocument ? widget.markdown : partial!.markdown,
-        html: wholeDocument
-            ? ianvsMarkdownClipboardHtml(widget.richMarkdown)
-            : partial!.html,
-      ),
+    final payload = ianvsMarkdownSelectionClipboardData(
+      widget.richMarkdown,
+      selectedText,
+      preferredStart: preferredStart,
+      budget: widget.clipboardBudget,
     );
+    await widget.clipboardWriter(payload);
   }
 }
 

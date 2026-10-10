@@ -5,11 +5,15 @@ import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 import 'package:markdown/markdown.dart' as md;
 
-/// The two representations provided to every Reading-mode clipboard writer.
+import 'render_budget.dart';
+import 'syntax_preset.dart';
+
+/// Complete text and optional HTML provided to Reading-mode clipboard writers.
 final class IanvsMarkdownClipboardData {
   const IanvsMarkdownClipboardData({
     required this.markdown,
     required this.html,
+    this.budgetExceeded,
   });
 
   /// Markdown-compatible plain text.
@@ -19,8 +23,15 @@ final class IanvsMarkdownClipboardData {
   /// Markdown fragment so inline and block formatting remain available.
   final String markdown;
 
-  /// A safe semantic HTML representation for rich-text paste targets.
+  /// Safe semantic HTML, or an empty string when conversion was skipped.
+  /// Writers must omit the HTML format when [hasHtml] is false.
   final String html;
+
+  bool get hasHtml => html.isNotEmpty;
+
+  /// When non-null, Markdown parsing was skipped. Whole-document Markdown is
+  /// exact source; partial selections contain the complete selected plain text.
+  final IanvsMarkdownBudgetExceeded? budgetExceeded;
 }
 
 /// Receives Markdown and rich HTML representations for host-controlled output.
@@ -34,8 +45,52 @@ typedef IanvsMarkdownClipboardWriter =
 Future<void> writeIanvsMarkdownClipboard(IanvsMarkdownClipboardData data) =>
     Clipboard.setData(ClipboardData(text: data.markdown));
 
-/// Converts Markdown to a safe HTML clipboard fragment.
-String ianvsMarkdownClipboardHtml(String markdown) {
+/// Converts Markdown to safe HTML, or returns an empty string on overflow.
+/// [onBudgetExceeded] observes why no HTML was generated. No truncated HTML
+/// is returned. Set [budget] to null only for trusted input.
+String ianvsMarkdownClipboardHtml(
+  String markdown, {
+  IanvsMarkdownRenderBudget? budget = const IanvsMarkdownRenderBudget(),
+  void Function(IanvsMarkdownBudgetExceeded reason)? onBudgetExceeded,
+}) {
+  final decision = _clipboardDecision(markdown, budget);
+  if (!decision.useMarkdown) {
+    onBudgetExceeded?.call(decision.budgetExceeded!);
+    return '';
+  }
+  return _markdownClipboardHtml(markdown);
+}
+
+IanvsMarkdownRenderDecision _clipboardDecision(
+  String source,
+  IanvsMarkdownRenderBudget? budget,
+) => scanMarkdownForRendering(
+  source,
+  budget: budget,
+  syntaxPreset: IanvsMarkdownSyntaxPreset.standard,
+);
+
+/// Builds a whole-document payload without truncating [markdown].
+/// [richMarkdown] may omit front matter or include a host's reading projection;
+/// both inputs must pass the budget before any HTML conversion is attempted.
+IanvsMarkdownClipboardData ianvsMarkdownDocumentClipboardData(
+  String markdown, {
+  String? richMarkdown,
+  IanvsMarkdownRenderBudget? budget = const IanvsMarkdownRenderBudget(),
+}) {
+  final sourceDecision = _clipboardDecision(markdown, budget);
+  final richSource = richMarkdown ?? markdown;
+  final decision = sourceDecision.useMarkdown && richSource != markdown
+      ? _clipboardDecision(richSource, budget)
+      : sourceDecision;
+  return IanvsMarkdownClipboardData(
+    markdown: markdown,
+    html: decision.useMarkdown ? _markdownClipboardHtml(richSource) : '',
+    budgetExceeded: decision.budgetExceeded,
+  );
+}
+
+String _markdownClipboardHtml(String markdown) {
   final rendered = md.markdownToHtml(
     markdown,
     extensionSet: md.ExtensionSet.gitHubFlavored,
@@ -74,9 +129,21 @@ IanvsMarkdownClipboardData ianvsMarkdownSelectionClipboardData(
   String markdown,
   String selectedText, {
   int? preferredStart,
+  IanvsMarkdownRenderBudget? budget = const IanvsMarkdownRenderBudget(),
 }) {
   if (selectedText.isEmpty) {
     return const IanvsMarkdownClipboardData(markdown: '', html: '');
+  }
+  final sourceDecision = _clipboardDecision(markdown, budget);
+  final decision = sourceDecision.useMarkdown
+      ? _clipboardDecision(selectedText, budget)
+      : sourceDecision;
+  if (!decision.useMarkdown) {
+    return IanvsMarkdownClipboardData(
+      markdown: selectedText,
+      html: '',
+      budgetExceeded: decision.budgetExceeded,
+    );
   }
   final rendered = md.markdownToHtml(
     markdown,

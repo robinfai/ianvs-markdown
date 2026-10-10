@@ -13,6 +13,7 @@ import '../obsidian_autolink.dart';
 import '../obsidian_html.dart';
 import '../obsidian_inline.dart';
 import '../obsidian_metadata.dart';
+import '../render_budget.dart';
 import '../strikethrough.dart';
 import '../wiki_link_reference.dart';
 import 'editor_models.dart';
@@ -106,6 +107,7 @@ class IanvsMarkdownController extends TextEditingController {
     IanvsMarkdownEditorMode mode = IanvsMarkdownEditorMode.livePreview,
     this.historyCoalescingDuration = const Duration(milliseconds: 500),
     this.historyPolicy = const IanvsMarkdownHistoryPolicy(),
+    this.parseBudget = const IanvsMarkdownRenderBudget(),
   }) : _mode = ValueNotifier<IanvsMarkdownEditorMode>(mode),
        _savedText = text,
        super.fromValue(
@@ -114,7 +116,7 @@ class IanvsMarkdownController extends TextEditingController {
            selection: const TextSelection.collapsed(offset: 0),
          ),
        ) {
-    _linkReferences = MarkdownLinkReferenceContext.parse(text);
+    _refreshParseState(text);
     _history.add(value);
     _historyTextBytes = text.length * 2;
     _lastObservedValue = value;
@@ -126,6 +128,24 @@ class IanvsMarkdownController extends TextEditingController {
   /// Retention limits for history. Set to null for legacy unlimited retention.
   /// Changing this policy requires creating a new controller.
   final IanvsMarkdownHistoryPolicy? historyPolicy;
+
+  /// Bounds reference preprocessing and source syntax styling. Set to null
+  /// only for trusted input. Independent from a widget's rendering budget:
+  /// preprocessing starts here, before an editor widget is mounted.
+  final IanvsMarkdownRenderBudget? parseBudget;
+  late IanvsMarkdownRenderDecision _parseDecision;
+
+  /// Current preprocessing result; updated before controller listeners run.
+  /// Over-budget text remains fully editable, saveable and undoable.
+  IanvsMarkdownRenderDecision get parseDecision => _parseDecision;
+
+  void _refreshParseState(String source) {
+    _parseDecision = scanMarkdownForRendering(source, budget: parseBudget);
+    _linkReferences = _parseDecision.useMarkdown
+        ? MarkdownLinkReferenceContext.parse(source, budget: null)
+        : MarkdownLinkReferenceContext.empty();
+  }
+
   final ValueNotifier<IanvsMarkdownEditorMode> _mode;
   final ValueNotifier<IanvsMarkdownHistoryValue> _historyState =
       ValueNotifier<IanvsMarkdownHistoryValue>(IanvsMarkdownHistoryValue.empty);
@@ -701,10 +721,10 @@ class IanvsMarkdownController extends TextEditingController {
     final current = value;
     final previous = _lastObservedValue;
     _lastObservedValue = current;
-    _setDirty(current.text != _savedText);
     if (current.text != previous.text) {
-      _linkReferences = MarkdownLinkReferenceContext.parse(current.text);
+      _refreshParseState(current.text);
     }
+    _setDirty(current.text != _savedText);
     if (_applyingHistory) return;
 
     if (current.text == previous.text) {
@@ -795,7 +815,7 @@ class IanvsMarkdownController extends TextEditingController {
     required bool withComposing,
   }) {
     final syntax = syntaxTheme;
-    if (syntax == null) {
+    if (syntax == null || !parseDecision.useMarkdown) {
       return super.buildTextSpan(
         context: context,
         style: style,
@@ -884,9 +904,14 @@ bool _isMarkdownPunctuation(String character) {
 /// An empty nested list item outdents once; an empty root item exits the list.
 /// Composing IME input is never rewritten.
 class IanvsMarkdownEditingFormatter extends TextInputFormatter {
-  IanvsMarkdownEditingFormatter() {
+  IanvsMarkdownEditingFormatter({
+    this.budget = const IanvsMarkdownRenderBudget(),
+  }) {
     _markdownNewlineModifiers.ensureListening();
   }
+
+  /// Over-budget edits pass through unchanged, including IME composition.
+  final IanvsMarkdownRenderBudget? budget;
 
   @override
   TextEditingValue formatEditUpdate(
@@ -894,6 +919,10 @@ class IanvsMarkdownEditingFormatter extends TextInputFormatter {
     TextEditingValue newValue,
   ) {
     if (newValue.composing.isValid && !newValue.composing.isCollapsed) {
+      return newValue;
+    }
+    if (!scanMarkdownForRendering(newValue.text, budget: budget).useMarkdown ||
+        !scanMarkdownForRendering(oldValue.text, budget: budget).useMarkdown) {
       return newValue;
     }
     final smartUrlPaste = formatSmartUrlPasteEdit(oldValue, newValue);

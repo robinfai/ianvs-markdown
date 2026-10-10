@@ -4,6 +4,8 @@ import 'package:flutter/widgets.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import 'front_matter.dart';
+import 'render_budget.dart';
+import 'syntax_preset.dart';
 
 final class IanvsMarkdownHeading {
   IanvsMarkdownHeading({required this.level, required this.text});
@@ -22,13 +24,31 @@ final class IanvsMarkdownDocument {
     required this.metadata,
     required this.headings,
     required this.hasFrontMatter,
+    this.parseDecision,
   });
 
   factory IanvsMarkdownDocument.parse(
     String source, {
     bool parseFrontMatter = true,
     int maximumHeadingLevel = 6,
+    IanvsMarkdownRenderBudget? budget = const IanvsMarkdownRenderBudget(),
+    IanvsMarkdownSyntaxPreset syntaxPreset = IanvsMarkdownSyntaxPreset.obsidian,
   }) {
+    final decision = scanMarkdownForRendering(
+      source,
+      budget: budget,
+      syntaxPreset: syntaxPreset,
+    );
+    if (!decision.useMarkdown) {
+      return IanvsMarkdownDocument(
+        source: source,
+        body: source,
+        metadata: const [],
+        headings: const [],
+        hasFrontMatter: false,
+        parseDecision: decision,
+      );
+    }
     final frontMatter = parseFrontMatter
         ? parseMarkdownFrontMatter(source)
         : MarkdownFrontMatterDocument(
@@ -43,8 +63,10 @@ final class IanvsMarkdownDocument {
       headings: parseMarkdownHeadings(
         frontMatter.body,
         maximumLevel: maximumHeadingLevel,
+        budget: null, // The complete source has already passed preflight.
       ),
       hasFrontMatter: frontMatter.hasFrontMatter,
+      parseDecision: decision,
     );
   }
 
@@ -53,13 +75,21 @@ final class IanvsMarkdownDocument {
   final List<MarkdownMetadataEntry> metadata;
   final List<IanvsMarkdownHeading> headings;
   final bool hasFrontMatter;
+
+  /// Null only for manually constructed documents. On rejection [body] is the
+  /// complete source; YAML and headings have not been parsed.
+  final IanvsMarkdownRenderDecision? parseDecision;
 }
 
 List<IanvsMarkdownHeading> parseMarkdownHeadings(
   String source, {
   int maximumLevel = 6,
+  IanvsMarkdownRenderBudget? budget = const IanvsMarkdownRenderBudget(),
 }) {
   assert(maximumLevel >= 1 && maximumLevel <= 6);
+  if (!scanMarkdownForRendering(source, budget: budget).useMarkdown) {
+    return const [];
+  }
   final document = md.Document(extensionSet: md.ExtensionSet.gitHubFlavored);
   final nodes = document.parseLines(const LineSplitter().convert(source));
   final result = <IanvsMarkdownHeading>[];

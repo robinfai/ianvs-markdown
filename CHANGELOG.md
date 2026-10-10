@@ -1,5 +1,23 @@
 ## Unreleased
 
+- **Processing-budget migration:** preflight Markdown before controller
+  references, document/YAML/headings, Live structure and clipboard HTML.
+  Defaults now include 1,048,576 source UTF-16 units and 4,096 units per line,
+  alongside the existing 4,096 syntax tokens and 64 KiB UTF-8 display prefix.
+  Rejected Reading content shows raw source, including unparsed YAML; Live
+  retains full source editing and reports its decision. Source, selection,
+  composition, save and history are preserved across the budget boundary.
+- Add independent `parseBudget` (controller), `renderBudget` (widgets) and
+  `clipboardBudget` (Reading copy), plus observable rejection reasons. A null
+  budget explicitly disables only its own operation's guard. These limits do
+  not bound Flutter text layout, host builders, memory or elapsed time.
+- Whole-document copy always preserves the original Markdown. Over-budget
+  partial copy returns the complete selected plain text; HTML is omitted.
+  Custom writers must check `hasHtml` or omit an empty HTML format; the native
+  clipboard adapter now handles this fallback without initializing its backend.
+- Add independently timed large-input regressions to `make check-core` and
+  both core CI SDKs; preserve child logs and partial results on failure.
+
 - **Clipboard migration:** remove `super_clipboard` from the core dependency
   graph. The existing default writer now writes complete Markdown plain text
   through Flutter; payload types and injected writers keep their contracts.

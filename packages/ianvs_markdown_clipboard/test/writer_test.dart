@@ -21,6 +21,25 @@ void main() {
   const html = '<h1><strong>Exact</strong> source</h1>';
 
   test(
+    'missing HTML writes full plain text without initializing native writer',
+    () async {
+      final written = <String?>[];
+      var nativeCalls = 0;
+      await writeClipboardWithFallback(
+        markdown: markdown,
+        html: '',
+        nativeClipboard: () {
+          nativeCalls++;
+          return null;
+        },
+        plainText: (data) async => written.add(data.text),
+      );
+      expect(written, [markdown]);
+      expect(nativeCalls, 0);
+    },
+  );
+
+  test(
     'native success writes both representations on exactly one item',
     () async {
       debugDefaultTargetPlatformOverride = TargetPlatform.linux;

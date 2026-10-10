@@ -10,6 +10,7 @@ chooses them. On Linux, the Flutter test runtime needs `libglu1-mesa`.
 ```sh
 make check-core          # dependency resolution, formatting, analysis, tests
 make check-package       # actual publication snapshot and external host
+make check-processing-budget # independent processes for pathological input
 make check-integrations  # macOS: app, native clipboard, Mermaid, Quick Look
 make build-examples      # macOS Debug: body, reading, editor, playground
 make check               # all three groups
@@ -32,6 +33,15 @@ Profile performance measurements use `make benchmark LABEL=after`. Read
 workarounds and incomplete-run handling are separate from widget-test results.
 Only a complete, error-free matched pair satisfies the full baseline gate.
 Partial diagnostics must identify unfinished phases and their limitations.
+
+`check-core` includes the processing-budget check on the supported Linux/macOS
+validation hosts (the process-group timeout runner requires POSIX). It gives each of 32
+preparse/copy cases a separate process group, a 60-second Flutter startup
+deadline and a 5-second operation deadline. A timeout kills only that child
+group and records partial results under `build/processing-budget/`; both core
+CI SDKs upload those logs alongside package evidence. This checks bounded-input
+behavior and source preservation, not a profile frame-time target. See
+[the R2-05 report](benchmark/PROCESSING-BUDGET-2026-10-10.md).
 
 Candidate macOS Profile/Release commands, observed native build requirements,
 and remaining device checks are recorded in [the platform matrix](doc/PLATFORM_SUPPORT.md).

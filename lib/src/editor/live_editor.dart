@@ -125,10 +125,12 @@ class IanvsMarkdownLiveEditor extends StatefulWidget {
     this.builders = const <String, MarkdownElementBuilder>{},
     this.styleSheet,
     this.renderBudget = const IanvsMarkdownRenderBudget(),
+    this.onRenderDecision,
     this.softLineBreak = true,
     this.enableFileLinkChips = false,
     this.normalizeTablesOnEdit = true,
     this.clipboardWriter = writeIanvsMarkdownClipboard,
+    this.clipboardBudget = const IanvsMarkdownRenderBudget(),
     this.theme,
   });
 
@@ -179,6 +181,11 @@ class IanvsMarkdownLiveEditor extends StatefulWidget {
   final Map<String, MarkdownElementBuilder> builders;
   final MarkdownStyleSheet? styleSheet;
   final IanvsMarkdownRenderBudget? renderBudget;
+
+  /// Latest full-document preflight, delivered after the frame on source,
+  /// controller or budget changes. Over-budget Live uses full source editing;
+  /// Reading shows a bounded plain prefix. No source or mode is rewritten.
+  final ValueChanged<IanvsMarkdownRenderDecision>? onRenderDecision;
   final bool softLineBreak;
   final bool enableFileLinkChips;
 
@@ -191,6 +198,7 @@ class IanvsMarkdownLiveEditor extends StatefulWidget {
 
   /// Writes the plain Markdown and rich HTML copied in Reading mode.
   final IanvsMarkdownClipboardWriter clipboardWriter;
+  final IanvsMarkdownRenderBudget? clipboardBudget;
   final IanvsMarkdownThemeData? theme;
 
   @override
@@ -209,8 +217,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   final GlobalKey _activeEditorKey = GlobalKey();
   final GlobalKey _sourceEditorKey = GlobalKey();
   final _BlockEditingController _blockController = _BlockEditingController();
-  final IanvsMarkdownEditingFormatter _editingFormatter =
-      IanvsMarkdownEditingFormatter();
+  late IanvsMarkdownEditingFormatter _editingFormatter;
   final Map<int, GlobalKey> _blockKeys = <int, GlobalKey>{};
   final Map<int, GlobalKey> _renderedBlockTapKeys = <int, GlobalKey>{};
   final IanvsMarkdownHeadingFoldController _headingFoldController =
@@ -225,6 +232,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   late IanvsMarkdownHeadingFoldModel _headingFoldModel;
   late MarkdownLinkReferenceContext _linkReferences;
   late String _lastText;
+  late IanvsMarkdownRenderDecision _renderDecision;
+  var _sourceFallback = false;
+  var _budgetSurfaceEpoch = 0;
   late IanvsMarkdownEditorMode _lastMode;
   int? _activeBlockStart;
   int? _activeHeadingStart;
@@ -270,6 +280,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     super.initState();
     _focusNode = widget.focusNode ?? FocusNode();
     _scrollController = widget.scrollController ?? ScrollController();
+    _editingFormatter = IanvsMarkdownEditingFormatter(
+      budget: widget.controller.parseBudget,
+    );
     _lastText = widget.controller.text;
     _lastMode = widget.controller.mode;
     _refreshBlocks(_lastText);
@@ -290,6 +303,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   void didUpdateWidget(covariant IanvsMarkdownLiveEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.controller, widget.controller)) {
+      _editingFormatter = IanvsMarkdownEditingFormatter(
+        budget: widget.controller.parseBudget,
+      );
       oldWidget.controller.commitHistoryGroup();
       oldWidget.controller.removeListener(_handleDocumentChanged);
       oldWidget.controller.modeListenable.removeListener(_handleModeChanged);
@@ -306,6 +322,10 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       widget.controller.addListener(_handleDocumentChanged);
       widget.controller.modeListenable.addListener(_handleModeChanged);
       widget.controller.headingNavigation.addListener(_handleHeadingNavigation);
+    }
+    if (identical(oldWidget.controller, widget.controller) &&
+        oldWidget.renderBudget != widget.renderBudget) {
+      _refreshBlocks(_lastText);
     }
     if (!identical(oldWidget.focusNode, widget.focusNode)) {
       if (oldWidget.focusNode == null) _focusNode.dispose();
@@ -342,7 +362,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             controller.mode != next) {
           return;
         }
-        if (next == IanvsMarkdownEditorMode.livePreview) {
+        if (next == IanvsMarkdownEditorMode.livePreview && !_sourceFallback) {
           final selection = widget.controller.selection;
           final surface = _selectionSurfaceFor(selection);
           if (surface != null) {
@@ -370,6 +390,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     // below, but references, blocks and folds depend only on the source text.
     if (textChanged || IanvsMarkdownEditorDiagnostics.forceDocumentRefresh) {
       _refreshBlocks(source);
+    } else {
+      // Finish a deferred return to Live after IME commits, without reparsing.
+      _updateBudgetSurface();
     }
     if (_activeBlockStart != null &&
         widget.controller.mode == IanvsMarkdownEditorMode.livePreview) {
@@ -508,20 +531,43 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
 
   void _refreshBlocks(String source) {
     IanvsMarkdownEditorDiagnostics.recordDocumentParse();
-    _linkReferences = MarkdownLinkReferenceContext.parse(source);
+    final decision = scanMarkdownForRendering(
+      source,
+      budget: widget.renderBudget,
+    );
+    _renderDecision = decision;
+    if (widget.onRenderDecision != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && identical(_renderDecision, decision)) {
+          widget.onRenderDecision?.call(decision);
+        }
+      });
+    }
+    _linkReferences = decision.useMarkdown
+        ? MarkdownLinkReferenceContext.parse(source, budget: null)
+        : MarkdownLinkReferenceContext.empty();
     _blockController.linkReferenceLabels = _linkReferences.labels;
-    _crossParagraphHighlightLiteralRuns =
-        ianvsMarkdownCrossParagraphHighlightLiteralRuns(source);
+    _crossParagraphHighlightLiteralRuns = decision.useMarkdown
+        ? ianvsMarkdownCrossParagraphHighlightLiteralRuns(source)
+        : const [];
     _blockController.documentHighlightLiteralRuns =
         _crossParagraphHighlightLiteralRuns;
-    _livePreviewFootnoteReferences = ianvsMarkdownLivePreviewFootnoteReferences(
-      source,
-    );
-    _blocks = parseMarkdownBlocks(source, splitListItems: true);
-    _headingFoldModel = IanvsMarkdownHeadingFoldModel.fromBlocks(
-      source,
-      _blocks,
-    );
+    _livePreviewFootnoteReferences = decision.useMarkdown
+        ? ianvsMarkdownLivePreviewFootnoteReferences(source)
+        : const [];
+    _blocks = decision.useMarkdown
+        ? parseMarkdownBlocks(source, splitListItems: true)
+        : const [];
+    _headingFoldModel = decision.useMarkdown
+        ? IanvsMarkdownHeadingFoldModel.fromBlocks(
+            source,
+            _blocks,
+            budget: null,
+          )
+        : IanvsMarkdownHeadingFoldModel.unparsed(
+            source,
+            budgetExceeded: decision.budgetExceeded,
+          );
     _headingFoldController.retainIdentities(_headingFoldModel.identities);
     final starts = _blocks.map((block) => block.start).toSet();
     _blockKeys.removeWhere((start, _) => !starts.contains(start));
@@ -538,13 +584,85 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     )) {
       _activeHeadingStart = headings.first.blockStart;
     }
+    _updateBudgetSurface();
+  }
+
+  void _updateBudgetSurface() {
+    final composing = widget.controller.value.composing;
+    final next =
+        !_renderDecision.useMarkdown ||
+        (_sourceFallback && composing.isValid && !composing.isCollapsed);
+    if (next == _sourceFallback) return;
+    _sourceFallback = next;
+    final epoch = ++_budgetSurfaceEpoch;
+    if (next) {
+      _resetDocumentDragSelection();
+      _activeBlockStart = null;
+      _activeGapLine = false;
+      _foldedSelectionBridge = null;
+    }
+    final focus = _focusNode;
+    final controller = widget.controller;
+    if (!focus.hasFocus ||
+        controller.mode != IanvsMarkdownEditorMode.livePreview) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          epoch != _budgetSurfaceEpoch ||
+          !identical(controller, widget.controller) ||
+          !identical(focus, _focusNode) ||
+          controller.mode != IanvsMarkdownEditorMode.livePreview) {
+        return;
+      }
+      if (next) {
+        focus.requestFocus();
+        _requestSurfaceKeyboard(_sourceEditorKey);
+      } else {
+        final selection = controller.selection;
+        final surface = _selectionSurfaceFor(selection);
+        if (surface != null) {
+          _activateSelectionSurface(selection, surface);
+        } else {
+          _activateDocumentCaret(
+            selection.isValid ? selection.extentOffset : 0,
+          );
+        }
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted &&
+              epoch == _budgetSurfaceEpoch &&
+              identical(controller, widget.controller) &&
+              controller.mode == IanvsMarkdownEditorMode.livePreview) {
+            _requestSurfaceKeyboard(_activeEditorKey);
+          }
+        });
+      }
+    });
+  }
+
+  // Retaining a FocusNode across different EditableTexts does not grant the
+  // new text input connection a keyboard token. Reconnect after mounting it.
+  void _requestSurfaceKeyboard(GlobalKey key) {
+    void visit(Element element) {
+      if (element is StatefulElement && element.state is EditableTextState) {
+        final state = element.state as EditableTextState;
+        if (identical(state.widget.focusNode, _focusNode)) {
+          state.requestKeyboard();
+        }
+        return;
+      }
+      element.visitChildElements(visit);
+    }
+
+    final root = key.currentContext;
+    if (root is Element) visit(root);
   }
 
   List<_EditorNavigationHeading> get _navigationHeadings {
     final result = <_EditorNavigationHeading>[];
     for (final block in _blocks) {
       if (block.type != IanvsMarkdownBlockType.heading) continue;
-      final headings = parseMarkdownHeadings(block.source);
+      final headings = parseMarkdownHeadings(block.source, budget: null);
       if (headings.isEmpty) continue;
       result.add(
         _EditorNavigationHeading(
@@ -3544,20 +3662,11 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             child: ValueListenableBuilder<IanvsMarkdownEditorMode>(
               valueListenable: widget.controller.modeListenable,
               builder: (context, mode, _) => switch (mode) {
-                IanvsMarkdownEditorMode.livePreview => _buildLiveMode(colors),
-                IanvsMarkdownEditorMode.source => IanvsMarkdownEditor(
-                  key: _sourceEditorKey,
-                  placeholder: widget.placeholder,
-                  enableModeShortcuts: widget.enableModeShortcuts,
-                  controller: widget.controller,
-                  focusNode: _focusNode,
-                  scrollController: _scrollController,
-                  autofocus: widget.autofocus,
-                  showToolbar: false,
-                  padding: widget.padding,
-                  onSaveRequested: widget.onSaveRequested,
-                  theme: colors,
-                ),
+                IanvsMarkdownEditorMode.livePreview =>
+                  !_sourceFallback
+                      ? _buildLiveMode(colors)
+                      : _buildSourceMode(colors, highlightSyntax: false),
+                IanvsMarkdownEditorMode.source => _buildSourceMode(colors),
                 IanvsMarkdownEditorMode.preview => IanvsMarkdownView(
                   focusNode: _focusNode,
                   autofocus: widget.autofocus,
@@ -3587,6 +3696,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
                   wikiLinkExists: widget.wikiLinkExists,
                   enableFileLinkChips: widget.enableFileLinkChips,
                   clipboardWriter: widget.clipboardWriter,
+                  clipboardBudget: widget.clipboardBudget,
                   theme: colors,
                 ),
               },
@@ -3596,6 +3706,24 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       ],
     );
   }
+
+  Widget _buildSourceMode(
+    IanvsMarkdownThemeData colors, {
+    bool highlightSyntax = true,
+  }) => IanvsMarkdownEditor(
+    key: _sourceEditorKey,
+    placeholder: widget.placeholder,
+    enableModeShortcuts: widget.enableModeShortcuts,
+    controller: widget.controller,
+    focusNode: _focusNode,
+    scrollController: _scrollController,
+    autofocus: widget.autofocus,
+    showToolbar: false,
+    highlightSyntax: highlightSyntax,
+    padding: widget.padding,
+    onSaveRequested: widget.onSaveRequested,
+    theme: colors,
+  );
 
   void _scrollToNavigationHeading(_EditorNavigationHeading heading) {
     widget.controller.revealHeading(heading.blockStart);
@@ -3949,6 +4077,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   }) {
     final referenceDefinitions = parseMarkdownLinkReferenceDefinitions(
       block.source,
+      budget: null,
     );
     if (referenceDefinitions.isNotEmpty) {
       return Container(
@@ -4570,6 +4699,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     final sourceTasks = projectObsidianTaskMarkers(block.source).tasks;
     final referenceDefinitions = parseMarkdownLinkReferenceDefinitions(
       block.source,
+      budget: null,
     );
     var renderedTaskIndex = 0;
     Widget rendered;
@@ -5582,10 +5712,10 @@ int? _headingLevelForSource(String source) {
       : source.substring(0, firstLineEnd);
   final atx = RegExp(r'^ {0,3}(#{1,6})(?:[ \t]+|$)').firstMatch(firstLine);
   if (atx != null) {
-    final headings = parseMarkdownHeadings(firstLine);
+    final headings = parseMarkdownHeadings(firstLine, budget: null);
     return headings.isEmpty ? null : headings.first.level;
   }
-  final headings = parseMarkdownHeadings(source);
+  final headings = parseMarkdownHeadings(source, budget: null);
   return headings.isEmpty ? null : headings.first.level;
 }
 

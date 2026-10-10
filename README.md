@@ -308,11 +308,15 @@ ThemeData(
 
 ## 渲染预算
 
-组件默认最多解析 4096 个 Markdown 语法 token。超限后会展示最多 64 KiB 的纯文本前缀，避免病理输入阻塞 UI。可信文档可以关闭预算：
+默认预算为全文 1,048,576 个 UTF-16 单元、单行 4,096 个 UTF-16 单元、4,096 个 Markdown 语法 token。检查发生在文档预解析和渲染之前；阅读超限后显示最多 64 KiB UTF-8 的原始纯文本，Live 保留完整源码编辑。完整原文、保存和撤销不会被截断。
+
+Controller 的 `parseBudget`、组件的 `renderBudget`、阅读复制的 `clipboardBudget` 各自独立，均使用上述默认值。复制超限保留完整原文（局部选择保留完整所选纯文本），不生成 HTML；自定义 writer 必须在 `data.hasHtml` 为 false 时省略 HTML 格式。`fallbackBuilder`、Live 的 `onRenderDecision`、Controller 的 `parseDecision` 和复制数据的 `budgetExceeded` 提供观察入口。可信文档可以单独关闭相应预算：
 
 ```dart
 IanvsMarkdown(data: trustedSource, renderBudget: null)
 ```
+
+输入额度不等于布局耗时、堆内存或宿主资源上限，Source 仍排版完整原文。边界、迁移及复现命令见 [预算契约](doc/API_CONTRACTS.md#预算与资源) 与 [R2-05 验证](https://github.com/robinfai/ianvs-markdown/blob/main/benchmark/PROCESSING-BUDGET-2026-10-10.md)。
 
 ## 来源边界
 

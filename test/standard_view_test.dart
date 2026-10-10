@@ -161,7 +161,8 @@ void main() {
           await tester.pumpAndSettle();
           expect(images, 0);
           expect(fallback?.truncated, isTrue);
-          expect(fallback?.text, preset == standard ? '---\nti' : '\n**');
+          // Rejected documents skip YAML preprocessing as well as Markdown.
+          expect(fallback?.text, '---\nti');
           await tester.tap(find.text(fallback!.text));
           await tester.pump();
           for (final key in [
@@ -175,7 +176,7 @@ void main() {
           }
           expect(copied?.markdown, source);
           expect(copied?.html, contains('<strong>😀😀</strong>'));
-          expect(copied?.html.contains('title: Metadata'), preset == standard);
+          expect(copied?.html.contains('title: Metadata'), isTrue);
           expect(tester.takeException(), isNull);
         } finally {
           debugDefaultTargetPlatformOverride = null;

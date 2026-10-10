@@ -33,6 +33,7 @@ class _EditorPageState extends State<_EditorPage> {
   final _memory = <String, String>{'draft.md': editorMarkdown};
   late final ExampleDocumentSession _session;
   var _english = true;
+  var _simplified = false;
   var _status =
       'F5 saves. Ctrl/⌘L switches language. Demo storage is in memory.';
 
@@ -119,8 +120,23 @@ class _EditorPageState extends State<_EditorPage> {
                 showToolbar: false,
                 showNavigationPane: false,
                 autofocus: true,
+                onRenderDecision: (decision) {
+                  final simplified = !decision.useMarkdown;
+                  if (_simplified != simplified) {
+                    setState(() => _simplified = simplified);
+                  }
+                },
               ),
             ),
+            if (_simplified)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  _english
+                      ? 'Large document: simplified display; full source can still be edited and saved.'
+                      : '内容较大，显示已简化；完整原文仍可编辑和保存。',
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.all(12),
               child: ValueListenableBuilder<bool>(
