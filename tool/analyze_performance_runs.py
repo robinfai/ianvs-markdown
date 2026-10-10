@@ -10,6 +10,17 @@ from pathlib import Path
 from compare_benchmarks import MATCH_FIELDS, SDK_FIELDS, require, validate
 
 
+def validate_window(state, label):
+    require(isinstance(state, dict), f'{label}: missing native window state')
+    require(all(state.get(key) is True for key in ('active', 'visible', 'occlusionVisible', 'onActiveSpace'))
+            and all(state.get(key) is False for key in ('miniaturized', 'appHidden')),
+            f'{label}: inactive or hidden benchmark window')
+    require(type(state.get('generation')) is int and state['generation'] >= 0,
+            f'{label}: missing native window generation')
+    require(all(isinstance(state.get(key), (int, float)) and state[key] > 0 for key in ('width', 'height')),
+            f'{label}: invalid native window dimensions')
+
+
 def read_run(path):
     # R2 retains the R0 workload and selection/text-change invariants, but both
     # variants use the shipped selection optimization (force refresh is false).
@@ -21,6 +32,10 @@ def read_run(path):
     require(data['editorSha256'] == data['sourceFilesSha256']['lib/src/editor/live_editor.dart'],
             f'{path}: editor hash differs from source manifest')
     require(data.get('runtimeInputsSha256'), f'{path}: dependency/host inputs missing')
+    require(data.get('environmentPolicy') == 'native-window-stable-v1',
+            f'{path}: native window environment policy required')
+    initial_window = data.get('initialWindowEnvironment')
+    validate_window(initial_window, str(path))
     trace_path = path.parent / data['sampleTraceFile']
     trace = trace_path.read_bytes()
     require(hashlib.sha256(trace).hexdigest() == data['sampleTraceSha256'],
@@ -28,6 +43,9 @@ def read_run(path):
     pending, completed = {}, {}
     for line in trace.decode().splitlines():
         event = json.loads(line)
+        window = event.get('windowEnvironment')
+        validate_window(window, str(path))
+        require(window == initial_window, f'{path}: window changed during run')
         identity = tuple(event[key] for key in ('utf8Bytes', 'budget', 'operation', 'stage', 'index'))
         if event['event'] == 'start':
             require(identity not in pending and identity not in completed,
@@ -59,10 +77,13 @@ def read_run(path):
 
 def compare_environment(reference, current, label, allowed_source_changes):
     excluded = {'sourceFilesSha256', 'editorSha256'}
-    for field in (*MATCH_FIELDS, 'processingBudgetPolicy', 'phaseTimingsEnabled', 'runtimeInputsSha256'):
+    for field in (*MATCH_FIELDS, 'processingBudgetPolicy', 'phaseTimingsEnabled', 'runtimeInputsSha256', 'environmentPolicy'):
         if field in excluded:
             continue
         require(reference[field] == current[field], f'{label}: unmatched {field}')
+    for key in ('width', 'height'):
+        require(reference['initialWindowEnvironment'][key] == current['initialWindowEnvironment'][key],
+                f'{label}: unmatched native window {key}')
     for field in SDK_FIELDS:
         require(reference['flutter'][field] == current['flutter'][field], f'{label}: unmatched SDK {field}')
     def workloads(data):
@@ -126,7 +147,7 @@ def analyze(baseline_paths, candidate_paths=(), changed_sources=()):
         'fullWorkloadValidation': 'passed',
         'deterministicGates': {'selectionBoth': 0, 'typingBoth': 1},
         'changedSources': sorted(changed_sources),
-        'environment': {field: reference[field] for field in (*MATCH_FIELDS, 'processingBudgetPolicy', 'runtimeInputsSha256')
+        'environment': {field: reference[field] for field in (*MATCH_FIELDS, 'processingBudgetPolicy', 'runtimeInputsSha256', 'environmentPolicy')
                         if field not in {'sourceFilesSha256', 'editorSha256'}},
         'flutter': {field: reference['flutter'][field] for field in SDK_FIELDS},
         'runs': [{'file': path.name, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
