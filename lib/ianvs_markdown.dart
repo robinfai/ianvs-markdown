@@ -32,6 +32,7 @@ export 'src/highlight.dart';
 export 'src/inline_link.dart';
 export 'src/ianvs_markdown.dart';
 export 'src/math.dart';
+export 'src/keyboard.dart' show IanvsMarkdownCommand, IanvsMarkdownShortcuts;
 export 'src/localization.dart'
     show IanvsMarkdownMessage, IanvsMarkdownStrings, IanvsMarkdownLocalization;
 export 'src/markdown_document.dart';

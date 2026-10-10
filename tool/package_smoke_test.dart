@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 
@@ -8,7 +9,9 @@ void main() {
   ) async {
     const source = '# 外部宿主\n\nHello **Markdown**.\n\n- [ ] Task';
     final controller = IanvsMarkdownController(text: source);
+    final focus = FocusNode();
     addTearDown(controller.dispose);
+    addTearDown(focus.dispose);
     String? saved;
     await tester.pumpWidget(
       MaterialApp(
@@ -17,9 +20,20 @@ void main() {
             strings: const IanvsMarkdownStrings.english(
               overrides: {IanvsMarkdownMessage.save: 'Persist note'},
             ),
-            child: IanvsMarkdownLiveEditor(
-              controller: controller,
-              onSaveRequested: (value) => saved = value,
+            child: IanvsMarkdownShortcuts(
+              bindings: const {
+                IanvsMarkdownCommand.source: [
+                  SingleActivator(LogicalKeyboardKey.f2),
+                ],
+                IanvsMarkdownCommand.save: [
+                  SingleActivator(LogicalKeyboardKey.f3),
+                ],
+              },
+              child: IanvsMarkdownLiveEditor(
+                controller: controller,
+                focusNode: focus,
+                onSaveRequested: (value) => saved = value,
+              ),
             ),
           ),
         ),
@@ -27,13 +41,17 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('外部宿主'), findsWidgets);
-    await tester.tap(find.byTooltip('Source mode'));
+    await tester.tap(find.text('外部宿主').first);
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.f2);
     await tester.pumpAndSettle();
     final field = find.byKey(const ValueKey('ianvs-markdown-source-field'));
     expect(field, findsOneWidget);
+    expect(focus.hasFocus, isTrue);
     await tester.enterText(field, '$source\n\nNew paragraph.');
     await tester.pump();
-    await tester.tap(find.byTooltip('Persist note'));
+    expect(find.byTooltip('Persist note'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.f3);
     await tester.pump();
     expect(saved, '$source\n\nNew paragraph.');
     controller.undo();

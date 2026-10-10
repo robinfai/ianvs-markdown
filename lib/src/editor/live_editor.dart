@@ -1,4 +1,5 @@
 import '../localization.dart';
+import '../keyboard.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show BoxHeightStyle, PointerDeviceKind;
@@ -317,8 +318,13 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   }
 
   void _handleModeChanged() {
+    final controller = widget.controller;
     final next = widget.controller.mode;
     if (next == _lastMode) return;
+    final restoreFocus =
+        FocusManager.instance.primaryFocus?.context
+            ?.findAncestorStateOfType<_IanvsMarkdownLiveEditorState>() ==
+        this;
     _lastMode = next;
     if (next != IanvsMarkdownEditorMode.livePreview) {
       _resetDocumentDragSelection();
@@ -329,6 +335,28 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     }
     widget.onModeChanged?.call(next);
     if (mounted) setState(() {});
+    if (restoreFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted ||
+            !identical(widget.controller, controller) ||
+            controller.mode != next) {
+          return;
+        }
+        if (next == IanvsMarkdownEditorMode.livePreview) {
+          final selection = widget.controller.selection;
+          final surface = _selectionSurfaceFor(selection);
+          if (surface != null) {
+            _activateSelectionSurface(selection, surface);
+          } else {
+            _activateDocumentCaret(
+              selection.isValid ? selection.extentOffset : 0,
+            );
+          }
+        } else {
+          _focusNode.requestFocus();
+        }
+      });
+    }
   }
 
   void _handleDocumentChanged() {
@@ -696,6 +724,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   // Arrow Left/Right, which would turn Shift-selection into plain navigation.
   // ignore: deprecated_member_use
   KeyEventResult _handleActiveBlockRawKey(RawKeyEvent event) {
+    if (markdownShortcutHandledRaw(event)) return KeyEventResult.handled;
     // ignore: deprecated_member_use
     final rawShiftPressed = event.isShiftPressed;
     // ignore: deprecated_member_use
@@ -3242,8 +3271,40 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       behavior: HitTestBehavior.translucent,
       onPointerDown: _recordPointerDown,
       onPointerUp: _handleActivePointerUp,
-      child: child,
+      child: MarkdownCommandTarget(
+        kind: MarkdownCommandKind.live,
+        onCommand: _handleConfiguredCommand,
+        child: child,
+      ),
     );
+  }
+
+  bool _handleConfiguredCommand(
+    IanvsMarkdownCommand command,
+    BuildContext focused,
+  ) {
+    switch (command) {
+      case IanvsMarkdownCommand.selectAll:
+        _handleSelectAllDocument();
+        return true;
+      case IanvsMarkdownCommand.copy:
+        if (_handleFoldedSelectionCopy() == KeyEventResult.handled) return true;
+        return invokeMarkdownTextCommand(command, focused);
+      case IanvsMarkdownCommand.deleteLine:
+        widget.controller.deleteSelectedLines(
+          preferredCaretOffset: _preferredDeleteLineCaret(),
+        );
+        return true;
+      case IanvsMarkdownCommand.indent:
+      case IanvsMarkdownCommand.outdent:
+        if (!_activeBlockIsCode) return false;
+        _handleActiveCodeIndentation(
+          outdent: command == IanvsMarkdownCommand.outdent,
+        );
+        return true;
+      default:
+        return false;
+    }
   }
 
   int _quoteCaretOffsetForTap(
@@ -3469,6 +3530,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       children: [
         if (widget.showToolbar)
           IanvsMarkdownEditorToolbar(
+            focusNode: _focusNode,
             controller: widget.controller,
             onSaveRequested: widget.onSaveRequested,
             showModeSwitcher: !showNavigation,
@@ -3497,6 +3559,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
                   theme: colors,
                 ),
                 IanvsMarkdownEditorMode.preview => IanvsMarkdownView(
+                  focusNode: _focusNode,
+                  autofocus: widget.autofocus,
                   data: widget.controller.text,
                   headingNavigation: widget.controller.headingNavigation,
                   controller: _scrollController,
@@ -6881,6 +6945,37 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
     return KeyEventResult.ignored;
   }
 
+  bool _handleConfiguredCellCommand(
+    _EditableTableCell cell,
+    IanvsMarkdownCommand command,
+    BuildContext focused,
+  ) {
+    final inline = switch (command) {
+      IanvsMarkdownCommand.bold => _TableInlineCommand.bold,
+      IanvsMarkdownCommand.italic => _TableInlineCommand.italic,
+      IanvsMarkdownCommand.insertLink => _TableInlineCommand.link,
+      _ => null,
+    };
+    if (inline != null) {
+      _applyTableInlineCommand(cell, inline);
+      return true;
+    }
+    switch (command) {
+      case IanvsMarkdownCommand.selectAll:
+        widget.onSelectAll();
+        return true;
+      case IanvsMarkdownCommand.deleteLine:
+        widget.onDeleteLine(cell);
+        return true;
+      case IanvsMarkdownCommand.indent:
+      case IanvsMarkdownCommand.outdent:
+        _moveTab(cell, backwards: command == IanvsMarkdownCommand.outdent);
+        return true;
+      default:
+        return invokeMarkdownTextCommand(command, focused);
+    }
+  }
+
   bool _hasTableInlineCommandModifier(LogicalKeyboardKey key) {
     final keyboard = HardwareKeyboard.instance;
     if (keyboard.isAltPressed || keyboard.isShiftPressed) return false;
@@ -7160,55 +7255,66 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                                     onPointerDown: (_) {
                                       _clearTableSelection();
                                     },
-                                    child: TextField(
-                                      contextMenuBuilder: (_, state) =>
-                                          buildMarkdownTextContextMenu(
-                                            context,
-                                            state,
+                                    child: MarkdownCommandTarget(
+                                      kind: MarkdownCommandKind.table,
+                                      onCommand: (command, focused) =>
+                                          _handleConfiguredCellCommand(
+                                            cell,
+                                            command,
+                                            focused,
                                           ),
-                                      key: ValueKey(
-                                        'ianvs-markdown-table-${cell.key}',
-                                      ),
-                                      controller: controller,
-                                      focusNode: focusNode,
-                                      maxLines: null,
-                                      keyboardType: TextInputType.text,
-                                      textInputAction: TextInputAction.next,
-                                      smartDashesType: SmartDashesType.disabled,
-                                      smartQuotesType: SmartQuotesType.disabled,
-                                      autocorrect: false,
-                                      enableSuggestions: false,
-                                      inputFormatters: [
-                                        _tableCellInputFormatter,
-                                      ],
-                                      textAlign: cell.alignment,
-                                      style: TextStyle(
-                                        color: widget.colors.textPrimary,
-                                        fontSize: 13.5,
-                                        height: 1.35,
-                                        fontWeight: cell.isHeader
-                                            ? FontWeight.w600
-                                            : FontWeight.w400,
-                                      ),
-                                      cursorColor: widget.colors.accent,
-                                      cursorWidth: 1.5,
-                                      decoration: const InputDecoration(
-                                        // The table owns cell backgrounds; host
-                                        // form-field fills must not cover them.
-                                        filled: false,
-                                        border: InputBorder.none,
-                                        enabledBorder: InputBorder.none,
-                                        focusedBorder: InputBorder.none,
-                                        isCollapsed: true,
-                                        visualDensity: VisualDensity.standard,
-                                        contentPadding: EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 7,
+                                      child: TextField(
+                                        contextMenuBuilder: (_, state) =>
+                                            buildMarkdownTextContextMenu(
+                                              context,
+                                              state,
+                                            ),
+                                        key: ValueKey(
+                                          'ianvs-markdown-table-${cell.key}',
                                         ),
-                                      ),
-                                      onChanged: (_) => widget.onCellChanged(
-                                        cell,
-                                        controller.value,
+                                        controller: controller,
+                                        focusNode: focusNode,
+                                        maxLines: null,
+                                        keyboardType: TextInputType.text,
+                                        textInputAction: TextInputAction.next,
+                                        smartDashesType:
+                                            SmartDashesType.disabled,
+                                        smartQuotesType:
+                                            SmartQuotesType.disabled,
+                                        autocorrect: false,
+                                        enableSuggestions: false,
+                                        inputFormatters: [
+                                          _tableCellInputFormatter,
+                                        ],
+                                        textAlign: cell.alignment,
+                                        style: TextStyle(
+                                          color: widget.colors.textPrimary,
+                                          fontSize: 13.5,
+                                          height: 1.35,
+                                          fontWeight: cell.isHeader
+                                              ? FontWeight.w600
+                                              : FontWeight.w400,
+                                        ),
+                                        cursorColor: widget.colors.accent,
+                                        cursorWidth: 1.5,
+                                        decoration: const InputDecoration(
+                                          // The table owns cell backgrounds; host
+                                          // form-field fills must not cover them.
+                                          filled: false,
+                                          border: InputBorder.none,
+                                          enabledBorder: InputBorder.none,
+                                          focusedBorder: InputBorder.none,
+                                          isCollapsed: true,
+                                          visualDensity: VisualDensity.standard,
+                                          contentPadding: EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 7,
+                                          ),
+                                        ),
+                                        onChanged: (_) => widget.onCellChanged(
+                                          cell,
+                                          controller.value,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -8121,7 +8227,10 @@ class _EditorNavigationPane extends StatelessWidget {
                 _EditorModeTile(
                   tooltip: IanvsMarkdownMessage.livePreview.resolve(context),
                   label: IanvsMarkdownMessage.previewLabel.resolve(context),
-                  shortcut: '⌘1',
+                  shortcut: IanvsMarkdownShortcuts.labelOf(
+                    context,
+                    IanvsMarkdownCommand.livePreview,
+                  ),
                   icon: Icons.visibility_outlined,
                   selected: mode == IanvsMarkdownEditorMode.livePreview,
                   colors: colors,
@@ -8131,7 +8240,10 @@ class _EditorNavigationPane extends StatelessWidget {
                 _EditorModeTile(
                   tooltip: IanvsMarkdownMessage.sourceMode.resolve(context),
                   label: IanvsMarkdownMessage.sourceLabel.resolve(context),
-                  shortcut: '⌘2',
+                  shortcut: IanvsMarkdownShortcuts.labelOf(
+                    context,
+                    IanvsMarkdownCommand.source,
+                  ),
                   icon: Icons.code_rounded,
                   selected: mode == IanvsMarkdownEditorMode.source,
                   colors: colors,
@@ -8140,7 +8252,10 @@ class _EditorNavigationPane extends StatelessWidget {
                 _EditorModeTile(
                   tooltip: IanvsMarkdownMessage.readingMode.resolve(context),
                   label: IanvsMarkdownMessage.readLabel.resolve(context),
-                  shortcut: '⌘3',
+                  shortcut: IanvsMarkdownShortcuts.labelOf(
+                    context,
+                    IanvsMarkdownCommand.reading,
+                  ),
                   icon: Icons.menu_book_outlined,
                   selected: mode == IanvsMarkdownEditorMode.preview,
                   colors: colors,

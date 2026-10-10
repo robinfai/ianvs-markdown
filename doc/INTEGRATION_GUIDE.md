@@ -7,7 +7,7 @@
 | 对象 | 宿主提供 | 组件未收到该对象时 |
 | --- | --- | --- |
 | `IanvsMarkdownController` | Source/Live 必须提供，宿主在组件卸载后释放 | 不自动创建 |
-| `FocusNode` | Source/Live 使用但不释放；替换后旧对象归宿主 | 组件创建并释放 |
+| `FocusNode` | 四种入口使用但不释放；正文仅在整文档选择开启时使用，View 需启用选择；替换后旧对象归宿主 | 组件创建并释放 |
 | `ScrollController` | View 的参数名为 `controller`，Source/Live 为 `scrollController`；均由宿主释放 | 组件创建并释放 |
 | `IanvsMarkdownHeadingFoldController` | View 可注入，由宿主释放 | View 创建并释放；Live 自己管理折叠状态 |
 | 标题导航 `ValueListenable` | View 只订阅并在替换/卸载时移除监听 | 不自动向宿主创建文档身份 |
@@ -78,12 +78,62 @@ IanvsMarkdownLocalization(
 
 选择菜单从所属编辑器/阅读组件捕获文案，图片弹窗保留作用域。未配置的 iOS 文本菜单仍采用 Flutter 系统原生菜单；显式配置菜单文案时使用 Flutter 自适应菜单。浏览器原生菜单和 Flutter 日期弹窗的整体本地化还应配置宿主的 locale / MaterialLocalizations。自定义 Widget builder 返回的界面由宿主自己翻译。
 
+## 快捷键与焦点
+
+在组件外放置 `IanvsMarkdownShortcuts`，用 `bindings` 替换指定命令的全部默认键；空列表禁用该命令的键盘入口。`hostShortcuts` 提供保留组合键的宿主回调，优先于组件命令。下例中的 `SingleActivator` / `LogicalKeyboardKey` 来自 Flutter widgets / services，`openCommandPalette` 为宿主自己的动作：
+
+```dart
+IanvsMarkdownShortcuts(
+  bindings: const {
+    IanvsMarkdownCommand.save: [
+      SingleActivator(LogicalKeyboardKey.f5, includeRepeats: false),
+    ],
+    IanvsMarkdownCommand.bold: [],
+  },
+  hostShortcuts: {
+    const SingleActivator(LogicalKeyboardKey.keyK, meta: true,
+        includeRepeats: false): openCommandPalette,
+  },
+  child: IanvsMarkdownLiveEditor(
+    controller: session.controller,
+    onSaveRequested: session.persist,
+  ),
+)
+```
+
+未覆盖命令保留原有默认行为。替换或禁用后，旧的默认键被消费，不会意外落到内部文本框的原动作；要让它执行宿主动作，应显式放入 `hostShortcuts`。宿主回调优先，其次是显式命令绑定，最后是未改动的默认行为；两个显式命令绑定同一组合键会抛出 `ArgumentError`。最近的作用域完整替代外层配置；同一作用域内、位于 Markdown 组件之外的普通输入框不受影响。配置的 map/list 应保持不可变，更新时替换配置。
+
+命令按焦点区域执行：表格格式化只修改当前单元格，Tab 对应单元格跳转；属性输入使用本地撤销，屏蔽文档格式化/删除行，并在保存或切换模式前提交待编辑值。阅读全选复制保留原始 Markdown；Source 的粘贴继续使用智能链接转换。`enableModeShortcuts: false` 仍会禁用重映射后的模式命令。普通文本导航、箭头、控件 Enter 和 IME 输入保持平台行为，但也可用 `hostShortcuts` 显式保留某个键。
+
+配置中的命令或宿主组合键遇到活跃 composing 时会被消费且不执行，组合区保持不变；组合输入提交后恢复。`includeRepeats: false` 的键长按时只执行首次，重复事件仍被消费。macOS 仅在原始事件中携带修饰键的消息也走相同配置，避免原始事件和标准化事件重复执行。此处的 widget 回归不代替 [真实平台 IME 验收](PLATFORM_SUPPORT.md)。
+
+自定义布局时，将同一宿主创建的 `FocusNode` 传给编辑器和独立工具栏：
+
+```dart
+Column(children: [
+  IanvsMarkdownEditorToolbar(
+    controller: session.controller,
+    focusNode: editorFocus,
+    onSaveRequested: session.persist,
+  ),
+  Expanded(child: IanvsMarkdownLiveEditor(
+    controller: session.controller,
+    focusNode: editorFocus,
+    onSaveRequested: session.persist,
+    autofocus: true,
+    showToolbar: false,
+  )),
+])
+```
+
+`editorFocus` 在宿主 State 中创建并在卸载后释放。自定义按钮执行 Controller 动作后也可调用 `editorFocus.requestFocus()`；独立工具栏的格式化、历史和保存按钮会自动执行这一步。模式切换源于当前组件焦点时，Live 将焦点转到新模式并保留源码选区；宿主正在编辑其他输入框时，程序更新模式不会主动抢回焦点（不要同时要求新控件 `autofocus`）。`IanvsMarkdownShortcuts.labelOf(context, command)` 显示当前首个可用组合键；禁用或所有组合键均已被覆盖/保留时返回空字符串。该标签不代表命令在当前模式必然可执行。
+
 ## 当前差异与后续任务
 
 | 缺口 | 归属 | 当前接入方式 |
 | --- | --- | --- |
 | Live / Source 尚无标准 GFM 编辑预设 | R1-02 范围决策；后续独立扩展 | 标准只读内容使用正文或 View 的 `syntaxPreset: standard`；编辑仍按 Obsidian 契约 |
-| 文案已有统一作用域，内部按键映射尚不能统一覆盖 | R1-03 进行中 | 文案按上节配置；可隐藏工具栏，`enableModeShortcuts` 仅关闭模式键，不代表禁用全部命令 |
+| 文案、命令及焦点已有统一宿主接入 | R1-03 | 使用相应作用域配置；文档内容与资源授权仍归宿主，真实平台交互证据继续在 R3-01 收集 |
 | 注入 clipboard writer 仍保留原生依赖 | R1-04 | 把它当作行为注入；按实际平台构建验证，拆包另行决策 |
 | 升级后的默认历史会裁剪旧快照 | R2-02 已实现，升级时核对配置 | 阅读 [容量与迁移契约](API_CONTRACTS.md#撤销历史容量r2-02)；需要旧行为时显式设置 `historyPolicy: null` |
 | View 追加数据重置滚动，异步结果没有组件级文档身份 | R2-03 | 宿主管理文档/版本与加载状态，当前不承诺完整流式接入能力 |

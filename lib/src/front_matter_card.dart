@@ -1,4 +1,5 @@
 import 'localization.dart';
+import 'keyboard.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +9,48 @@ import 'front_matter.dart';
 import 'theme.dart';
 
 const int _collapsedMetadataItems = 6;
+
+Widget _propertyCommandTarget({
+  required BuildContext context,
+  required UndoHistoryController undoController,
+  required VoidCallback commit,
+  required Widget child,
+}) => MarkdownCommandTarget(
+  kind: MarkdownCommandKind.property,
+  onCommand: (command, focused) {
+    switch (command) {
+      case IanvsMarkdownCommand.bold:
+      case IanvsMarkdownCommand.italic:
+      case IanvsMarkdownCommand.insertLink:
+      case IanvsMarkdownCommand.deleteLine:
+        return true;
+      case IanvsMarkdownCommand.undo:
+        undoController.undo();
+        return true;
+      case IanvsMarkdownCommand.redo:
+        undoController.redo();
+        return true;
+      case IanvsMarkdownCommand.indent:
+      case IanvsMarkdownCommand.outdent:
+        commit();
+        final scope = FocusScope.of(context);
+        if (command == IanvsMarkdownCommand.outdent) {
+          scope.previousFocus();
+        } else {
+          scope.nextFocus();
+        }
+        return true;
+      default:
+        if (command == IanvsMarkdownCommand.save ||
+            markdownCommandIsMode(command)) {
+          commit();
+          return false;
+        }
+        return invokeMarkdownTextCommand(command, focused);
+    }
+  },
+  child: child,
+);
 
 bool _isOuterMarkdownFormattingShortcut(KeyEvent event) {
   if (event is! KeyDownEvent && event is! KeyRepeatEvent) return false;
@@ -666,40 +709,45 @@ class _ObsidianEditableKeyState extends State<_ObsidianEditableKey> {
   Widget build(BuildContext context) {
     return Focus(
       onKeyEvent: _handleKeyEvent,
-      child: TextField(
-        contextMenuBuilder: (_, state) =>
-            buildMarkdownTextContextMenu(context, state),
-        key: ValueKey(
-          'ianvs-markdown-front-matter-key-input-${widget.entry.key}',
-        ),
-        controller: _controller,
+      child: _propertyCommandTarget(
+        context: context,
         undoController: _undoController,
-        focusNode: _focusNode,
-        maxLines: 1,
-        textInputAction: TextInputAction.done,
-        smartDashesType: SmartDashesType.disabled,
-        smartQuotesType: SmartQuotesType.disabled,
-        autocorrect: false,
-        enableSuggestions: false,
-        onSubmitted: (_) {
-          _commit();
-          _focusNode.unfocus();
-        },
-        onTapOutside: (_) => _focusNode.unfocus(),
-        style: TextStyle(
-          color: widget.colors.textSecondary,
-          fontSize: 11.5,
-          height: 1.35,
-          fontWeight: FontWeight.w500,
-        ),
-        cursorColor: widget.colors.accent,
-        decoration: InputDecoration(
-          isDense: true,
-          contentPadding: EdgeInsets.zero,
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: UnderlineInputBorder(
-            borderSide: BorderSide(color: widget.colors.accentSoft),
+        commit: _commit,
+        child: TextField(
+          contextMenuBuilder: (_, state) =>
+              buildMarkdownTextContextMenu(context, state),
+          key: ValueKey(
+            'ianvs-markdown-front-matter-key-input-${widget.entry.key}',
+          ),
+          controller: _controller,
+          undoController: _undoController,
+          focusNode: _focusNode,
+          maxLines: 1,
+          textInputAction: TextInputAction.done,
+          smartDashesType: SmartDashesType.disabled,
+          smartQuotesType: SmartQuotesType.disabled,
+          autocorrect: false,
+          enableSuggestions: false,
+          onSubmitted: (_) {
+            _commit();
+            _focusNode.unfocus();
+          },
+          onTapOutside: (_) => _focusNode.unfocus(),
+          style: TextStyle(
+            color: widget.colors.textSecondary,
+            fontSize: 11.5,
+            height: 1.35,
+            fontWeight: FontWeight.w500,
+          ),
+          cursorColor: widget.colors.accent,
+          decoration: InputDecoration(
+            isDense: true,
+            contentPadding: EdgeInsets.zero,
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: widget.colors.accentSoft),
+            ),
           ),
         ),
       ),
@@ -1079,41 +1127,46 @@ class _ObsidianEditableListValueState
             width: 92,
             child: Focus(
               onKeyEvent: _handleKeyEvent,
-              child: TextField(
-                contextMenuBuilder: (_, state) =>
-                    buildMarkdownTextContextMenu(context, state),
-                key: ValueKey(
-                  'ianvs-markdown-front-matter-list-input-${widget.entry.key}',
-                ),
-                controller: _controller,
+              child: _propertyCommandTarget(
+                context: context,
                 undoController: _undoController,
-                focusNode: _focusNode,
-                maxLines: 1,
-                textInputAction: TextInputAction.done,
-                smartDashesType: SmartDashesType.disabled,
-                smartQuotesType: SmartQuotesType.disabled,
-                autocorrect: false,
-                enableSuggestions: false,
-                onSubmitted: (_) => _commitInput(),
-                onTapOutside: (_) => _focusNode.unfocus(),
-                style: TextStyle(
-                  color: widget.colors.textPrimary,
-                  fontSize: 10.5,
-                  height: 1.25,
-                ),
-                cursorColor: widget.colors.accent,
-                decoration: InputDecoration(
-                  isDense: true,
-                  hintText: _items.isEmpty ? widget.hintText : null,
-                  hintStyle: TextStyle(
-                    color: widget.colors.textTertiary,
-                    fontSize: 10.5,
+                commit: _commitInput,
+                child: TextField(
+                  contextMenuBuilder: (_, state) =>
+                      buildMarkdownTextContextMenu(context, state),
+                  key: ValueKey(
+                    'ianvs-markdown-front-matter-list-input-${widget.entry.key}',
                   ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 2),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: widget.colors.accentSoft),
+                  controller: _controller,
+                  undoController: _undoController,
+                  focusNode: _focusNode,
+                  maxLines: 1,
+                  textInputAction: TextInputAction.done,
+                  smartDashesType: SmartDashesType.disabled,
+                  smartQuotesType: SmartQuotesType.disabled,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  onSubmitted: (_) => _commitInput(),
+                  onTapOutside: (_) => _focusNode.unfocus(),
+                  style: TextStyle(
+                    color: widget.colors.textPrimary,
+                    fontSize: 10.5,
+                    height: 1.25,
+                  ),
+                  cursorColor: widget.colors.accent,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: _items.isEmpty ? widget.hintText : null,
+                    hintStyle: TextStyle(
+                      color: widget.colors.textTertiary,
+                      fontSize: 10.5,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 2),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: widget.colors.accentSoft),
+                    ),
                   ),
                 ),
               ),
@@ -1309,40 +1362,45 @@ class _ObsidianEditableDateValueState
         child: Focus(
           onKeyEvent: (node, event) =>
               _handleKeyEvent(node, event, undoController),
-          child: TextField(
-            contextMenuBuilder: (_, state) =>
-                buildMarkdownTextContextMenu(context, state),
-            key: ValueKey(
-              'ianvs-markdown-front-matter-date-$keySuffix-${widget.entry.key}',
-            ),
-            controller: controller,
+          child: _propertyCommandTarget(
+            context: context,
             undoController: undoController,
-            focusNode: focusNode,
-            maxLines: 1,
-            maxLength: maximumLength,
-            keyboardType: TextInputType.number,
-            textInputAction: TextInputAction.done,
-            textAlign: TextAlign.center,
-            smartDashesType: SmartDashesType.disabled,
-            smartQuotesType: SmartQuotesType.disabled,
-            autocorrect: false,
-            enableSuggestions: false,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            onSubmitted: (_) => _submit(),
-            style: TextStyle(
-              color: widget.colors.textPrimary,
-              fontSize: 11.5,
-              height: 1.35,
-            ),
-            cursorColor: widget.colors.accent,
-            decoration: InputDecoration(
-              isDense: true,
-              counterText: '',
-              contentPadding: const EdgeInsets.symmetric(vertical: 2),
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: widget.colors.accentSoft),
+            commit: _commit,
+            child: TextField(
+              contextMenuBuilder: (_, state) =>
+                  buildMarkdownTextContextMenu(context, state),
+              key: ValueKey(
+                'ianvs-markdown-front-matter-date-$keySuffix-${widget.entry.key}',
+              ),
+              controller: controller,
+              undoController: undoController,
+              focusNode: focusNode,
+              maxLines: 1,
+              maxLength: maximumLength,
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.done,
+              textAlign: TextAlign.center,
+              smartDashesType: SmartDashesType.disabled,
+              smartQuotesType: SmartQuotesType.disabled,
+              autocorrect: false,
+              enableSuggestions: false,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              onSubmitted: (_) => _submit(),
+              style: TextStyle(
+                color: widget.colors.textPrimary,
+                fontSize: 11.5,
+                height: 1.35,
+              ),
+              cursorColor: widget.colors.accent,
+              decoration: InputDecoration(
+                isDense: true,
+                counterText: '',
+                contentPadding: const EdgeInsets.symmetric(vertical: 2),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: widget.colors.accentSoft),
+                ),
               ),
             ),
           ),
@@ -1542,43 +1600,48 @@ class _ObsidianEditableNumberValueState
   Widget build(BuildContext context) {
     return Focus(
       onKeyEvent: _handleKeyEvent,
-      child: TextField(
-        contextMenuBuilder: (_, state) =>
-            buildMarkdownTextContextMenu(context, state),
-        key: ValueKey(
-          'ianvs-markdown-front-matter-number-input-${widget.entry.key}',
-        ),
-        controller: _controller,
+      child: _propertyCommandTarget(
+        context: context,
         undoController: _undoController,
-        focusNode: _focusNode,
-        maxLines: 1,
-        keyboardType: const TextInputType.numberWithOptions(
-          decimal: true,
-          signed: true,
-        ),
-        textInputAction: TextInputAction.done,
-        smartDashesType: SmartDashesType.disabled,
-        smartQuotesType: SmartQuotesType.disabled,
-        autocorrect: false,
-        enableSuggestions: false,
-        onSubmitted: (_) {
-          _commit();
-          _focusNode.unfocus();
-        },
-        onTapOutside: (_) => _focusNode.unfocus(),
-        style: TextStyle(
-          color: widget.colors.textPrimary,
-          fontSize: 11.5,
-          height: 1.35,
-        ),
-        cursorColor: widget.colors.accent,
-        decoration: InputDecoration(
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(vertical: 2),
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: UnderlineInputBorder(
-            borderSide: BorderSide(color: widget.colors.accentSoft),
+        commit: _commit,
+        child: TextField(
+          contextMenuBuilder: (_, state) =>
+              buildMarkdownTextContextMenu(context, state),
+          key: ValueKey(
+            'ianvs-markdown-front-matter-number-input-${widget.entry.key}',
+          ),
+          controller: _controller,
+          undoController: _undoController,
+          focusNode: _focusNode,
+          maxLines: 1,
+          keyboardType: const TextInputType.numberWithOptions(
+            decimal: true,
+            signed: true,
+          ),
+          textInputAction: TextInputAction.done,
+          smartDashesType: SmartDashesType.disabled,
+          smartQuotesType: SmartQuotesType.disabled,
+          autocorrect: false,
+          enableSuggestions: false,
+          onSubmitted: (_) {
+            _commit();
+            _focusNode.unfocus();
+          },
+          onTapOutside: (_) => _focusNode.unfocus(),
+          style: TextStyle(
+            color: widget.colors.textPrimary,
+            fontSize: 11.5,
+            height: 1.35,
+          ),
+          cursorColor: widget.colors.accent,
+          decoration: InputDecoration(
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(vertical: 2),
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: widget.colors.accentSoft),
+            ),
           ),
         ),
       ),
@@ -1695,46 +1758,53 @@ class _ObsidianEditableTextValueState
   Widget build(BuildContext context) {
     return Focus(
       onKeyEvent: _handleKeyEvent,
-      child: TextField(
-        contextMenuBuilder: (_, state) =>
-            buildMarkdownTextContextMenu(context, state),
-        key: ValueKey('ianvs-markdown-front-matter-input-${widget.entry.key}'),
-        controller: _controller,
+      child: _propertyCommandTarget(
+        context: context,
         undoController: _undoController,
-        focusNode: _focusNode,
-        maxLines: 1,
-        keyboardType: TextInputType.text,
-        textInputAction: TextInputAction.done,
-        smartDashesType: SmartDashesType.disabled,
-        smartQuotesType: SmartQuotesType.disabled,
-        autocorrect: false,
-        enableSuggestions: false,
-        onSubmitted: (_) {
-          _commit();
-          _focusNode.unfocus();
-        },
-        onTapOutside: (_) => _focusNode.unfocus(),
-        style: TextStyle(
-          color: widget.colors.textPrimary,
-          fontSize: 11.5,
-          height: 1.35,
-        ),
-        cursorColor: widget.colors.accent,
-        decoration: InputDecoration(
-          isDense: true,
-          hintText: widget.entry.value.isEmpty
-              ? IanvsMarkdownMessage.noValue.resolve(context)
-              : null,
-          hintStyle: TextStyle(
-            color: widget.colors.textTertiary,
-            fontSize: 11.5,
-            fontStyle: FontStyle.italic,
+        commit: _commit,
+        child: TextField(
+          contextMenuBuilder: (_, state) =>
+              buildMarkdownTextContextMenu(context, state),
+          key: ValueKey(
+            'ianvs-markdown-front-matter-input-${widget.entry.key}',
           ),
-          contentPadding: const EdgeInsets.symmetric(vertical: 2),
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: UnderlineInputBorder(
-            borderSide: BorderSide(color: widget.colors.accentSoft),
+          controller: _controller,
+          undoController: _undoController,
+          focusNode: _focusNode,
+          maxLines: 1,
+          keyboardType: TextInputType.text,
+          textInputAction: TextInputAction.done,
+          smartDashesType: SmartDashesType.disabled,
+          smartQuotesType: SmartQuotesType.disabled,
+          autocorrect: false,
+          enableSuggestions: false,
+          onSubmitted: (_) {
+            _commit();
+            _focusNode.unfocus();
+          },
+          onTapOutside: (_) => _focusNode.unfocus(),
+          style: TextStyle(
+            color: widget.colors.textPrimary,
+            fontSize: 11.5,
+            height: 1.35,
+          ),
+          cursorColor: widget.colors.accent,
+          decoration: InputDecoration(
+            isDense: true,
+            hintText: widget.entry.value.isEmpty
+                ? IanvsMarkdownMessage.noValue.resolve(context)
+                : null,
+            hintStyle: TextStyle(
+              color: widget.colors.textTertiary,
+              fontSize: 11.5,
+              fontStyle: FontStyle.italic,
+            ),
+            contentPadding: const EdgeInsets.symmetric(vertical: 2),
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: widget.colors.accentSoft),
+            ),
           ),
         ),
       ),

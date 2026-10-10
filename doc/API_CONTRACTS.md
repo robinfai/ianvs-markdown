@@ -1,6 +1,6 @@
 # 公共 API 与行为契约
 
-适用范围：2026-10-10 的仓库版本（`0.3.1` + `Unreleased`）。本文件对应 R1-01 / R1-02 / R2-02 及 R1-03 已交付的文案配置；R1-03 快捷键覆盖仍在实施。后续修改预设、预算或默认行为时必须同步更新。平台范围见 [构建与交互证据](PLATFORM_SUPPORT.md)，不能从 Dart 类型可用推断平台支持。
+适用范围：2026-10-10 的仓库版本（`0.3.1` + `Unreleased`）。本文件对应 R1-01 / R1-02 / R2-02 及 R1-03 文案、命令与焦点配置。后续修改预设、预算或默认行为时必须同步更新。平台范围见 [构建与交互证据](PLATFORM_SUPPORT.md)，不能从 Dart 类型可用推断平台支持。
 
 ## 四种入口
 
@@ -14,7 +14,7 @@
 | 自定义元素 | `builders`、`paddingBuilders`、图片/图表/公式/Wiki builder | `builders`、图片/图表/公式/Wiki builder | 无渲染 builder | `builders`、图片/图表/公式/Wiki builder；应用于可渲染模式 |
 | 选择 | 默认单文档跨块选择；可用 `documentSelection: false` 退回块级选择；`selectable: false` 关闭 | 默认跨块选择；可用 `selectable: false` 关闭 | Controller 的原文选区 | Live/Source 使用源码选区；Reading 使用阅读态选择 |
 | 滚动对象 | 由外层宿主提供滚动布局 | 参数 `controller` 的类型是 **`ScrollController`** | 参数 `scrollController` | 参数 `scrollController`，随模式使用 |
-| 焦点对象 | 阅读选择内部管理 | 阅读选择内部管理 | 可注入 `focusNode`，另有 `autofocus` | 可注入 `focusNode`，另有 `autofocus` |
+| 焦点对象 | 整文档选择可注入 `focusNode` / `autofocus`；块级选择不使用它们 | 可注入 `focusNode` / `autofocus`，需启用 `selectable` | 可注入 `focusNode`，另有 `autofocus` | 可注入 `focusNode`，另有 `autofocus` |
 | 渲染预算 | 整个正文的 `renderBudget` 与 `fallbackBuilder` | 正文预算与 `fallbackBuilder`；预解析范围另见下文 | 无 `renderBudget` | 渲染块使用 `renderBudget`，Reading 传给 View；无公开 `fallbackBuilder`，Source 不受该预算约束 |
 | 主题 | `theme` / ThemeExtension；`styleSheet` 与 `styleSheetTheme` | `theme` / ThemeExtension；`styleSheet` | `theme` / ThemeExtension 与组件源码样式 | `theme` / ThemeExtension；`styleSheet` 用于渲染面 |
 | 界面文案 | 外层 `IanvsMarkdownLocalization`，中/英文与逐条覆盖 | 同正文，含大纲及折叠 | 同正文，含工具栏与文本选择菜单 | 同正文，含导航、表格与各模式 |
@@ -22,7 +22,7 @@
 | 模式切换 | 无 | 无 | 控件始终是源码编辑器；工具栏可以改变 Controller.mode，宿主负责切换显示 | 监听 Controller.mode 并切换实际界面 |
 | 文本变化通知 | 宿主更新 `data` | 宿主更新 `data` | `onChanged` 只报告文本变化 | `onChanged` 报告文本变化，`onModeChanged` 报告模式变化 |
 | 保存 | 宿主负责 | 宿主负责 | `onSaveRequested`，支持异步完成与取消 | `onSaveRequested`，支持异步完成与取消 |
-| 工具栏/快捷键 | 无编辑工具栏 | 无编辑工具栏 | `showToolbar`；`enableModeShortcuts` 只控制模式键 | 同 Source；导航栏可替代工具栏中的模式切换器 |
+| 工具栏/快捷键 | `IanvsMarkdownShortcuts` 配置选择/复制；无编辑工具栏 | 同正文 | 作用域配置命令；`showToolbar`；`enableModeShortcuts` 仍控制重映射后的模式键 | 同 Source；表格与属性保留局部命令语义，导航显示当前组合键 |
 | 阅读复制 | 原始 Markdown / 安全 HTML 双表示，可注入 `clipboardWriter` | 同正文 | 使用文本编辑面复制；无 `clipboardWriter` 参数 | `clipboardWriter` 用于阅读/渲染面，不替换 Source 的文本编辑复制 |
 
 源码依据：[正文与 View](../lib/src/ianvs_markdown.dart)、[Source](../lib/src/editor/source_editor.dart)、[Live](../lib/src/editor/live_editor.dart)。
@@ -36,7 +36,19 @@
 
 文案覆盖包括工具栏、导航/折叠、表格控件、属性、任务语义标签、代码复制/降级、图片查看器、默认 Callout 标题和文本选择菜单。选择菜单在 Overlay 中从所属组件读取配置；图片弹窗捕获主题作用域。回调、源码、选区/历史与复制数据不因改文案而改变。默认文本菜单保留 Flutter 的系统原生路径；显式自定义菜单文案时使用 Flutter 自适应菜单。浏览器原生菜单及 Flutter 自有日期弹窗的整体 locale 仍由宿主的浏览器/MaterialLocalizations 配置负责。
 
-快捷键策略不由文案作用域改变；R1-03 的命令覆盖、焦点恢复及 IME 验收仍须独立完成。接入见 [指南](INTEGRATION_GUIDE.md#界面文案与作用域)，回归见 [localization_test.dart](../test/localization_test.dart)。
+快捷键策略由独立的 `IanvsMarkdownShortcuts` 配置，不受文案语言影响。接入见 [指南](INTEGRATION_GUIDE.md#界面文案与作用域)，回归见 [localization_test.dart](../test/localization_test.dart)。
+
+## 命令配置与焦点（R1-03）
+
+公共配置是 `IanvsMarkdownShortcuts` 和 `IanvsMarkdownCommand`。`bindings` 为命令到 `List<SingleActivator>` 的覆盖；空列表禁用，未提供的命令保留默认行为。`hostShortcuts` 绑定明确的宿主回调，优先于组件命令；显式命令优先于未修改的默认键。替换/禁用命令后，其旧默认键被消费，不能依赖祖先 Shortcuts 自动接管；改用宿主回调。显式命令间、宿主条目间存在重叠时抛出 `ArgumentError`，宿主与命令重叠则按宿主优先处理。最近作用域完整替代外层配置，更新需替换不可变 map/list。
+
+命令集合：撤销、重做、粗体、斜体、插入链接、删除行、保存、切换阅读、Live/Source/Reading、缩进/反缩进、全选、复制、剪切和粘贴。内部命令边界按当前焦点分发：阅读使用整文档语义（块级选择使用相应文本块），Source 使用源码，Live 活动块保持源码映射，表格格式化与 Tab 使用单元格语义，属性使用本地撤销并阻止正文格式化/删行。属性保存/模式命令先提交局部输入再交给外层。文本箭头、普通输入、控件 Enter 属于平台/控件行为；宿主仍可显式保留这些键。
+
+作用域只处理 Markdown 区域内的焦点。配置的命令与宿主保留键在活跃组合输入期间不执行，不清除 composing；未覆盖的默认行为保持兼容。非重复绑定消费长按重复消息但不重复调用。原始 macOS 消息与标准化键盘路径共用配置并去重；阅读的 HardwareKeyboard 监听也遵守它，防止宿主复制键同时触发正文复制。`enableModeShortcuts: false` 不因重映射而被绕过。标签 API `labelOf` 返回首个可用组合键；命令被禁用或所有组合键均已被覆盖/保留时返回空字符串。
+
+正文和 View 新增可选、宿主持有的 `focusNode` / `autofocus`（默认 false）；正文仅在整文档选择开启时使用。替换或卸载不释放宿主焦点对象。内置工具栏的格式/历史/保存动作返回编辑焦点；独立工具栏可传同一 `focusNode`，未传时保持原有行为。Live 在当前组件内触发模式变化后恢复新模式焦点和源码选区；外部输入正持有焦点时，程序更新模式不主动抢焦点，宿主显式 autofocus 另行生效。
+
+接入与兼容说明见 [快捷键与焦点](INTEGRATION_GUIDE.md#快捷键与焦点)。自动证据见 [命令配置回归](../test/keyboard_configuration_test.dart) 与 [包外 smoke host](../tool/package_smoke_test.dart)。真实 IME 候选窗、系统剪贴板和读屏交互仍需按 R3-01 单独验收。
 
 ## 原文、选择与更新
 
@@ -115,7 +127,7 @@ final legacy = IanvsMarkdownController(text: initialMarkdown, historyPolicy: nul
 
 ## 公共导出承诺与分层
 
-入口是 `package:ianvs_markdown/ianvs_markdown.dart`。R1-01 用 Dart AST 审查直接导出及 show/hide 规则，并用 Flutter 编译探针核对符号；后续新增的文案三种类型由公共入口 widget 回归验证。清单现在包括 168 个项目符号和 11 个第三方重导出；不包含实例成员清单。
+入口是 `package:ianvs_markdown/ianvs_markdown.dart`。R1-01 用 Dart AST 审查直接导出及 show/hide 规则，并用 Flutter 编译探针核对符号；后续新增的文案及键盘五种类型由公共入口 widget 回归验证。清单现在包括 170 个项目符号和 11 个第三方重导出；不包含实例成员清单。
 
 | 使用面 | 范围 | 兼容约束 |
 | --- | --- | --- |
@@ -195,6 +207,10 @@ final legacy = IanvsMarkdownController(text: initialMarkdown, historyPolicy: nul
 ### [lib/src/markdown_document.dart](../lib/src/markdown_document.dart)
 
 `IanvsMarkdownDocument`、`IanvsMarkdownHeading`、`parseMarkdownHeadings`
+
+### [lib/src/keyboard.dart](../lib/src/keyboard.dart)
+
+`IanvsMarkdownCommand`、`IanvsMarkdownShortcuts`
 
 ### [lib/src/localization.dart](../lib/src/localization.dart)
 

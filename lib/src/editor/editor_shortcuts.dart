@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 
 import '../front_matter_card.dart';
+import '../keyboard.dart';
 import 'editor_controller.dart';
 import 'editor_models.dart';
 import 'editor_toolbar.dart';
@@ -30,74 +30,37 @@ class IanvsMarkdownEditorShortcuts extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final platform = Theme.of(context).platform;
-    final usesCommandModifier =
-        platform == TargetPlatform.macOS || platform == TargetPlatform.iOS;
-    return Shortcuts(
+    final intents = <IanvsMarkdownCommand, Intent>{
+      IanvsMarkdownCommand.undo: const _UndoIntent(),
+      IanvsMarkdownCommand.redo: const _RedoIntent(),
+      IanvsMarkdownCommand.deleteLine: const _DeleteLineIntent(),
+      IanvsMarkdownCommand.bold: const _BoldIntent(),
+      IanvsMarkdownCommand.italic: const _ItalicIntent(),
+      IanvsMarkdownCommand.insertLink: const _LinkIntent(),
+      IanvsMarkdownCommand.save: const _SaveIntent(),
+      if (enableModeShortcuts) ...{
+        IanvsMarkdownCommand.togglePreview: const _ToggleModeIntent(),
+        IanvsMarkdownCommand.livePreview: const _SetModeIntent(
+          IanvsMarkdownEditorMode.livePreview,
+        ),
+        IanvsMarkdownCommand.source: const _SetModeIntent(
+          IanvsMarkdownEditorMode.source,
+        ),
+        IanvsMarkdownCommand.reading: const _SetModeIntent(
+          IanvsMarkdownEditorMode.preview,
+        ),
+      },
+      IanvsMarkdownCommand.indent: const _IndentIntent(),
+      IanvsMarkdownCommand.outdent: const _OutdentIntent(),
+    };
+    final shortcuts = Shortcuts(
       shortcuts: <ShortcutActivator, Intent>{
-        const SingleActivator(LogicalKeyboardKey.keyZ, meta: true):
-            const _UndoIntent(),
-        const SingleActivator(LogicalKeyboardKey.keyZ, control: true):
-            const _UndoIntent(),
-        const SingleActivator(LogicalKeyboardKey.keyZ, meta: true, shift: true):
-            const _RedoIntent(),
-        const SingleActivator(
-          LogicalKeyboardKey.keyZ,
-          control: true,
-          shift: true,
-        ): const _RedoIntent(),
-        const SingleActivator(LogicalKeyboardKey.keyY, control: true):
-            const _RedoIntent(),
-        const SingleActivator(LogicalKeyboardKey.keyD, meta: true):
-            const _DeleteLineIntent(),
-        if (!usesCommandModifier)
-          const SingleActivator(LogicalKeyboardKey.keyD, control: true):
-              const _DeleteLineIntent(),
-        const SingleActivator(LogicalKeyboardKey.keyB, meta: true):
-            const _BoldIntent(),
-        if (!usesCommandModifier)
-          const SingleActivator(LogicalKeyboardKey.keyB, control: true):
-              const _BoldIntent(),
-        const SingleActivator(LogicalKeyboardKey.keyI, meta: true):
-            const _ItalicIntent(),
-        const SingleActivator(LogicalKeyboardKey.keyI, control: true):
-            const _ItalicIntent(),
-        const SingleActivator(LogicalKeyboardKey.keyK, meta: true):
-            const _LinkIntent(),
-        if (!usesCommandModifier)
-          const SingleActivator(LogicalKeyboardKey.keyK, control: true):
-              const _LinkIntent(),
-        const SingleActivator(LogicalKeyboardKey.keyS, meta: true):
-            const _SaveIntent(),
-        const SingleActivator(LogicalKeyboardKey.keyS, control: true):
-            const _SaveIntent(),
-        if (enableModeShortcuts)
-          const SingleActivator(LogicalKeyboardKey.keyE, meta: true):
-              const _ToggleModeIntent(),
-        if (enableModeShortcuts && !usesCommandModifier)
-          const SingleActivator(LogicalKeyboardKey.keyE, control: true):
-              const _ToggleModeIntent(),
-        if (enableModeShortcuts)
-          const SingleActivator(LogicalKeyboardKey.digit1, meta: true):
-              const _SetModeIntent(IanvsMarkdownEditorMode.livePreview),
-        if (enableModeShortcuts)
-          const SingleActivator(LogicalKeyboardKey.digit1, control: true):
-              const _SetModeIntent(IanvsMarkdownEditorMode.livePreview),
-        if (enableModeShortcuts)
-          const SingleActivator(LogicalKeyboardKey.digit2, meta: true):
-              const _SetModeIntent(IanvsMarkdownEditorMode.source),
-        if (enableModeShortcuts)
-          const SingleActivator(LogicalKeyboardKey.digit2, control: true):
-              const _SetModeIntent(IanvsMarkdownEditorMode.source),
-        if (enableModeShortcuts)
-          const SingleActivator(LogicalKeyboardKey.digit3, meta: true):
-              const _SetModeIntent(IanvsMarkdownEditorMode.preview),
-        if (enableModeShortcuts)
-          const SingleActivator(LogicalKeyboardKey.digit3, control: true):
-              const _SetModeIntent(IanvsMarkdownEditorMode.preview),
-        const SingleActivator(LogicalKeyboardKey.tab): const _IndentIntent(),
-        const SingleActivator(LogicalKeyboardKey.tab, shift: true):
-            const _OutdentIntent(),
+        for (final entry in intents.entries)
+          for (final binding in defaultMarkdownBindings(
+            entry.key,
+            Theme.of(context).platform,
+          ))
+            binding: entry.value,
       },
       child: Actions(
         actions: <Type, Action<Intent>>{
@@ -197,6 +160,18 @@ class IanvsMarkdownEditorShortcuts extends StatelessWidget {
         },
         child: child,
       ),
+    );
+    return MarkdownCommandTarget(
+      kind: MarkdownCommandKind.editor,
+      onCommand: (command, focused) {
+        if (intents[command] case final intent?) {
+          Actions.maybeInvoke(focused, intent);
+          return true;
+        }
+        if (markdownCommandIsMode(command)) return true;
+        return invokeMarkdownTextCommand(command, focused);
+      },
+      child: shortcuts,
     );
   }
 

@@ -23,12 +23,16 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
     super.key,
     required this.controller,
     this.onSaveRequested,
+    this.focusNode,
     this.showModeSwitcher = true,
     this.theme,
   });
 
   final IanvsMarkdownController controller;
   final IanvsMarkdownSaveCallback? onSaveRequested;
+
+  /// Host-owned editing focus, restored after formatting/history actions.
+  final FocusNode? focusNode;
   final bool showModeSwitcher;
   final IanvsMarkdownThemeData? theme;
 
@@ -89,6 +93,7 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
                       return Row(
                         children: [
                           _ToolbarButton(
+                            focusNode: focusNode,
                             tooltip: IanvsMarkdownMessage.undo.resolve(context),
                             icon: Icons.undo_rounded,
                             enabled: history.canUndo,
@@ -96,6 +101,7 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
                             onPressed: controller.undo,
                           ),
                           _ToolbarButton(
+                            focusNode: focusNode,
                             tooltip: IanvsMarkdownMessage.redo.resolve(context),
                             icon: Icons.redo_rounded,
                             enabled: history.canRedo,
@@ -108,6 +114,7 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
                   ),
                   _ToolbarDivider(colors: colors),
                   _ToolbarButton(
+                    focusNode: focusNode,
                     tooltip: IanvsMarkdownMessage.bold.resolve(context),
                     icon: Icons.format_bold_rounded,
                     enabled: editable,
@@ -115,6 +122,7 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
                     onPressed: () => controller.toggleInline('**'),
                   ),
                   _ToolbarButton(
+                    focusNode: focusNode,
                     tooltip: IanvsMarkdownMessage.italic.resolve(context),
                     icon: Icons.format_italic_rounded,
                     enabled: editable,
@@ -122,6 +130,7 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
                     onPressed: () => controller.toggleInline('*'),
                   ),
                   _ToolbarButton(
+                    focusNode: focusNode,
                     tooltip: IanvsMarkdownMessage.inlineCode.resolve(context),
                     icon: Icons.data_object_rounded,
                     enabled: editable,
@@ -129,6 +138,7 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
                     onPressed: () => controller.toggleInline('`'),
                   ),
                   _ToolbarButton(
+                    focusNode: focusNode,
                     tooltip: IanvsMarkdownMessage.link.resolve(context),
                     icon: Icons.link_rounded,
                     enabled: editable,
@@ -136,6 +146,7 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
                     onPressed: controller.insertLink,
                   ),
                   _ToolbarButton(
+                    focusNode: focusNode,
                     tooltip: IanvsMarkdownMessage.heading.resolve(context),
                     icon: Icons.title_rounded,
                     enabled: editable,
@@ -143,6 +154,7 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
                     onPressed: () => controller.toggleLinePrefix('## '),
                   ),
                   _ToolbarButton(
+                    focusNode: focusNode,
                     tooltip: IanvsMarkdownMessage.bulletList.resolve(context),
                     icon: Icons.format_list_bulleted_rounded,
                     enabled: editable,
@@ -150,6 +162,7 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
                     onPressed: () => controller.toggleLinePrefix('- '),
                   ),
                   _ToolbarButton(
+                    focusNode: focusNode,
                     tooltip: IanvsMarkdownMessage.taskList.resolve(context),
                     icon: Icons.check_box_outlined,
                     enabled: editable,
@@ -157,6 +170,7 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
                     onPressed: () => controller.toggleLinePrefix('- [ ] '),
                   ),
                   _ToolbarButton(
+                    focusNode: focusNode,
                     tooltip: IanvsMarkdownMessage.codeBlock.resolve(context),
                     icon: Icons.terminal_rounded,
                     enabled: editable,
@@ -168,6 +182,7 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
                     ValueListenableBuilder<bool>(
                       valueListenable: controller.dirtyListenable,
                       builder: (context, dirty, _) => _ToolbarButton(
+                        focusNode: focusNode,
                         tooltip: dirty
                             ? IanvsMarkdownMessage.save.resolve(context)
                             : IanvsMarkdownMessage.saved.resolve(context),
@@ -246,11 +261,13 @@ class _ToolbarButton extends StatelessWidget {
     required this.enabled,
     required this.colors,
     required this.onPressed,
+    this.focusNode,
   });
 
   final String tooltip;
   final IconData icon;
   final bool enabled;
+  final FocusNode? focusNode;
   final IanvsMarkdownThemeData colors;
   final VoidCallback onPressed;
 
@@ -258,7 +275,12 @@ class _ToolbarButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return IconButton(
       tooltip: tooltip,
-      onPressed: enabled ? onPressed : null,
+      onPressed: enabled
+          ? () {
+              onPressed();
+              focusNode?.requestFocus();
+            }
+          : null,
       icon: Icon(icon, size: 17),
       color: colors.textSecondary,
       disabledColor: colors.textTertiary.withValues(alpha: .42),

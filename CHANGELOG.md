@@ -1,5 +1,14 @@
 ## Unreleased
 
+- Add `IanvsMarkdownShortcuts` and `IanvsMarkdownCommand` for scoped command
+  remapping, disabling and explicit host key reservations across reading,
+  Source/Live editors, table cells and properties. Preserve local editing and
+  history actions, guard configured shortcuts during IME composition, and
+  deduplicate raw macOS and normalized key events.
+- Add host-owned `focusNode` / `autofocus` to document reading surfaces and
+  `focusNode` to the standalone toolbar. Restore editing focus after toolbar
+  actions and retain focus/selection through keyboard mode changes without
+  taking focus from an unrelated host input.
 - Add scoped Chinese, English and host-overridden interface messages through
   `IanvsMarkdownLocalization`, `IanvsMarkdownStrings` and `IanvsMarkdownMessage`.
   Cover toolbars, outline/folding, tables, properties, task semantics, code,

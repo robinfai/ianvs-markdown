@@ -37,6 +37,11 @@
 作用域覆盖工具栏、大纲、表格、属性、代码、图片和选择菜单，详见
 [文案接入](doc/INTEGRATION_GUIDE.md#界面文案与作用域)。
 
+快捷键可通过 `IanvsMarkdownShortcuts` 按 `IanvsMarkdownCommand` 重映射或禁用，
+使用 `hostShortcuts` 将组合键交给宿主回调。四种入口可注入宿主持有的
+`focusNode`；独立工具栏也可使用同一焦点对象。详见
+[快捷键与焦点接入](doc/INTEGRATION_GUIDE.md#快捷键与焦点)。
+
 在应用的 `pubspec.yaml` 中添加依赖：
 
 ```yaml
