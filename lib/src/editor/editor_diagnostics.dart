@@ -43,6 +43,13 @@ abstract final class IanvsMarkdownEditorDiagnostics {
       },
   };
 
+  static var _sourceBackgroundParses = 0;
+  static int get sourceBackgroundParses => _sourceBackgroundParses;
+
+  static void recordSourceBackgroundParse() {
+    if (enabled) _sourceBackgroundParses += 1;
+  }
+
   static var _documentParses = 0;
   static int get documentParses => _documentParses;
 

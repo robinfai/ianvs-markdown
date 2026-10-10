@@ -1,5 +1,10 @@
 ## Unreleased
 
+- Reuse Source editor text geometry for quote and fenced-code backgrounds,
+  keeping surfaces aligned with styled wrapping, scaling, RTL and scrolling
+  without laying out duplicate plain-text paragraphs. Cache only current-source
+  ranges, invalidating on text/controller changes while retaining full source,
+  inherited typography, composing, undo and processing-budget behavior.
 - Collect document link references with GFM block parsing, avoiding unrelated
   inline work on each edit. Build outlines by parsing only heading inlines
   after collecting forward definitions; retain full parsing when footnote
