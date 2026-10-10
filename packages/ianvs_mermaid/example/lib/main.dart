@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
+import 'package:ianvs_markdown_clipboard/ianvs_markdown_clipboard.dart';
 
 import 'package:ianvs_mermaid/ianvs_mermaid.dart';
 
@@ -99,6 +100,10 @@ class _MarkdownExampleState extends State<MarkdownExample> {
       ),
       body: IanvsMarkdownLiveEditor(
         controller: _controller,
+        clipboardWriter: (data) => writeIanvsMarkdownRichClipboard(
+          markdown: data.markdown,
+          html: data.html,
+        ),
         showToolbar: true,
         showNavigationPane: false,
         showFrontMatter: true,

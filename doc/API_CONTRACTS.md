@@ -1,6 +1,6 @@
 # 公共 API 与行为契约
 
-适用范围：2026-10-10 的仓库版本（`0.3.1` + `Unreleased`）。本文件对应 R1-01 / R1-02 / R2-02 及 R1-03 文案、命令与焦点配置。后续修改预设、预算或默认行为时必须同步更新。平台范围见 [构建与交互证据](PLATFORM_SUPPORT.md)，不能从 Dart 类型可用推断平台支持。
+适用范围：2026-10-10 的仓库版本（`0.3.1` + `Unreleased`）。本文件对应 R1-01 / R1-02 / R2-02、R1-03 文案/命令/焦点及 R1-04 剪贴板默认行为迁移。后续修改预设、预算或默认行为时必须同步更新。平台范围见 [构建与交互证据](PLATFORM_SUPPORT.md)，不能从 Dart 类型可用推断平台支持。
 
 ## 四种入口
 
@@ -23,7 +23,7 @@
 | 文本变化通知 | 宿主更新 `data` | 宿主更新 `data` | `onChanged` 只报告文本变化 | `onChanged` 报告文本变化，`onModeChanged` 报告模式变化 |
 | 保存 | 宿主负责 | 宿主负责 | `onSaveRequested`，支持异步完成与取消 | `onSaveRequested`，支持异步完成与取消 |
 | 工具栏/快捷键 | `IanvsMarkdownShortcuts` 配置选择/复制；无编辑工具栏 | 同正文 | 作用域配置命令；`showToolbar`；`enableModeShortcuts` 仍控制重映射后的模式键 | 同 Source；表格与属性保留局部命令语义，导航显示当前组合键 |
-| 阅读复制 | 原始 Markdown / 安全 HTML 双表示，可注入 `clipboardWriter` | 同正文 | 使用文本编辑面复制；无 `clipboardWriter` 参数 | `clipboardWriter` 用于阅读/渲染面，不替换 Source 的文本编辑复制 |
+| 阅读复制 | writer 接收原始 Markdown / 安全 HTML 双表示；默认写 Markdown 纯文本，可选适配器写双格式 | 同正文 | 使用文本编辑面复制；无 `clipboardWriter` 参数 | `clipboardWriter` 用于阅读/渲染面，不替换 Source 的文本编辑复制 |
 
 源码依据：[正文与 View](../lib/src/ianvs_markdown.dart)、[Source](../lib/src/editor/source_editor.dart)、[Live](../lib/src/editor/live_editor.dart)。
 行为证据：[标准 View](../test/standard_view_test.dart)、[标题范围](../test/heading_folding_test.dart)、[标准语法](../test/standard_syntax_test.dart)、[正文/View](../test/ianvs_markdown_test.dart)、[Live](../test/live_editor_test.dart)、[宿主契约](../test/host_contract_test.dart)。矩阵描述支持范围，不能把同名参数视为相同的处理路径。
@@ -90,7 +90,7 @@ UTF-8 降级边界不切开有效 Unicode 码点；小于下一个码点所需�
 
 View 在正文渲染预算判断前解析文档，Live 在各块渲染前维护全文结构；Source 排版完整源码。富文本复制还会转换 Markdown/HTML。历史使用下文单独的 R2-02 容量策略；预解析和复制预算由 R2-05 跟进，不能把渲染预算描述成这些路径的完整保护。
 
-图片默认显示占位，不自动读取文件或网络；图片、Wiki 嵌入、链接导航和图表后端的权限、解码、缓存及过期结果由宿主负责。`super_clipboard` 是包级依赖，注入 writer 只改变调用行为，不能消除原生构建依赖。参考 [剪贴板](../lib/src/rich_clipboard.dart)、[预算](../lib/src/render_budget.dart)。
+图片默认显示占位，不自动读取文件或网络；图片、Wiki 嵌入、链接导航和图表后端的权限、解码、缓存及过期结果由宿主负责。R1-04 将 `super_clipboard` 移到可选适配器；核心默认 writer 通过 Flutter 只写完整 Markdown，HTML 仍提供给自定义 writer。现有类型和函数签名保留，默认输出格式有显式变更，见 [迁移说明](INTEGRATION_GUIDE.md#剪贴板迁移r1-04)。参考 [剪贴板](../lib/src/rich_clipboard.dart)、[预算](../lib/src/render_budget.dart)。
 
 ## 撤销历史容量（R2-02）
 

@@ -12,6 +12,8 @@ dependencies:
     path: ../
   ianvs_markdown:
     path: ../../../
+  ianvs_markdown_clipboard:
+    path: ../../ianvs_markdown_clipboard
 
 dev_dependencies:
   flutter_test:

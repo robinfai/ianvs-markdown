@@ -2,6 +2,8 @@
 
 先用 [能力矩阵](API_CONTRACTS.md) 选择入口：消息/正文使用 `IanvsMarkdown`，完整阅读使用 `IanvsMarkdownView`，源码输入使用 `IanvsMarkdownEditor`，三模式编辑使用 `IanvsMarkdownLiveEditor`。View/编辑器需要有界高度，例如放入 `Scaffold.body` 或 `Expanded`；正文的滚动由宿主布局提供。
 
+可以直接运行 [正文](../example/lib/body.dart)、[阅读](../example/lib/reading.dart)、[完整编辑](../example/lib/editor.dart) 三个入口，命令与操作步骤见 [样例说明](../example/README.md)。它们只使用公开 API；编辑样例的存储为内存演示，实际文件或数据库写入由宿主替换。
+
 ## 谁创建，谁释放
 
 | 对象 | 宿主提供 | 组件未收到该对象时 |
@@ -128,13 +130,42 @@ Column(children: [
 
 `editorFocus` 在宿主 State 中创建并在卸载后释放。自定义按钮执行 Controller 动作后也可调用 `editorFocus.requestFocus()`；独立工具栏的格式化、历史和保存按钮会自动执行这一步。模式切换源于当前组件焦点时，Live 将焦点转到新模式并保留源码选区；宿主正在编辑其他输入框时，程序更新模式不会主动抢回焦点（不要同时要求新控件 `autofocus`）。`IanvsMarkdownShortcuts.labelOf(context, command)` 显示当前首个可用组合键；禁用或所有组合键均已被覆盖/保留时返回空字符串。该标签不代表命令在当前模式必然可执行。
 
+## 剪贴板迁移（R1-04）
+
+这是一项 **Unreleased 默认行为变化**，不是已经发布的新版本：
+
+| 接入 | 0.3.1 / 拆分前 | 当前候选实现 |
+| --- | --- | --- |
+| 不提供 `clipboardWriter` | 尝试原生 Markdown + HTML，失败后纯文本回退 | Flutter 直接写入完整 Markdown 纯文本；没有原生剪贴板依赖 |
+| 已有自定义 writer | 收到 `IanvsMarkdownClipboardData` | 类型、Markdown/HTML 字段及调用契约不变 |
+| 需要原有原生双格式输出 | 默认提供 | 显式接入 `ianvs_markdown_clipboard` 并传入 writer |
+
+完整文档全选仍保留原文（含 YAML、换行与 Unicode），局部选择仍生成语义 Markdown。`writeIanvsMarkdownClipboard(data)` 签名保留，现在等价于 Flutter 的纯文本写入；写入失败继续向调用方报告。HTML 转换和预算限制没有因依赖拆分自动消失，见 R2-05。
+
+原生适配器当前通过源码接入，尚未发布 registry 版本。依赖声明见 [适配器说明](https://github.com/robinfai/ianvs-markdown/tree/main/packages/ianvs_markdown_clipboard)。已有富文本宿主使用：
+
+```dart
+import 'package:ianvs_markdown/ianvs_markdown.dart';
+import 'package:ianvs_markdown_clipboard/ianvs_markdown_clipboard.dart';
+
+Future<void> writeRich(IanvsMarkdownClipboardData data) =>
+    writeIanvsMarkdownRichClipboard(markdown: data.markdown, html: data.html);
+
+IanvsMarkdownView(data: source, clipboardWriter: writeRich);
+// IanvsMarkdown 和 IanvsMarkdownLiveEditor 使用相同参数。
+```
+
+适配器把两种表示放入同一原生 item，原生后端不可用或写入失败时回退完整 Markdown，回退失败则报告错误。Source/文本框的复制属于 Flutter 原生编辑行为，不经过阅读 writer。Linefold 桌面/iOS 阅读和 Mermaid 示例已显式接入，以保留已有输出格式。
+
+旧 macOS 宿主如果移除了最后一个 CocoaPods 插件，需要清理旧 Pods 工程引用后再做干净构建；仍使用其他插件的宿主不能一并移除它们的配置。核心示例的迁移可作参考。依赖图、成本、方案权衡与构建限制见 [决策报告](CLIPBOARD_DEPENDENCY_DECISION.md)。
+
 ## 当前差异与后续任务
 
 | 缺口 | 归属 | 当前接入方式 |
 | --- | --- | --- |
 | Live / Source 尚无标准 GFM 编辑预设 | R1-02 范围决策；后续独立扩展 | 标准只读内容使用正文或 View 的 `syntaxPreset: standard`；编辑仍按 Obsidian 契约 |
 | 文案、命令及焦点已有统一宿主接入 | R1-03 | 使用相应作用域配置；文档内容与资源授权仍归宿主，真实平台交互证据继续在 R3-01 收集 |
-| 注入 clipboard writer 仍保留原生依赖 | R1-04 | 把它当作行为注入；按实际平台构建验证，拆包另行决策 |
+| 默认复制改为纯文本，原生富文本改为显式适配器 | R1-04 | 按上文迁移；核心没有原生剪贴板依赖，适配器仍需验证所用平台 |
 | 升级后的默认历史会裁剪旧快照 | R2-02 已实现，升级时核对配置 | 阅读 [容量与迁移契约](API_CONTRACTS.md#撤销历史容量r2-02)；需要旧行为时显式设置 `historyPolicy: null` |
 | View 追加数据重置滚动，异步结果没有组件级文档身份 | R2-03 | 宿主管理文档/版本与加载状态，当前不承诺完整流式接入能力 |
 | 渲染预算未覆盖全部预解析/复制/排版 | R2-01、R2-05 | 按已测负载使用；区分默认降级和无预算完整渲染 |

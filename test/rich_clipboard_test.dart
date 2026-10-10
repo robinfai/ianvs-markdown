@@ -1,7 +1,53 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'default core writer sends complete Markdown through Flutter only',
+    () async {
+      const source = '---\r\ntitle: 中文\r\n---\r\n# **Exact** source\n';
+      final calls = <MethodCall>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+            calls.add(call);
+            return null;
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null),
+      );
+      await writeIanvsMarkdownClipboard(
+        const IanvsMarkdownClipboardData(
+          markdown: source,
+          html: '<h1>HTML remains available to an injected writer</h1>',
+        ),
+      );
+      expect(calls, hasLength(1));
+      expect(calls.single.method, 'Clipboard.setData');
+      expect(calls.single.arguments, {'text': source});
+    },
+  );
+
+  test('default core writer reports platform write errors', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (_) async {
+          throw PlatformException(code: 'clipboard_denied');
+        });
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null),
+    );
+    await expectLater(
+      writeIanvsMarkdownClipboard(
+        const IanvsMarkdownClipboardData(markdown: '', html: ''),
+      ),
+      throwsA(isA<PlatformException>()),
+    );
+  });
+
   test('partial cross-block clipboard keeps Markdown and rich structure', () {
     const source = '''
 # Render and edit together

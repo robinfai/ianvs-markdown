@@ -6,6 +6,10 @@
 
 实际平台构建和交互覆盖范围见 [平台能力矩阵](doc/PLATFORM_SUPPORT.md)。
 
+**Unreleased 迁移：**核心已移除原生剪贴板依赖，默认复制现在通过 Flutter 写入完整
+Markdown 纯文本；需要原有 HTML 双格式输出的宿主应显式接入可选适配器。
+见 [剪贴板迁移](doc/INTEGRATION_GUIDE.md#剪贴板迁移r1-04)。该变化尚未发布到 pub.dev。
+
 ## 能力
 
 - GitHub Flavored Markdown、可选择文本、表格与任务列表
@@ -30,6 +34,7 @@
 ## 使用
 
 四种入口的能力与限制见 [公共 API 契约](doc/API_CONTRACTS.md)；对象释放、文档切换和异步保存见 [宿主接入指南](doc/INTEGRATION_GUIDE.md)。
+正文、完整阅读和三模式编辑各有 [独立可运行样例](example/README.md)，不依赖 Linefold 或原生 Mermaid。
 
 界面文案可在四种入口外包裹 `IanvsMarkdownLocalization`，选择
 `IanvsMarkdownStrings.chinese()` / `.english()`，并通过类型化的
@@ -99,7 +104,7 @@ Mermaid，单独传入 `diagramBuilder` 不会绕过该覆盖。宿主添加的�
 
 流式宿主仍负责消息身份、增量合并、总量预算和异步图表的过期结果处理。
 更新 `data` 会重新解析，不提供增量 AST 保证；当前组件内的整文档选择状态会在源码
-变化时失效。`super_clipboard` 仍是包依赖，自定义纯文本 writer 不会移除原生构建依赖。
+变化时失效。核心默认复制不依赖原生剪贴板插件；接入可选适配器的宿主仍承担其原生构建要求。
 跨项目可共用 [标准语法样例契约](test/fixtures/standard_syntax_contract.json)，并另行验证
 各宿主的选择范围、图片策略、图表后端和平台构建。
 从 0.3.1 起，`flutter_markdown_plus` 的依赖下限为 1.0.12；1.0.7 未通过既有
@@ -126,10 +131,10 @@ Expanded(
 
 `IanvsMarkdown` 与 `IanvsMarkdownView` 默认都使用单一文档选择区域，允许跨标题、
 段落和列表连续选择。阅读态按
-`Cmd+A`（macOS/iOS）或 `Ctrl+A`（其他平台）会选中整篇文档；随后复制会在
-同一个剪贴板项目中写入两种表示：`text/plain` 是未经改写的原始 Markdown，
-`text/html` 是经过安全过滤的语义富文本，因此 Markdown 编辑器和富文本编辑器
-可以各取所需。普通鼠标拖选也会从实际选中的语义片段生成 Markdown 与富文本，跨区块
+`Cmd+A`（macOS/iOS）或 `Ctrl+A`（其他平台）会选中整篇文档；随后复制将完整、
+未经改写的原始 Markdown 写入纯文本剪贴板。writer 回调同时收到安全过滤的 HTML；
+显式接入原生适配器后，会在同一个剪贴板项目写入 Markdown 与 HTML，供不同粘贴目标选择。
+普通鼠标拖选也会从实际选中的语义片段生成 Markdown 与富文本，跨区块
 选择时仍会保留标题、粗体、斜体、链接、引用和列表等结构。设置
 `selectable: false` 可关闭这套阅读态选择能力；只有需要自行协调源码选区的宿主才应
 设置 `documentSelection: false`，退回逐区块选择。
