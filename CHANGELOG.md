@@ -1,5 +1,10 @@
 ## Unreleased
 
+- Isolate custom block-tag registration per renderer and rebuild, preventing a
+  block builder in one document from changing another document's inline layout.
+  Keep public builder/style types and host-controlled resource loading; document
+  the internal derived renderer and its upstream license/maintenance boundary.
+
 - **Processing-budget migration:** preflight Markdown before controller
   references, document/YAML/headings, Live structure and clipboard HTML.
   Defaults now include 1,048,576 source UTF-16 units and 4,096 units per line,

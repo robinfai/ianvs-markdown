@@ -58,6 +58,7 @@ import 'obsidian_inline.dart';
 import 'obsidian_metadata.dart';
 import 'obsidian_image.dart';
 import 'render_budget.dart';
+import 'renderer/scoped_body.dart';
 import 'rich_clipboard.dart';
 import 'strikethrough.dart';
 import 'syntax_preset.dart';
@@ -665,7 +666,7 @@ class IanvsMarkdown extends StatelessWidget {
     var imageIndex = 0;
     var taskIndex = 0;
     Set<String>? imageReferenceLabels;
-    final body = MarkdownBody(
+    final body = ScopedMarkdownBody(
       key: ValueKey<bool>(softLineBreak),
       // flutter_markdown_plus only reparses when data or styles change, so
       // changing this option must remount its state to rebuild line spans.
@@ -852,7 +853,7 @@ class IanvsMarkdown extends StatelessWidget {
     IanvsMarkdownThemeData colors, {
     required bool blockSelectable,
   }) {
-    return MarkdownBody(
+    return ScopedMarkdownBody(
       key: ValueKey((syntaxPreset, softLineBreak)),
       data: source,
       selectable: blockSelectable,
