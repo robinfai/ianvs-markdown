@@ -167,3 +167,33 @@ Additional containing-folder grants and external-file favorite bookmarks are
 persisted separately. New changes typed during an asynchronous Trash operation
 remain in an untitled session, while queued saves of removed sessions are ignored.
 This preserves the file-first model without a second content database.
+
+## iOS reading preview
+
+The iOS product lives in `lib/src/preview/` and shares the Markdown renderer and
+native Mermaid pipeline with the desktop editor. `main.dart` chooses it on iOS;
+desktop workspace recovery, file-association prompts and editor chrome remain
+in the macOS shell.
+
+`MarkdownImporter.swift` coordinates a provider read under security-scoped
+access, validates the extension/UTF-8/5 MiB limit, and atomically stores an
+app-owned copy. `PreviewIntegration` imports off the main thread and queues
+paths/errors until Dart drains them. `SceneDelegate` forwards both cold and
+running-app file URLs; Flutter deep-link routing is disabled for these URLs.
+
+`apple/CloudWorkspace.swift` is compiled into both native apps. It resolves the
+entitled ubiquity container off the main thread, coordinates file reads/writes,
+exposes remote document stubs, and forwards iCloud metadata updates. Both apps
+select this container on startup; security scopes for other workspaces are only
+acquired by manual selection. Native iOS folder scopes last for the session.
+
+`PreviewLibrary` discovers workspace documents and records recent history in
+local Application Support. It bounds reads and refuses paths or symlinks outside
+the selected workspace. Old local imports migrate once by stable import ID;
+their backups remain local and never resurrect a subsequently deleted cloud file.
+The explicit Personal Team build omits iCloud signing/Info.plist capabilities
+and exposes local storage honestly; regular builds retain the shared container.
+`PreviewController` protects the reader from stale asynchronous opens and
+continues through individual batch failures. `PreviewPlatform` serializes
+native queue drains. Tests cover real file copies, queue ordering, recovery,
+same-named documents, bad input, and narrow/large-text reading layouts.

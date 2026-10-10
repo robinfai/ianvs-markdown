@@ -11,7 +11,7 @@ INTEGRATION_DART = app/lib app/test packages/ianvs_mermaid/lib packages/ianvs_me
 # Flutter resolves dependencies and writes generated files in each package.
 .NOTPARALLEL:
 
-.PHONY: help deps deps-core deps-integrations format format-check format-check-core format-check-integrations analyze analyze-core analyze-integrations test test-example test-app test-mermaid test-mermaid-example test-quicklook check check-core check-integrations check-package benchmark run example run-app install clean publish-dry-run
+.PHONY: help deps deps-core deps-integrations format format-check format-check-core format-check-integrations analyze analyze-core analyze-integrations test test-example test-app test-mermaid test-mermaid-example test-quicklook test-native-import test-ios-preview build-ios-preview run-ios check check-core check-integrations check-package benchmark run example run-app install clean publish-dry-run
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -56,6 +56,18 @@ test-example: ## Run example application tests
 test-app: ## Run desktop application tests
 	cd app && $(FLUTTER) test
 
+test-native-import: ## Verify native Markdown file import handling
+	bash app/tool/test_native_markdown_import.sh
+
+test-ios-preview: test-native-import ## Check iOS reading, import handling, and native file copying
+	cd app && $(FLUTTER) test test/preview_app_test.dart test/preview_library_test.dart test/preview_platform_test.dart
+
+build-ios-preview: ## Build the iOS reading preview for the simulator
+	cd app && $(FLUTTER) build ios --simulator --debug --no-codesign
+
+run-ios: ## Run on an iOS device or simulator (pass DEVICE=<device id>)
+	cd app && $(FLUTTER) run $(if $(DEVICE),-d $(DEVICE),)
+
 test-mermaid: ## Run the macOS native Mermaid bridge and visual regressions
 	cargo test --locked --manifest-path packages/ianvs_mermaid/rust/Cargo.toml
 	cd packages/ianvs_mermaid && $(FLUTTER) test
@@ -69,7 +81,7 @@ test-quicklook: deps-integrations ## Test the native macOS Quick Look renderer a
 
 check-core: deps-core format-check-core analyze-core test test-example ## Validate core without Apple or Mermaid integration checks
 
-check-integrations: deps-integrations format-check-integrations analyze-integrations test-app test-mermaid test-mermaid-example test-quicklook ## Validate the app and native integrations (macOS)
+check-integrations: deps-integrations format-check-integrations analyze-integrations test-app test-mermaid test-mermaid-example test-quicklook test-native-import ## Validate the app and native integrations (macOS)
 
 check-package: ## Test the actual Pub snapshot in an external Flutter host
 	$(PYTHON) tool/check_package.py --flutter "$(FLUTTER)" --dart "$(DART)"

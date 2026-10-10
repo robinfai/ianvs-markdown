@@ -28,6 +28,7 @@ class MainFlutterWindow: NSWindow {
     }
 
     RegisterGeneratedPlugins(registry: flutterViewController)
+    CloudWorkspace.shared.attach(to: flutterViewController.engine.binaryMessenger)
     registerFileAccessChannel(with: flutterViewController)
     registerDesktopIntegration(with: flutterViewController)
 

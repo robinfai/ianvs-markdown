@@ -6,6 +6,80 @@ import 'package:linefold/src/services/workspace_session_store.dart';
 import 'support/fakes.dart';
 
 void main() {
+  test(
+    'launch selects iCloud, external folders require selection, drafts survive',
+    () async {
+      final files = MemoryMarkdownFileService()..selectedFolder = '/manual';
+      final clean = DocumentSession(
+        id: 'document-1',
+        name: 'clean.md',
+        path: '/old/clean.md',
+        text: '# Saved',
+        persistedText: '# Saved',
+        accessToken: 'access:/old/clean.md',
+      );
+      final dirty = DocumentSession(
+        id: 'document-2',
+        name: 'draft.md',
+        path: '/old/draft.md',
+        text: '# Unsaved',
+        persistedText: '# Saved',
+        accessToken: 'access:/old/draft.md',
+      );
+      final sessions = MemoryWorkspaceSessionStore()
+        ..snapshot = WorkspaceSnapshot(
+          documents: [clean.toJson(), dirty.toJson()],
+          activeDocumentId: dirty.id,
+          workspaceRoot: '/old',
+          workspaceAccessToken: 'access:/old',
+          sidebarVisible: true,
+          outlineVisible: true,
+        );
+      clean.dispose();
+      dirty.dispose();
+      final workspace = WorkspaceController(
+        fileService: files,
+        sessionStore: sessions,
+        defaultWorkspaceDirectory: () async => '/cloud/Linefold',
+      );
+      addTearDown(workspace.dispose);
+      addTearDown(files.dispose);
+      await workspace.initialize();
+      expect(workspace.workspaceRoot, '/cloud/Linefold');
+      expect(workspace.isCloudWorkspace, isTrue);
+      expect(workspace.documents, hasLength(1));
+      expect(workspace.activeDocument!.path, isNull);
+      expect(workspace.activeDocument!.accessToken, isNull);
+      expect(workspace.activeDocument!.controller.text, '# Unsaved');
+      expect(workspace.activeDocument!.controller.isDirty, isTrue);
+      await workspace.chooseWorkspaceFolder();
+      expect(workspace.workspaceRoot, '/manual');
+      expect(workspace.isCloudWorkspace, isFalse);
+      await workspace.useDefaultWorkspace();
+      expect(workspace.workspaceRoot, '/cloud/Linefold');
+    },
+  );
+
+  test(
+    'unavailable iCloud does not silently restore a different workspace',
+    () async {
+      final files = MemoryMarkdownFileService()..selectedFolder = '/manual';
+      final workspace = WorkspaceController(
+        fileService: files,
+        sessionStore: MemoryWorkspaceSessionStore(),
+        defaultWorkspaceDirectory: () async => throw StateError('Unavailable'),
+      );
+      addTearDown(workspace.dispose);
+      addTearDown(files.dispose);
+      await workspace.initialize();
+      expect(workspace.workspaceRoot, isNull);
+      expect(workspace.workspaceNotice, contains('iCloud'));
+      await workspace.chooseWorkspaceFolder();
+      expect(workspace.workspaceRoot, '/manual');
+      expect(workspace.workspaceNotice, isNull);
+    },
+  );
+
   test('opens, saves, reorders, and restores document sessions', () async {
     final files = MemoryMarkdownFileService()
       ..files['/notes/one.md'] = '# One'

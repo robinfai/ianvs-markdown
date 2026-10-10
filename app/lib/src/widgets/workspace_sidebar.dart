@@ -270,7 +270,9 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                         Expanded(
                           child: Text(
                             root != null
-                                ? p.basename(root)
+                                ? widget.workspace.isCloudWorkspace
+                                      ? 'iCloud · Linefold'
+                                      : p.basename(root)
                                 : hasFiles
                                 ? 'External Files'
                                 : 'No folder open',
@@ -299,6 +301,12 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                           icon: const Icon(Icons.more_horiz, size: 16),
                           onSelected: _toolbarAction,
                           itemBuilder: (_) => [
+                            if (widget.workspace.defaultWorkspaceDirectory !=
+                                null)
+                              const PopupMenuItem(
+                                value: 'icloud',
+                                child: Text('iCloud · Linefold'),
+                              ),
                             const PopupMenuItem(
                               height: 32,
                               value: 'new',
@@ -353,6 +361,21 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                   ),
                 ),
               ),
+              if (widget.workspace.workspaceNotice case final notice?)
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(notice, style: const TextStyle(fontSize: 12)),
+                      TextButton(
+                        onPressed: () =>
+                            _run(widget.workspace.useDefaultWorkspace),
+                        child: const Text('重试 iCloud'),
+                      ),
+                    ],
+                  ),
+                ),
               if (hasFiles)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
@@ -1075,6 +1098,8 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
 
   void _toolbarAction(String action) {
     switch (action) {
+      case 'icloud':
+        _run(widget.workspace.useDefaultWorkspace);
       case 'new':
         _run(() => _startCreate(folder: false));
       case 'folder':

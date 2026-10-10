@@ -1,0 +1,4 @@
+// Copy to Signing.local.xcconfig (gitignored), then set an iCloud-capable team.
+// Runner and LinefoldQuickLook both include this configuration.
+LINEFOLD_CLOUD_ENABLED = YES
+DEVELOPMENT_TEAM = YOUR_TEAM_ID

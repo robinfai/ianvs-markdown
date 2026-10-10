@@ -6,6 +6,8 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 
+import 'apple_workspace_service.dart';
+
 const markdownTypeGroup = XTypeGroup(
   label: 'Markdown',
   extensions: <String>['md', 'markdown', 'mdown', 'mkd', 'txt'],
@@ -75,7 +77,9 @@ abstract class MarkdownFileService {
 }
 
 class DesktopMarkdownFileService implements MarkdownFileService {
-  const DesktopMarkdownFileService();
+  const DesktopMarkdownFileService({this.workspace});
+
+  final AppleWorkspaceService? workspace;
 
   static const _fileAccessChannel = MethodChannel(
     'work.ianvs.linefold/file_access',
@@ -94,6 +98,9 @@ class DesktopMarkdownFileService implements MarkdownFileService {
     final location = await getSaveLocation(
       acceptedTypeGroups: const <XTypeGroup>[markdownTypeGroup],
       suggestedName: suggestedName,
+      initialDirectory: workspace == null
+          ? null
+          : AppleWorkspaceService.defaultPath,
       canCreateDirectories: true,
     );
     return location?.path;
@@ -105,8 +112,9 @@ class DesktopMarkdownFileService implements MarkdownFileService {
 
   @override
   Future<MarkdownFileData> readMarkdownFile(String path) async {
-    final bytes = await File(path).readAsBytes();
-    final contents = utf8.decode(bytes, allowMalformed: false);
+    final contents = workspace == null
+        ? utf8.decode(await File(path).readAsBytes(), allowMalformed: false)
+        : await workspace!.read(path);
     return MarkdownFileData(
       path: path,
       name: p.basename(path),
@@ -117,6 +125,10 @@ class DesktopMarkdownFileService implements MarkdownFileService {
 
   @override
   Future<void> writeMarkdownFileAtomic(String path, String contents) async {
+    if (workspace != null) {
+      await workspace!.write(path, contents);
+      return;
+    }
     final target = File(path);
     await target.parent.create(recursive: true);
     final temporary = File(
@@ -138,6 +150,24 @@ class DesktopMarkdownFileService implements MarkdownFileService {
 
   @override
   Future<List<WorkspaceEntry>> listDirectory(String path) async {
+    if (workspace != null) {
+      final entries = await workspace!.list(path);
+      return [
+        for (final entry in entries)
+          WorkspaceEntry(
+            path: entry['path'] as String,
+            name: entry['name'] as String,
+            isDirectory: entry['isDirectory'] as bool,
+            modified: DateTime.fromMillisecondsSinceEpoch(
+              (entry['modified'] as num).toInt(),
+            ),
+          ),
+      ]..sort(
+        (a, b) => a.isDirectory != b.isDirectory
+            ? (a.isDirectory ? -1 : 1)
+            : a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+      );
+    }
     final entries = <WorkspaceEntry>[];
     await for (final entity in Directory(path).list(followLinks: false)) {
       if (entity is Link) continue;
@@ -249,7 +279,12 @@ class DesktopMarkdownFileService implements MarkdownFileService {
       _fileAccessChannel.invokeMethod<void>('trashEntry', {'path': path});
 
   @override
-  bool fileExists(String path) => File(path).existsSync();
+  bool fileExists(String path) =>
+      File(path).existsSync() ||
+      (workspace != null &&
+          File(
+            p.join(p.dirname(path), '.${p.basename(path)}.icloud'),
+          ).existsSync());
 }
 
 bool isMarkdownFileName(String name) {

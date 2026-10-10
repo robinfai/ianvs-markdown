@@ -1,0 +1,14 @@
+// Local macOS builds do not require an Apple Developer team. Opt in to iCloud
+// with Signing.local.xcconfig when a team can provision the shared container.
+LINEFOLD_CLOUD_ENABLED = NO
+
+LINEFOLD_ENTITLEMENTS_SUFFIX_NO = Local
+LINEFOLD_ENTITLEMENTS_SUFFIX_YES =
+LINEFOLD_ENTITLEMENTS_SUFFIX = $(LINEFOLD_ENTITLEMENTS_SUFFIX_$(LINEFOLD_CLOUD_ENABLED))
+
+// Runner and its Quick Look extension must use the same signing identity.
+LINEFOLD_CODE_SIGN_IDENTITY_NO = -
+LINEFOLD_CODE_SIGN_IDENTITY_YES = Apple Development
+CODE_SIGN_IDENTITY = $(LINEFOLD_CODE_SIGN_IDENTITY_$(LINEFOLD_CLOUD_ENABLED))
+
+#include? "Signing.local.xcconfig"
