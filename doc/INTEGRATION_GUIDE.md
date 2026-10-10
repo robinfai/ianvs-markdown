@@ -45,7 +45,7 @@ IanvsMarkdownLiveEditor(
 | 宿主动作 | 当前行为 | 宿主责任 |
 | --- | --- | --- |
 | 修改正文 `data` | 重新渲染，阅读选择失效；没有增量 AST 保证 | 合并分片、控制更新频率与总量 |
-| 修改 View `data` / `syntaxPreset` | 重新解析并安排滚动到顶部 | 需要持续追加/跟随滚动时先定义策略；该扩展记录在 R2-03 |
+| 修改 View `data` / `syntaxPreset` | 重新解析并安排滚动到顶部 | 整文档阅读保持此默认行为；持续追加可使用下述宿主滚动样例 |
 | 修改编辑 Controller 的选区 | 源码范围变化，Live 复用文档结构 | 使用 UTF-16 偏移；避免把字节数当偏移 |
 | 修改编辑文本 | 刷新相关状态与当前全文结构，更新历史和 dirty | 需要精确选区时提供完整 TextEditingValue；尊重 IME composing |
 | 改变 Controller.mode | Live 切换三种界面；独立 Source 控件仍显示源码 | 根据入口选择合适容器；模式切换不代表保存 |
@@ -53,6 +53,38 @@ IanvsMarkdownLiveEditor(
 | 异步图片/图表/嵌入返回 | builder 返回的 Widget 与状态由宿主定义 | 用 document ID、版本和资源身份防止旧结果进入新文档 |
 
 图片、链接、Wiki 和图表的加载权限、路径解析、大小与缓存由宿主处理。默认组件不自动访问网络或本地文件。阅读态复制的 plain text 与 HTML 是不同表示：整文档 plain text 保留原始 Markdown，部分阅读选择根据语义片段重建；不要把阅读选择回调当作精确源码选区。
+
+## 持续追加内容（R2-03）
+
+[流式入口](../example/lib/streaming.dart) 使用 `IanvsMarkdown` 加宿主的 `SingleChildScrollView`，直接运行 `flutter run -d macos -t lib/streaming.dart`。每次把已接收片段合并成完整 `data`，保留未闭合围栏、表格和链接，直到后续片段使语法收敛。组件不负责传输、重排、重试、分片解码和总量上限；不要把 UTF-8 分片在多字节字符中间独立解码。这里没有新增核心流式 API，也不承诺增量 AST 或每 token 一帧的吞吐率。
+
+| 状态 | 样例策略及可依赖边界 |
+| --- | --- |
+| 同一响应追加 | 保持 document ID / Widget Key；递增版本、替换完整源码。正文的已有阅读选择失效，需重新选择后复制；完整复制包含当前原文 |
+| 跟随滚动 | 默认跟随，内容布局或异步资源高度变化后移动到末尾；向上阅读时暂停，用户显式恢复后才再次跟随 |
+| 暂停跟随 | 追加不主动改变滚动偏移；内容高度缩小时仍由 Flutter 限制合法滚动范围，不承诺屏幕中同一个词始终原位 |
+| 切换文档 | 替换稳定 Key、重置版本和滚动，并暂停跟随。相同文本也不代表同一文档；旧的布局回调不得滚动新文档 |
+| View | 保留既有 `data` 变化后回到顶部的整文档阅读契约；不把正文样例的跟随策略暗中变为 View 默认行为 |
+| Source / Live | 通过 Controller 的完整 `TextEditingValue` 指定文本、UTF-16 选区及 composing；只在原文末尾追加且不修改 preedit 时可保留有效范围。与用户编辑冲突的片段由宿主排队或合并，不能盲目覆盖 `text` |
+
+异步资源接入见 [ExampleAsyncDiagram](../example/lib/async_diagram.dart)。它接收捕获的 `(documentId, revision, source)`，在请求身份或 loader 改变时立即清空旧结果并生成新的请求代数。结果返回时同时检查 `mounted` 和请求代数；成功与失败都遵守此检查。即使文档或源码从 A 切到 B 再切回 A，第一次 A 的结果仍然过期。普通 rebuild 不重复启动相同请求；当前错误允许重试。
+
+```dart
+IanvsMarkdown(
+  key: ValueKey(documentId),
+  data: completeSource,
+  diagramBuilder: (_, source) => ExampleAsyncDiagram(
+    request: (documentId: documentId, revision: revision, source: source),
+    load: approvedHostLoader,
+  ),
+)
+```
+
+这里的类型来自 example，不是核心导出。样例 loader 仅延迟返回本地文本，不访问网络、文件或原生 Mermaid。真实宿主仍须授权资源、限制缓存与解码成本，并尽可能取消过期昂贵任务；忽略结果不等于取消底层任务。共享缓存也需使用完整资源身份，不能只按 Widget 的当前位置缓存。
+
+组件内部代码块的复制反馈也按请求代数隔离：源码、复制回调变化或新复制请求都会使旧反馈失效；已经开始的复制仍作用于调用时捕获的内容，组件不会撤销已发生的系统写入。宿主自己的保存/网络写入仍须按上文的顺序与版本规则管理。
+
+验证入口是 [组件追加回归](../test/streaming_contract_test.dart) 和 [样例回归](../example/test/streaming_example_test.dart)：正文/View 的两种预设、Live/Reading 的围栏/表格/行内及引用链接，选择失效、编辑 preedit、旧复制反馈，异步成功/失败乱序、A/B/A、重试、卸载及滚动策略。自动回归不替代 R2-01 的完整性能验收或 R3-01 的真实输入法、触摸和读屏。
 
 ## 界面文案与作用域
 
@@ -193,7 +225,7 @@ final editor = IanvsMarkdownLiveEditor(
 | 文案、命令及焦点已有统一宿主接入 | R1-03 | 使用相应作用域配置；文档内容与资源授权仍归宿主，真实平台交互证据继续在 R3-01 收集 |
 | 默认复制改为纯文本，原生富文本改为显式适配器 | R1-04 | 按上文迁移；核心没有原生剪贴板依赖，适配器仍需验证所用平台 |
 | 升级后的默认历史会裁剪旧快照 | R2-02 已实现，升级时核对配置 | 阅读 [容量与迁移契约](API_CONTRACTS.md#撤销历史容量r2-02)；需要旧行为时显式设置 `historyPolicy: null` |
-| View 追加数据重置滚动，异步结果没有组件级文档身份 | R2-03 | 宿主管理文档/版本与加载状态，当前不承诺完整流式接入能力 |
+| 持续追加使用全文快照，View 默认重置滚动；异步资源仍由宿主负责 | R2-03 | 使用下述正文流式样例；R2-01 优化版本仍需复验，未承诺增量 AST 或实时延迟 |
 | 预解析与复制已有独立预算，完整源码排版仍未完成性能验收 | R2-05 / R2-01 | 按下方配置解析、渲染、复制额度；排版耗时不能用预算检查替代 |
 
 证据：[宿主行为回归](../test/host_contract_test.dart)、[会话示例测试](../example/test/document_session_test.dart)、[外部包接入检查](https://github.com/robinfai/ianvs-markdown/blob/main/tool/package_smoke_test.dart)。维护脚本在源码仓库提供，不属于发布包依赖；发布内容与实例接入还需执行 `make check-package`。

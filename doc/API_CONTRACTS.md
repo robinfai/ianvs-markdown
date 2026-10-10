@@ -57,6 +57,7 @@
 - 正文 `data` 变化重新构建解析；阅读选择会随源码变化失效，不承诺增量 AST。View 的 `data`、`syntaxPreset`、`showFrontMatter` 或预算变化会重新解析并安排滚动回到顶部。
 - Live 在纯选区/composing 变化时复用文档结构，文本变化、撤销/重做与替换 Controller 时重新更新结构。Controller 自身还维护引用上下文。解析次数减少不代表所有布局成本已经消除。
 - 模式切换使用同一 Controller 的原文、dirty 和历史。Live 与 Reading 的选区是不同交互面，不保证恢复阅读态的拖选区域或所有模式的滚动像素位置。
+- 持续追加和异步资源遵守 [R2-03 宿主接入](INTEGRATION_GUIDE.md#持续追加内容r2-03)：正文可由宿主跟随/暂停滚动，View 默认更新回到顶部；旧阅读选择不跨源码版本保留。资源结果按文档、版本和资源身份隔离，资源缓存仍由宿主管理。
 - 没有独立的 document ID API。推荐每个文档持有一个 Controller，宿主保存文档身份并用稳定 Key 区分文档。直接替换 `controller.text` 不会自动重置历史或保存基线。
 
 ## 语法预设的范围（R1-02）

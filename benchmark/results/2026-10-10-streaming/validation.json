@@ -1,0 +1,25 @@
+{
+  "baseRevision": "dba969de21f2caf3f375a740a2e64226e091896b",
+  "copyFixRevision": "1df53fe",
+  "flutter": "3.44.8",
+  "dart": "3.12.2",
+  "makeCheckExit": 0,
+  "streamingDebugBuildExit": 0,
+  "coreTests": 953,
+  "exampleTests": 20,
+  "appTests": 274,
+  "appSkippedOptionalCorpus": 1,
+  "budgetCases": 32,
+  "implementationSha256": {
+    "lib/src/code_block.dart": "040d61a5558a6db4636967761ff91bf61d0b6fe9fb082fc7a72608d00836c0e5",
+    "test/streaming_contract_test.dart": "6ef4e4692d01354f0c35fb9ea495b33119a422e456e37f11cd49e049f62d7c7f",
+    "example/lib/streaming.dart": "264d8310395fb18fe9965cc6ed69e9d3c0739262a1dad46f9d888aa90fea0a7f",
+    "example/lib/async_diagram.dart": "d3affa9127cecc542fc2c9fe5b62175b5982350a85aca1a1a1dd78578da629bd",
+    "example/test/streaming_example_test.dart": "a4aae88d6680ec9a833be68aa252e3278a95497085e3e86f6c2349babcc4a4ab"
+  },
+  "limitations": [
+    "GUI interaction and performance not measured: Mac locked.",
+    "R2-03 final validation must include completed R2-01 implementation.",
+    "Example asynchronous loader is a delayed local text placeholder; no network or native diagram engine."
+  ]
+}
