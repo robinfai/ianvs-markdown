@@ -8,6 +8,7 @@ import 'dart:ui' show FramePhase;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:ianvs_markdown/src/editor/editor_diagnostics.dart';
 
@@ -79,12 +80,14 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
   var generation = 0;
   var currentSize = 0;
   var currentBudget = '';
+  final environment = _BenchmarkEnvironment();
 
   @override
   void initState() {
     super.initState();
     SchedulerBinding.instance.addTimingsCallback(frames.addAll);
-    WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(run()));
+    // Query native state even if an occluded window never produces a frame.
+    unawaited(run());
   }
 
   @override
@@ -159,36 +162,54 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
       'stage': stage,
       'index': index,
     };
+    final before = await environment.check();
     trace({
       ...identity,
       'event': 'start',
       'timelineMicros': developer.Timeline.now,
+      'windowEnvironment': before,
     });
     final firstFrame = frameStamp;
+    IanvsMarkdownEditorDiagnostics.resetPhases();
     final parses = IanvsMarkdownEditorDiagnostics.documentParses;
     final watch = Stopwatch()..start();
     await callback();
+    final callbackMs = watch.elapsedMicroseconds / 1000;
     await nextFrame();
     watch.stop();
     final latency = watch.elapsedMicroseconds / 1000;
     final parseCount = (IanvsMarkdownEditorDiagnostics.documentParses - parses)
         .toDouble();
     final rss = ProcessInfo.currentRss / (1024 * 1024);
+    final lastFrame = frameStamp;
+    final phaseSnapshot = IanvsMarkdownEditorDiagnostics.phaseSnapshot();
+    // Keep method-channel overhead outside the latency and frame intervals.
+    final after = await environment.check();
     if (stage == 'sample') {
       operation.durations.add(latency);
       operation.parses.add(parseCount);
       operation.rss.add(rss);
-      operation.frameIntervals.add((firstFrame, frameStamp));
+      operation.callbackMs.add(callbackMs);
+      operation.frameWaitMs.add(latency - callbackMs);
+      operation.frameIntervals.add((firstFrame, lastFrame));
+      if (IanvsMarkdownEditorDiagnostics.profilePhases) {
+        operation.phases.add(phaseSnapshot);
+      }
     }
     trace({
       ...identity,
       'event': 'end',
       'timelineMicros': developer.Timeline.now,
       'latencyMs': latency,
+      'callbackMs': callbackMs,
+      'completionFrameWaitMs': latency - callbackMs,
+      'lifecycle': SchedulerBinding.instance.lifecycleState?.name ?? 'unknown',
       'documentParses': parseCount,
       'rssMiB': rss,
       'firstFrameMicros': firstFrame,
-      'lastFrameMicros': frameStamp,
+      'lastFrameMicros': lastFrame,
+      'windowEnvironment': after,
+      if (IanvsMarkdownEditorDiagnostics.profilePhases) 'phases': phaseSnapshot,
     });
   }
 
@@ -248,6 +269,8 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
   Future<void> run() async {
     final results = <Map<String, Object>>[];
     try {
+      await environment.initialize();
+      await nextFrame();
       for (final size in selectedSizes) {
         final source = benchmarkCorpus(size);
         currentSize = size;
@@ -293,6 +316,18 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
               );
             },
             'typing': (i) async {
+              final original = controller!.value;
+              if (!original.selection.isValid ||
+                  !original.selection.isCollapsed) {
+                throw StateError(
+                  'Typing requires a collapsed source selection',
+                );
+              }
+              final expected = original.text.replaceRange(
+                original.selection.extentOffset,
+                original.selection.extentOffset,
+                'a',
+              );
               final editable = activeEditable();
               final value = editable.widget.controller.value;
               final offset = value.selection.extentOffset;
@@ -302,6 +337,9 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
                   selection: TextSelection.collapsed(offset: offset + 1),
                 ),
               );
+              if (controller!.text != expected) {
+                throw StateError('Typing did not preserve the source mapping');
+              }
             },
             'scroll': (i) async {
               final destination = i.isEven ? 0.0 : 300.0 + (i % 4) * 300;
@@ -337,6 +375,7 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
           checkpoint('caseComplete');
         }
       }
+      await environment.check();
       print(
         'IANVS_BENCHMARK_RESULT: ${jsonEncode(snapshot(results, complete: true))}',
       );
@@ -356,6 +395,9 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
     return {
       'schemaVersion': 2,
       'processingBudgetPolicy': 'full-document-preflight-v1',
+      'phaseTimingsEnabled': IanvsMarkdownEditorDiagnostics.profilePhases,
+      'environmentPolicy': 'native-window-stable-v1',
+      'initialWindowEnvironment': environment.initial,
       'corpusVersion': corpusVersion,
       'mode': 'profile',
       'warmupPerOperation': warmup,
@@ -383,6 +425,57 @@ class _BenchmarkAppState extends State<_BenchmarkApp> {
   }
 }
 
+class _BenchmarkEnvironment {
+  static const channel = MethodChannel('ianvs_markdown/benchmark_environment');
+  Map<String, Object?>? initial;
+
+  Future<Map<String, Object?>> read() async =>
+      (await channel.invokeMapMethod<String, Object?>('snapshot')) ??
+      (throw StateError('Missing native benchmark environment'));
+
+  bool valid(Map<String, Object?> state) =>
+      state['active'] == true &&
+      state['visible'] == true &&
+      state['occlusionVisible'] == true &&
+      state['onActiveSpace'] == true &&
+      state['miniaturized'] == false &&
+      state['appHidden'] == false;
+
+  Future<void> initialize() async {
+    channel.setMethodCallHandler((call) async {
+      if (call.method != 'changed' || initial == null) return;
+      final state = Map<String, Object?>.from(call.arguments as Map);
+      if (!valid(state) || !mapEquals(initial, state)) {
+        // A hidden/locked window may stop frames. Fail from the native event
+        // rather than waiting for the action's next frame or outer watchdog.
+        print('IANVS_BENCHMARK_ERROR: Benchmark window changed: $state');
+        exit(1);
+      }
+    });
+    final watch = Stopwatch()..start();
+    Map<String, Object?>? previous;
+    while (watch.elapsed < const Duration(seconds: 10)) {
+      final state = await read();
+      if (valid(state) && previous != null && mapEquals(previous, state)) {
+        initial = state;
+        return;
+      }
+      previous = state;
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    }
+    throw StateError('Benchmark window unavailable at startup: $previous');
+  }
+
+  Future<Map<String, Object?>> check() async {
+    final state = await read();
+    // The native generation detects a loss/regain between these snapshots.
+    if (!valid(state) || !mapEquals(initial, state)) {
+      throw StateError('Benchmark window changed during run: $state');
+    }
+    return state;
+  }
+}
+
 class _Operation {
   _Operation(this.name);
 
@@ -390,7 +483,10 @@ class _Operation {
   final durations = <double>[];
   final parses = <double>[];
   final rss = <double>[];
+  final callbackMs = <double>[];
+  final frameWaitMs = <double>[];
   final frameIntervals = <(int, int)>[];
+  final phases = <Map<String, Object>>[];
 
   Map<String, Object> result(List<FrameTiming> allFrames) {
     // Both timestamps originate from the engine's raw frame clock. Assign
@@ -419,6 +515,9 @@ class _Operation {
       ]),
       'frameAttribution': 'engine-vsync-intervals',
       'rssMiB': distribution(rss),
+      'callbackMs': distribution(callbackMs),
+      'completionFrameWaitMs': distribution(frameWaitMs),
+      if (IanvsMarkdownEditorDiagnostics.profilePhases) 'phases': phases,
     };
   }
 }

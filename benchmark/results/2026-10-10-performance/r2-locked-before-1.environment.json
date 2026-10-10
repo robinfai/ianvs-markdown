@@ -1,0 +1,7 @@
+{
+  "acceptedPerformanceEvidence": false,
+  "reason": "Computer-use tool confirmed Mac locked; Flutter also reported failed foreground activation.",
+  "action": "Stopped only the owned Flutter process group; runner recorded incomplete result; second baseline did not start.",
+  "baselineRevision": "c7d8f5d",
+  "next": "Re-run full baselines after verifying unlocked, active, visible benchmark window. Do not use these samples to set latency observation lines."
+}

@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import 'front_matter.dart';
+import 'editor/editor_diagnostics.dart';
 import 'render_budget.dart';
 import 'syntax_preset.dart';
 
@@ -50,7 +51,10 @@ final class IanvsMarkdownDocument {
       );
     }
     final frontMatter = parseFrontMatter
-        ? parseMarkdownFrontMatter(source)
+        ? IanvsMarkdownEditorDiagnostics.measure(
+            'document.frontMatter',
+            () => parseMarkdownFrontMatter(source),
+          )
         : MarkdownFrontMatterDocument(
             body: source,
             entries: const <MarkdownMetadataEntry>[],
@@ -60,10 +64,13 @@ final class IanvsMarkdownDocument {
       source: source,
       body: frontMatter.body,
       metadata: frontMatter.entries,
-      headings: parseMarkdownHeadings(
-        frontMatter.body,
-        maximumLevel: maximumHeadingLevel,
-        budget: null, // The complete source has already passed preflight.
+      headings: IanvsMarkdownEditorDiagnostics.measure(
+        'document.headings',
+        () => parseMarkdownHeadings(
+          frontMatter.body,
+          maximumLevel: maximumHeadingLevel,
+          budget: null, // The complete source has already passed preflight.
+        ),
       ),
       hasFrontMatter: frontMatter.hasFrontMatter,
       parseDecision: decision,
@@ -91,7 +98,15 @@ List<IanvsMarkdownHeading> parseMarkdownHeadings(
     return const [];
   }
   final document = md.Document(extensionSet: md.ExtensionSet.gitHubFlavored);
-  final nodes = document.parseLines(const LineSplitter().convert(source));
+  final lines = const LineSplitter().convert(source);
+  // Footnote numbers depend on references throughout the document, including
+  // ordinary paragraphs and headings excluded by maximumLevel. Keep the full
+  // parser whenever footnote syntax may be present. Otherwise block parsing
+  // collects forward link definitions before parsing only heading inlines.
+  final parseWholeDocument = source.contains('[^');
+  final nodes = parseWholeDocument
+      ? document.parseLines(lines)
+      : md.BlockParser(lines.map(md.Line.new).toList(), document).parseLines();
   final result = <IanvsMarkdownHeading>[];
   for (final node in nodes) {
     if (node is! md.Element || node.tag.length != 2) continue;
@@ -104,8 +119,16 @@ List<IanvsMarkdownHeading> parseMarkdownHeadings(
       'h6' => 6,
       _ => null,
     };
-    final text = node.textContent.trim();
-    if (level == null || level > maximumLevel || text.isEmpty) continue;
+    if (level == null || level > maximumLevel) continue;
+    final text =
+        (parseWholeDocument
+                ? node.textContent
+                : document
+                      .parseInline(node.textContent)
+                      .map((inline) => inline.textContent)
+                      .join())
+            .trim();
+    if (text.isEmpty) continue;
     result.add(IanvsMarkdownHeading(level: level, text: text));
   }
   return List<IanvsMarkdownHeading>.unmodifiable(result);

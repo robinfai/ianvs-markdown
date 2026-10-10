@@ -89,7 +89,13 @@ final class MarkdownLinkReferenceContext {
       return MarkdownLinkReferenceContext.empty();
     }
     final document = md.Document(extensionSet: md.ExtensionSet.gitHubFlavored);
-    document.parseLines(source.split('\n'));
+    // Definitions are collected by block syntax, including nested containers.
+    // Inline parsing cannot add definitions and needlessly processes every
+    // paragraph (and potentially pathological bracket sequences) on each edit.
+    md.BlockParser(
+      source.split('\n').map(md.Line.new).toList(),
+      document,
+    ).parseLines();
     return MarkdownLinkReferenceContext._(
       Map<String, md.LinkReference>.unmodifiable(document.linkReferences),
     );

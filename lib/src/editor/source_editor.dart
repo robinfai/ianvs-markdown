@@ -1,5 +1,3 @@
-import 'dart:ui' show BoxHeightStyle;
-
 import '../localization.dart';
 import '../keyboard.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +8,7 @@ import '../code_surface.dart';
 import '../inline_code.dart';
 import '../theme.dart';
 import 'editor_controller.dart';
+import 'editor_diagnostics.dart';
 import 'editor_models.dart';
 import 'editor_shortcuts.dart';
 import 'editor_toolbar.dart';
@@ -60,6 +59,12 @@ class IanvsMarkdownEditor extends StatefulWidget {
 
 class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
   final GlobalKey _editorSurfaceKey = GlobalKey();
+  final GlobalKey _backgroundSurfaceKey = GlobalKey();
+  final _backgroundRanges = _SourceBackgroundRanges();
+  late final _backgroundLayout = _SourceBackgroundLayout(
+    _editorSurfaceKey,
+    _backgroundSurfaceKey,
+  );
   late FocusNode _focusNode;
   late ScrollController _scrollController;
   late String _lastText;
@@ -83,6 +88,7 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
       oldWidget.controller.commitHistoryGroup();
       oldWidget.controller.removeListener(_handleControllerChanged);
       _lastText = widget.controller.text;
+      _backgroundRanges.clear();
       widget.controller.addListener(_handleControllerChanged);
     }
     if (!identical(oldWidget.focusNode, widget.focusNode)) {
@@ -99,6 +105,7 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
     final next = widget.controller.text;
     if (next == _lastText) return;
     _lastText = next;
+    _backgroundRanges.clear();
     widget.onChanged?.call(next);
   }
 
@@ -424,8 +431,6 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
     final colors = IanvsMarkdownThemeData.resolve(context, widget.theme);
     final dark = Theme.of(context).brightness == Brightness.dark;
     final direction = Directionality.of(context);
-    final resolvedPadding = widget.padding.resolve(direction);
-    final textScaler = MediaQuery.textScalerOf(context);
     widget.controller.syntaxTheme = widget.highlightSyntax
         ? ianvsMarkdownSyntaxTheme(colors, dark: dark)
         : null;
@@ -510,6 +515,7 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
               controller: widget.controller,
               onSaveRequested: widget.onSaveRequested,
               child: Stack(
+                key: _backgroundSurfaceKey,
                 fit: StackFit.expand,
                 children: [
                   IgnorePointer(
@@ -520,11 +526,9 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
                       painter: _SourceQuoteBackgroundPainter(
                         enabled: widget.highlightSyntax,
                         controller: widget.controller,
-                        scrollController: _scrollController,
-                        style: textStyle,
-                        padding: resolvedPadding,
+                        layout: _backgroundLayout,
+                        ranges: _backgroundRanges,
                         textDirection: direction,
-                        textScaler: textScaler,
                         colors: colors,
                         dark: dark,
                         repaint: Listenable.merge(<Listenable>[
@@ -542,11 +546,8 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
                       painter: _SourceFencedCodeBackgroundPainter(
                         enabled: widget.highlightSyntax,
                         controller: widget.controller,
-                        scrollController: _scrollController,
-                        style: textStyle,
-                        padding: resolvedPadding,
-                        textDirection: direction,
-                        textScaler: textScaler,
+                        layout: _backgroundLayout,
+                        ranges: _backgroundRanges,
                         colors: colors,
                         dark: dark,
                         repaint: Listenable.merge(<Listenable>[
@@ -590,15 +591,114 @@ int _sourceLineEnd(String text, int offset) {
   return newline < 0 ? text.length : newline;
 }
 
+// Cache only source ranges for the current text, never text layout. Selection,
+// scrolling and composition-only updates reuse ranges. Text/controller changes
+// clear them, including when a budget rejection disables decoration painting.
+class _SourceBackgroundRanges {
+  String? _source;
+  List<TextRange>? _quotes;
+  List<TextRange>? _code;
+
+  void clear() {
+    _source = null;
+    _quotes = null;
+    _code = null;
+  }
+
+  void _use(String source) {
+    if (_source == source) return;
+    clear();
+    _source = source;
+  }
+
+  List<TextRange> quotes(String source) {
+    _use(source);
+    return _quotes ??= IanvsMarkdownEditorDiagnostics.measure<List<TextRange>>(
+      'source.quoteRanges',
+      () {
+        IanvsMarkdownEditorDiagnostics.recordSourceBackgroundParse();
+        return parseMarkdownBlocks(source)
+            .where((block) => block.type == IanvsMarkdownBlockType.blockquote)
+            .map((block) => TextRange(start: block.start, end: block.end))
+            .toList(growable: false);
+      },
+    );
+  }
+
+  List<TextRange> code(String source) {
+    _use(source);
+    return _code ??= IanvsMarkdownEditorDiagnostics.measure<List<TextRange>>(
+      'source.codeRanges',
+      () {
+        IanvsMarkdownEditorDiagnostics.recordSourceBackgroundParse();
+        return _markdownFencedCodeRanges(source);
+      },
+    );
+  }
+}
+
+class _SourceBackgroundLayout {
+  const _SourceBackgroundLayout(this.editorKey, this.surfaceKey);
+
+  final GlobalKey editorKey;
+  final GlobalKey surfaceKey;
+
+  _SourceTextGeometry? resolve() {
+    final editable = _findRenderEditable(
+      editorKey.currentContext?.findRenderObject(),
+    );
+    final surface = surfaceKey.currentContext?.findRenderObject();
+    if (editable == null ||
+        !editable.attached ||
+        !editable.hasSize ||
+        editable.size.isEmpty ||
+        surface is! RenderBox ||
+        !surface.attached ||
+        !surface.hasSize) {
+      return null;
+    }
+    return _SourceTextGeometry(
+      editable,
+      editable.localToGlobal(Offset.zero, ancestor: surface),
+    );
+  }
+}
+
+class _SourceTextGeometry {
+  const _SourceTextGeometry(this.editable, this.origin);
+
+  final RenderEditable editable;
+  final Offset origin;
+
+  Rect? boundsFor(TextRange range) {
+    // RenderEditable owns the styled paragraph and already includes its scroll
+    // paint offset in selection boxes. Applying it again would shift surfaces.
+    final boxes = editable.getBoxesForSelection(
+      TextSelection(baseOffset: range.start, extentOffset: range.end),
+    );
+    if (boxes.isEmpty) return null;
+    var top = boxes.first.top;
+    var bottom = boxes.first.bottom;
+    for (final box in boxes.skip(1)) {
+      if (box.top < top) top = box.top;
+      if (box.bottom > bottom) bottom = box.bottom;
+    }
+    return Rect.fromLTRB(
+      origin.dx,
+      origin.dy + top,
+      origin.dx + editable.size.width,
+      origin.dy + bottom,
+    );
+  }
+}
+
 class _SourceQuoteBackgroundPainter extends CustomPainter {
   _SourceQuoteBackgroundPainter({
     required this.controller,
     required this.enabled,
-    required this.scrollController,
-    required this.style,
-    required this.padding,
+    required this.layout,
+    required this.ranges,
     required this.textDirection,
-    required this.textScaler,
     required this.colors,
     required this.dark,
     required Listenable repaint,
@@ -606,56 +706,33 @@ class _SourceQuoteBackgroundPainter extends CustomPainter {
 
   final IanvsMarkdownController controller;
   final bool enabled;
-  final ScrollController scrollController;
-  final TextStyle style;
-  final EdgeInsets padding;
+  final _SourceBackgroundLayout layout;
+  final _SourceBackgroundRanges ranges;
   final TextDirection textDirection;
-  final TextScaler textScaler;
   final IanvsMarkdownThemeData colors;
   final bool dark;
 
   @override
   void paint(Canvas canvas, Size size) {
     if (!enabled || !controller.parseDecision.useMarkdown) return;
-    final ranges = parseMarkdownBlocks(controller.text)
-        .where((block) => block.type == IanvsMarkdownBlockType.blockquote)
-        .map((block) => TextRange(start: block.start, end: block.end))
-        .toList(growable: false);
-    if (ranges.isEmpty || size.isEmpty) return;
-
-    final contentWidth = size.width - padding.horizontal;
-    if (contentWidth <= 0) return;
-    final textPainter = TextPainter(
-      text: TextSpan(text: controller.text, style: style),
-      textDirection: textDirection,
-      textScaler: textScaler,
-      textWidthBasis: TextWidthBasis.parent,
-    )..layout(maxWidth: contentWidth);
-    final positions = scrollController.positions;
-    final scrollOffset = positions.isEmpty ? 0.0 : positions.last.pixels;
+    final quoteRanges = ranges.quotes(controller.text);
+    if (quoteRanges.isEmpty || size.isEmpty) return;
+    final geometry = layout.resolve();
+    if (geometry == null) return;
     final patternColor = (dark ? Colors.white : Colors.black).withValues(
       alpha: .12,
     );
 
     canvas.save();
     canvas.clipRect(Offset.zero & size);
-    for (final range in ranges) {
-      final boxes = textPainter.getBoxesForSelection(
-        TextSelection(baseOffset: range.start, extentOffset: range.end),
-        boxHeightStyle: BoxHeightStyle.max,
-      );
-      if (boxes.isEmpty) continue;
-      final top = boxes
-          .map((box) => box.top)
-          .reduce((value, next) => value < next ? value : next);
-      final bottom = boxes
-          .map((box) => box.bottom)
-          .reduce((value, next) => value > next ? value : next);
+    for (final range in quoteRanges) {
+      final bounds = geometry.boundsFor(range);
+      if (bounds == null) continue;
       final rect = Rect.fromLTRB(
-        (padding.left - 6).clamp(0, size.width),
-        padding.top + top - scrollOffset - 8,
-        (size.width - padding.right + 6).clamp(0, size.width),
-        padding.top + bottom - scrollOffset + 8,
+        (bounds.left - 6).clamp(0, size.width),
+        bounds.top - 8,
+        (bounds.right + 6).clamp(0, size.width),
+        bounds.bottom + 8,
       );
       if (rect.bottom < 0 || rect.top > size.height) continue;
       paintIanvsMarkdownQuoteSurface(
@@ -673,15 +750,9 @@ class _SourceQuoteBackgroundPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _SourceQuoteBackgroundPainter oldDelegate) {
-    return oldDelegate.enabled != enabled ||
-        oldDelegate.controller != controller ||
-        oldDelegate.scrollController != scrollController ||
-        oldDelegate.style != style ||
-        oldDelegate.padding != padding ||
-        oldDelegate.textDirection != textDirection ||
-        oldDelegate.textScaler != textScaler ||
-        oldDelegate.colors != colors ||
-        oldDelegate.dark != dark;
+    // Host typography and layout can change without changing controller text.
+    // Range parsing is cached; geometry always comes from the current field.
+    return true;
   }
 }
 
@@ -689,11 +760,8 @@ class _SourceFencedCodeBackgroundPainter extends CustomPainter {
   _SourceFencedCodeBackgroundPainter({
     required this.controller,
     required this.enabled,
-    required this.scrollController,
-    required this.style,
-    required this.padding,
-    required this.textDirection,
-    required this.textScaler,
+    required this.layout,
+    required this.ranges,
     required this.colors,
     required this.dark,
     required Listenable repaint,
@@ -701,30 +769,18 @@ class _SourceFencedCodeBackgroundPainter extends CustomPainter {
 
   final IanvsMarkdownController controller;
   final bool enabled;
-  final ScrollController scrollController;
-  final TextStyle style;
-  final EdgeInsets padding;
-  final TextDirection textDirection;
-  final TextScaler textScaler;
+  final _SourceBackgroundLayout layout;
+  final _SourceBackgroundRanges ranges;
   final IanvsMarkdownThemeData colors;
   final bool dark;
 
   @override
   void paint(Canvas canvas, Size size) {
     if (!enabled || !controller.parseDecision.useMarkdown) return;
-    final ranges = _markdownFencedCodeRanges(controller.text);
-    if (ranges.isEmpty || size.isEmpty) return;
-
-    final contentWidth = size.width - padding.horizontal;
-    if (contentWidth <= 0) return;
-    final textPainter = TextPainter(
-      text: TextSpan(text: controller.text, style: style),
-      textDirection: textDirection,
-      textScaler: textScaler,
-      textWidthBasis: TextWidthBasis.parent,
-    )..layout(maxWidth: contentWidth);
-    final positions = scrollController.positions;
-    final scrollOffset = positions.isEmpty ? 0.0 : positions.last.pixels;
+    final codeRanges = ranges.code(controller.text);
+    if (codeRanges.isEmpty || size.isEmpty) return;
+    final geometry = layout.resolve();
+    if (geometry == null) return;
     final outline = Paint()
       ..color = colors.borderSoft
       ..style = PaintingStyle.stroke
@@ -738,23 +794,14 @@ class _SourceFencedCodeBackgroundPainter extends CustomPainter {
 
     canvas.save();
     canvas.clipRect(Offset.zero & size);
-    for (final range in ranges) {
-      final boxes = textPainter.getBoxesForSelection(
-        TextSelection(baseOffset: range.start, extentOffset: range.end),
-        boxHeightStyle: BoxHeightStyle.max,
-      );
-      if (boxes.isEmpty) continue;
-      final top = boxes
-          .map((box) => box.top)
-          .reduce((value, next) => value < next ? value : next);
-      final bottom = boxes
-          .map((box) => box.bottom)
-          .reduce((value, next) => value > next ? value : next);
+    for (final range in codeRanges) {
+      final bounds = geometry.boundsFor(range);
+      if (bounds == null) continue;
       final rect = Rect.fromLTRB(
-        (padding.left - 6).clamp(0, size.width),
-        padding.top + top - scrollOffset - 3,
-        (size.width - padding.right + 6).clamp(0, size.width),
-        padding.top + bottom - scrollOffset + 3,
+        (bounds.left - 6).clamp(0, size.width),
+        bounds.top - 3,
+        (bounds.right + 6).clamp(0, size.width),
+        bounds.bottom + 3,
       );
       if (rect.bottom < 0 || rect.top > size.height) continue;
       final radius = Radius.circular(colors.smallRadius / 2);
@@ -781,15 +828,9 @@ class _SourceFencedCodeBackgroundPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _SourceFencedCodeBackgroundPainter oldDelegate) {
-    return oldDelegate.enabled != enabled ||
-        oldDelegate.controller != controller ||
-        oldDelegate.scrollController != scrollController ||
-        oldDelegate.style != style ||
-        oldDelegate.padding != padding ||
-        oldDelegate.textDirection != textDirection ||
-        oldDelegate.textScaler != textScaler ||
-        oldDelegate.colors != colors ||
-        oldDelegate.dark != dark;
+    // Host typography and layout can change without changing controller text.
+    // Range parsing is cached; geometry always comes from the current field.
+    return true;
   }
 }
 

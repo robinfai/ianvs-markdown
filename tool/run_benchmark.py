@@ -28,6 +28,7 @@ def main():
     parser.add_argument("--flutter", default=os.environ.get("FLUTTER", "flutter"))
     parser.add_argument("--windowing-workaround", action="store_true", help="Apply the documented Flutter AOT workaround to a disposable SDK under a system temp directory")
     parser.add_argument("--force-document-parse", action="store_true", help="Reproduce the pre-cache document refresh behavior for comparison")
+    parser.add_argument("--phase-timings", action="store_true", help="Enable synchronous component attribution; diagnostic runs only, not accepted latency baselines")
     args = parser.parse_args()
     if not args.label.replace("-", "").replace("_", "").isalnum():
         parser.error("label must contain only letters, numbers, - or _")
@@ -63,7 +64,13 @@ def main():
             patch = root / 'benchmark/flutter-windowing-workaround.patch'
             subprocess.run(['git', 'apply', '--check', '--unidiff-zero', str(patch)], cwd=sdk, check=True)
             subprocess.run(['git', 'apply', '--unidiff-zero', str(patch)], cwd=sdk, check=True)
-    input_paths = sorted((root / 'lib').rglob('*.dart')) + [
+    runtime_paths = [root / name for name in (
+        'pubspec.yaml', 'pubspec.lock', 'example/pubspec.yaml', 'example/pubspec.lock',
+        'example/macos/Runner/MainFlutterWindow.swift',
+        'example/macos/Runner/Base.lproj/MainMenu.xib',
+    )]
+    source_paths = sorted((root / 'lib').rglob('*.dart'))
+    input_paths = source_paths + runtime_paths + [
         root / 'benchmark/corpus.dart', root / 'benchmark/live_editor_benchmark.dart',
         Path(__file__).resolve(), feature_file,
     ]
@@ -76,6 +83,7 @@ def main():
         args.flutter, "run", "-d", "macos", "--profile",
         "--target", "../benchmark/live_editor_benchmark.dart",
         "--dart-define=IANVS_MARKDOWN_DIAGNOSTICS=true",
+        f"--dart-define=IANVS_MARKDOWN_PROFILE_PHASES={str(args.phase_timings).lower()}",
         f"--dart-define=BENCHMARK_SAMPLES={args.samples}",
         f"--dart-define=BENCHMARK_WARMUP={args.warmup}",
         f"--dart-define=BENCHMARK_SIZES={args.sizes}",
@@ -182,6 +190,8 @@ def main():
     result['errors'].extend(runtime_errors)
     changed_inputs = [path for path, digest in input_hashes.items()
                       if hashlib.sha256(Path(path).read_bytes()).hexdigest() != digest]
+    if source_paths != sorted((root / 'lib').rglob('*.dart')):
+        changed_inputs.append('library source file inventory')
     if changed_inputs:
         result['complete'] = False
         result['fullBaseline'] = False
@@ -196,9 +206,15 @@ def main():
     result['wallSeconds'] = time.monotonic() - started_clock
     result['runFinishedAtUtc'] = datetime.now(timezone.utc).isoformat()
     result['runnerSha256'] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    result['revision'] = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip()
+    result['trackedDiffSha256'] = hashlib.sha256(subprocess.check_output(['git', 'diff', 'HEAD', '--', 'lib', 'benchmark', 'tool/run_benchmark.py'], cwd=root)).hexdigest()
     result['sourceFilesSha256'] = {
         str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
         for path in sorted((root / 'lib').rglob('*.dart'))
+    }
+    result['runtimeInputsSha256'] = {
+        str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in runtime_paths
     }
     result['runStartedAtUtc'] = started
     result["host"] = platform.platform()

@@ -1,0 +1,66 @@
+{
+  "recordedAtUtc": "2026-10-10T08:31:12.836153+00:00",
+  "implementationRevision": "084a5d5c820408519e02da9b6ff5b34d86e8cb58",
+  "fullCheckImplementationRevision": "760dad7619910770871e60a842d97b9bbac96ce2",
+  "fullCheckEvidence": "source-background-validation.json",
+  "all84ImplementationHashesMatchFullCheckAndPackage": true,
+  "streamingRevalidation": {
+    "flutter": "3.44.8",
+    "dart": "3.12.2",
+    "sdkUnmodified": true,
+    "core": 35,
+    "example": 10,
+    "commands": [
+      "flutter pub get && flutter test test/streaming_contract_test.dart",
+      "cd example && flutter pub get && flutter test test/streaming_example_test.dart"
+    ],
+    "exitCodes": [
+      0,
+      0
+    ]
+  },
+  "pairedComparison": "paired-comparison.json",
+  "fullWorkloadValidation": "passed",
+  "baselines": [
+    "r2-visible-before-1",
+    "r2-visible-before-6"
+  ],
+  "candidates": [
+    "r2-candidate-1",
+    "r2-candidate-3"
+  ],
+  "excludedCandidate": "r2-candidate-2",
+  "rows": 42,
+  "samplesPerRun": 840,
+  "rowsExceedingObservationLine": 0,
+  "limitations": [
+    "Temporary windowing SDK only supports controlled performance attribution, not unmodified-SDK release acceptance.",
+    "1 MiB unlimited Live-to-Source still costs 6.18–6.22 seconds P95; full paragraph layout remains.",
+    "Default 1 MiB typing costs 371–380 ms P95; no universal frame-time guarantee.",
+    "Real platform interactions and Reading AOT failures remain R3-01 work."
+  ],
+  "evidenceSha256": {
+    "source-background-validation.json": "67daf08612037ff218d502f9998574564467023f4cf22746d691bae83241c610",
+    "paired-comparison.json": "ee53f646330388101967a45da3017fa64f270bfa7789d60647ec1da7e0e45cd6",
+    "baseline-observation.json": "716c43452d24cfec8d6ad557d33a913d2c972d4b67f9c993f146bb5803c3c21c",
+    "streaming-final-core.log.gz": "e0c4c68f86a02956673eea07c43911b722837a9c01552e362d6abe75b3422c9f",
+    "streaming-final-example.log.gz": "0f4de203087aeb946538ec50450ed2a36fa1fa6c84a9d06d4e8959f526cf6fd4",
+    "r2-visible-before-1.json": "49f40e0d64957464af843a1f42e4cb409c172ef6b3c99742ff46937d711742f5",
+    "r2-visible-before-1.samples.jsonl": "71d8e4a19284d3f28f399ba6af61ebde7137a36f386299f5fd727597faf79ac7",
+    "r2-visible-before-1.log.gz": "37ef8626afda0b5dd6afd526dd077f4062f86ce432f0b81de30a546b40215c74",
+    "r2-visible-before-6.json": "88f76e3201397f7ad1f67ce1c38f8847eb5af17fde2e98311fee3765cd3949e7",
+    "r2-visible-before-6.samples.jsonl": "5582b9d6cafd41127b3f78eb9b3f8a8fd591d34ac91c2d40227ca7cbdcc7d52d",
+    "r2-visible-before-6.log.gz": "d39f7e7bffa43ab752114cfa55c640c7fbca5e8a27868f52322ed2c76d2c3f75",
+    "r2-candidate-1.json": "df77fa4baf9fa482dd4177bae0a902751e4b2167b7d76bdafda1582177cce840",
+    "r2-candidate-1.samples.jsonl": "c5652000a36d19076f77cc86850c8aa234cd0cdb7811dc35788a77c78c95af38",
+    "r2-candidate-1.log.gz": "30cbcddb1a6cafbc4a79ac5ab392ec77c7652ac4328aabe058e571c254915a59",
+    "r2-candidate-3.json": "786c16b1ed75ae943987d8b759a1c24f1012c4637d33c2b676f30c6769cfe146",
+    "r2-candidate-3.samples.jsonl": "c0e93bdfe4d083457fa335c3a68eb354320561e0e89c0591ebeee11aa0b23ed9",
+    "r2-candidate-3.log.gz": "8f2872562ddd504dfa33d77c93bef3dc19e80b61a445085120b6ab86e3dcfa76",
+    "r2-candidate-2.json": "054191f6ef7f2ac10f39c59ada58bd2998fac4d968325d7431154d0603409da2",
+    "r2-candidate-2.samples.jsonl": "e512cb17e449b5d7b9eb86d99c2c38d1b6b871125691bd672c8cc3f717a22c22",
+    "r2-candidate-2.log.gz": "2e02c4d26c1e9f461e09efbef19c79d0ca4eec3a159cad670e5ef38f075d4e3b",
+    "paired-core-ci.json": "17428e1987bb17495dc0c7ad2760b612b89328ad50efddcc27f5e0fb0863de92",
+    "paired-native-ci.json": "bcf55c1e66067bc76b4f5c9996620ed080ba45e2357771598f70be32e174e805"
+  }
+}

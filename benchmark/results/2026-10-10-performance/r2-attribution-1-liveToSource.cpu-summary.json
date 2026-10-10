@@ -1,0 +1,572 @@
+{
+  "operation": "liveToSource",
+  "sampleCount": 4174,
+  "samplePeriodMicros": 1000,
+  "actionLatencyMs": 6336.444,
+  "componentFunctions": [
+    {
+      "name": "IanvsMarkdownEditorDiagnostics.measure",
+      "kind": "Dart",
+      "inclusiveTicks": 515,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_diagnostics.dart"
+    },
+    {
+      "name": "buildMarkdownSourceTextSpan",
+      "kind": "Dart",
+      "inclusiveTicks": 317,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_controller.dart"
+    },
+    {
+      "name": "IanvsMarkdownController.buildTextSpan",
+      "kind": "Dart",
+      "inclusiveTicks": 317,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_controller.dart"
+    },
+    {
+      "name": "buildTextSpan.<anonymous closure>",
+      "kind": "Dart",
+      "inclusiveTicks": 317,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_controller.dart"
+    },
+    {
+      "name": "_markdownSyntaxTokens",
+      "kind": "Dart",
+      "inclusiveTicks": 311,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_controller.dart"
+    },
+    {
+      "name": "_SourceFencedCodeBackgroundPainter.paint",
+      "kind": "Dart",
+      "inclusiveTicks": 211,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/source_editor.dart"
+    },
+    {
+      "name": "paint.<anonymous closure>",
+      "kind": "Dart",
+      "inclusiveTicks": 186,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/source_editor.dart"
+    },
+    {
+      "name": "_addAutolinkSyntaxTokens",
+      "kind": "Dart",
+      "inclusiveTicks": 126,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_controller.dart"
+    },
+    {
+      "name": "matchIanvsMarkdownAutolinkAt",
+      "kind": "Dart",
+      "inclusiveTicks": 126,
+      "exclusiveTicks": 2,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/obsidian_autolink.dart"
+    },
+    {
+      "name": "parseMarkdownBlocks",
+      "kind": "Dart",
+      "inclusiveTicks": 78,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_models.dart"
+    },
+    {
+      "name": "ianvsMarkdownBlockIdRanges",
+      "kind": "Dart",
+      "inclusiveTicks": 59,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/obsidian_metadata.dart"
+    },
+    {
+      "name": "_obsidianCodeRanges",
+      "kind": "Dart",
+      "inclusiveTicks": 55,
+      "exclusiveTicks": 3,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/obsidian_metadata.dart"
+    },
+    {
+      "name": "_obsidianLiteralCodeRanges",
+      "kind": "Dart",
+      "inclusiveTicks": 55,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/obsidian_metadata.dart"
+    },
+    {
+      "name": "ianvsMarkdownBlockCodeRanges",
+      "kind": "Dart",
+      "inclusiveTicks": 43,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/markdown_code_ranges.dart"
+    },
+    {
+      "name": "_collectBlockCodeRanges",
+      "kind": "Dart",
+      "inclusiveTicks": 43,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/markdown_code_ranges.dart"
+    },
+    {
+      "name": "_classifyBlock",
+      "kind": "Dart",
+      "inclusiveTicks": 42,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_models.dart"
+    },
+    {
+      "name": "ianvsMarkdownCommentRanges",
+      "kind": "Dart",
+      "inclusiveTicks": 42,
+      "exclusiveTicks": 5,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/obsidian_metadata.dart"
+    },
+    {
+      "name": "_addInlineHtmlSyntaxTokens",
+      "kind": "Dart",
+      "inclusiveTicks": 15,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_controller.dart"
+    },
+    {
+      "name": "_addInlineHtmlSyntaxTokens.scan",
+      "kind": "Dart",
+      "inclusiveTicks": 15,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_controller.dart"
+    },
+    {
+      "name": "_overlapsAnyRange",
+      "kind": "Dart",
+      "inclusiveTicks": 14,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_controller.dart"
+    },
+    {
+      "name": "ianvsMarkdownTableBodyContinues",
+      "kind": "Dart",
+      "inclusiveTicks": 11,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_models.dart"
+    },
+    {
+      "name": "_tableEnd",
+      "kind": "Dart",
+      "inclusiveTicks": 11,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_models.dart"
+    },
+    {
+      "name": "_addInlineCodeSyntaxTokens",
+      "kind": "Dart",
+      "inclusiveTicks": 10,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_controller.dart"
+    },
+    {
+      "name": "_blockListMarker",
+      "kind": "Dart",
+      "inclusiveTicks": 9,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_models.dart"
+    },
+    {
+      "name": "_htmlBlockStart",
+      "kind": "Dart",
+      "inclusiveTicks": 8,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_models.dart"
+    },
+    {
+      "name": "_sourceLines",
+      "kind": "Dart",
+      "inclusiveTicks": 8,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_models.dart"
+    },
+    {
+      "name": "_addFencedCodeSyntaxTokens",
+      "kind": "Dart",
+      "inclusiveTicks": 8,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_controller.dart"
+    },
+    {
+      "name": "_isAtxHeading",
+      "kind": "Dart",
+      "inclusiveTicks": 7,
+      "exclusiveTicks": 1,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_models.dart"
+    },
+    {
+      "name": "_fence",
+      "kind": "Dart",
+      "inclusiveTicks": 7,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/editor/editor_models.dart"
+    },
+    {
+      "name": "markdownHighlightedCodeSpan",
+      "kind": "Dart",
+      "inclusiveTicks": 7,
+      "exclusiveTicks": 0,
+      "source": "file:///Users/robinfai/flutter_projects/ianvs-markdown/lib/src/code_block.dart"
+    }
+  ],
+  "topInclusive": [
+    {
+      "name": "[Truncated]",
+      "kind": "Tag",
+      "inclusiveTicks": 3999,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "kDartVmSnapshotInstructions",
+      "kind": "Native",
+      "inclusiveTicks": 3848,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "Dart_InvokeClosure",
+      "kind": "Native",
+      "inclusiveTicks": 3827,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "dart::DartEntry::InvokeCallable(dart::Thread*, dart::Function const&, dart::Array const&, dart::Array const&)",
+      "kind": "Native",
+      "inclusiveTicks": 3826,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "dart.ui._invoke",
+      "kind": "Dart",
+      "inclusiveTicks": 3826,
+      "exclusiveTicks": 0,
+      "source": "org-dartlang-sdk:///flutter/lib/ui/hooks.dart"
+    },
+    {
+      "name": "PlatformDispatcher._drawFrame",
+      "kind": "Dart",
+      "inclusiveTicks": 3826,
+      "exclusiveTicks": 0,
+      "source": "org-dartlang-sdk:///flutter/lib/ui/platform_dispatcher.dart"
+    },
+    {
+      "name": "_MixinApplication150&BindingBase&GestureBinding&SchedulerBinding._handleDrawFrame",
+      "kind": "Dart",
+      "inclusiveTicks": 3826,
+      "exclusiveTicks": 0,
+      "source": "file:///private/tmp/ianvs-r2-perf-9BCIxV/flutter/packages/flutter/lib/src/scheduler/binding.dart"
+    },
+    {
+      "name": "_MixinApplication150&BindingBase&GestureBinding&SchedulerBinding.handleDrawFrame",
+      "kind": "Dart",
+      "inclusiveTicks": 3826,
+      "exclusiveTicks": 0,
+      "source": "file:///private/tmp/ianvs-r2-perf-9BCIxV/flutter/packages/flutter/lib/src/scheduler/binding.dart"
+    },
+    {
+      "name": "_MixinApplication150&BindingBase&GestureBinding&SchedulerBinding._invokeFrameCallback",
+      "kind": "Dart",
+      "inclusiveTicks": 3826,
+      "exclusiveTicks": 0,
+      "source": "file:///private/tmp/ianvs-r2-perf-9BCIxV/flutter/packages/flutter/lib/src/scheduler/binding.dart"
+    },
+    {
+      "name": "_MixinApplication154&BindingBase&GestureBinding&SchedulerBinding&ServicesBinding&PaintingBinding&SemanticsBinding&RendererBinding._handlePersistentFrameCallback",
+      "kind": "Dart",
+      "inclusiveTicks": 3826,
+      "exclusiveTicks": 0,
+      "source": "file:///private/tmp/ianvs-r2-perf-9BCIxV/flutter/packages/flutter/lib/src/rendering/binding.dart"
+    },
+    {
+      "name": "_MixinApplication155&BindingBase&GestureBinding&SchedulerBinding&ServicesBinding&PaintingBinding&SemanticsBinding&RendererBinding&WidgetsBinding.drawFrame",
+      "kind": "Dart",
+      "inclusiveTicks": 3826,
+      "exclusiveTicks": 0,
+      "source": "file:///private/tmp/ianvs-r2-perf-9BCIxV/flutter/packages/flutter/lib/src/widgets/binding.dart"
+    },
+    {
+      "name": "_MixinApplication154&BindingBase&GestureBinding&SchedulerBinding&ServicesBinding&PaintingBinding&SemanticsBinding&RendererBinding.drawFrame",
+      "kind": "Dart",
+      "inclusiveTicks": 3826,
+      "exclusiveTicks": 0,
+      "source": "file:///private/tmp/ianvs-r2-perf-9BCIxV/flutter/packages/flutter/lib/src/rendering/binding.dart"
+    },
+    {
+      "name": "dart.ui._drawFrame",
+      "kind": "Dart",
+      "inclusiveTicks": 3826,
+      "exclusiveTicks": 0,
+      "source": "org-dartlang-sdk:///flutter/lib/ui/hooks.dart"
+    },
+    {
+      "name": "tonic::DartInvokeVoid(_Dart_Handle*)",
+      "kind": "Native",
+      "inclusiveTicks": 3825,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "flutter::PlatformConfiguration::BeginFrame(fml::TimePoint, unsigned long long)",
+      "kind": "Native",
+      "inclusiveTicks": 3825,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "flutter::RuntimeController::BeginFrame(fml::TimePoint, unsigned long long)",
+      "kind": "Native",
+      "inclusiveTicks": 3818,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "flutter::Animator::BeginFrame(std::__fl::unique_ptr<flutter::FrameTimingsRecorder, std::__fl::default_delete<flutter::FrameTimingsRecorder>>)",
+      "kind": "Native",
+      "inclusiveTicks": 3815,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "std::__fl::__function::__func<flutter::Animator::AwaitVSync()::$_0, std::__fl::allocator<flutter::Animator::AwaitVSync()::$_0>, void (std::__fl::unique_ptr<flutter::FrameTimingsRecorder, std::__fl::default_delete<flutter::FrameTimingsRecorder>>)>::operator()(std::__fl::unique_ptr<flutter::FrameTimingsRecorder, std::__fl::default_delete<flutter::FrameTimingsRecorder>>&&)",
+      "kind": "Native",
+      "inclusiveTicks": 3815,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "std::__fl::__function::__func<flutter::VsyncWaiter::FireCallback(fml::TimePoint, fml::TimePoint, bool)::$_0, std::__fl::allocator<flutter::VsyncWaiter::FireCallback(fml::TimePoint, fml::TimePoint, bool)::$_0>, void ()>::operator()()",
+      "kind": "Native",
+      "inclusiveTicks": 3814,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "flutter::EmbedderTaskRunner::PostTask(unsigned long long)",
+      "kind": "Native",
+      "inclusiveTicks": 3813,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "flutter::EmbedderEngine::RunTask(FlutterTask const*)",
+      "kind": "Native",
+      "inclusiveTicks": 3810,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "FlutterEngineRunTask",
+      "kind": "Native",
+      "inclusiveTicks": 3806,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "TextPainter.layout",
+      "kind": "Dart",
+      "inclusiveTicks": 3793,
+      "exclusiveTicks": 0,
+      "source": "file:///private/tmp/ianvs-r2-perf-9BCIxV/flutter/packages/flutter/lib/src/painting/text_painter.dart"
+    },
+    {
+      "name": "__60-[FlutterEngine postMainThreadTask:targetTimeInNanoseconds:]_block_invoke",
+      "kind": "Native",
+      "inclusiveTicks": 3790,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "$sIeyB_Ieg_TR",
+      "kind": "Native",
+      "inclusiveTicks": 3788,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "$s20InternalFlutterSwift0B7RunLoopC19performExpiredTasks33_D4CDF1FCA38C25E611593B39D16A3F51LLyyF",
+      "kind": "Native",
+      "inclusiveTicks": 3779,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "$s20InternalFlutterSwift0B7RunLoopCACyc33_D4CDF1FCA38C25E611593B39D16A3F51LlfcySvSgcfU_",
+      "kind": "Native",
+      "inclusiveTicks": 3772,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "$s20InternalFlutterSwift0B7RunLoopCACyc33_D4CDF1FCA38C25E611593B39D16A3F51LlfcySvSgcfU_To",
+      "kind": "Native",
+      "inclusiveTicks": 3761,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "__CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__",
+      "kind": "Native",
+      "inclusiveTicks": 3752,
+      "exclusiveTicks": 0,
+      "source": ""
+    },
+    {
+      "name": "__CFRunLoopDoSource0",
+      "kind": "Native",
+      "inclusiveTicks": 3737,
+      "exclusiveTicks": 0,
+      "source": ""
+    }
+  ],
+  "topExclusive": [
+    {
+      "name": "std::__fl::__function::__func<skia::textlayout::ParagraphImpl::applySpacingAndBuildClusterTable()::$_0, std::__fl::allocator<skia::textlayout::ParagraphImpl::applySpacingAndBuildClusterTable()::$_0>, void (skia::textlayout::Cluster*)>::operator()(skia::textlayout::Cluster*&&)",
+      "kind": "Native",
+      "inclusiveTicks": 3104,
+      "exclusiveTicks": 3096,
+      "source": ""
+    },
+    {
+      "name": "dart::IrregexpInterpreter::Result dart::(anonymous namespace)::RawMatch<unsigned short const, dart::TwoByteString>(dart::Thread*, dart::TypedData const&, dart::String const&, base::Vector<unsigned short const const>, int*, int, int, int, unsigned int, dart::RegExpStatics::CallOrigin, unsigned int)",
+      "kind": "Native",
+      "inclusiveTicks": 130,
+      "exclusiveTicks": 119,
+      "source": ""
+    },
+    {
+      "name": "_platform_memmove",
+      "kind": "Native",
+      "inclusiveTicks": 83,
+      "exclusiveTicks": 83,
+      "source": ""
+    },
+    {
+      "name": "skia::textlayout::ParagraphImpl::addLine(SkPoint, SkPoint, skia::textlayout::SkRange<unsigned long>, skia::textlayout::SkRange<unsigned long>, skia::textlayout::SkRange<unsigned long>, skia::textlayout::SkRange<unsigned long>, skia::textlayout::SkRange<unsigned long>, float, skia::textlayout::InternalLineMetrics)",
+      "kind": "Native",
+      "inclusiveTicks": 68,
+      "exclusiveTicks": 64,
+      "source": ""
+    },
+    {
+      "name": "bool std::__fl::__insertion_sort_incomplete[abi:nn210000]<std::__fl::_ClassicAlgPolicy, skia::textlayout::OneLineShaper::finish(skia::textlayout::Block const&, float, float&)::$_0&, skia::textlayout::OneLineShaper::RunBlock*>(skia::textlayout::OneLineShaper::RunBlock*, skia::textlayout::OneLineShaper::RunBlock*, skia::textlayout::OneLineShaper::finish(skia::textlayout::Block const&, float, float&)::$_0&)",
+      "kind": "Native",
+      "inclusiveTicks": 59,
+      "exclusiveTicks": 59,
+      "source": ""
+    },
+    {
+      "name": "void std::__fl::__introsort<std::__fl::_ClassicAlgPolicy, skia::textlayout::OneLineShaper::finish(skia::textlayout::Block const&, float, float&)::$_0&, skia::textlayout::OneLineShaper::RunBlock*, false>(skia::textlayout::OneLineShaper::RunBlock*, skia::textlayout::OneLineShaper::RunBlock*, skia::textlayout::OneLineShaper::finish(skia::textlayout::Block const&, float, float&)::$_0&, std::__fl::iterator_traits<skia::textlayout::OneLineShaper::RunBlock*>::difference_type, bool)",
+      "kind": "Native",
+      "inclusiveTicks": 108,
+      "exclusiveTicks": 49,
+      "source": ""
+    },
+    {
+      "name": "skia::textlayout::OneLineShaper::finish(skia::textlayout::Block const&, float, float&)",
+      "kind": "Native",
+      "inclusiveTicks": 168,
+      "exclusiveTicks": 44,
+      "source": ""
+    },
+    {
+      "name": "dart::IrregexpInterpreter::Result dart::(anonymous namespace)::RawMatch<unsigned char const, dart::OneByteString>(dart::Thread*, dart::TypedData const&, dart::String const&, base::Vector<unsigned char const const>, int*, int, int, int, unsigned int, dart::RegExpStatics::CallOrigin, unsigned int)",
+      "kind": "Native",
+      "inclusiveTicks": 32,
+      "exclusiveTicks": 29,
+      "source": ""
+    },
+    {
+      "name": "skia::textlayout::Cluster& skia_private::TArray<skia::textlayout::Cluster, true>::emplace_back<skia::textlayout::ParagraphImpl*, unsigned long const&, unsigned long&, unsigned long&, SkSpan<char const>&, float&, float&>(skia::textlayout::ParagraphImpl*&&, unsigned long const&, unsigned long&, unsigned long&, SkSpan<char const>&, float&, float&)",
+      "kind": "Native",
+      "inclusiveTicks": 24,
+      "exclusiveTicks": 19,
+      "source": ""
+    },
+    {
+      "name": "void AAT::StateTableDriver<AAT::ExtendedTypes, AAT::LigatureEntry<true>::EntryData, AAT::LigatureSubtable<AAT::ExtendedTypes>::Flags>::drive<AAT::LigatureSubtable<AAT::ExtendedTypes>::driver_context_t>(AAT::LigatureSubtable<AAT::ExtendedTypes>::driver_context_t*, AAT::hb_aat_apply_context_t*)",
+      "kind": "Native",
+      "inclusiveTicks": 22,
+      "exclusiveTicks": 17,
+      "source": ""
+    },
+    {
+      "name": "_xzm_free_main",
+      "kind": "Native",
+      "inclusiveTicks": 17,
+      "exclusiveTicks": 17,
+      "source": ""
+    },
+    {
+      "name": "icu_77::RuleBasedBreakIterator::handleNext()",
+      "kind": "Native",
+      "inclusiveTicks": 18,
+      "exclusiveTicks": 14,
+      "source": ""
+    },
+    {
+      "name": "skia::textlayout::ParagraphImpl::getRectsForRange(unsigned int, unsigned int, skia::textlayout::RectHeightStyle, skia::textlayout::RectWidthStyle)",
+      "kind": "Native",
+      "inclusiveTicks": 19,
+      "exclusiveTicks": 12,
+      "source": ""
+    },
+    {
+      "name": "dart::VMHandles::AllocateHandle(dart::Zone*)",
+      "kind": "Native",
+      "inclusiveTicks": 12,
+      "exclusiveTicks": 12,
+      "source": ""
+    },
+    {
+      "name": "skia::textlayout::TextWrapper::lookAhead(float, skia::textlayout::Cluster*, bool)",
+      "kind": "Native",
+      "inclusiveTicks": 24,
+      "exclusiveTicks": 11,
+      "source": ""
+    },
+    {
+      "name": "_xzm_xzone_malloc_tiny",
+      "kind": "Native",
+      "inclusiveTicks": 11,
+      "exclusiveTicks": 11,
+      "source": ""
+    },
+    {
+      "name": "SkUTF::NextUTF8(char const**, char const*)",
+      "kind": "Native",
+      "inclusiveTicks": 10,
+      "exclusiveTicks": 10,
+      "source": ""
+    },
+    {
+      "name": "unsigned int (anonymous namespace)::TFormat4UTF16cmapTable::MapT<false, unsigned short>(unsigned short const*, unsigned short*, unsigned int&, bool) const",
+      "kind": "Native",
+      "inclusiveTicks": 11,
+      "exclusiveTicks": 10,
+      "source": ""
+    },
+    {
+      "name": "_StringBase.indexOf",
+      "kind": "Dart",
+      "inclusiveTicks": 12,
+      "exclusiveTicks": 9,
+      "source": "org-dartlang-sdk:///flutter/third_party/dart/sdk/lib/_internal/vm/lib/string_patch.dart"
+    },
+    {
+      "name": "_platform_memset",
+      "kind": "Native",
+      "inclusiveTicks": 8,
+      "exclusiveTicks": 8,
+      "source": ""
+    }
+  ]
+}

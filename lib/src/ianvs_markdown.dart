@@ -14,6 +14,7 @@ import 'callout.dart';
 import 'code_block.dart';
 import 'code_surface.dart';
 import 'editor/editor_models.dart';
+import 'editor/editor_diagnostics.dart';
 import 'editor/markdown_code_ranges.dart';
 import 'emphasis.dart';
 import 'front_matter_card.dart';
@@ -57,6 +58,7 @@ import 'obsidian_inline.dart';
 import 'obsidian_metadata.dart';
 import 'obsidian_image.dart';
 import 'render_budget.dart';
+import 'renderer/scoped_body.dart';
 import 'rich_clipboard.dart';
 import 'strikethrough.dart';
 import 'syntax_preset.dart';
@@ -635,30 +637,36 @@ class IanvsMarkdown extends StatelessWidget {
       ),
       IanvsMarkdownTagSyntax(),
     ];
-    final preparedData = _projectIrregularObsidianTables(
-      prepareObsidianMarkdownForRendering(
-        decision.text,
-        mode: obsidianMetadataMode,
+    final preparedData = IanvsMarkdownEditorDiagnostics.measure(
+      'body.prepare',
+      () => _projectIrregularObsidianTables(
+        prepareObsidianMarkdownForRendering(
+          decision.text,
+          mode: obsidianMetadataMode,
+        ),
       ),
     );
     final imageProjectedData =
         obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing
         ? projectObsidianReferenceImagesForLivePreview(preparedData)
         : preparedData;
-    final renderedData =
-        projectObsidianInlineLinkDestinationBackslashesForRendering(
-          projectObsidianCrossParagraphHighlightsForRendering(
-            imageProjectedData,
-          ),
-        );
-    final taskProjection = projectObsidianTaskMarkers(renderedData);
+    final renderedData = IanvsMarkdownEditorDiagnostics.measure(
+      'body.inlineProjection',
+      () => projectObsidianInlineLinkDestinationBackslashesForRendering(
+        projectObsidianCrossParagraphHighlightsForRendering(imageProjectedData),
+      ),
+    );
+    final taskProjection = IanvsMarkdownEditorDiagnostics.measure(
+      'body.taskProjection',
+      () => projectObsidianTaskMarkers(renderedData),
+    );
     final listIndentStep =
         (effectiveStyleSheet.listIndent ?? 24) +
         (effectiveStyleSheet.listBulletPadding?.horizontal ?? 4);
     var imageIndex = 0;
     var taskIndex = 0;
     Set<String>? imageReferenceLabels;
-    final body = MarkdownBody(
+    final body = ScopedMarkdownBody(
       key: ValueKey<bool>(softLineBreak),
       // flutter_markdown_plus only reparses when data or styles change, so
       // changing this option must remount its state to rebuild line spans.
@@ -845,7 +853,7 @@ class IanvsMarkdown extends StatelessWidget {
     IanvsMarkdownThemeData colors, {
     required bool blockSelectable,
   }) {
-    return MarkdownBody(
+    return ScopedMarkdownBody(
       key: ValueKey((syntaxPreset, softLineBreak)),
       data: source,
       selectable: blockSelectable,
@@ -1456,10 +1464,13 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
     );
     _headings = _document.headings;
     _headingFoldModel = _document.parseDecision!.useMarkdown
-        ? IanvsMarkdownHeadingFoldModel.parse(
-            _document.body,
-            syntaxPreset: widget.syntaxPreset,
-            budget: null, // Preflight already covered the complete source.
+        ? IanvsMarkdownEditorDiagnostics.measure(
+            'view.folding',
+            () => IanvsMarkdownHeadingFoldModel.parse(
+              _document.body,
+              syntaxPreset: widget.syntaxPreset,
+              budget: null, // Preflight already covered the complete source.
+            ),
           )
         : IanvsMarkdownHeadingFoldModel.unparsed(
             _document.body,

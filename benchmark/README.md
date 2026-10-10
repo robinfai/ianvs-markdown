@@ -32,6 +32,56 @@ are historical and cannot substitute for a new baseline. The comparison tool
 already requires matching source and harness hashes. This change has not rerun
 the profile baseline; R2-01 performs the new matched measurements.
 
+## R2 attribution and performance comparisons
+
+`--phase-timings` records opt-in synchronous timings for Controller and Live
+preflight/references, highlights, footnotes, blocks/headings, document metadata,
+source spans/background layout and body projections. These timings are inclusive
+and may be nested. They exclude Flutter's actual text-field and reading-widget
+layout; use the CPU companion for those costs. Keep attribution separate from
+accepted latency runs, which have `phaseTimingsEnabled: false`.
+
+Each action also records callback duration, the subsequent frame wait and app
+lifecycle state. Preserve slow/outlier samples: a long wait with few UI CPU
+samples does not alone prove that Markdown parsing blocked the UI.
+
+The macOS harness requires `native-window-stable-v1`: the window must be active,
+visible, unhidden, unminimized and on the active Space. Native notifications track
+state changes, including a loss/regain between action snapshots; a change after
+startup immediately invalidates the run even when hidden windows stop producing
+frames. The initial window dimensions and generation are retained, and every raw
+action start/end must match them. Startup allows ten seconds for activation.
+Snapshot calls are outside measured latency and frame intervals. Keep the window
+in front throughout each run; do not resize it or run builds concurrently. This
+guard does not detect unrelated background CPU load or thermal throttling.
+
+R2 compares real source versions with the shipped selection optimization enabled
+in both. Freeze the measurement code before running at least two serial, fresh
+process baselines with default 5 warmups / 20 samples and all six cases / seven
+operations. Source and dependency hashes, raw action traces, SDK, window and
+sampling configuration must match. Generate the observation lines before editing
+the optimization:
+
+```sh
+python3 tool/analyze_performance_runs.py \
+  --baseline build/benchmark/r2-before-1.json \
+  --baseline build/benchmark/r2-before-2.json \
+  --output build/benchmark/r2-baseline-summary.json
+```
+
+After optimization, provide two full `--candidate` runs and one explicit
+`--changed-source lib/...dart` argument per changed/added/removed library file.
+The validator rejects other source changes, fallback differences, overlapping
+runs, changed dependencies, incomplete coverage, attribution runs and JSON
+summaries that disagree with their trace files. A candidate exceeding a baseline
+observation line returns failure for investigation; the line is specific to the
+measured environment, not a portable CI threshold. `make test-tools` exercises
+the validator's rejection paths. The older `compare_benchmarks.py` remains the
+R0 forced-selection-refresh comparison and its historical evidence is unchanged.
+
+R2's initial diagnosis and pending acceptance are recorded in
+[PERFORMANCE-2026-10-10.md](PERFORMANCE-2026-10-10.md).
+
 ## Measurements
 
 - `initialDisplay`: create a new controller/editor, mount, and complete the

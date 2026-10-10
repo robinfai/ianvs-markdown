@@ -12,6 +12,7 @@
 | 本机 macOS 27.0.1、arm64，Flutter 3.44.8 / Dart 3.12.2 | R2 核心 842 项、示例 6 项；176 个公共符号编译、发布快照及包外宿主通过 | 基于 `e131698`；未修改日常 Flutter SDK |
 | 本机 macOS 27.0.1、Xcode 27.0 (27A266a)、Rust 1.90.0 | 最小 macOS 示例 Profile / Release 候选构建 | 结果见下节；构建通过不等于完成真机交互验收 |
 | 本机 macOS 27.0.1、arm64，Flutter 3.44.8 / Dart 3.12.2，2026-10-10 | 完整 `make check`、Linefold macOS Debug / iOS Simulator Debug 构建通过 | 代码对应 `603187c`；核心 842、示例 6、app 274（跳过 1 项可选语料）；Mermaid Flutter 9 / Rust 4、原生示例 3、Quick Look Rust 8 / Swift 10 和原生导入通过。宿主构建不替代平台交互验收 |
+| 本机 macOS 27.0.1、arm64，Flutter 3.44.8 / Dart 3.12.2，2026-10-10 | `c9dec69` renderer 隔离实现的完整 `make check` 通过 | 核心 925、示例 10、Python 7、独立预算 32 组、app 274（跳过 1 项）、剪贴板 6 与原生/包外快照通过；[完整记录](../benchmark/PERFORMANCE-2026-10-10.md#本轮交付与未完成验收2026-10-10)。未重跑设备交互，完整 GUI 性能基线因锁屏中断且不计验收 |
 
 Core 的最低 SDK 与较新 SDK 组合都固定在 [CI 工作流](https://github.com/robinfai/ianvs-markdown/blob/main/.github/workflows/core.yml)，原生回归使用 [独立工作流](https://github.com/robinfai/ianvs-markdown/blob/main/.github/workflows/integrations.yml)。SDK 升级需重新验收，不能用某一次本地通过替换整个矩阵。
 
@@ -77,6 +78,8 @@ R2 性能分支的后续优化仍需重验，R3-01 保持进行中。
 实际拆分实现通过完整 `make check`：核心 902、核心示例 9、剪贴板适配器 5、app 274（可选语料跳过 1），原有 Mermaid / Quick Look / 文件导入检查通过；146 文件、约 616 KB 的 Pub 快照零警告，包外示例和新宿主依赖图均不包含原生后端。对核心 example 执行 `flutter clean` 后，`make build-examples` 的 `body.dart`、`reading.dart`、`editor.dart`、`main.dart` 四个 macOS Debug 入口全部成功，未注册 macOS 插件，产物框架仅有 App 和 FlutterMacOS。CI 已纳入这四个入口与显式使用原生剪贴板的 Mermaid 宿主；远端结果按相应 PR 的 Checks 单独确认。
 
 最小阅读入口的 Release 构建曾在未修改 SDK 的 `_window_macos.dart / _Rect` 出现 `illegal cid, full-aot`；该入口的失败不被历史 playground Release 成功抵消。本轮没有用补丁 SDK 把它记为通过。新入口的最低 SDK、Profile/Release 候选与真实交互仍需要逐入口记录。
+
+R2-01 在 `dba969d` 基线上也复现基准入口的未修改 SDK Profile AOT 失败；临时 SDK 的 windowing 补丁仅用于诊断。早期基准完整采样曾因锁屏/前台激活失败中断；解锁并增加原生窗口校验后，一轮完整基线通过，另两轮因运行中失去前台而排除。这些中断属于性能测量环境失效，不据此推断已发布组件的渲染故障或扩展平台支持范围。归档证据见 [R2-01 报告](../benchmark/PERFORMANCE-2026-10-10.md)。
 
 原生剪贴板适配器是独立源码包，当前未发布。其自动测试验证同一 item 双格式、不可用/初始化失败/写入失败时完整 Markdown 回退，以及最终写入失败的错误传播；没有触碰系统剪贴板。Linefold 与 Mermaid 宿主显式接入后仍需在候选版本执行真实跨应用粘贴，不能用这些单元回归扩大平台支持声明。
 
