@@ -1,0 +1,47 @@
+{
+  "revision": "5d639278abecc8a889bb3f139374909c72a2b7e4",
+  "mode": "Flutter test diagnostic, not profile performance baseline",
+  "rows": [
+    {
+      "operation": "controller",
+      "enteredOperation": true,
+      "timedOut": true,
+      "exitCode": -9,
+      "operationTimeoutSeconds": 5
+    },
+    {
+      "operation": "document",
+      "enteredOperation": true,
+      "timedOut": true,
+      "exitCode": -9,
+      "operationTimeoutSeconds": 5
+    },
+    {
+      "operation": "html",
+      "enteredOperation": true,
+      "timedOut": true,
+      "exitCode": -9,
+      "operationTimeoutSeconds": 5
+    },
+    {
+      "operation": "partial",
+      "enteredOperation": true,
+      "timedOut": true,
+      "exitCode": -9,
+      "operationTimeoutSeconds": 5
+    },
+    {
+      "operation": "dense_html",
+      "enteredOperation": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "operationTimeoutSeconds": 5,
+      "results": [
+        {
+          "microseconds": 961079,
+          "length": 2696335
+        }
+      ]
+    }
+  ]
+}

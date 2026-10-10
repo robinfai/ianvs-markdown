@@ -1,0 +1,197 @@
+{
+  "revision": "5d639278abecc8a889bb3f139374909c72a2b7e4",
+  "mode": "Dart JIT diagnostic; HTML operation is parser stage only, not full clipboard conversion",
+  "rows": [
+    {
+      "case": "lines",
+      "operation": "scan",
+      "ready": {
+        "ready": true,
+        "codeUnits": 1048576
+      },
+      "operationTimeoutSeconds": 5,
+      "exitCode": 0,
+      "result": {
+        "microseconds": 11065,
+        "result": {
+          "useMarkdown": true,
+          "tokens": 0,
+          "truncated": false
+        }
+      },
+      "error": ""
+    },
+    {
+      "case": "lines",
+      "operation": "references",
+      "ready": {
+        "ready": true,
+        "codeUnits": 1048576
+      },
+      "operationTimeoutSeconds": 5,
+      "exitCode": 0,
+      "result": {
+        "microseconds": 995,
+        "result": {
+          "references": 0
+        }
+      },
+      "error": ""
+    },
+    {
+      "case": "lines",
+      "operation": "html",
+      "ready": {
+        "ready": true,
+        "codeUnits": 1048576
+      },
+      "operationTimeoutSeconds": 5,
+      "exitCode": 0,
+      "result": {
+        "microseconds": 90277,
+        "result": {
+          "htmlLength": 1048583
+        }
+      },
+      "error": ""
+    },
+    {
+      "case": "plain",
+      "operation": "scan",
+      "ready": {
+        "ready": true,
+        "codeUnits": 1048576
+      },
+      "operationTimeoutSeconds": 5,
+      "exitCode": 0,
+      "result": {
+        "microseconds": 10301,
+        "result": {
+          "useMarkdown": true,
+          "tokens": 0,
+          "truncated": false
+        }
+      },
+      "error": ""
+    },
+    {
+      "case": "plain",
+      "operation": "references",
+      "ready": {
+        "ready": true,
+        "codeUnits": 1048576
+      },
+      "operationTimeoutSeconds": 5,
+      "exitCode": 0,
+      "result": {
+        "microseconds": 1134,
+        "result": {
+          "references": 0
+        }
+      },
+      "error": ""
+    },
+    {
+      "case": "plain",
+      "operation": "html",
+      "ready": {
+        "ready": true,
+        "codeUnits": 1048576
+      },
+      "operationTimeoutSeconds": 5,
+      "timedOut": true
+    },
+    {
+      "case": "bracket",
+      "operation": "scan",
+      "ready": {
+        "ready": true,
+        "codeUnits": 1048576
+      },
+      "operationTimeoutSeconds": 5,
+      "exitCode": 0,
+      "result": {
+        "microseconds": 10636,
+        "result": {
+          "useMarkdown": true,
+          "tokens": 1,
+          "truncated": false
+        }
+      },
+      "error": ""
+    },
+    {
+      "case": "bracket",
+      "operation": "references",
+      "ready": {
+        "ready": true,
+        "codeUnits": 1048576
+      },
+      "operationTimeoutSeconds": 5,
+      "timedOut": true
+    },
+    {
+      "case": "bracket",
+      "operation": "html",
+      "ready": {
+        "ready": true,
+        "codeUnits": 1048576
+      },
+      "operationTimeoutSeconds": 5,
+      "timedOut": true
+    },
+    {
+      "case": "dense",
+      "operation": "scan",
+      "ready": {
+        "ready": true,
+        "codeUnits": 1048572
+      },
+      "operationTimeoutSeconds": 5,
+      "exitCode": 0,
+      "result": {
+        "microseconds": 5310,
+        "result": {
+          "useMarkdown": false,
+          "tokens": 4097,
+          "truncated": true
+        }
+      },
+      "error": ""
+    },
+    {
+      "case": "dense",
+      "operation": "references",
+      "ready": {
+        "ready": true,
+        "codeUnits": 1048572
+      },
+      "operationTimeoutSeconds": 5,
+      "exitCode": 0,
+      "result": {
+        "microseconds": 429728,
+        "result": {
+          "references": 0
+        }
+      },
+      "error": ""
+    },
+    {
+      "case": "dense",
+      "operation": "html",
+      "ready": {
+        "ready": true,
+        "codeUnits": 1048572
+      },
+      "operationTimeoutSeconds": 5,
+      "exitCode": 0,
+      "result": {
+        "microseconds": 539419,
+        "result": {
+          "htmlLength": 2696335
+        }
+      },
+      "error": ""
+    }
+  ]
+}
