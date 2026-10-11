@@ -1,0 +1,9 @@
+package:ianvs_markdown has `uses-material-design: true` set but the primary pubspec contains `uses-material-design: false`. If the application needs material icons, then `uses-material-design`  must be set to true.
+00:00 +0: loading /private/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-package-6nnawv9y/host/test/package_smoke_test.dart
+00:00 +0: external host observes parse and clipboard budgets without source loss
+00:00 +1: migration keeps exact plain text with and without HTML
+00:00 +2: migration budgets remain local to each operation
+00:00 +3: migration offers bounded history and explicit legacy retention
+00:00 +4: migration save captures source through fallback and retry
+00:00 +5: external host renders, edits, saves and restores exact source
+00:01 +6: All tests passed!

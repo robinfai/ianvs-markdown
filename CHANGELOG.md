@@ -1,5 +1,9 @@
 ## Unreleased
 
+- Add a consolidated [0.3.1 migration guide](doc/MIGRATION.md), external-snapshot
+  migration tests and a reviewed public API baseline in core validation. These
+  prepare R3 release contracts without freezing 1.0 or changing runtime behavior.
+
 - Separate Live editor table editing, selection navigation and source projection
   into private modules in the same Dart library. Preserve the public widget,
   document ownership, focus/IME, history and existing rendering algorithms;
