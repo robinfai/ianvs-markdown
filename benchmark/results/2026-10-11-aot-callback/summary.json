@@ -1,0 +1,97 @@
+[
+  {
+    "name": "create_struct",
+    "sourceSha256": "b431c0b18bab5b912a6278cc316d81745b972dbe4804f0da8411e8b27a50cdc8",
+    "result": {
+      "command": [
+        "/Users/robinfai/development/flutter/bin/cache/dart-sdk/bin/dart",
+        "compile",
+        "aot-snapshot",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/create_struct.dart",
+        "-o",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/create_struct.aot"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "seconds": 1.492253625000103,
+      "log": "create_struct.log",
+      "logSha256": "6874c4acb9ba390f18affbf37ce0cfc0e39319fcfcbf315ec8a1e29610f1d245"
+    }
+  },
+  {
+    "name": "sizeof_struct",
+    "sourceSha256": "88745ab3307db53b5942275cab4868b2ca9ec76dabaaade8cd2b046b35c9eb8a",
+    "result": {
+      "command": [
+        "/Users/robinfai/development/flutter/bin/cache/dart-sdk/bin/dart",
+        "compile",
+        "aot-snapshot",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/sizeof_struct.dart",
+        "-o",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/sizeof_struct.aot"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "seconds": 1.0611806249999063,
+      "log": "sizeof_struct.log",
+      "logSha256": "03b8a6f52ce31ada6e1e1c43c04ccf5ab1324c91f1722ba3239a11acdcaadef0"
+    }
+  },
+  {
+    "name": "native_struct_arg",
+    "sourceSha256": "fe069910f22aed297a6783722efe7d53049f81209cbb87ffb81ea850472cfe39",
+    "result": {
+      "command": [
+        "/Users/robinfai/development/flutter/bin/cache/dart-sdk/bin/dart",
+        "compile",
+        "aot-snapshot",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/native_struct_arg.dart",
+        "-o",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/native_struct_arg.aot"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "seconds": 1.1099355000001196,
+      "log": "native_struct_arg.log",
+      "logSha256": "b43d2c89c25f65acb21395c22e5dc8a11b8c6288cd16184e26a213acc4ab8894"
+    }
+  },
+  {
+    "name": "native_pointer_arg",
+    "sourceSha256": "79eca6dfcffaa4d525deca7c2cbd7e3d4c5b9b19fd0b7296f1d0ceafe9af90b4",
+    "result": {
+      "command": [
+        "/Users/robinfai/development/flutter/bin/cache/dart-sdk/bin/dart",
+        "compile",
+        "aot-snapshot",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/native_pointer_arg.dart",
+        "-o",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/native_pointer_arg.aot"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "seconds": 1.107571750000261,
+      "log": "native_pointer_arg.log",
+      "logSha256": "5e725601f84c8e1872bafa79511a759fef8b6d7a720fb05c642f52e5831b6b84"
+    }
+  },
+  {
+    "name": "native_struct_return",
+    "sourceSha256": "a7cee951329b520a8b56a1f398f4eb0d6e950c75562d392a0981135f740cb6f8",
+    "result": {
+      "command": [
+        "/Users/robinfai/development/flutter/bin/cache/dart-sdk/bin/dart",
+        "compile",
+        "aot-snapshot",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/native_struct_return.dart",
+        "-o",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/native_struct_return.aot"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "seconds": 1.055603291999887,
+      "log": "native_struct_return.log",
+      "logSha256": "f188e611857459b03b9ce41b29f32d32a66b3f2e643fb8284da7771924fd19b8"
+    }
+  }
+]

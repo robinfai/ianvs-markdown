@@ -1,0 +1,11 @@
+{
+  "command": [
+    "/Users/robinfai/development/flutter/bin/cache/dart-sdk/bin/dart",
+    "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/live-callback-control.dart"
+  ],
+  "exitCode": 0,
+  "timedOut": false,
+  "seconds": 0.23486558299919125,
+  "log": "live-callback-final-jit.log",
+  "logSha256": "af6997ea60cc3c0a2222eebc404075e77a3f0462591ee9881481c13546ed12da"
+}

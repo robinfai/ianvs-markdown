@@ -1,0 +1,13 @@
+from pathlib import Path
+import json,os,subprocess
+info=json.loads(Path('build/aot-ffi-reduction/dart-debug-path.json').read_text());root=Path(info['root']);sdk=Path(info['sdk']);depot=root/'depot_tools';out=Path('build/aot-ffi-reduction').resolve()
+assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=sdk,text=True).strip()==Path('/Users/robinfai/development/flutter/bin/cache/dart-sdk/revision').read_text().strip()
+subprocess.run(['git','clone','--depth','1','https://chromium.googlesource.com/chromium/tools/depot_tools.git',str(depot)],check=True)
+# Omit unrelated test runtimes and extra toolchain hosts; leave C++ source dependencies pinned by DEPS.
+skip=['sdk/third_party/d8/linux/x64','sdk/third_party/d8/linux/arm64','sdk/third_party/d8/macos/x64','sdk/third_party/d8/macos/arm64','sdk/third_party/d8/windows/x64','sdk/third_party/devtools','sdk/tests/co19/src','sdk/buildtools/linux-x64/clang','sdk/buildtools/mac-x64/clang','sdk/pkg/front_end/test/types/benchmark_data','sdk/benchmarks/FfiBoringssl/native/out/','sdk/benchmarks/FfiCall/native/out/']
+config={'name':'sdk','url':'https://github.com/dart-lang/sdk.git','managed':False,'custom_deps':{k:None for k in skip},'custom_vars':{'download_reclient':False,'download_android_deps':False,'download_chrome':False,'checkout_javascript_engines':False,'build_devtools_from_sources':False}}
+(root/'.gclient').write_text('solutions = '+repr([config])+'\n');(out/'gclient-config.txt').write_text((root/'.gclient').read_text())
+env=dict(os.environ,PATH=str(depot)+os.pathsep+os.environ['PATH'],DEPOT_TOOLS_UPDATE='0',DEPOT_TOOLS_METRICS='0')
+with (out/'dart-dependencies.log').open('w') as log:
+ r=subprocess.run([str(depot/'gclient'),'sync','--nohooks','--no-history','-j','8'],cwd=root,env=env,stdout=log,stderr=subprocess.STDOUT)
+print('Dependency sync exit',r.returncode,flush=True);raise SystemExit(r.returncode)

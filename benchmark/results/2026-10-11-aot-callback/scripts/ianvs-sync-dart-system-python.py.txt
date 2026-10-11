@@ -1,0 +1,7 @@
+from pathlib import Path
+import json,os,subprocess,sys
+info=json.loads(Path('build/aot-ffi-reduction/dart-debug-path.json').read_text());root=Path(info['root']);depot=root/'depot_tools';out=Path('build/aot-ffi-reduction').resolve()
+env=dict(os.environ,PATH=str(depot)+os.pathsep+os.environ['PATH'],DEPOT_TOOLS_UPDATE='0',DEPOT_TOOLS_METRICS='0')
+with (out/'dart-dependencies-system-python.log').open('w') as log:
+ r=subprocess.run([sys.executable,str(depot/'gclient.py'),'sync','--nohooks','--no-history','-j','8'],cwd=root,env=env,stdout=log,stderr=subprocess.STDOUT)
+print('System Python dependency sync exit',r.returncode,flush=True);raise SystemExit(r.returncode)

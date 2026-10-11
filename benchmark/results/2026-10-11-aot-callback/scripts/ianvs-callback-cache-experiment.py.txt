@@ -1,0 +1,25 @@
+from pathlib import Path
+import hashlib,json,os,shlex,shutil,subprocess,sys
+sys.path.insert(0,str(Path.cwd()/'tool'))
+from check_macos_candidates import run
+out=Path('build/aot-ffi-reduction').resolve();info=json.loads((out/'dart-debug-path.json').read_text());sdk=Path(info['sdk']);build=sdk/'xcodebuild/DebugSIMARM64'
+original=out/'gen_snapshot_unmodified_debug';shutil.copy2(build/'gen_snapshot',original)
+p=sdk/'runtime/vm/compiler/aot/precompiler.cc';source=p.read_text();needle='  IG->object_store()->set_closure_functions_table(Object::null_array());\n'
+assert source.count(needle)==1
+p.write_text(source.replace(needle,needle+'''  // This deduplication cache can retain callbacks from optimized-away code.
+  // Live callbacks are already reachable from the generated object pools.
+  IG->object_store()->set_ffi_callback_functions(Object::null_array());
+'''))
+patch=subprocess.check_output(['git','diff','--','runtime/vm/compiler/aot/precompiler.cc'],cwd=sdk,text=True);(out/'experimental-callback-cache.patch').write_text(patch)
+# Override only the linker command in the generated build file, not Dart source.
+build_ninja=build/'toolchain.ninja';s=build_ninja.read_text();linker=subprocess.check_output(['xcrun','--find','ld'],text=True).strip()
+lines=s.splitlines(keepends=True);count=0
+for i,line in enumerate(lines):
+ if line.lstrip().startswith('command = ') and 'clang++' in line and 'dsymutil' in line:
+  lines[i]=line.replace('clang++ ', 'clang++ -fuse-ld='+shlex.quote(linker)+' ',1);count+=1
+assert count>0
+build_ninja.write_text(''.join(lines));(out/'generated-linker-override.json').write_text(json.dumps({'file':str(build_ninja),'ruleCount':count,'linker':linker},indent=2)+'\n')
+r=run([str(sdk/'buildtools/ninja/ninja'),'-C',str(build),'-j','8','gen_snapshot'],sdk,out/'experimental-build.log',300,dict(os.environ));(out/'experimental-build.json').write_text(json.dumps(r,indent=2)+'\n');print('Experimental build',r['exitCode'],flush=True)
+if r['exitCode']:print((out/'experimental-build.log').read_text()[-5000:]);raise SystemExit(1)
+cmd=[str(build/'gen_snapshot'),'--deterministic','--snapshot_kind=app-aot-assembly','--assembly='+str(out/'experimental-view.S'),str(out/'component-3.44.8.dill')]
+r=run(cmd,Path.cwd(),out/'experimental-view.log',300,dict(os.environ));r['snapshotterSha256']=hashlib.sha256((build/'gen_snapshot').read_bytes()).hexdigest();r['kernelSha256']=hashlib.sha256((out/'component-3.44.8.dill').read_bytes()).hexdigest();r['assemblyExists']=(out/'experimental-view.S').exists();(out/'experimental-view.json').write_text(json.dumps(r,indent=2)+'\n');print('Experimental View snapshot',r['exitCode'],flush=True);print((out/'experimental-view.log').read_text()[-4000:],flush=True)

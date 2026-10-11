@@ -1,0 +1,14 @@
+diff --git a/runtime/vm/compiler/aot/precompiler.cc b/runtime/vm/compiler/aot/precompiler.cc
+index a1501f76..8d05b246 100644
+--- a/runtime/vm/compiler/aot/precompiler.cc
++++ b/runtime/vm/compiler/aot/precompiler.cc
+@@ -2339,6 +2339,9 @@ void Precompiler::DropFunctions() {
+ 
+   // Only needed during compilation.
+   IG->object_store()->set_closure_functions_table(Object::null_array());
++  // This deduplication cache can retain callbacks from optimized-away code.
++  // Live callbacks are already reachable from the generated object pools.
++  IG->object_store()->set_ffi_callback_functions(Object::null_array());
+ }
+ 
+ void Precompiler::DropFields() {

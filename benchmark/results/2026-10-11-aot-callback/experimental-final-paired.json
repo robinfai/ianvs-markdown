@@ -1,0 +1,126 @@
+[
+  {
+    "label": "repro-final",
+    "sourceSha256": "7d58e50355ae9fe06acd7c9ad2d81d37b528000ff87571116aa76f85b5be2038",
+    "kernelSha256": "d76a8adfb462c94c6190d031d4bd24203947a4b96662ee05c396799862d9de17",
+    "frontend": {
+      "command": [
+        "/Users/robinfai/development/flutter/bin/cache/dart-sdk/bin/dartaotruntime",
+        "/Users/robinfai/development/flutter/bin/cache/dart-sdk/bin/snapshots/gen_kernel_aot.dart.snapshot",
+        "--platform",
+        "/Users/robinfai/development/flutter/bin/cache/dart-sdk/lib/_internal/vm_platform_product.dill",
+        "--aot",
+        "--tfa",
+        "--target-os",
+        "macos",
+        "-Ddart.vm.product=true",
+        "--output",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/repro-final.dill",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/tool/fixtures/ffi_callback_aot.dart"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "seconds": 0.2937396670022281,
+      "log": "repro-final-kernel.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "snapshots": [
+      {
+        "command": [
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/gen_snapshot_unmodified_debug",
+          "--deterministic",
+          "--snapshot_kind=app-aot-elf",
+          "--elf=/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/repro-final-original.aot",
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/repro-final.dill"
+        ],
+        "exitCode": -6,
+        "timedOut": false,
+        "seconds": 1.0543124590039952,
+        "log": "repro-final-original.log",
+        "logSha256": "e2cd486f53701c5af4dfa9d31427562a7cf69de50b7fd1e37325e69b9534f69e",
+        "variant": "original",
+        "snapshotterSha256": "bbccd83e7ac39985be1e18348750f2227d7362267fba2d741da3ba9135faf624",
+        "artifactExists": false
+      },
+      {
+        "command": [
+          "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-dart-debug-jk1fd5qb/sdk/xcodebuild/DebugSIMARM64/gen_snapshot",
+          "--deterministic",
+          "--snapshot_kind=app-aot-elf",
+          "--elf=/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/repro-final-experimental.aot",
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/repro-final.dill"
+        ],
+        "exitCode": 0,
+        "timedOut": false,
+        "seconds": 0.9370438339974498,
+        "log": "repro-final-experimental.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "variant": "experimental",
+        "snapshotterSha256": "08de70d18433566162b8e08d6af50baca1d5762e093f53ae21c446375beb0e10",
+        "artifactExists": true
+      }
+    ]
+  },
+  {
+    "label": "live-callback-final",
+    "sourceSha256": "0d549c6e1d0a1540b099cac8827d8e332a96f5b519521d83fc1b5e14924ff928",
+    "kernelSha256": "e1956fc38c6ea889fb90dec85aa17d991e85a678950f027b317a02d6d6bb4f3e",
+    "frontend": {
+      "command": [
+        "/Users/robinfai/development/flutter/bin/cache/dart-sdk/bin/dartaotruntime",
+        "/Users/robinfai/development/flutter/bin/cache/dart-sdk/bin/snapshots/gen_kernel_aot.dart.snapshot",
+        "--platform",
+        "/Users/robinfai/development/flutter/bin/cache/dart-sdk/lib/_internal/vm_platform_product.dill",
+        "--aot",
+        "--tfa",
+        "--target-os",
+        "macos",
+        "-Ddart.vm.product=true",
+        "--output",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/live-callback-final.dill",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/live-callback-control.dart"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "seconds": 0.23818308299814817,
+      "log": "live-callback-final-kernel.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "snapshots": [
+      {
+        "command": [
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/gen_snapshot_unmodified_debug",
+          "--deterministic",
+          "--snapshot_kind=app-aot-elf",
+          "--elf=/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/live-callback-final-original.aot",
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/live-callback-final.dill"
+        ],
+        "exitCode": 0,
+        "timedOut": false,
+        "seconds": 0.9375571659984416,
+        "log": "live-callback-final-original.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "variant": "original",
+        "snapshotterSha256": "bbccd83e7ac39985be1e18348750f2227d7362267fba2d741da3ba9135faf624",
+        "artifactExists": true
+      },
+      {
+        "command": [
+          "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-dart-debug-jk1fd5qb/sdk/xcodebuild/DebugSIMARM64/gen_snapshot",
+          "--deterministic",
+          "--snapshot_kind=app-aot-elf",
+          "--elf=/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/live-callback-final-experimental.aot",
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/live-callback-final.dill"
+        ],
+        "exitCode": 0,
+        "timedOut": false,
+        "seconds": 0.9475862920007785,
+        "log": "live-callback-final-experimental.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "variant": "experimental",
+        "snapshotterSha256": "08de70d18433566162b8e08d6af50baca1d5762e093f53ae21c446375beb0e10",
+        "artifactExists": true
+      }
+    ]
+  }
+]

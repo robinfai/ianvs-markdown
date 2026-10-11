@@ -1,0 +1,8 @@
+from pathlib import Path
+import json,subprocess,tempfile
+out=Path('build/aot-ffi-reduction').resolve()
+r=json.loads(subprocess.check_output(['gh','api','repos/dart-lang/sdk/git/ref/tags/3.12.2'],text=True))
+print('Dart tag',r['object'],flush=True)
+root=Path(tempfile.mkdtemp(prefix='ianvs-dart-debug-'));sdk=root/'sdk';(out/'dart-debug-path.json').write_text(json.dumps({'root':str(root),'sdk':str(sdk),'tag':r},indent=2)+'\n')
+subprocess.run(['git','clone','--depth','1','--branch','3.12.2','https://github.com/dart-lang/sdk.git',str(sdk)],check=True)
+print('Dart source:',sdk,flush=True)

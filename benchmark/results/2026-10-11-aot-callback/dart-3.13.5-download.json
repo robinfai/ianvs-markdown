@@ -1,0 +1,11 @@
+{
+  "root": "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-dart-3135-ip27o1td",
+  "sdk": "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-dart-3135-ip27o1td/dart-sdk",
+  "url": "https://storage.googleapis.com/dart-archive/channels/stable/release/3.13.5/sdk/dartsdk-macos-arm64-release.zip",
+  "sha256": "9dfe7d6f2558816c2a978aff6c80e8a4509c6cb726c0702a616c64d286f60e88",
+  "version": {
+    "date": "2026-09-29",
+    "version": "3.13.5",
+    "revision": "04bcd1036cdc799ac6564988f159ee454d42c822"
+  }
+}

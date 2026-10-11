@@ -1,0 +1,14 @@
+{
+  "root": "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-dart-debug-jk1fd5qb",
+  "sdk": "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-dart-debug-jk1fd5qb/sdk",
+  "tag": {
+    "ref": "refs/tags/3.12.2",
+    "node_id": "MDM6UmVmMzU3MjYzMTA6cmVmcy90YWdzLzMuMTIuMg==",
+    "url": "https://api.github.com/repos/dart-lang/sdk/git/refs/tags/3.12.2",
+    "object": {
+      "sha": "704629bcd35e8bc1dd6b4808b618cccbbbd8fb6a",
+      "type": "tag",
+      "url": "https://api.github.com/repos/dart-lang/sdk/git/tags/704629bcd35e8bc1dd6b4808b618cccbbbd8fb6a"
+    }
+  }
+}
