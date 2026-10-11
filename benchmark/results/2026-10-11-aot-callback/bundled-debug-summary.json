@@ -1,0 +1,14 @@
+{
+  "command": [
+    "/Users/robinfai/development/flutter/bin/cache/artifacts/engine/darwin-x64/gen_snapshot_arm64",
+    "--deterministic",
+    "--snapshot_kind=app-aot-assembly",
+    "--assembly=/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/debug-probe.S",
+    "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/component-3.44.8.dill"
+  ],
+  "exitCode": -6,
+  "timedOut": false,
+  "seconds": 6.960623375000068,
+  "log": "bundled-debug-snapshot.log",
+  "logSha256": "e18edfa0c7e1eef86192f9b6d875d1ac04a2011f1b1e101e6e7f59234549e8b5"
+}

@@ -1,0 +1,13 @@
+from pathlib import Path
+import hashlib,json,os,subprocess,sys,time
+info=json.loads(Path('build/aot-ffi-reduction/dart-debug-path.json').read_text());sdk=Path(info['sdk']);out=Path('build/aot-ffi-reduction').resolve()
+env=dict(os.environ,PYTHONUNBUFFERED='1',DEPOT_TOOLS_UPDATE='0',DEPOT_TOOLS_METRICS='0')
+commands=[['python3','tools/gn.py','-a','simarm64','-m','debug','--no-rbe','--no-ide'],['buildtools/ninja/ninja','-C','xcodebuild/DebugSIMARM64','-j','8','gen_snapshot']]
+rows=[]
+for i,cmd in enumerate(commands):
+ log=out/('dart-debug-'+str(i)+'.log');started=time.monotonic()
+ with log.open('w') as f:r=subprocess.run(cmd,cwd=sdk,env=env,stdout=f,stderr=subprocess.STDOUT)
+ rows.append({'command':cmd,'exitCode':r.returncode,'seconds':time.monotonic()-started,'log':log.name,'logSha256':hashlib.sha256(log.read_bytes()).hexdigest()});(out/'dart-debug-build.json').write_text(json.dumps(rows,indent=2)+'\n')
+ print('Step',i,'exit',r.returncode,flush=True)
+ if r.returncode:print(log.read_text()[-5000:],flush=True);raise SystemExit(r.returncode)
+print('Debug snapshotter:',sdk/'xcodebuild/DebugSIMARM64/gen_snapshot',flush=True)

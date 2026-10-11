@@ -1,0 +1,29 @@
+from pathlib import Path
+import hashlib,json,os,sys
+sys.path.insert(0,str(Path.cwd()/'tool'))
+from check_macos_candidates import run
+out=Path('build/aot-ffi-reduction').resolve();out.mkdir(exist_ok=False)
+prefix="""import 'dart:ffi';
+final class Rect extends Struct {
+  @Double()
+  external double x;
+}
+final class Request extends Struct {
+  @Int64()
+  external int id;
+  external Pointer<NativeFunction<Pointer<Rect> Function(Pointer<Rect>)>> callback;
+}
+"""
+cases={
+'create_struct':prefix+"void main() { final request = Struct.create<Request>(); print(request.id); }\n",
+'sizeof_struct':prefix+"void main() { print(sizeOf<Request>()); }\n",
+'native_struct_arg':prefix+"@Native<Void Function(Request)>(symbol: 'unused_probe')\nexternal void nativeProbe(Request request);\nvoid main() { nativeProbe(Struct.create<Request>()); }\n",
+'native_pointer_arg':prefix+"@Native<Void Function(Pointer<Request>)>(symbol: 'unused_probe')\nexternal void nativeProbe(Pointer<Request> request);\nvoid main() { nativeProbe(nullptr); }\n",
+'native_struct_return':prefix+"@Native<Request Function()>(symbol: 'unused_probe')\nexternal Request nativeProbe();\nvoid main() { print(nativeProbe().id); }\n",
+}
+rows=[]
+for name,source in cases.items():
+ p=out/(name+'.dart');p.write_text(source)
+ r=run(['/Users/robinfai/development/flutter/bin/cache/dart-sdk/bin/dart','compile','aot-snapshot',str(p),'-o',str(out/(name+'.aot'))],out,out/(name+'.log'),120,dict(os.environ))
+ rows.append(dict(name=name,sourceSha256=hashlib.sha256(p.read_bytes()).hexdigest(),result=r));(out/'summary.json').write_text(json.dumps(rows,indent=2)+'\n')
+ print(name,r['exitCode'],(out/(name+'.log')).read_text()[-700:],flush=True)

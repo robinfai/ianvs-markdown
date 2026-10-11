@@ -1,0 +1,44 @@
+[
+  {
+    "label": "3.12.2",
+    "version": "Dart SDK version: 3.12.2 (stable) (Tue Jun 9 01:11:39 2026 -0700) on \"macos_arm64\"\n",
+    "sourceSha256": "7d58e50355ae9fe06acd7c9ad2d81d37b528000ff87571116aa76f85b5be2038",
+    "result": {
+      "command": [
+        "/Users/robinfai/development/flutter/bin/cache/dart-sdk/bin/dart",
+        "compile",
+        "aot-snapshot",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/tool/fixtures/ffi_callback_aot.dart",
+        "-o",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/repro-final-3.12.2.aot"
+      ],
+      "exitCode": 254,
+      "timedOut": false,
+      "seconds": 1.065027167000153,
+      "log": "repro-final-3.12.2.log",
+      "logSha256": "e4ccf9624ae90285f44d53a251a94d0649a00c94b6608ff846da7986f7095550"
+    },
+    "illegalCidFailure": true
+  },
+  {
+    "label": "3.13.5",
+    "version": "Dart SDK version: 3.13.5 (stable) (Tue Sep 29 01:00:52 2026 -0700) on \"macos_arm64\"\n",
+    "sourceSha256": "7d58e50355ae9fe06acd7c9ad2d81d37b528000ff87571116aa76f85b5be2038",
+    "result": {
+      "command": [
+        "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-dart-3135-ip27o1td/dart-sdk/bin/dart",
+        "compile",
+        "aot-snapshot",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/tool/fixtures/ffi_callback_aot.dart",
+        "-o",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/repro-final-3.13.5.aot"
+      ],
+      "exitCode": 254,
+      "timedOut": false,
+      "seconds": 1.1176331670003492,
+      "log": "repro-final-3.13.5.log",
+      "logSha256": "3c7a7ff5d78085aaa68bbdb06a9b200b7c98e3cd8e5d04edaec7ea38abd6344c"
+    },
+    "illegalCidFailure": true
+  }
+]

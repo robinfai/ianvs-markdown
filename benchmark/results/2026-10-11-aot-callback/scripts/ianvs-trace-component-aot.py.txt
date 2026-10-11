@@ -1,0 +1,19 @@
+from pathlib import Path
+import hashlib,json,shutil,sys,os
+sys.path.insert(0,str(Path.cwd()/'tool'))
+import reproduce_macos_aot as probe
+from check_macos_candidates import run
+out=Path('build/aot-ffi-reduction').resolve()
+original=probe.run
+
+def traced(command,cwd,log,timeout,environment):
+ if log.name=='snapshot.log':
+  kernel=Path(command[-1]);shutil.copy2(kernel,out/'component-3.44.8.dill')
+  command=[command[0],'--trace_precompiler',*command[1:]]
+ return original(command,cwd,log,timeout,environment)
+probe.run=traced
+sys.argv=['reproduce_macos_aot.py','--flutter','/Users/robinfai/development/flutter/bin/flutter','--source','tool/fixtures/macos_view_aot.dart','--component','--label','view-trace-3.44.8']
+try:probe.main()
+except SystemExit as e:print('Traced release exit',e.code,flush=True)
+cmd=['/Users/robinfai/development/flutter/bin/cache/artifacts/engine/darwin-x64/gen_snapshot_arm64','--deterministic','--snapshot_kind=app-aot-assembly','--assembly='+str(out/'debug-probe.S'),str(out/'component-3.44.8.dill')]
+r=run(cmd,Path.cwd(),out/'bundled-debug-snapshot.log',120,dict(os.environ));(out/'bundled-debug-summary.json').write_text(json.dumps(r,indent=2)+'\n');print('Bundled debug snapshot',r['exitCode'],flush=True)

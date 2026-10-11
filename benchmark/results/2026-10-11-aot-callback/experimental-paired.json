@@ -1,0 +1,126 @@
+[
+  {
+    "label": "repro",
+    "sourceSha256": "4fd9ada9589522b9123df82ed015d6c9c9a72514b92357746150e6eff5828796",
+    "kernelSha256": "5180761f21eab779238f31270706a4c3b3c59f79424d5fde7ed243274ea72d98",
+    "frontend": {
+      "command": [
+        "/Users/robinfai/development/flutter/bin/cache/dart-sdk/bin/dartaotruntime",
+        "/Users/robinfai/development/flutter/bin/cache/dart-sdk/bin/snapshots/gen_kernel_aot.dart.snapshot",
+        "--platform",
+        "/Users/robinfai/development/flutter/bin/cache/dart-sdk/lib/_internal/vm_platform_product.dill",
+        "--aot",
+        "--tfa",
+        "--target-os",
+        "macos",
+        "-Ddart.vm.product=true",
+        "--output",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/repro.dill",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/tool/fixtures/ffi_callback_aot.dart"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "seconds": 0.2538645839995297,
+      "log": "repro-kernel.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "snapshots": [
+      {
+        "command": [
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/gen_snapshot_unmodified_debug",
+          "--deterministic",
+          "--snapshot_kind=app-aot-elf",
+          "--elf=/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/repro-original.aot",
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/repro.dill"
+        ],
+        "exitCode": -6,
+        "timedOut": false,
+        "seconds": 1.4594044999994367,
+        "log": "repro-original.log",
+        "logSha256": "749e425ffdc7ea6d878ef4863bacfccd23359702b3fbdd5f29f8ec1e20aa8085",
+        "variant": "original",
+        "snapshotterSha256": "bbccd83e7ac39985be1e18348750f2227d7362267fba2d741da3ba9135faf624",
+        "artifactExists": false
+      },
+      {
+        "command": [
+          "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-dart-debug-jk1fd5qb/sdk/xcodebuild/DebugSIMARM64/gen_snapshot",
+          "--deterministic",
+          "--snapshot_kind=app-aot-elf",
+          "--elf=/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/repro-experimental.aot",
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/repro.dill"
+        ],
+        "exitCode": 0,
+        "timedOut": false,
+        "seconds": 0.9666373749996637,
+        "log": "repro-experimental.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "variant": "experimental",
+        "snapshotterSha256": "08de70d18433566162b8e08d6af50baca1d5762e093f53ae21c446375beb0e10",
+        "artifactExists": true
+      }
+    ]
+  },
+  {
+    "label": "live-callback",
+    "sourceSha256": "0d549c6e1d0a1540b099cac8827d8e332a96f5b519521d83fc1b5e14924ff928",
+    "kernelSha256": "e1956fc38c6ea889fb90dec85aa17d991e85a678950f027b317a02d6d6bb4f3e",
+    "frontend": {
+      "command": [
+        "/Users/robinfai/development/flutter/bin/cache/dart-sdk/bin/dartaotruntime",
+        "/Users/robinfai/development/flutter/bin/cache/dart-sdk/bin/snapshots/gen_kernel_aot.dart.snapshot",
+        "--platform",
+        "/Users/robinfai/development/flutter/bin/cache/dart-sdk/lib/_internal/vm_platform_product.dill",
+        "--aot",
+        "--tfa",
+        "--target-os",
+        "macos",
+        "-Ddart.vm.product=true",
+        "--output",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/live-callback.dill",
+        "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/live-callback-control.dart"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "seconds": 0.2481381670004339,
+      "log": "live-callback-kernel.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "snapshots": [
+      {
+        "command": [
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/gen_snapshot_unmodified_debug",
+          "--deterministic",
+          "--snapshot_kind=app-aot-elf",
+          "--elf=/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/live-callback-original.aot",
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/live-callback.dill"
+        ],
+        "exitCode": 0,
+        "timedOut": false,
+        "seconds": 0.9026212919998216,
+        "log": "live-callback-original.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "variant": "original",
+        "snapshotterSha256": "bbccd83e7ac39985be1e18348750f2227d7362267fba2d741da3ba9135faf624",
+        "artifactExists": true
+      },
+      {
+        "command": [
+          "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-dart-debug-jk1fd5qb/sdk/xcodebuild/DebugSIMARM64/gen_snapshot",
+          "--deterministic",
+          "--snapshot_kind=app-aot-elf",
+          "--elf=/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/live-callback-experimental.aot",
+          "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/live-callback.dill"
+        ],
+        "exitCode": 0,
+        "timedOut": false,
+        "seconds": 0.9085098750001634,
+        "log": "live-callback-experimental.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "variant": "experimental",
+        "snapshotterSha256": "08de70d18433566162b8e08d6af50baca1d5762e093f53ae21c446375beb0e10",
+        "artifactExists": true
+      }
+    ]
+  }
+]

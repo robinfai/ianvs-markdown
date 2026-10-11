@@ -1,0 +1,26 @@
+from pathlib import Path
+import hashlib,json,os,sys
+sys.path.insert(0,str(Path.cwd()/'tool'))
+from check_macos_candidates import run
+out=Path('build/aot-ffi-reduction/dead-callbacks').resolve();out.mkdir(exist_ok=False)
+prefix="""import 'dart:ffi';
+final class Rect extends Struct {
+  @Double()
+  external double x;
+}
+Pointer<Rect> position(Pointer<Rect> rect) => rect;
+"""
+create="final callback = NativeCallable<Pointer<Rect> Function(Pointer<Rect>)>.isolateLocal(position); print(callback.nativeFunction.address); callback.close();"
+cases={
+'list_empty':prefix+"void main() { if (<int>[].isNotEmpty) { "+create+" } }\n",
+'list_length':prefix+"void main() { if (<int>[1].length > 1) { "+create+" } }\n",
+'inline_false':prefix+"@pragma('vm:prefer-inline')\nvoid create(bool flag) { if (flag) { "+create+" } }\nvoid main() { create(false); }\n",
+'constant_function':prefix+"@pragma('vm:prefer-inline')\nbool enabled() => false;\nvoid main() { if (enabled()) { "+create+" } }\n",
+'inline_throw':prefix+"@pragma('vm:prefer-inline')\nvoid create(bool flag) { if (!flag) { throw StateError('disabled'); } "+create+" }\nvoid main() { create(false); }\n",
+}
+rows=[]
+for name,source in cases.items():
+ p=out/(name+'.dart');p.write_text(source)
+ r=run(['/Users/robinfai/development/flutter/bin/cache/dart-sdk/bin/dart','compile','aot-snapshot',str(p),'-o',str(out/(name+'.aot'))],out,out/(name+'.log'),120,dict(os.environ))
+ rows.append(dict(name=name,sourceSha256=hashlib.sha256(p.read_bytes()).hexdigest(),result=r));(out/'summary.json').write_text(json.dumps(rows,indent=2)+'\n')
+ print(name,r['exitCode'],(out/(name+'.log')).read_text()[-700:],flush=True)

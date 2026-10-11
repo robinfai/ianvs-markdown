@@ -1,0 +1,13 @@
+import 'dart:ffi';
+final class Rect extends Struct {
+  @Double()
+  external double x;
+}
+final class Request extends Struct {
+  @Int64()
+  external int id;
+  external Pointer<NativeFunction<Pointer<Rect> Function(Pointer<Rect>)>> callback;
+}
+@Native<Request Function()>(symbol: 'unused_probe')
+external Request nativeProbe();
+void main() { print(nativeProbe().id); }

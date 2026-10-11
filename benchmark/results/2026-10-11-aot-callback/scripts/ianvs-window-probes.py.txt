@@ -1,0 +1,12 @@
+from pathlib import Path
+import json,subprocess
+root=Path.cwd();out=root/'build/aot-ffi-reduction'
+variants={
+'window_scope':"import 'package:flutter/material.dart';\nimport 'package:flutter/src/widgets/_window.dart';\nvoid main() => runApp(MaterialApp(home: Builder(builder: (context) => Text('${WindowScope.maybeContentSizeOf(context)}'))));\n",
+'dialog_controller':"import 'package:flutter/material.dart';\nimport 'package:flutter/src/widgets/_window.dart';\nvoid main() { final controller = DialogWindowController(); print(controller.contentSize); runApp(const MaterialApp(home: Text('Window diagnostic'))); }\n",
+'dialog_scope':"import 'package:flutter/material.dart';\nimport 'package:flutter/src/widgets/_window.dart';\nvoid main() => runApp(MaterialApp(home: DialogWindow(controller: DialogWindowController(), child: const Text('Window diagnostic'))));\n",
+}
+for name,s in variants.items():
+ p=out/(name+'.dart');p.write_text(s)
+ r=subprocess.run(['python3','tool/reproduce_macos_aot.py','--flutter','/Users/robinfai/development/flutter/bin/flutter','--source',str(p),'--label','window-'+name],capture_output=True,text=True)
+ print(name,r.returncode,r.stdout[-800:],r.stderr[-400:],flush=True)

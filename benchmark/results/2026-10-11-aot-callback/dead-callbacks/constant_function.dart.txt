@@ -1,0 +1,9 @@
+import 'dart:ffi';
+final class Rect extends Struct {
+  @Double()
+  external double x;
+}
+Pointer<Rect> position(Pointer<Rect> rect) => rect;
+@pragma('vm:prefer-inline')
+bool enabled() => false;
+void main() { if (enabled()) { final callback = NativeCallable<Pointer<Rect> Function(Pointer<Rect>)>.isolateLocal(position); print(callback.nativeFunction.address); callback.close(); } }

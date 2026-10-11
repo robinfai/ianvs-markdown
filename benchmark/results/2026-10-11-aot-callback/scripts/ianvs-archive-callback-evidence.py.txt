@@ -1,0 +1,135 @@
+from pathlib import Path
+from datetime import datetime, timezone
+import gzip
+import hashlib
+import json
+import subprocess
+
+root = Path.cwd()
+source = root / 'build/aot-ffi-reduction'
+dest = root / 'benchmark/results/2026-10-11-aot-callback'
+dest.mkdir(parents=True, exist_ok=False)
+
+def digest(data):
+    return hashlib.sha256(data).hexdigest()
+
+def archive(path, relative):
+    data = path.read_bytes()
+    if path.suffix == '.log':
+        relative = str(relative) + '.gz'
+        data = gzip.compress(data, mtime=0)
+    elif path.suffix in ('.dart', '.py'):
+        relative = str(relative) + '.txt'
+    target = dest / relative
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(data)
+
+for path in sorted(source.rglob('*')):
+    if path.is_file() and path.suffix in ('.json', '.log', '.txt', '.dart', '.patch'):
+        archive(path, path.relative_to(source))
+for label in ('view-trace-3.44.8', 'window-window_scope',
+              'window-dialog_controller', 'window-dialog_scope'):
+    folder = root / 'build/aot-reduction' / label
+    for path in sorted(folder.rglob('*')):
+        if path.is_file():
+            assert path.suffix in ('.json', '.log', '.txt', '.lock'), path
+            archive(path, Path(label) / path.relative_to(folder))
+archive(root / 'tool/fixtures/ffi_callback_aot.dart', 'repro-final.dart')
+
+scripts = ('ffi-layout-probes', 'window-probes', 'trace-component-aot',
+           'prepare-dart-debug', 'sync-dart-debug', 'sync-dart-system-python',
+           'build-dart-debug', 'build-dart-debug-retry', 'link-dart-debug',
+           'ffi-dead-callback-probes', 'prepare-new-dart',
+           'callback-cache-experiment', 'verify-ffi-repro',
+           'validate-callback-cache', 'verify-final-ffi-repro',
+           'validate-final-callback-cache', 'archive-callback-evidence')
+for name in scripts:
+    path = Path('/tmp') / f'ianvs-{name}.py'
+    archive(path, Path('scripts') / path.name)
+
+sdk = Path(json.loads((source / 'dart-debug-path.json').read_text())['sdk'])
+archive(sdk / 'xcodebuild/DebugSIMARM64/args.gn', 'debug-args.gn.txt')
+git = lambda *args, cwd=root: subprocess.check_output(['git', *args], cwd=cwd, text=True).strip()
+stock = Path('/Users/robinfai/development/flutter')
+assert not git('status', '--porcelain', '--untracked-files=no', cwd=stock)
+assert git('diff', '--name-only', cwd=sdk) == 'runtime/vm/compiler/aot/precompiler.cc'
+assert (source / 'experimental-callback-cache.patch').read_bytes() == subprocess.check_output(['git', 'diff'], cwd=sdk)
+
+checks = []
+def verify_logs(value, folder):
+    if isinstance(value, dict):
+        if 'log' in value and 'logSha256' in value:
+            name = value['log']
+            log = folder / name
+            if log.exists():
+                data = log.read_bytes()
+            else:
+                log = folder / (name + '.gz')
+                data = gzip.decompress(log.read_bytes())
+            assert digest(data) == value['logSha256'], log
+            checks.append(str(log.relative_to(dest)))
+        for item in value.values():
+            verify_logs(item, folder)
+    elif isinstance(value, list):
+        for item in value:
+            verify_logs(item, folder)
+for path in dest.rglob('*.json'):
+    verify_logs(json.loads(path.read_text()), path.parent)
+
+for folder in (dest, dest / 'dead-callbacks'):
+    for row in json.loads((folder / 'summary.json').read_text()):
+        assert digest((folder / (row['name'] + '.dart.txt')).read_bytes()) == row['sourceSha256']
+for stem, filename in [('repro-cross-version', 'repro-with-print.dart.txt'),
+                       ('repro-final-cross-version', 'repro-final.dart.txt')]:
+    for row in json.loads((dest / (stem + '.json')).read_text()):
+        assert row['sourceSha256'] == digest((dest / filename).read_bytes())
+        assert row['illegalCidFailure'] and row['result']['exitCode'] == 254
+for stem, filename in [('experimental-paired', 'repro-with-print.dart.txt'),
+                       ('experimental-final-paired', 'repro-final.dart.txt')]:
+    rows = json.loads((dest / (stem + '.json')).read_text())
+    for row, code in zip(rows, (-6, 0)):
+        src = filename if code == -6 else 'live-callback-control.dart.txt'
+        assert row['sourceSha256'] == digest((dest / src).read_bytes())
+        assert row['frontend']['exitCode'] == 0
+        assert [r['exitCode'] for r in row['snapshots']] == [code, 0]
+        assert row['snapshots'][1]['artifactExists']
+
+trace = json.loads((dest / 'view-trace-3.44.8/summary.json').read_text())
+assert trace['revision'] == '24ea2fc5a52b349173c6a1920506868745cdf8b2'
+assert trace['sdkUnmodifiedBefore'] and trace['sdkUnmodifiedAfter']
+for name, expected in trace['componentInputsSha256'].items():
+    data = subprocess.check_output(['git', 'show', trace['revision'] + ':' + name])
+    assert digest(data) == expected, name
+baseline = json.loads((dest / 'debug-snapshot-backtrace.json').read_text())
+experimental = json.loads((dest / 'experimental-view.json').read_text())
+assert baseline['kernelSha256'] == experimental['kernelSha256'] == trace['kernelSha256']
+assert baseline['exitCode'] == -6 and experimental['exitCode'] == 0 and experimental['assemblyExists']
+validation = {
+    'recordedAtUtc': datetime.now(timezone.utc).isoformat(),
+    'componentRevision': trace['revision'],
+    'fixtureRevision': git('rev-parse', 'HEAD'),
+    'fixtureSha256': digest((dest / 'repro-final.dart.txt').read_bytes()),
+    'stockFlutterRevision': git('rev-parse', 'HEAD', cwd=stock),
+    'stockFlutterTrackedSourceUnmodifiedAfter': True,
+    'debugDartRevision': git('rev-parse', 'HEAD', cwd=sdk),
+    'depotToolsRevision': git('rev-parse', 'HEAD', cwd=sdk.parent / 'depot_tools'),
+    'compilerPatchSha256': digest((dest / 'experimental-callback-cache.patch').read_bytes()),
+    'debugSnapshotterSha256': baseline['snapshotterSha256'],
+    'experimentalSnapshotterSha256': experimental['snapshotterSha256'],
+    'viewKernelSha256': baseline['kernelSha256'],
+    'componentFilesVerifiedAgainstCommit': len(trace['componentInputsSha256']),
+    'logHashReferencesVerified': len(checks),
+    'uniqueLogFilesVerified': len(set(checks)),
+    'finalFixtureStockCompilers': '3.12.2 and 3.13.5: wrapper exit 254, illegal cid for Rect',
+    'finalFixtureDebugPair': [-6, 0],
+    'liveCallbackDebugPair': [0, 0],
+    'viewDebugPair': [-6, 0],
+    'runtimeExecution': 'Only the live-callback control on stock Dart JIT; no experimental AOT runtime execution',
+    'limits': ['No VM FFI suite', 'No official SDK fix', 'No full patched Flutter bundle',
+               'No new IME, clipboard, accessibility or external-host acceptance'],
+    'excludedArtifacts': ['SDK/source checkouts', 'snapshotter binaries', 'kernels', 'AOT snapshots', 'assembly'],
+}
+(dest / 'validation.json').write_text(json.dumps(validation, indent=2) + '\n')
+index = {str(p.relative_to(dest)): digest(p.read_bytes()) for p in sorted(dest.rglob('*')) if p.is_file()}
+(dest / 'SHA256.json').write_text(json.dumps(index, indent=2) + '\n')
+print(json.dumps({'files': len(index), 'bytes': sum(p.stat().st_size for p in dest.rglob('*') if p.is_file()), 'verifiedLogReferences': len(checks), 'componentFiles': len(trace['componentInputsSha256'])}))

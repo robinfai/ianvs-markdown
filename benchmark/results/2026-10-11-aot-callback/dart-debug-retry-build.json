@@ -1,0 +1,31 @@
+[
+  {
+    "command": [
+      "python3",
+      "tools/gn.py",
+      "-a",
+      "simarm64",
+      "-m",
+      "debug",
+      "--no-rbe"
+    ],
+    "exitCode": 0,
+    "seconds": 3.954523583000082,
+    "log": "dart-debug-retry-0.log",
+    "logSha256": "677ff3f15b309fd87799a9115839b3d99f2f1638f8767c2e017cc0b03f7bbf16"
+  },
+  {
+    "command": [
+      "buildtools/ninja/ninja",
+      "-C",
+      "xcodebuild/DebugSIMARM64",
+      "-j",
+      "8",
+      "gen_snapshot"
+    ],
+    "exitCode": 1,
+    "seconds": 68.54165720800029,
+    "log": "dart-debug-retry-1.log",
+    "logSha256": "07da35c5d517af2d5f63f0ebe7ce6d423c545cbf35f0902745d2c3ff9201158c"
+  }
+]

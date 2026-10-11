@@ -1,0 +1,44 @@
+{
+  "recordedAtUtc": "2026-10-11T14:02:35.820452+00:00",
+  "componentRevision": "24ea2fc5a52b349173c6a1920506868745cdf8b2",
+  "fixtureRevision": "38290c409e7a48fbd5193eeb4624e4f99e5e9194",
+  "fixtureSha256": "7d58e50355ae9fe06acd7c9ad2d81d37b528000ff87571116aa76f85b5be2038",
+  "stockFlutterRevision": "058e0af2c2b57e369d905a03ac9748b0ebf543c6",
+  "stockFlutterTrackedSourceUnmodifiedAfter": true,
+  "debugDartRevision": "d684a576a6aa954ae107a03b2b4e1d61c3bebe93",
+  "depotToolsRevision": "a03dfbf7f2d1cefa2795d81d59ca4f16c8616a8f",
+  "compilerPatchSha256": "2189d84f8d4de3ca1e28b8338ced9e545e821f2c0b6a5c3aad5ccac8a750d016",
+  "debugSnapshotterSha256": "bbccd83e7ac39985be1e18348750f2227d7362267fba2d741da3ba9135faf624",
+  "experimentalSnapshotterSha256": "08de70d18433566162b8e08d6af50baca1d5762e093f53ae21c446375beb0e10",
+  "viewKernelSha256": "1c57534369634c00a50a228f26f72627a3e0e1deb0ce6170087b40e783f8db17",
+  "componentFilesVerifiedAgainstCommit": 84,
+  "logHashReferencesVerified": 52,
+  "uniqueLogFilesVerified": 52,
+  "finalFixtureStockCompilers": "3.12.2 and 3.13.5: wrapper exit 254, illegal cid for Rect",
+  "finalFixtureDebugPair": [
+    -6,
+    0
+  ],
+  "liveCallbackDebugPair": [
+    0,
+    0
+  ],
+  "viewDebugPair": [
+    -6,
+    0
+  ],
+  "runtimeExecution": "Only the live-callback control on stock Dart JIT; no experimental AOT runtime execution",
+  "limits": [
+    "No VM FFI suite",
+    "No official SDK fix",
+    "No full patched Flutter bundle",
+    "No new IME, clipboard, accessibility or external-host acceptance"
+  ],
+  "excludedArtifacts": [
+    "SDK/source checkouts",
+    "snapshotter binaries",
+    "kernels",
+    "AOT snapshots",
+    "assembly"
+  ]
+}

@@ -4,6 +4,10 @@
 工具链为未修改 Flutter 3.47.7 / Dart 3.13.5，SDK revision
 `abaf9c523780a608bd46686fd5e53740a07077f8`，本机 macOS arm64。
 
+> 后续更新（2026-10-11）：已获得独立于 Flutter/Markdown 的 17 行 Dart 失败复现，
+> 并完成 Debug 引用链与实验编译器配对。见 [回调缓存报告](AOT-CALLBACK-2026-10-11.md)。
+> 下文保留 2026-10-10 当时的对照结论；正式平台验收仍未通过。
+
 ## 结论
 
 公共 `IanvsMarkdownView` 的 12 行入口在直接 AOT 编译中继续触发

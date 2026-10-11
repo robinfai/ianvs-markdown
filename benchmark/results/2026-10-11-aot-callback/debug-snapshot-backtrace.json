@@ -1,0 +1,16 @@
+{
+  "command": [
+    "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-dart-debug-jk1fd5qb/sdk/xcodebuild/DebugSIMARM64/gen_snapshot",
+    "--deterministic",
+    "--snapshot_kind=app-aot-assembly",
+    "--assembly=/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/traced-debug.S",
+    "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/build/aot-ffi-reduction/component-3.44.8.dill"
+  ],
+  "exitCode": -6,
+  "timedOut": false,
+  "seconds": 20.662020208000285,
+  "log": "debug-snapshot-backtrace.log",
+  "logSha256": "a3f6216b58bfc33aa5abd022b6e676727c7b9cec043c18370b2ddae5ce836aa0",
+  "snapshotterSha256": "bbccd83e7ac39985be1e18348750f2227d7362267fba2d741da3ba9135faf624",
+  "kernelSha256": "1c57534369634c00a50a228f26f72627a3e0e1deb0ce6170087b40e783f8db17"
+}

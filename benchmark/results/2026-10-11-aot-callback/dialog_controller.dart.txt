@@ -1,0 +1,3 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/src/widgets/_window.dart';
+void main() { final controller = DialogWindowController(); print(controller.contentSize); runApp(const MaterialApp(home: Text('Window diagnostic'))); }

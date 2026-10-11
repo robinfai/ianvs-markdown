@@ -1,0 +1,10 @@
+from pathlib import Path
+import hashlib,json,os,subprocess,sys
+sys.path.insert(0,str(Path.cwd()/'tool'))
+from check_macos_candidates import run
+out=Path('build/aot-ffi-reduction').resolve();repro=Path('tool/fixtures/ffi_callback_aot.dart').resolve();new=Path(json.loads((out/'dart-3.13.5-download.json').read_text())['sdk']);old=Path('/Users/robinfai/development/flutter/bin/cache/dart-sdk')
+rows=[]
+for label,sdk in [('3.12.2',old),('3.13.5',new)]:
+ version=subprocess.run([str(sdk/'bin/dart'),'--version'],text=True,capture_output=True,check=True)
+ r=run([str(sdk/'bin/dart'),'compile','aot-snapshot',str(repro),'-o',str(out/('repro-final-'+label+'.aot'))],Path.cwd(),out/('repro-final-'+label+'.log'),120,dict(os.environ));log=(out/r['log']).read_text();rows.append({'label':label,'version':version.stdout+version.stderr,'sourceSha256':hashlib.sha256(repro.read_bytes()).hexdigest(),'result':r,'illegalCidFailure':'Class with illegal cid, full-aot' in log});print(label,r['exitCode'],log[-800:],flush=True)
+(out/'repro-final-cross-version.json').write_text(json.dumps(rows,indent=2)+'\n')

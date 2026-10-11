@@ -1,0 +1,14 @@
+import 'dart:ffi';
+final class Rect extends Struct {
+  @Double()
+  external double x;
+}
+Pointer<Rect> identity(Pointer<Rect> rect) => rect;
+void main() {
+  final callback = NativeCallable<Pointer<Rect> Function(Pointer<Rect>)>.isolateLocal(identity);
+  final invoke = callback.nativeFunction.asFunction<Pointer<Rect> Function(Pointer<Rect>)>();
+  final result = invoke(Pointer<Rect>.fromAddress(1234));
+  if (result.address != 1234) throw StateError('callback changed');
+  callback.close();
+  print('live callback passed');
+}

@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "startedAtUtc": "2026-10-11T03:14:23.662706+00:00",
+  "kind": "Flutter frontend + arm64 gen_snapshot",
+  "scope": "Compile only; no bundle, app launch or interaction acceptance",
+  "revision": "24ea2fc5a52b349173c6a1920506868745cdf8b2",
+  "sourceSha256": "857abb8518e2c871622c8b10e87fd094c641467b306f4a9d42bbfde97d9b3ffc",
+  "componentInputsSha256": {},
+  "sdkRevision": "058e0af2c2b57e369d905a03ac9748b0ebf543c6",
+  "sdkUnmodifiedBefore": true,
+  "sdkUnmodifiedAfter": true,
+  "host": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "architecture": "arm64",
+  "runnerSha256": "ff85c11ba5626cf8d9ede45e2c6c71a52693728c74839e1a78ede234a1c90149",
+  "steps": [
+    {
+      "command": [
+        "/Users/robinfai/development/flutter/bin/flutter",
+        "--version",
+        "--machine"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "seconds": 0.45972375000019383,
+      "log": "sdk-version.json",
+      "logSha256": "4e0348d42876b829fd80bbfa6ee17bd7058a996bd7783a059071a177e62190ee"
+    },
+    {
+      "command": [
+        "/Users/robinfai/development/flutter/bin/flutter",
+        "pub",
+        "get"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "seconds": 4.115253417000076,
+      "log": "pub-get.log",
+      "logSha256": "113cb94b33841969d314982196b3e52a5ec24e42fbf0e364c02855ae121971cf"
+    },
+    {
+      "command": [
+        "/Users/robinfai/development/flutter/bin/cache/dart-sdk/bin/dartaotruntime",
+        "/Users/robinfai/development/flutter/bin/cache/dart-sdk/bin/snapshots/frontend_server_aot.dart.snapshot",
+        "--sdk-root",
+        "/Users/robinfai/development/flutter/bin/cache/artifacts/engine/common/flutter_patched_sdk_product/",
+        "--target=flutter",
+        "--aot",
+        "--tfa",
+        "--target-os",
+        "macos",
+        "-Ddart.vm.product=true",
+        "--packages",
+        "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-probe-s4voekoz/host/.dart_tool/package_config.json",
+        "--output-dill",
+        "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-probe-s4voekoz/host/probe.dill",
+        "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-probe-s4voekoz/host/main.dart"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "seconds": 3.330270959000245,
+      "log": "frontend.log",
+      "logSha256": "816a00b0222e7d4592088a8696ca4be286e004840332578cdaa30711f2128d61"
+    },
+    {
+      "command": [
+        "/Users/robinfai/development/flutter/bin/cache/artifacts/engine/darwin-x64-release/gen_snapshot_arm64",
+        "--deterministic",
+        "--snapshot_kind=app-aot-assembly",
+        "--assembly=/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-probe-s4voekoz/host/probe.S",
+        "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-aot-probe-s4voekoz/host/probe.dill"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "seconds": 1.9130712919995858,
+      "log": "snapshot.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "errors": [],
+  "complete": true,
+  "passed": true,
+  "windowingAotFailure": false,
+  "flutter": {
+    "frameworkVersion": "3.44.8",
+    "channel": "stable",
+    "repositoryUrl": "https://github.com/flutter/flutter.git",
+    "frameworkRevision": "058e0af2c2b57e369d905a03ac9748b0ebf543c6",
+    "frameworkCommitDate": "2026-07-23 10:56:21 -0700",
+    "engineRevision": "0cd610717bde95fd88343c64f81c11ba4e5c0010",
+    "engineCommitDate": "2026-07-23 16:11:34.000Z",
+    "engineContentHash": "13ffd72b2f9a5ca4db2a74ea52d5353ec2e8f939",
+    "engineBuildDate": "2026-07-24 00:36:29.809",
+    "dartSdkVersion": "3.12.2",
+    "devToolsVersion": "2.57.0",
+    "flutterVersion": "3.44.8",
+    "flutterRoot": "/Users/robinfai/development/flutter"
+  },
+  "frameworkAndComponentPathsVerified": true,
+  "kernelSha256": "58c3104034fd450836692a9152930b5b2df232240a84c5a73b6e1aa577fb7cef",
+  "artifactSha256": "318b8805f1914ad8deaad931902148db94f053b6cff2665183ca2d0250469ff5",
+  "finishedAtUtc": "2026-10-11T03:14:33.602175+00:00"
+}

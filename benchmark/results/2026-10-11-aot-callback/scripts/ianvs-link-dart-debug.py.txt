@@ -1,0 +1,17 @@
+from pathlib import Path
+import hashlib,json,os,shlex,subprocess,sys
+sys.path.insert(0,str(Path.cwd()/'tool'))
+from check_macos_candidates import run
+info=json.loads(Path('build/aot-ffi-reduction/dart-debug-path.json').read_text());sdk=Path(info['sdk']);out=Path('build/aot-ffi-reduction').resolve();build=sdk/'xcodebuild/DebugSIMARM64'
+commands=subprocess.check_output([str(sdk/'buildtools/ninja/ninja'),'-C',str(build),'-t','commands','gen_snapshot'],text=True)
+link=next(line for line in reversed(commands.splitlines()) if ' -o ./gen_snapshot ' in line)
+linker=subprocess.check_output(['xcrun','--find','ld'],text=True).strip()
+new=link.replace('clang++ ','clang++ -fuse-ld='+shlex.quote(linker)+' ',1)
+assert new!=link
+(out/'debug-link-command-original.txt').write_text(link+'\n');(out/'debug-link-command-xcode.txt').write_text(new+'\n')
+r=run(['bash','-c',new],build,out/'dart-debug-xcode-link.log',120,dict(os.environ));(out/'dart-debug-xcode-link.json').write_text(json.dumps(r,indent=2)+'\n');print('Xcode link exit',r['exitCode'],flush=True)
+if r['exitCode']:
+ print((out/'dart-debug-xcode-link.log').read_text()[-5000:]);raise SystemExit(1)
+snapshot=build/'gen_snapshot';print(subprocess.check_output(['file',str(snapshot)],text=True),flush=True)
+cmd=[str(snapshot),'--deterministic','--snapshot_kind=app-aot-assembly','--assembly='+str(out/'traced-debug.S'),str(out/'component-3.44.8.dill')]
+r=run(cmd,Path.cwd(),out/'debug-snapshot-backtrace.log',300,dict(os.environ));r['snapshotterSha256']=hashlib.sha256(snapshot.read_bytes()).hexdigest();r['kernelSha256']=hashlib.sha256((out/'component-3.44.8.dill').read_bytes()).hexdigest();(out/'debug-snapshot-backtrace.json').write_text(json.dumps(r,indent=2)+'\n');print('Debug snapshot exit',r['exitCode'],flush=True);print((out/'debug-snapshot-backtrace.log').read_text()[-5000:],flush=True)

@@ -1,0 +1,31 @@
+from pathlib import Path
+import hashlib,json,os,sys
+sys.path.insert(0,str(Path.cwd()/'tool'))
+from check_macos_candidates import run
+out=Path('build/aot-ffi-reduction').resolve();sdk=Path(json.loads((out/'dart-debug-path.json').read_text())['sdk']);dart=Path('/Users/robinfai/development/flutter/bin/cache/dart-sdk');repro=Path('tool/fixtures/ffi_callback_aot.dart').resolve()
+control=out/'live-callback-control.dart'
+control.write_text('''import 'dart:ffi';
+final class Rect extends Struct {
+  @Double()
+  external double x;
+}
+Pointer<Rect> identity(Pointer<Rect> rect) => rect;
+void main() {
+  final callback = NativeCallable<Pointer<Rect> Function(Pointer<Rect>)>.isolateLocal(identity);
+  final invoke = callback.nativeFunction.asFunction<Pointer<Rect> Function(Pointer<Rect>)>();
+  final result = invoke(Pointer<Rect>.fromAddress(1234));
+  if (result.address != 1234) throw StateError('callback changed');
+  callback.close();
+  print('live callback passed');
+}
+''')
+results=[]
+for label,source in [('repro-final',repro),('live-callback-final',control)]:
+ kernel=out/(label+'.dill');cmd=[str(dart/'bin/dartaotruntime'),str(dart/'bin/snapshots/gen_kernel_aot.dart.snapshot'),'--platform',str(dart/'lib/_internal/vm_platform_product.dill'),'--aot','--tfa','--target-os','macos','-Ddart.vm.product=true','--output',str(kernel),str(source)]
+ front=run(cmd,Path.cwd(),out/(label+'-kernel.log'),120,dict(os.environ));assert front['exitCode']==0
+ row={'label':label,'sourceSha256':hashlib.sha256(source.read_bytes()).hexdigest(),'kernelSha256':hashlib.sha256(kernel.read_bytes()).hexdigest(),'frontend':front,'snapshots':[]}
+ for variant,snapshotter in [('original',out/'gen_snapshot_unmodified_debug'),('experimental',sdk/'xcodebuild/DebugSIMARM64/gen_snapshot')]:
+  artifact=out/(label+'-'+variant+'.aot');cmd=[str(snapshotter),'--deterministic','--snapshot_kind=app-aot-elf','--elf='+str(artifact),str(kernel)];r=run(cmd,Path.cwd(),out/(label+'-'+variant+'.log'),180,dict(os.environ));r.update(variant=variant,snapshotterSha256=hashlib.sha256(snapshotter.read_bytes()).hexdigest(),artifactExists=artifact.exists() and artifact.stat().st_size>0);row['snapshots'].append(r);print(label,variant,r['exitCode'],flush=True)
+ results.append(row);(out/'experimental-final-paired.json').write_text(json.dumps(results,indent=2)+'\n')
+# Execute only the local self-contained live-callback control on the stock SDK.
+r=run([str(dart/'bin/dart'),str(control)],Path.cwd(),out/'live-callback-final-jit.log',60,dict(os.environ));(out/'live-callback-final-jit.json').write_text(json.dumps(r,indent=2)+'\n');print('stock JIT live callback',r['exitCode'],flush=True)

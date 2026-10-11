@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-dart-debug-jk1fd5qb/sdk/buildtools/ninja/ninja",
+    "-C",
+    "/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/ianvs-dart-debug-jk1fd5qb/sdk/xcodebuild/DebugSIMARM64",
+    "-j",
+    "8",
+    "gen_snapshot"
+  ],
+  "exitCode": 0,
+  "timedOut": false,
+  "seconds": 6.946705125000335,
+  "log": "experimental-build.log",
+  "logSha256": "d93fee4730d872fe2da65a55611ff776ffe966794a74ff11c9032b0c832bfb68"
+}
