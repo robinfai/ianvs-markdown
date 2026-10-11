@@ -8,7 +8,8 @@
 
 **Unreleased 迁移：**核心已移除原生剪贴板依赖，默认复制现在通过 Flutter 写入完整
 Markdown 纯文本；需要原有 HTML 双格式输出的宿主应显式接入可选适配器。
-见 [剪贴板迁移](doc/INTEGRATION_GUIDE.md#剪贴板迁移r1-04)。该变化尚未发布到 pub.dev。
+预算和历史默认值也有变化，完整步骤见 [0.3.1 → Unreleased 迁移指南](doc/MIGRATION.md)。
+这些变化尚未发布到 pub.dev。
 
 ## 能力
 

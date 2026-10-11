@@ -66,7 +66,11 @@ core example or external host cause the snapshot check to fail.
 
 The new host imports the public library, renders Markdown, edits source, invokes
 the save callback, undoes the change, and switches to reading mode. This is a
-widget integration check; the snapshot also runs all three integration-entry
+widget integration check. It also verifies migration behavior for default plain-text
+copy (with a mocked platform channel), independent budgets, bounded/legacy history,
+and captured asynchronous saves through cancellation and retry. These checks do
+not substitute for the two real external hosts. See [the migration guide](doc/MIGRATION.md).
+The snapshot also runs the integration-entry
 regressions. Native CI separately builds all four core entries and the Mermaid
 host, which opts into the native clipboard adapter.
 The core archive excludes `app/`, `packages/`, `demos/`, benchmarks and internal

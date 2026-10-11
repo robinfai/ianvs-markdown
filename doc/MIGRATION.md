@@ -1,0 +1,141 @@
+# 从 0.3.1 升级到当前 Unreleased
+
+更新：2026-10-11。面向已使用 0.3.1 的宿主，整理当前仓库候选的行为变化与接入步骤。
+仓库版本仍是 `0.3.1`，这些变更尚未发布到 pub.dev；不能仅通过更新版本约束获得它们。
+接入验证应锁定候选提交或该提交的 Pub-selected 包快照，并记录文件哈希。
+本指南不表示 1.0 API 已冻结，也不替代平台和两个真实外部宿主的最终验收。
+
+## 1. 先确认受影响的默认行为
+
+| 项目 | 0.3.1 行为 | 当前 Unreleased | 宿主需要做什么 |
+| --- | --- | --- | --- |
+| 默认阅读复制 | 尝试原生 Markdown + HTML，失败后纯文本回退 | Flutter 写完整 Markdown 纯文本；核心移除原生剪贴板依赖 | 需要双格式的宿主显式接入可选适配器；自定义 writer 检查 `hasHtml` |
+| 昂贵解析与复制 | 已有显示语法预算，但不是所有预解析和 HTML 复制入口都有相同保护 | Controller、文档预解析、Live 结构和复制先检查输入；新增全文与单行额度 | 明确 `parseBudget`、`renderBudget`、`clipboardBudget`，观察各自的降级原因 |
+| 撤销历史 | 无容量上限 | 默认最多 200 个快照、32 MiB 计账文本，含当前状态 | 需要不同容量时配置策略；确需旧行为时显式 `historyPolicy: null` |
+| standard GFM | 正文已支持 opt-in standard | View 也支持 standard；默认仍为 Obsidian | 按阅读用途选择，不向 Live/Source 传入不存在的 standard 编辑参数 |
+| 文案、快捷键与焦点 | 原有标签和命令 | 增加局部配置作用域与可注入焦点 | 需要时 opt in，校验自己的快捷键保留、焦点和对象释放 |
+| 异步保存 | 已支持捕获文本确认 | 契约保持；补充文档关闭后迟到确认的保护和接入样例 | 检查存储回调真正等待写入，绑定文档身份；不能把新编辑错误标为已保存 |
+
+内部 renderer 状态隔离、Source 几何复用和 Live 私有模块拆分不要求改用新的公共入口。
+不要引用 `lib/src/` 的内部实现；完整参数与语义见 [API 契约](API_CONTRACTS.md)。
+
+## 2. 复制：明确选择纯文本或原生双格式
+
+不传 `clipboardWriter` 的正文/View 及 Live 阅读面会使用核心纯文本 writer。
+完整文档复制保留原始 YAML、Markdown 标记、换行和 Unicode；这不是渲染后的纯文本导出。
+Source 和文本框的复制仍走 Flutter 编辑行为，不经过阅读 writer。
+
+现有 `IanvsMarkdownClipboardData(markdown: ..., html: ...)` 构造和 writer 注入继续可用。
+预算超限时 `markdown` 仍完整，`html` 为空，`hasHtml == false`；自定义原生 writer 必须省略
+HTML 格式，避免接收端选择空表示。`maxFallbackBytes` 不限制要复制的原文长度。
+核心 writer 示例：
+
+```dart
+final data = ianvsMarkdownDocumentClipboardData(source);
+await writeIanvsMarkdownClipboard(data); // 写入 data.markdown，包含完整原文
+```
+
+需要原有 Markdown + HTML 输出时，按 [剪贴板接入](INTEGRATION_GUIDE.md#剪贴板迁移r1-04)
+显式添加 `ianvs_markdown_clipboard` 并注入其 writer。适配器当前为 `publish_to: none`
+的源码包，没有可承诺的 registry 版本；候选提交、核心和适配器来源需一起固定。
+适配器的原生平台验收独立于核心纯文本测试，不能因核心移除插件就删除宿主其他插件的配置。
+
+## 3. 预算：三个操作分别配置，降级不丢原文
+
+默认输入额度为 1,048,576 个 UTF-16 单元、每行 4,096 个 UTF-16 单元、4,096 个语法 token；
+默认显示降级前缀最多 64 KiB UTF-8。等于额度时允许，超过才降级；不要混淆 UTF-16 长度和
+UTF-8 显示字节。检查完整原文后，Reading 可以显示包括未解析 YAML 的原文前缀，Live 可以
+退到完整源码编辑。Controller 的原文、选区、保存和整篇复制不被显示前缀截断。
+
+需要一致策略时由宿主把同一对象传给各入口：
+
+```dart
+const budget = IanvsMarkdownRenderBudget();
+final controller = IanvsMarkdownController(
+  text: source,
+  parseBudget: budget,
+);
+final editor = IanvsMarkdownLiveEditor(
+  controller: controller,
+  renderBudget: budget,
+  clipboardBudget: budget,
+);
+```
+
+Controller 在 Widget 前创建，`parseBudget` 不从 Widget 自动继承。
+`parseBudget: null` 只关闭该 Controller 的保护，不会关闭渲染或复制的保护；其他预算参数
+同理。Controller 的预算在构造时确定；需要切换策略时按文档会话管理 Controller 替换。
+独立文档解析、HTML 转换和折叠辅助函数也要核对自己的 `budget` 参数。
+
+宿主通过 `controller.parseDecision`、Live 的 `onRenderDecision`、渲染 `fallbackBuilder`
+和复制数据的 `budgetExceeded` / `hasHtml` 观察结果。预算不限制完整源码的 Flutter 排版、
+宿主 builder、图片解码、进程内存或耗时；关闭预算应根据实际文档负载评估，不能推断大文档
+输入已实时化。范围和已有性能边界见 [预算契约](API_CONTRACTS.md#预算与资源)。
+
+## 4. 历史：选择容量，不把撤销栈当持久化
+
+默认策略会裁剪旧快照；200 指保留状态总数，包含当前状态，不是保证 200 次可撤销操作。
+32 MiB 按每份字符串 `length * 2` 计账，不是 Dart 堆内存上限。当前状态超过额度时仍完整
+保留，但可能只剩当前状态可用；保存基线独立于历史裁剪。
+
+```dart
+final bounded = IanvsMarkdownController(
+  text: source,
+  historyPolicy: const IanvsMarkdownHistoryPolicy(
+    maxEntries: 100,
+    maxTextBytes: 16 * 1024 * 1024,
+  ),
+);
+final legacy = IanvsMarkdownController(text: source, historyPolicy: null);
+```
+
+`null` 恢复无界历史，长时间编辑可能持续累积快照。两种方式都保留完整当前文本。
+使用 `retainedHistoryEntries` / `retainedHistoryTextBytes` 检查宿主负载，测试裁剪后的撤销、
+重做与 dirty；不要依赖历史栈在关闭重开后恢复内容。详见 [历史契约](API_CONTRACTS.md#撤销历史容量r2-02)。
+
+## 5. 保存、文档切换和异步资源
+
+使用内置工具栏/快捷键时，`onSaveRequested(capturedText)` 应返回真实写入的 Future。
+组件等它成功后用捕获的文本确认保存；期间的新编辑仍为 dirty。回调不需要再次调用
+`markSaved()`，也不能只排队后台写入就提前返回成功。
+
+自行实现保存按钮时，捕获文档 ID、Controller 和文本，写入该文档后调用
+`controller.markSaved(savedText: capturedText)`。同一文档写入应串行或由存储端校验版本。
+取消保存使用 `IanvsMarkdownSaveCancelledException`；普通错误交给宿主错误处理，失败和
+取消都不能清除 dirty。已关闭文档的写入绑定原文档，不能改写当前打开的另一篇文档。
+
+一次打开对应独立 Controller 和稳定文档 ID；只赋值 `controller.text` 是编辑当前文档，
+不是完整的文档切换。宿主创建的 Controller、FocusNode 和 ScrollController 由宿主释放，
+先完成组件替换或卸载。异步图片/图表结果需同时检查文档、版本和资源身份。
+可运行的串行保存与切换示例见 [接入指南](INTEGRATION_GUIDE.md#保存捕获的版本) 和
+[编辑样例](../example/lib/editor.dart)；示例使用内存存储，持久化由实际宿主实现。
+
+## 6. 预设、配置与 SDK 范围
+
+- `IanvsMarkdownView(syntaxPreset: IanvsMarkdownSyntaxPreset.standard, ...)`
+  现在可用于标准 GFM 阅读；正文的 standard 已在 0.3.1 提供。Live/Source 仍使用 Obsidian
+  编辑语义，不能把 View 的能力推断为 standard 三模式编辑。
+- `IanvsMarkdownLocalization` 不设置时保留旧标签；`.chinese()` / `.english()` 与覆盖表
+  按最近作用域生效，文档文本不被翻译。
+- `IanvsMarkdownShortcuts` 可以重映射或禁用命令；需要宿主接管时显式配置 `hostShortcuts`，
+  不依赖禁用命令自动冒泡。组合输入期间的行为仍须在目标平台实测。
+- 当前声明 Flutter `>=3.44.0` / Dart `^3.12.0`。Core CI 的 3.44.0 与 3.47.6 证明对应的
+  分析、widget 测试和包快照检查；它们不等于全部平台的 AOT 或真实交互通过。
+  macOS Reading/Editor/Streaming AOT 仍有上游限制，见 [平台矩阵](PLATFORM_SUPPORT.md)。
+- 核心、剪贴板适配器和 Mermaid 的分发/版本分别管理；本轮没有发布新版本，也没有扩大
+  平台承诺。最终支持范围与版本决策须等 R3 的平台和真实宿主证据。
+
+## 7. 按顺序验证升级
+
+1. 固定候选提交/快照，记录原版本、目标平台、SDK 与可选适配器来源；对照上表选择策略。
+2. 更新宿主依赖和配置，分析并编译。核对源码保真、预算降级、复制格式、历史裁剪、异步
+   保存失败/取消/重试、文档切换与过期资源，不从编译成功推断行为兼容。
+3. 在组件源码仓库运行 `make check-core` 和 `make check-package`。前者含 API 基线门禁；
+   后者只复制 Pub 实际选中的文件，在全新包外宿主执行迁移 smoke，不解析回工作目录。
+4. 真实只读/编辑宿主及平台交互按最终安排单独验收，记录实际持久化和关闭重开结果。
+   自动 smoke 使用模拟剪贴板与内存 Future，不能替代真实宿主、系统复制或 IME 验收。
+
+维护工具和 smoke 源码只在
+[源码仓库](https://github.com/robinfai/ianvs-markdown/blob/main/tool/package_smoke_test.dart)
+提供，不进入核心包依赖。API 基线检测新增、删除和声明变化，不能证明行为兼容；后续每次
+改动仍需同步本指南、[API 契约](API_CONTRACTS.md) 和 [CHANGELOG](../CHANGELOG.md)。
