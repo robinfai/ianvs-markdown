@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "scope": "R3-03 preparation; no API freeze, AOT, real-device or real-host acceptance",
+  "baseRevision": "ffd9e7334b22ea6e83fca281ef4545547643ff60",
+  "testedCheckout": "411c60e + migration tests/docs and R3 acceptance checklist; exact package/input hashes below",
+  "command": "make check-core check-package FLUTTER=/Users/robinfai/development/flutter/bin/flutter DART=/Users/robinfai/development/flutter/bin/cache/dart-sdk/bin/dart",
+  "exitCode": 0,
+  "checks": {
+    "apiTests": 8,
+    "apiExports": 183,
+    "apiDeclarations": 1143,
+    "coreTests": 967,
+    "exampleTests": 20,
+    "pythonTests": 10,
+    "budgetCases": 32,
+    "snapshotExampleTests": 20,
+    "externalHostTests": 6,
+    "additionalDart3135ApiCheck": "passed against the same Flutter 3.44.8 resolved dependencies; full Flutter SDK matrix is CI"
+  },
+  "runtimeDiff": "",
+  "checkedMaintenanceInputsSha256": {
+    "Makefile": "917a8953142053c0602cdf41978e66d1de83937b0f25f8a428ed95cf45fece10",
+    "tool/api_check/README.md": "cb297f4c940cdada508b747ef2f693ace28338cf53ad9c870ab62064385edc99",
+    "tool/api_check/analysis_options.yaml": "69d5fc7c4dc082613882215d52d18b02b1688b833d674ce9b281f45821626b7d",
+    "tool/api_check/api_baseline.json": "f747ad138666be4738ed08fe21268296db6fdd60648717e55bbd473ed245d6e6",
+    "tool/api_check/bin/check.dart": "a984c9328985ac867f604dabdb20a30cc13f2cb11c380db5d0b3f15d38197224",
+    "tool/api_check/lib/surface.dart": "852dfbef6a11727779891966cc59b2d424fd4b070996195fa9e0bf592586f61f",
+    "tool/api_check/pubspec.lock": "56ced90e4200f6f725fe8391a434652f3716c924254576ad2be0bffcf622904f",
+    "tool/api_check/pubspec.yaml": "aeb1d3ea44dd19fa531f5b4f0ac7ebd8a34af3b0860995cc4ab07a66d33bfacb",
+    "tool/api_check/test/surface_test.dart": "5b5b3b06e7efb1404b0f90d3472a44105513c9954206a0ecb0e735308da3bfd6",
+    "tool/package_smoke_test.dart": "5164c059838a3a745ea46e92b55171b44eaeef7c77f740fde2bc6468c2f815e5"
+  },
+  "evidenceSha256": {
+    "api-dart-3.13.5.log": "5e7d090da7757ff19f349fc473e25ba72143debf83b444a65ff1944bbde77457",
+    "budget-logs.tar.gz": "eec08ddf9f901818ca6b7c8fb275ead8a7ae920b6a6cdbf0886a5f7aed20f350",
+    "budget-results.json": "8660d3f35933ae398bafcd66416ce7408eda31141117077ac6340a1d428047c7",
+    "dart-3.13.5.txt": "1fd45dc46ea6f73652ae0a5ba7c354706bb9c05a3849b03f1189c8df94f7d906",
+    "full-check.log.gz": "25922401a8521645c1f54d76cc252513055e3c9f8496c69769e96d05346461bc",
+    "package-example-test.log": "7d8b316039969cb2beeacddd707baa74802884f21ab24a2de023a9ac6907b6e3",
+    "package-host-test.log": "951d49b231fb5677e96bd73b4ad8511233d5c745cfd3de29baf81753e29a4b62",
+    "package-manifest.json": "1e2e200abdad168aea8da0a13b3de06b882d72f668449cd6443c3988de48712d",
+    "package-summary.json": "d378cb73f59fcb53a4b0d3072c3038ee711b0dbadc09875cddfd4b9b0fa422fa",
+    "sdk.json": "4e0348d42876b829fd80bbfa6ee17bd7058a996bd7783a059071a177e62190ee",
+    "snapshot-publish.log.gz": "e5961b67f4a224400e6cf89b88a178f3fd8e8b00bc91a2fb1c4e54cd62816482"
+  }
+}
