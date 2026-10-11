@@ -1,9 +1,11 @@
-# Draft: optimized-away NativeCallable retains a Struct with illegal cid in AOT
+# Report: optimized-away NativeCallable retains a Struct with illegal cid in AOT
 
-Local draft, 2026-10-11; not submitted upstream. This report contains no project
-source dependency. Related Flutter symptom:
-[flutter/flutter#191575](https://github.com/flutter/flutter/issues/191575).
-The relationship to other reports needs maintainer confirmation.
+Published with user authorization on 2026-10-11 as a
+[comment on flutter/flutter#191575](https://github.com/flutter/flutter/issues/191575#issuecomment-6110222678).
+The published body was read back and verified against the approved report;
+[exact text and receipt](results/2026-10-11-aot-upstream/) are archived.
+This report contains no project source dependency. Maintainer assessment of the
+proposed cause and experimental patch is still pending.
 
 ## Reproduction
 
@@ -102,5 +104,6 @@ Raw logs, source variants, the experimental diff and hash records:
 [local evidence](results/2026-10-11-aot-callback/).
 Detailed diagnosis and limitations:
 [local report](AOT-CALLBACK-2026-10-11.md).
-Before posting, use the merged repository URL for these attachments and keep the
-minimal source inline. No upstream message has been sent by this workflow.
+The published comment includes the minimal source inline and links evidence at
+merged revision `e567ba3cacde1bed8529500a8449c0296dfd0a74`. Posting this report
+does not mean the experimental patch is accepted or the platform gates pass.
