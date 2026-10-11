@@ -5,13 +5,14 @@ INSTALL_DIR ?= /Applications
 PYTHON ?= python3
 
 CORE_DART = lib test example/lib example/test tool/package_smoke_test.dart benchmark
+API_CHECK_DART = tool/api_check/lib tool/api_check/bin tool/api_check/test
 INTEGRATION_DART = app/lib app/test packages/ianvs_mermaid/lib packages/ianvs_mermaid/hook packages/ianvs_mermaid/test packages/ianvs_mermaid/example/lib packages/ianvs_mermaid/example/test packages/ianvs_markdown_clipboard/lib packages/ianvs_markdown_clipboard/test
 
 .DEFAULT_GOAL := help
 # Flutter resolves dependencies and writes generated files in each package.
 .NOTPARALLEL:
 
-.PHONY: help deps deps-core deps-integrations format format-check format-check-core format-check-integrations analyze analyze-core analyze-integrations test test-example test-app test-mermaid test-mermaid-example test-quicklook test-native-import test-ios-preview build-ios-preview build-examples run-ios check check-core check-integrations check-package check-processing-budget test-clipboard benchmark run example run-app install clean publish-dry-run
+.PHONY: help deps deps-core deps-integrations format format-check format-check-core format-check-integrations analyze analyze-core analyze-integrations test test-example test-app test-mermaid test-mermaid-example test-quicklook test-native-import test-ios-preview build-ios-preview build-examples run-ios check check-core check-integrations check-package check-api check-processing-budget test-clipboard benchmark run example run-app install clean publish-dry-run
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -27,7 +28,7 @@ deps-integrations: ## Install app and optional native adapter dependencies
 	cd app && $(FLUTTER) pub get
 
 format: ## Format Dart source and test files
-	$(FORMAT_DART) format $(CORE_DART) $(INTEGRATION_DART)
+	$(FORMAT_DART) format $(CORE_DART) $(INTEGRATION_DART) $(API_CHECK_DART)
 
 format-check: format-check-core format-check-integrations ## Check all Dart formatting
 
@@ -99,7 +100,14 @@ check-processing-budget: ## Check large-input preprocessing in killable processe
 test-tools: ## Validate performance evidence checks
 	$(PYTHON) -m unittest discover -s tool -p 'test_*.py'
 
-check-core: deps-core format-check-core analyze-core test test-example test-tools check-processing-budget ## Validate core without Apple or Mermaid integration checks
+check-api: deps-core ## Validate the public API baseline and its checker
+	cd tool/api_check && $(DART) pub get --enforce-lockfile
+	$(FORMAT_DART) format --output=none --set-exit-if-changed $(API_CHECK_DART)
+	cd tool/api_check && $(DART) analyze
+	cd tool/api_check && $(DART) test
+	cd tool/api_check && $(DART) run bin/check.dart --check ../..
+
+check-core: check-api format-check-core analyze-core test test-example test-tools check-processing-budget ## Validate core without Apple or Mermaid integration checks
 
 check-integrations: deps-integrations format-check-integrations analyze-integrations test-app test-mermaid test-mermaid-example test-clipboard test-quicklook test-native-import ## Validate the app and native integrations (macOS)
 

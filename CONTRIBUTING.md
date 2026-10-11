@@ -9,6 +9,7 @@ chooses them. On Linux, the Flutter test runtime needs `libglu1-mesa`.
 
 ```sh
 make check-core          # dependency resolution, formatting, analysis, tests
+make check-api           # resolved exports and declared public member baseline
 make check-package       # actual publication snapshot and external host
 make check-processing-budget # independent processes for pathological input
 make check-integrations  # macOS: app, native clipboard, Mermaid, Quick Look
@@ -21,6 +22,12 @@ Use `FLUTTER=/path/to/flutter/bin/flutter` and `DART=/path/to/flutter/bin/dart`
 to select a toolchain. Formatting uses Dart 3.12; when testing newer SDKs, also
 set `FORMAT_DART=/path/to/flutter-3.44.0/bin/dart`. The Flutter 3.47/Dart 3.13
 formatter makes different layout decisions for some existing callbacks.
+
+`check-core` includes `check-api`. The checker is an isolated, locked Dart tool
+under `tool/api_check/`, excluded from the Pub archive. API additions, removals,
+member signatures, defaults and constants require a reviewed baseline update;
+this does not certify behavioral or semantic-version compatibility. Follow
+[the API baseline workflow](tool/api_check/README.md) when changing public APIs.
 
 `check-integrations` requires macOS, Xcode command-line tools, CocoaPods,
 Rust/Cargo, and the Rust target for the current architecture.

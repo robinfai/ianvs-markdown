@@ -2,6 +2,15 @@
 
 适用范围：2026-10-10 的仓库版本（`0.3.1` + `Unreleased`）。本文件对应 R1-01 / R1-02 / R2-02、R1-03 文案/命令/焦点、R1-04 剪贴板默认行为迁移及 R2-05 预解析/复制预算。后续修改预设、预算或默认行为时必须同步更新。平台范围见 [构建与交互证据](PLATFORM_SUPPORT.md)，不能从 Dart 类型可用推断平台支持。
 
+## API 漂移校验
+
+仓库的 `make check-api`（同时包含在 `make check-core` 和双 SDK Core CI 中）解析公共入口，
+比较 172 个项目导出、11 个第三方重导出，以及它们声明的公开成员、类型、默认值和常量。
+新增、删除和修改都要求审查；检查不会自动重写基线。修改 API 时先更新本契约、迁移说明和
+行为测试，再显式生成并审查基线差异。工具不比较继承成员的实现或任意行为，不能证明
+语义版本兼容，也不表示 1.0 API 已冻结。维护工具与基线不进入发布包，操作说明见
+[源码仓库中的 API 校验说明](https://github.com/robinfai/ianvs-markdown/blob/main/tool/api_check/README.md)。
+
 ## 四种入口
 
 | 能力 | `IanvsMarkdown` | `IanvsMarkdownView` | `IanvsMarkdownEditor` | `IanvsMarkdownLiveEditor` |
