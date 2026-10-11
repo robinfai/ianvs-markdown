@@ -1,0 +1,13 @@
+{
+  "issue": "https://github.com/flutter/flutter/issues/191575",
+  "commentUrl": "https://github.com/flutter/flutter/issues/191575#issuecomment-6110222678",
+  "commentId": 6110222678,
+  "author": "robinfai",
+  "createdAt": "2026-10-11T14:47:15Z",
+  "updatedAt": "2026-10-11T14:47:15Z",
+  "bodySha256": "29ad5faf138a66429b423b4870ec5bba1334fae1c5f02d3abab06489d9793224",
+  "requestBodySha256": "29ad5faf138a66429b423b4870ec5bba1334fae1c5f02d3abab06489d9793224",
+  "readBackMatchedIgnoringTrailingNewline": true,
+  "evidenceRevision": "e567ba3cacde1bed8529500a8449c0296dfd0a74",
+  "status": "Published; maintainer assessment and official SDK fix still pending"
+}

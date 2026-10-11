@@ -16,7 +16,7 @@
 
 为每个拟支持的 SDK 单独建证据目录，记录 Flutter/Dart revision、OS、CPU、Xcode、组件提交和命令。
 SDK 必须是可追溯的原版工具链；禁止把实验编译器覆盖到日常 SDK 后当作原版通过。
-上游英文报告已作为[本地草稿](../benchmark/UPSTREAM-AOT-REPRO-2026-10-11.md)准备，对外提交需用户另行授权。
+上游英文报告已于 2026-10-11 获用户授权并[发布到 Flutter #191575](https://github.com/flutter/flutter/issues/191575#issuecomment-6110222678)，回读正文与批准稿一致；[发布记录](../benchmark/UPSTREAM-AOT-REPRO-2026-10-11.md)已归档。下一步核对维护者结论和正式修复候选，不能把报告发布记为平台通过。
 
 1. 用候选 SDK 编译 `tool/fixtures/ffi_callback_aot.dart`，留完整日志、退出码和产物哈希。若候选声称修复 Dart 根因，预期退出 0；254 / illegal cid 表示该问题仍存在。若官方修复仅改变 Flutter 的触发路径，独立 Dart 可以仍失败，须保留这一限制并继续公共 View 筛查，不因此声称 Dart 已修复。
 2. 用同一 SDK 重放公共 View。用新的 label，避免覆盖旧证据：
