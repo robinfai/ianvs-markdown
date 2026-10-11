@@ -137,6 +137,7 @@ Xcode 自带 `ld` 后完成。未关闭 TLS 校验。原版与实验版均使用
 [SHA256.json](results/2026-10-11-aot-callback/SHA256.json)。原始日志使用确定性 gzip，
 解压后匹配各摘要 `logSha256`；源码以 `.dart.txt` 保留原始字节，脚本以 `.py.txt` 保存
 当时过程，临时绝对路径仅供溯源。kernel、二进制、assembly 和 SDK checkout 不进入 Git。
+官方版本 JSON 的 CRLF 与补丁的上下文空格按原样保留，文本空白检查对这两份原始证据单独排除。
 [validation.json](results/2026-10-11-aot-callback/validation.json) 记录 52 处日志哈希校验、
 84 个 View 输入与固定提交逐项匹配，以及原版/实验版的配对关系。
 最小复现的静态分析无问题、格式零改动，现有 Python 工具回归 10 项通过。
