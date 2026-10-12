@@ -147,7 +147,8 @@
       "headingBoldItalicUnicodeCode": true,
       "relativeLinkAppearance": true,
       "rtfHyperlinkFields": 0,
-      "relativeLinkBoundary": "Relative destinations remain exact in Markdown; TextEdit retained blue underlined labels but did not create active RTF links."
+      "relativeLinkBoundary": "Relative destinations remain exact in Markdown; TextEdit retained blue underlined labels but did not create active RTF links.",
+      "rtfRawSha256": "a6028e372e0f86ca2efe9e86ea4ad5e8e146695801699acd703998dd207631c0"
     },
     "resources": {
       "markdownRelativeEncodedSpaceAndTarget": "chapter one.md opened in Read with Target visible",
@@ -172,7 +173,7 @@
   ],
   "evidence": {
     "app-copy.md": "95a28882b6bb95e691ee309ad59d732f0dd90ae0bd1cea75343d53233e29e191",
-    "app-copy.rtf": "a6028e372e0f86ca2efe9e86ea4ad5e8e146695801699acd703998dd207631c0",
+    "app-copy.rtf.gz": "0c0f5f92ef612ec8621e35be7c6dd1ec8aad0ad036ff683565cd021b1cdfed6c",
     "broken-svg.bin.gz": "938fe110c7b1d464cc23ef021c92b8430ef0d6f110db522a9859ec4de41e0187",
     "chapter one.md": "55aed4a53500fd72d91a6eb938fa87aa5942ba2ca3dddf49bf32ab9adb7bdf45",
     "example-copy.md.gz": "3fdaeb7298977ef14a0de414e40315fc59f9d72148f30c3705b24b85fe5fd823",

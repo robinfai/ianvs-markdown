@@ -66,7 +66,7 @@ app 使用 `FLUTTER_XCODE_ARCHS=arm64`、`CARGO_PROFILE_RELEASE_STRIP=none`。
    只归档本轮语料、保存结果、压缩日志、产物和输入哈希以及过滤后的布尔核验结果。
 
 实际运行 PID 首次记录为 example 75195 / app 76300，均来自本次 Release bundle。截图可在
-任务操作过程查看，仓库未归档截图文件。CRLF 及长原文用 gzip 保存以避免证据换行被转换。
+任务操作过程查看，仓库未归档截图文件。CRLF、长原文及 RTF 用 gzip 保存，保留原始换行和有意义的尾随空格。
 
 ## 边界与后续
 
