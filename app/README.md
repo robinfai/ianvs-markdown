@@ -162,7 +162,8 @@ Integration boundaries in the current desktop shell:
 
 - Embedded local/remote images and Wiki embeds still need host resolution:
   images show a blocked placeholder and Wiki embeds show a reference. Ordinary
-  image links open a preview. Open the document's containing folder as a workspace
+  image links open a preview. Missing/oversized files and malformed SVG text
+  show a closable error without changing the document. Open the document's containing folder as a workspace
   to grant sandbox access to sibling documents and assets. In Live mode, ordinary
   links retain their source-editing behavior; use Read mode to follow them.
 - YAML is editable in Source and hidden in Live/Read. The package's optional

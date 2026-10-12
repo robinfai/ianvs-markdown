@@ -22,9 +22,9 @@ class LocalDocumentImage extends StatefulWidget {
 }
 
 class _LocalDocumentImageState extends State<LocalDocumentImage> {
-  late final _bytes = _read();
+  late final _image = _read();
 
-  Future<Uint8List> _read() async {
+  Future<({Uint8List bytes, String? svg})> _read() async {
     final file = await File(widget.path).open();
     try {
       const limit = 32 * 1024 * 1024;
@@ -35,38 +35,47 @@ class _LocalDocumentImageState extends State<LocalDocumentImage> {
       if (bytes.length > limit) {
         throw const FormatException('Image is too large.');
       }
-      return bytes;
+      // Decode inside the future so malformed text uses the same recoverable
+      // error surface as missing or oversized files, instead of failing build.
+      return (
+        bytes: bytes,
+        svg: p.extension(widget.path).toLowerCase() == '.svg'
+            ? utf8.decode(bytes)
+            : null,
+      );
     } finally {
       await file.close();
     }
   }
 
   @override
-  Widget build(BuildContext context) => FutureBuilder<Uint8List>(
-    future: _bytes,
-    builder: (context, snapshot) {
-      if (snapshot.hasError) {
-        return SelectableText(describeFileError(snapshot.error!));
-      }
-      if (!snapshot.hasData) {
-        return const Center(child: CircularProgressIndicator());
-      }
-      return InteractiveViewer(
-        minScale: 0.25,
-        maxScale: 6,
-        child: p.extension(widget.path).toLowerCase() == '.svg'
-            ? SvgDocumentView(
-                svg: utf8.decode(snapshot.data!),
-                onOpenExternal: widget.onOpenExternal,
-              )
-            : Image.memory(
-                snapshot.data!,
-                cacheWidth: 2048,
-                fit: BoxFit.contain,
-                errorBuilder: (_, error, stack) =>
-                    Text('Unable to decode image: $error'),
-              ),
+  Widget build(BuildContext context) =>
+      FutureBuilder<({Uint8List bytes, String? svg})>(
+        future: _image,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return SelectableText(describeFileError(snapshot.error!));
+          }
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final image = snapshot.requireData;
+          return InteractiveViewer(
+            minScale: 0.25,
+            maxScale: 6,
+            child: image.svg != null
+                ? SvgDocumentView(
+                    svg: image.svg!,
+                    onOpenExternal: widget.onOpenExternal,
+                  )
+                : Image.memory(
+                    image.bytes,
+                    cacheWidth: 2048,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, error, stack) =>
+                        Text('Unable to decode image: $error'),
+                  ),
+          );
+        },
       );
-    },
-  );
 }
