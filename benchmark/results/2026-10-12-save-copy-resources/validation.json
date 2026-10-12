@@ -1,0 +1,208 @@
+{
+  "schema": 1,
+  "date": "2026-10-12",
+  "scope": "R3 L05/L06 through example/app main; local macOS only",
+  "runtimeRevision": "8f159c9fbd0c24ffa083332d435a43cc9f3b15e0",
+  "runtimeAndTestsRevision": "d0d10223f28f8e4be3cdacf7bf593f4fb9c011ab",
+  "environment": {
+    "os": "macOS 27.0.1 (26A434)",
+    "cpu": "arm64",
+    "xcode": "27.0 (27A266a)",
+    "rustc": "1.90.0",
+    "sdkRevision": "058e0af2c2b57e369d905a03ac9748b0ebf543c6",
+    "sdkGitStatusPorcelain": "",
+    "nativeBuildEnv": {
+      "FLUTTER_XCODE_ARCHS": "arm64",
+      "CARGO_PROFILE_RELEASE_STRIP": "none"
+    }
+  },
+  "commands": [
+    {
+      "command": "make check-local build-local-release",
+      "log": "ianvs-l05-l06-full.log.gz",
+      "exitCode": 2,
+      "boundary": "Stopped at new example test if-block lint; not counted as passed."
+    },
+    {
+      "command": "make check-local build-local-release",
+      "log": "ianvs-l05-l06-full-after.log.gz",
+      "exitCode": 2,
+      "boundary": "Core/API/example/Python/budget passed. App had one incorrect assertion expecting a parent exception name; fixed to actual missing-file message."
+    },
+    {
+      "command": "make check-integrations build-local build-local-release",
+      "log": "ianvs-l05-l06-integrations-final.log.gz",
+      "exitCode": 0
+    },
+    {
+      "command": "make check-package",
+      "log": "ianvs-l05-l06-package.log.gz",
+      "exitCode": 0,
+      "boundary": "Final package includes the R3 acceptance documentation; automatic publication-quality smoke, not an independent acceptance entry."
+    }
+  ],
+  "checks": {
+    "core": 967,
+    "example": 25,
+    "api": 8,
+    "apiExports": 183,
+    "apiDeclarations": 1143,
+    "python": 10,
+    "processingBudget": 32,
+    "appPassed": 287,
+    "appHistoricalOptionalCorpusSkipped": 1,
+    "mermaidFlutter": 9,
+    "mermaidRust": 4,
+    "mermaidExample": 3,
+    "clipboard": 6,
+    "quickLookRust": 8,
+    "quickLookSwift": 10,
+    "nativeImport": "passed"
+  },
+  "baselineRegression": {
+    "revision": "1b1443e",
+    "passed": 3,
+    "failed": 3,
+    "failures": [
+      "shortcut save failure unhandled",
+      "native menu save failure callback return type",
+      "SVG invalid UTF-8 in widget build"
+    ],
+    "boundary": "Candidate app tests with baseline versions of the two runtime files; final tests additionally tighten error-text assertions and if-block lint."
+  },
+  "artifacts": [
+    {
+      "entry": "example/lib/main.dart",
+      "mode": "Debug",
+      "bundle": "example/build/macos/Build/Products/Debug/Ianvs Markdown Playground.app",
+      "buildExitCode": 0,
+      "uiStarted": false,
+      "executableSha256": "6c6f15c5be143dd6eb3ee3ff394bb71a42a175a2875f93f42ac6d0723029525d",
+      "appFrameworkSha256": "38527492771d79b8111168adf818f1f14aae100af21fa3c019d4f99c93fe70c1"
+    },
+    {
+      "entry": "example/lib/main.dart",
+      "mode": "Release",
+      "bundle": "example/build/macos/Build/Products/Release/Ianvs Markdown Playground.app",
+      "buildExitCode": 0,
+      "uiStarted": true,
+      "executableSha256": "81cf14235334237b32387e7c440c036df2975599a49e2870af76604607d13569",
+      "appFrameworkSha256": "1a302b6b4cfd89265871588d1c3689f8a94072c9e870f7d2159a7cba500f0f55"
+    },
+    {
+      "entry": "app/lib/main.dart",
+      "mode": "Debug",
+      "bundle": "app/build/macos/Build/Products/Debug/Linefold.app",
+      "buildExitCode": 0,
+      "uiStarted": false,
+      "executableSha256": "5c243c79690404982e2b34a35a397611998ebb83186d65af052ffbbd9d967555",
+      "appFrameworkSha256": "df2f50c998eaf80fd63e6e0fe102078cdd579dede0f8d49ef22d8e5a4d892a6a"
+    },
+    {
+      "entry": "app/lib/main.dart",
+      "mode": "Release",
+      "bundle": "app/build/macos/Build/Products/Release/Linefold.app",
+      "buildExitCode": 0,
+      "uiStarted": true,
+      "executableSha256": "dbb569b6d4f0e5af3b3ea3cfa8289b3765f06bb152d73935e7ad28400d8694ef",
+      "appFrameworkSha256": "189fe95e8506f81fb0d58953c696227fc6598ac80fce0ca4bec64f3999c4cbb4"
+    }
+  ],
+  "observedProcesses": [
+    {
+      "pid": 75195,
+      "entry": "example/lib/main.dart",
+      "path": "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/example/build/macos/Build/Products/Release/Ianvs Markdown Playground.app/Contents/MacOS/Ianvs Markdown Playground"
+    },
+    {
+      "pid": 76300,
+      "entry": "app/lib/main.dart",
+      "path": "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/app/build/macos/Build/Products/Release/Linefold.app/Contents/MacOS/Linefold"
+    }
+  ],
+  "gui": {
+    "appSaveFirstExact": true,
+    "appContinuedDraftAndPersistedTextDistinct": true,
+    "appDiskUnchangedWhileDirty": true,
+    "appLatestSaveExact": true,
+    "appSaveCloseReopen": "Saved; latest SAVEDLATER marker; CRLF",
+    "appNoOwnWriteConflictObserved": true,
+    "saveCrlfCount": 3,
+    "saveTrailingNewline": false,
+    "exampleSystemCopy": {
+      "mode": "Source",
+      "action": "Select All followed by native Edit > Copy; paste into app Source and save",
+      "exact": true,
+      "bytes": 4478,
+      "expected": "Dart evaluates the unmodified exampleMarkdown literal extracted from example/lib/main.dart",
+      "customCrlfGuiPaste": "not accepted as evidence; AX changed but actual model did not; three-mode custom CRLF covered by widget tests"
+    },
+    "appSameCopyDualFormat": {
+      "sourceMode": "Read",
+      "action": "Focus body, Cmd+A, observe, Cmd+C, then paste into TextEdit and app Source without another copy",
+      "plainMarkdownExact": true,
+      "plainBytes": 273,
+      "richReceiver": "TextEdit blank RTF document, only a clipboard consumer",
+      "rtfBytes": 1154,
+      "headingBoldItalicUnicodeCode": true,
+      "relativeLinkAppearance": true,
+      "rtfHyperlinkFields": 0,
+      "relativeLinkBoundary": "Relative destinations remain exact in Markdown; TextEdit retained blue underlined labels but did not create active RTF links."
+    },
+    "resources": {
+      "markdownRelativeEncodedSpaceAndTarget": "chapter one.md opened in Read with Target visible",
+      "svg": "blue rectangle / white circle preview, closed successfully",
+      "invalidSvg": "FormatException: Invalid UTF-8 byte (at offset 0); closed successfully",
+      "missingImage": "PathNotFoundException: Cannot open file; closed successfully",
+      "embeddedImage": "Image blocked · local",
+      "mermaidValid": "保存 -> 继续输入 rendered",
+      "mermaidInvalid": "error and original diagram source visible"
+    },
+    "originalUserDocuments": {
+      "count": 9,
+      "textsAndPersistedTextUnchanged": true
+    },
+    "screenshots": "Visible in task interaction only; no screenshot files archived",
+    "realDiskFailureInjected": false,
+    "realImeTested": false
+  },
+  "remaining": [
+    "L07 large documents through both main entries",
+    "L08 real IME and keyboard/focus workflows"
+  ],
+  "evidence": {
+    "app-copy.md": "95a28882b6bb95e691ee309ad59d732f0dd90ae0bd1cea75343d53233e29e191",
+    "app-copy.rtf": "a6028e372e0f86ca2efe9e86ea4ad5e8e146695801699acd703998dd207631c0",
+    "broken-svg.bin.gz": "938fe110c7b1d464cc23ef021c92b8430ef0d6f110db522a9859ec4de41e0187",
+    "chapter one.md": "55aed4a53500fd72d91a6eb938fa87aa5942ba2ca3dddf49bf32ab9adb7bdf45",
+    "example-copy.md.gz": "3fdaeb7298977ef14a0de414e40315fc59f9d72148f30c3705b24b85fe5fd823",
+    "example-expected.md.gz": "3fdaeb7298977ef14a0de414e40315fc59f9d72148f30c3705b24b85fe5fd823",
+    "flutter.version.json": "304c26a7987c2ea11d9e9d71168d658ea22fe7ec015a4aa72ab68afd7727cd74",
+    "ianvs-l05-after.log.gz": "fed652793afd50d80ac9b5704c346057a75880fc3d2e8688b9837f35e9b13e4d",
+    "ianvs-l05-l06-base-regression.log.gz": "d4f7af6206b7dd8f700d23e08cde95b673560af8eab41ed04e0b76cc8f282433",
+    "ianvs-l05-l06-full-after.log.gz": "31922ee2500166ed99e21fdaa546908a83b42f4ad3840e35c421052200e454ac",
+    "ianvs-l05-l06-full.log.gz": "8e65dae17779a55749d52c61f6db8ba13cc2e9a8ea4dee21135206c776c2ffe8",
+    "ianvs-l05-l06-integrations-final.log.gz": "0d077cd6fb67fd2d4b4b96fb313d15721830b358013b436dda44234ef0fc9b8c",
+    "ianvs-l05-l06-package.log.gz": "dd1f1cb1c6e8bee1d241fc064a065da0bc65182856a6454689e8b634f07a9456",
+    "ianvs-l06-example-after.log.gz": "e1b864760bec16b1ca09d3d395aa4212aa0f5732af0bcb9609998d6586daa403",
+    "ianvs-l06-resources-fixed.log.gz": "0498ce5d7fd95e64a08a94cc2914dac1a1825692ef3879e2a275eda44c8a2777",
+    "input-hashes.json": "b816b8e3a2183f7f75c57cfd9733f5bd585e19ac4c6f9f6bfc3b859552cb2c59",
+    "invalid-diagram.md": "5a894b4f74a88a1e184e0977d5cf37fa5e1c60dc2ab46ac98df0c1c285964f1b",
+    "package-manifest.json": "1899732bddcf5825a0a43767e0f269f6f6f590673d9c6b6093033aeda507652d",
+    "package-summary.json": "b23433349e73656572a3f3bcf56aac87d2b6bd3f15be625893dd88a7c1d4a2b7",
+    "resources.md": "95a28882b6bb95e691ee309ad59d732f0dd90ae0bd1cea75343d53233e29e191",
+    "save-after.md.gz": "4118f19f56ff54b607aebfacdfdae72e87dfaaddc20410ee9071fc7b6c07f835",
+    "save-before.md.gz": "1a840a8e650185dcce6d7c95a1ffa04a6075bf6cafdf52d5f570691d8ed04917",
+    "save-first.md.gz": "0b72c88ae3b001db2606acec159fb5360bd345183865071acf6022c5432b4cde",
+    "tile.svg": "3e5849e20f3ccc04df2b0112c11cf0d3c180ace30c3abf4f382761e223becded"
+  },
+  "package": {
+    "files": 168,
+    "uncompressedBytes": 2950005,
+    "pubCompressedSize": "668 KB.",
+    "snapshotDryRun": "passed without warnings",
+    "exampleTests": "passed",
+    "externalHostTests": "passed",
+    "workspacePathLeak": false
+  }
+}
