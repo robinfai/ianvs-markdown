@@ -46,10 +46,8 @@ jobs:
           sw_vers
       - name: Host and native regressions
         run: make check-integrations
-      - name: Build all core entries and the native adapter host
-        run: |
-          make build-examples
-          (cd packages/ianvs_mermaid/example && flutter build macos --debug)
+      - name: Build the example and app main entries
+        run: make build-local build-local-release
       - name: Save native rendering evidence
         if: always()
         uses: actions/upload-artifact@v4

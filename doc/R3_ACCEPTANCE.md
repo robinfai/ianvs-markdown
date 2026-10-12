@@ -1,146 +1,94 @@
-# R3 剩余验收执行清单
+# R3 双入口本地执行清单
 
-更新：2026-10-11。用于接续 [ROADMAP](../ROADMAP.md) 的最后三项任务。
-这是执行规程，不是通过记录：R3-01 / R3-03 进行中，R3-02 待开始；总数仍为 16 项、完成 13 项。
-R3-03 已提前执行不依赖上游的准备工作，最终冻结/发布核对仍需前置验收。
-每次只在实际完成后填写结果，失败、未执行和不适用分开记录。
+更新：2026-10-12。用户已将当前目标改为围绕仓库内 example / app 推进，不等待上游修复，
+不走独立验收宿主。本文替代 [原 R3 执行规程](https://github.com/robinfai/ianvs-markdown/blob/1f814eb39347716511170d47c32ed74a3d7eb413/doc/R3_ACCEPTANCE.md)；历史 AOT、实验和平台记录保留，未验证能力不补记通过。
+任务状态以 [ROADMAP](../ROADMAP.md) 为准；以下是操作规程，实际结果单独留证。
 
-## 1. 当前输入与先后顺序
+## 1. 固定两个应用入口
 
-- 本轮起点：`ffd9e73`，版本 `0.3.1` + `Unreleased`；R0–R2 已验收。本轮只改维护工具、测试和文档，组件实现基线仍为 `24ea2fc`。
-- AOT 已有[独立 Dart 复现及实验补丁证据](../benchmark/AOT-CALLBACK-2026-10-11.md)。两个原版 Dart 仍失败，实验快照通过不能解除正式构建门禁。
-- 先做不依赖上游的 API 基线、迁移说明和包外迁移验证；取得并验证正式 SDK 修复后，再用同一候选完成 macOS 交互。下一平台按真实宿主需求确定，未验收能力继续在[平台矩阵](PLATFORM_SUPPORT.md)标为待验收。
-- 外部宿主按用户安排留到最后：届时只提醒一次提供只读项目、编辑项目及目标平台，使用同一候选包执行第 4 节。
-- 发布核对可以提前准备，API 冻结、支持范围和最终版本决策须等平台及外部宿主验收完成。此清单不授权发布包。
-
-## 2. R3-01：修复候选的构建门禁
-
-为每个拟支持的 SDK 单独建证据目录，记录 Flutter/Dart revision、OS、CPU、Xcode、组件提交和命令。
-SDK 必须是可追溯的原版工具链；禁止把实验编译器覆盖到日常 SDK 后当作原版通过。
-上游英文报告已于 2026-10-11 获用户授权并[发布到 Flutter #191575](https://github.com/flutter/flutter/issues/191575#issuecomment-6110222678)，回读正文与批准稿一致；[发布记录](../benchmark/UPSTREAM-AOT-REPRO-2026-10-11.md)已归档。下一步核对维护者结论和正式修复候选，不能把报告发布记为平台通过。
-
-1. 用候选 SDK 编译 `tool/fixtures/ffi_callback_aot.dart`，留完整日志、退出码和产物哈希。若候选声称修复 Dart 根因，预期退出 0；254 / illegal cid 表示该问题仍存在。若官方修复仅改变 Flutter 的触发路径，独立 Dart 可以仍失败，须保留这一限制并继续公共 View 筛查，不因此声称 Dart 已修复。
-2. 用同一 SDK 重放公共 View。用新的 label，避免覆盖旧证据：
-
-   ```sh
-   python3 tool/reproduce_macos_aot.py \
-     --flutter /path/to/stock/flutter/bin/flutter \
-     --source tool/fixtures/macos_view_aot.dart --component \
-     --label fixed-sdk-view-1
-   ```
-
-   必须 `complete: true`、`passed: true`，且 SDK 前后干净、依赖指向隔离组件快照。View 仍失败时停止后续昂贵矩阵并保留结果。
-3. 运行六入口、两个模式的完整矩阵。省略 `--target` / `--mode` 才是完整 12 组：
-
-   ```sh
-   python3 tool/check_macos_candidates.py \
-     --flutter /path/to/stock/flutter/bin/flutter \
-     --include-control --keep-host --label fixed-sdk-matrix-1
-   ```
-
-   六入口为纯 Flutter 对照、Body、Reading、Editor、playground、Streaming；Profile / Release 全部通过才算此 SDK 的候选构建通过。
-   工具会覆盖临时宿主内前一入口的同名 bundle。`--keep-host` 只保留工作目录和最后的产物，**不代表六份应用均保留**。
-4. 交互验收前，对要测的入口分别以 `--target reading`、`--target editor` 等和 `--mode release --keep-host` 单独留产物，使用不同 label。
-   从各自 `summary.json` 的 `hostDirectory` 获取 bundle，记录 App.framework 哈希并启动该产物。
-   若为交互另加注入或语料，提交/归档 harness 并重建，不能沿用旧二进制哈希。
-5. 最低声明 SDK 若仍失败：保留限制，先明确 SDK 支持范围与迁移决策，再修改 pubspec / 文档 / CI 并重验；不能只选一个通过的版本来宣称整个范围通过。
-
-没有修复候选时，不在相同输入上反复跑完整矩阵。可继续准备交互用例、宿主验收字段和迁移核对。
-
-## 3. R3-01：真实平台交互
-
-仅对已通过构建的候选填写“通过”。Debug 探索可用于找问题，须单列，不能替代对应候选产物。
-默认使用核心样例；双格式复制另用显式接入可选适配器的宿主。逐入口记录实际预设，
-Live / Source 目前是 Obsidian 编辑语义；standard 阅读分别在 Body 和公共 View 验证，不推断存在 standard 编辑模式。
-
-| 用例 | 操作与输入 | 通过条件 / 留证 |
+| 入口 | 作用 | 操作范围 |
 | --- | --- | --- |
-| M01 启动与焦点 | 逐入口启动；Tab / Shift-Tab 遍历工具栏、正文、导航；切到另一应用再返回 | 无崩溃或焦点陷阱，正文可重新获焦；记录入口、模式、产物哈希 |
-| M02 中文 IME | Editor 的 Source、Live 各用真实拼音输入法输入“中文输入测试”；先连续组合，再选候选、改选候选、Esc 取消；在列表、链接附近和表格单元格重复 | 候选窗跟随输入位置，无丢字、重复提交或标记破坏；记录输入法名称/版本及录屏 |
-| M03 组合态与模式/焦点 | 中文尚在组合时切焦点或尝试切模式，再继续输入；完成后 Source→Live→Reading→Source | 组合会话结束方式可解释，无重复提交，最终源码与实际确认的输入一致；不预设“一次 IME 必须等于一次撤销” |
-| M04 键盘与 Unicode | 输入 `中文 😀 é`，逐字移动、Shift 扩选、按词移动、Home/End、跨段删除，再撤销/重做 | 不产生损坏的代理字符，选择和删除范围一致；跨块恢复准确 |
-| M05 导航与文档替换 | Reading 使用 Jump to checklist / Back to top，折叠标题后选择；Switch document 后复制 | 导航位置正确，替换后无旧选区/旧内容，恢复到新文档顶部；保存复制结果 |
-| M06 纯文本跨应用复制 | Reading 全选复制到纯文本编辑器，与 `readingGuide` 比较；局部选区和 Editor Source 分别复制；切换文档再重复 | 整篇包括原始 YAML/Markdown；局部符合所选语义，无旧文档内容。记录接收应用及原文/结果文件 |
-| M07 双格式复制 | 在显式使用 `ianvs_markdown_clipboard` 的宿主复制到纯文本及支持富文本的接收端，另测超预算输入 | 纯文本保留完整原文；预算内 HTML 正确，超预算完整纯文本回退且不写旧 HTML；记录 writer 和接收端，核心默认纯文本不计此项通过 |
-| M08 VoiceOver | 在 Body、View、Source、Live 开启 VoiceOver，遍历标题、链接、代码复制、工具栏、折叠开关；执行操作并读出反馈 | 名称、角色、状态和顺序可理解，无焦点陷阱；记录 OS/读屏版本、逐步实际读出及缺口。语义单测不替代读屏 |
-| M09 流式内容 | Streaming 连续 Append fragment，上滚暂停跟随，再恢复；在异步预览返回前连续切换文档 | 旧结果不覆盖新文档，跟随/暂停符合状态，无旧复制反馈；记录片段序列与切换时点 |
-| M10 保存与降级 | Editor F5/工具栏保存；用大文档触发简化显示，编辑、保存、复制；真实持久化错误留给外部编辑宿主验证 | 捕获的原文完整，简化显示不截断保存/整篇复制；示例仅内存保存，关闭重开不能证明持久化 |
+| `example/lib/main.dart` | 无原生后端依赖的组件 playground | 默认完整语料，Live / Source / Reading、选择、撤销、保存回调、主题及安全资源回退 |
+| `app/lib/main.dart` | Linefold 实际应用 | macOS 本地文件、工作区、多标签、保存/恢复、Mermaid 与剪贴板；iOS 分支按实际需求处理阅读 |
 
-M04 的 `é` 是 `e` 加组合重音，测试文件保留原始 UTF-8 字节。M06 原文来自固定提交的
-`example/lib/reading.dart`，包含运行时生成的 12 个章节；不要拿 Dart 插值源码字面量直接比较复制结果。
-M02–M04 可在 Editor Source 输入以下小语料后切换模式，表格内容不要直接粘贴覆盖整个单元格模型：
+不另外创建临时 Flutter host；不将 `body.dart` / `reading.dart` / `editor.dart` /
+`streaming.dart` 或 FFI fixture 作为当前任务的应用入口。它们仍可用于单项诊断和契约测试。
+自动 Pub 快照 smoke 作为包内容质量检查保留，真实外部宿主验收已移出本轮计划。
+当前首先验证本机 macOS；不据此扩大其他 OS、CPU、最低 macOS 或 SDK 的支持声明。
 
-```markdown
-# 中文输入测试
+## 2. R3-01：构建与启动
 
-中文 😀 é 与 **加粗**、[链接](https://example.invalid)。
+从仓库根目录使用原版 Flutter 3.44.8（或实际明确选择并记录的工具链）：
 
-- [ ] 列表中的组合输入
-
-| 名称 | 内容 |
-| --- | --- |
-| 中文 | 😀 |
+```sh
+make build-local          # 两个 main 的 Debug
+make build-local-release  # 同两个 main 的 Release
+make run-example          # 默认 example main
+make run-app              # 默认 app main
 ```
 
-standard 阅读需用公共 `syntaxPreset` 接口构建 Body / View 对照，记录 harness 源码和重新构建的产物。
-这里的链接只是语料，宿主不应自动打开；网络图片、图表等资源继续由宿主授权。
-下一平台另增触摸长按/选区手柄、滚动、软键盘遮挡及 IME 用例，记录设备和系统，不能沿用 macOS 通过结果。
+可以用 `FLUTTER=/path/to/flutter/bin/flutter` 指定 SDK。app 的构建目标保留现有
+`FLUTTER_XCODE_ARCHS=$(uname -m)` 和 `CARGO_PROFILE_RELEASE_STRIP=none` 配置。
+不修改 SDK、不执行安装或覆盖 `/Applications`。Debug 与 Release 各自记录；构建通过
+后直接打开该构建的 bundle，记录实际进程路径和产物哈希，不能误用旧安装包。
 
-每个用例采用以下字段保存到日期证据目录：
+| 检查 | example | app |
+| --- | --- | --- |
+| Debug / Release 构建 | 使用 `lib/main.dart`，保留日志与退出码 | 同左，包含实际原生插件和 Quick Look 构建 |
+| 冷启动 | 显示默认 Markdown 和三模式工具栏，无启动异常 | 显示工作区/文件 UI，无启动异常；iCloud 不可用时本地文件路径仍可用 |
+| 基本操作 | 在 Source/Live/Reading 切换，能返回原文 | 新建或打开测试文档，切换模式，返回可编辑状态 |
+| 证据边界 | 主入口通过不代表独立最小入口 AOT 修复 | 构建和启动不等于真机 IME、分享或无障碍已验收 |
+
+若两个真实入口之一失败，优先修复该入口的可复现问题；不先展开独立矩阵或等待上游。
+
+## 3. R3-02：应用内使用链路
+
+在专用本地测试目录保存语料，保留用户原有文件与未保存文档。使用同一提交的两个主入口，
+记录模式、步骤、预期/实际文本；真实 UI 与自动 widget 测试分开标记。
+
+| 用例 | 入口与步骤 | 验收条件 |
+| --- | --- | --- |
+| L01 三模式保真 | example 输入含 YAML、中文、emoji、链接、表格的 Markdown，Source→Live→Reading→Source | 完整源码不变；改动可撤销/重做，选择与焦点能继续操作 |
+| L02 示例保存 | example 编辑后触发保存，再 Reset example | 保存反馈符合回调语义；Reset 恢复默认语料和历史基线。示例不宣称磁盘持久化 |
+| L03 本地文件闭环 | app 打开临时目录中的 Markdown，编辑、保存、关闭文档并重开 | 磁盘内容与捕获原文一致；标题、dirty、编码/换行信息正确 |
+| L04 多文档与恢复 | app 在两个文件/未命名文档间切换，测试未保存关闭提示；重启恢复 | 文本、dirty 和文档归属不串；取消关闭保留内容；恢复路径按现有契约工作 |
+| L05 保存期间编辑 | app 通过已有保存竞态/文件监视回归复验；真实 UI 用本地文件检查保存后新输入 | 旧确认不清除较新编辑，文件监视不误判自己的写入，错误和取消保留 dirty |
+| L06 复制与资源 | 两个应用分别全选复制；app Read 检查本地链接、图像和 Mermaid | example 原文纯文本与 app 选择的双格式符合契约；只访问测试目录中的资源，失败有回退 |
+| L07 大文档降级 | 在两个主入口输入超预算但可管理的测试文本，编辑、保存或复制 | 完整原文保留，观察预算结果和实际延迟；不以 debug 耗时作为性能基准 |
+| L08 输入与无障碍 | 两个主入口实际中文组合输入、候选取消、焦点/快捷键；读屏有需求时逐项记录 | 无丢字/重复确认/焦点陷阱；未执行部分保留待办，不用程序输入冒充真实 IME |
+
+没有实际 UI/存储证据时只填写自动测试通过，不能写成真实场景通过。发现缺陷后按当前
+入口复现、修复、添加有区分力的回归，再复测同一路径。
+
+## 4. R3-03：每批本地交付
+
+```sh
+make check-local    # 核心、example/app/适配器回归，以及两个 main 的 Debug 构建
+make build-local-release
+# 改动影响发布内容或公共接入时额外运行；CI 继续保留此自动检查。
+make check-package
+```
+
+`check-core` 仍包含 API 基线、格式、分析与输入预算回归；`check-integrations` 包含 app、
+原生剪贴板、Mermaid、Quick Look 等实际依赖的回归。独立示例测试属于契约辅助证据。
+Native CI 默认构建 example/app 的 main（Debug / Release），不再将五个独立示例的构建
+作为本地交付主线。版本、SDK 和原生依赖不随入口调整自动升级。
+
+公共 API/默认行为有变化时同时更新 [API 契约](API_CONTRACTS.md)、[迁移指南](MIGRATION.md)、
+CHANGELOG 和对应入口说明；修改基线需显式审查。本地交付不包含 1.0 API 冻结或包发布。
+
+每次记录：
 
 ```text
-用例：Mxx；状态：未执行 / 通过 / 失败 / 不适用（必须解释）
-组件提交 / 包快照 SHA-256：
-SDK revision / OS / 设备与架构：
-入口 / preset / 构建模式 / App.framework 或对应产物 SHA-256：
-输入法 / 读屏 / 剪贴板 writer / 接收应用：
-前置条件、实际步骤与原始输入：
-预期结果 / 实际结果：
-日志、录屏、源码及粘贴结果的路径与哈希：
-缺陷链接与复测记录：
+日期 / 组件提交 / 工作区改动或输入哈希：
+入口：example/lib/main.dart 或 app/lib/main.dart
+SDK revision / OS / CPU / Xcode / 原生构建配置：
+模式 / bundle 路径 / App.framework 哈希 / 实际进程路径：
+用例编号 / 自动或真实 UI / 输入 / 实际步骤和结果：
+状态：通过 / 失败 / 未执行 / 不适用（说明原因）
+日志、截图、测试文件与保存结果：
+已修复问题、保留限制和下一项：
 ```
 
-当前 M01–M10 对修复候选均为**未执行**。构建通过后按实际拟声明能力逐项验收，
-失败项转为明确缺陷；不适用项需说明宿主/平台范围，不能用“不适用”隐藏声明中的缺口。
-
-## 4. R3-02：最后执行的两个真实外部宿主
-
-由用户最后提供项目路径/仓库、只读或编辑场景、目标平台。两个场景须是独立真实项目，
-不能用当前仓库 example、Linefold 路径依赖或自动 smoke 代替。每个项目保留以下记录：
-
-| 验收面 | 只读宿主 | 编辑宿主 |
-| --- | --- | --- |
-| 候选来源 | 同一 Pub-selected 包内容/哈希；不得解析到本仓库工作目录 | 同左；记录原依赖版本和升级差异 |
-| 公共 API | Body/View、滚动、导航、预设和主题 | Controller 生命周期、三种模式、工具栏/快捷键 |
-| 资源 | 图片/链接/图表注入、拒绝及错误状态 | 同左，另测文档替换后过期结果 |
-| 保存/持久化 | 确认只读边界 | 实际保存、失败/取消、并发编辑期间保存、关闭重开；不得仅测示例内存 map |
-| 平台交互 | 实际平台的选择、复制、触摸/读屏 | 同左，加 IME、焦点、撤销/重做和长文档预算 |
-| 升级 | 依照迁移说明重建并运行 | 核对默认预算、历史容量、保存回调与可选剪贴板变更 |
-| 退出条件 | 无未解决接入阻塞，宿主维护者确认记录 | 同左 |
-
-这里的候选包可以是尚未发布的验证快照；不为完成宿主验收提前发布新版本。
-
-## 5. R3-03：可提前准备与最终发布核对
-
-当前可独立执行的准备步骤：
-
-1. `make check-api` 解析公共入口并比较导出及声明成员；已并入 `make check-core` 和双 SDK CI。
-   API 变化先更新契约/迁移/行为测试，再显式生成并审查基线；操作见
-   [工具说明](https://github.com/robinfai/ianvs-markdown/blob/main/tool/api_check/README.md)。
-2. 按 [0.3.1 迁移指南](MIGRATION.md) 核对默认复制、三种预算、历史、保存及配置。
-3. `make check-package` 对实际 Pub 快照运行包外迁移 smoke，覆盖复制、预算、历史和
-   保存取消/重试。模拟平台通道及内存保存只证明包外契约，不抵扣第 3、4 节真实验收。
-
-这些是可持续维护的发布准备。下表的最终候选核对仍等待 R3-01 和 R3-02：
-
-| 检查 | 当前材料 | 完成依据 |
-| --- | --- | --- |
-| API 与 SDK 范围 | [API 契约](API_CONTRACTS.md)、`make check-api` 基线、pubspec、Core 双 SDK 工作流 | 核对实际公共导出和拟支持 SDK；实验/第三方导出边界明确；不先改成 1.0 |
-| 迁移与默认行为 | [迁移指南](MIGRATION.md)、[接入指南](INTEGRATION_GUIDE.md)、CHANGELOG Unreleased | 预算、历史容量、默认纯文本剪贴板、异步保存/文档身份逐项对齐候选 |
-| 核心与包内容 | `make check-core`、`make check-package` | 最终提交的结果通过；快照没有仓库路径泄漏或无关原生资产 |
-| 原生/平台与性能 | `make check-integrations`、R2 报告、平台矩阵 | 涉及的适配器、真实交互及默认预算性能边界与同一候选一致 |
-| 外部验收 | 第 4 节两份记录 | 真实只读、编辑宿主均通过，问题闭环 |
-| 发布决策 | 版本、CHANGELOG、核心/适配器分发范围 | 前置门禁全部满足后再决定版本和发布时间；另行执行发布 |
-
-维护顺序：先归档原始证据和问题，再更新平台矩阵，最后更改 roadmap 状态。文档准备、
-单项实验或 CI 通过都不能单独把 R3-01 / R3-02 / R3-03 标成完成。
+本轮不再请求用户提供外部项目；以后若重新开展跨平台独立分发，再单独确定外部产品、
+SDK 矩阵与发行要求。上游报告和实验补丁作为历史证据保留，不在当前工作中继续等待或催办。

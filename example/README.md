@@ -1,8 +1,13 @@
 # ianvs_markdown example
 
-Each entry below runs independently and imports only public APIs. The example
-package depends only on Flutter and `ianvs_markdown`; it does not depend on
-Linefold or the optional Mermaid backend.
+The default `lib/main.dart` playground is the component-facing entry for local
+iteration. Run `make run-example` from the repository root, alongside
+`make run-app` for the file-based Linefold workflow. Both use the current core
+library; neither requires a separate acceptance host or an upstream fix first.
+
+The example depends only on Flutter and `ianvs_markdown`, not Linefold or the
+optional Mermaid backend. The focused entries below remain optional learning
+and diagnostic examples that use only public APIs.
 
 | Entry | Demonstrates | Host responsibilities |
 | --- | --- | --- |
@@ -25,12 +30,13 @@ From this directory:
 
 ```sh
 flutter pub get
+# Default application entry (also `make run-example` from the root).
+flutter run -d macos -t lib/main.dart
+# Optional focused examples:
 flutter run -d macos -t lib/body.dart
 flutter run -d macos -t lib/reading.dart
 flutter run -d macos -t lib/editor.dart
 flutter run -d macos -t lib/streaming.dart
-# Existing playground; also available as `make run example` from the root.
-flutter run -d macos -t lib/main.dart
 ```
 
 Launch one entry at a time. In the reader, use the heading button to navigate,
@@ -48,10 +54,13 @@ and host-owned FocusNode. F5 saves; Ctrl/⌘L changes the UI language. Failed
 writes remain errors rather than being acknowledged as saved.
 
 Run all example regressions with `flutter test`. From the repository root,
-`make build-examples` builds all five macOS Debug entries. `make check-package`
-runs the same example tests in a Pub-selected snapshot outside the repository,
-then checks a separately created host. This automated check does not replace
-real IME, cross-application clipboard or external-product acceptance.
+`make check-local` runs core/app/native regression checks and builds the two
+main entries in Debug. `make build-local-release` builds the same entries in
+Release. `make build-examples` remains an optional diagnostic target.
+`make check-package` still checks publication contents and public contracts in
+a temporary snapshot; it is not a separate product-acceptance task. Real IME
+and cross-application clipboard checks run in the two actual apps and are
+recorded separately from automated tests.
 
 The examples do not open or write files. The full file-first desktop product,
 including workspace navigation, tabs, recovery, and file watching, lives in

@@ -3,7 +3,8 @@
 更新：2026-10-11。面向已使用 0.3.1 的宿主，整理当前仓库候选的行为变化与接入步骤。
 仓库版本仍是 `0.3.1`，这些变更尚未发布到 pub.dev；不能仅通过更新版本约束获得它们。
 接入验证应锁定候选提交或该提交的 Pub-selected 包快照，并记录文件哈希。
-本指南不表示 1.0 API 已冻结，也不替代平台和两个真实外部宿主的最终验收。
+本指南不表示 1.0 API 已冻结。2026-10-12 起当前迭代改以 example/app 两个 main 为入口，
+按 [本地执行清单](R3_ACCEPTANCE.md) 推进；跨平台独立分发与外部产品验收不作为本地前置。
 
 ## 1. 先确认受影响的默认行为
 
@@ -123,7 +124,7 @@ final legacy = IanvsMarkdownController(text: source, historyPolicy: null);
   分析、widget 测试和包快照检查；它们不等于全部平台的 AOT 或真实交互通过。
   macOS Reading/Editor/Streaming AOT 仍有上游限制，见 [平台矩阵](PLATFORM_SUPPORT.md)。
 - 核心、剪贴板适配器和 Mermaid 的分发/版本分别管理；本轮没有发布新版本，也没有扩大
-  平台承诺。最终支持范围与版本决策须等 R3 的平台和真实宿主证据。
+  平台承诺。最终分发范围与版本决策另行安排，不是当前双入口本地迭代的退出条件。
 
 ## 7. 按顺序验证升级
 
@@ -132,8 +133,9 @@ final legacy = IanvsMarkdownController(text: source, historyPolicy: null);
    保存失败/取消/重试、文档切换与过期资源，不从编译成功推断行为兼容。
 3. 在组件源码仓库运行 `make check-core` 和 `make check-package`。前者含 API 基线门禁；
    后者只复制 Pub 实际选中的文件，在全新包外宿主执行迁移 smoke，不解析回工作目录。
-4. 真实只读/编辑宿主及平台交互按最终安排单独验收，记录实际持久化和关闭重开结果。
-   自动 smoke 使用模拟剪贴板与内存 Future，不能替代真实宿主、系统复制或 IME 验收。
+4. 当前在 example/app 的 main 中验证三模式和实际文件工作流，app 记录保存/关闭重开。
+   自动 smoke 使用模拟剪贴板与内存 Future，不能替代真实 UI、系统复制或 IME；独立
+   产品接入与发行支持留待后续分发工作另行安排，不要求本轮提供外部项目。
 
 维护工具和 smoke 源码只在
 [源码仓库](https://github.com/robinfai/ianvs-markdown/blob/main/tool/package_smoke_test.dart)

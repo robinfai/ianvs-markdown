@@ -4,6 +4,22 @@
 `lib/main.dart` entry point selects the iOS reader on iPhone/iPad and keeps the
 existing desktop shell on macOS.
 
+## Local iteration
+
+The repository now uses two default entries: this application's `lib/main.dart`
+and `example/lib/main.dart`. On macOS, start them with `make run-app` and
+`make run-example` from the repository root. Use `make check-local` for core,
+example/app and native regressions plus both Debug builds; use
+`make build-local-release` for both Release builds. These targets do not install
+over `/Applications` or require an independent acceptance host.
+
+Current work follows the local file workflow in this app and the three-mode
+component playground in example. Upstream AOT diagnostics and broader release
+support remain recorded separately; they do not block this local iteration.
+See [the execution checklist](../doc/R3_ACCEPTANCE.md) for save/reopen, recovery,
+multiple-document, resource and input checks. Build success alone does not
+claim those interactions passed.
+
 ## iOS reading preview
 
 The iOS version supports iPhone and iPad on iOS 15 or later. In another app,

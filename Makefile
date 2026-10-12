@@ -12,7 +12,7 @@ INTEGRATION_DART = app/lib app/test packages/ianvs_mermaid/lib packages/ianvs_me
 # Flutter resolves dependencies and writes generated files in each package.
 .NOTPARALLEL:
 
-.PHONY: help deps deps-core deps-integrations format format-check format-check-core format-check-integrations analyze analyze-core analyze-integrations test test-example test-app test-mermaid test-mermaid-example test-quicklook test-native-import test-ios-preview build-ios-preview build-examples run-ios check check-core check-integrations check-package check-api check-processing-budget test-clipboard benchmark run example run-app install clean publish-dry-run
+.PHONY: help deps deps-core deps-integrations format format-check format-check-core format-check-integrations analyze analyze-core analyze-integrations test test-example test-app test-mermaid test-mermaid-example test-quicklook test-native-import test-ios-preview build-ios-preview build-examples run-ios check check-local build-local build-local-release run-example check-core check-integrations check-package check-api check-processing-budget test-clipboard benchmark run example run-app install clean publish-dry-run
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -72,7 +72,15 @@ test-ios-preview: test-native-import ## Check iOS reading, import handling, and 
 build-ios-preview: ## Build the iOS reading preview for the simulator
 	cd app && $(FLUTTER) build ios --simulator --debug --no-codesign
 
-build-examples: ## Build body, reading, editor, streaming and playground entries for macOS
+build-local: deps ## Build the two local application entries for macOS Debug
+	cd example && $(FLUTTER) build macos --debug --target lib/main.dart
+	cd app && FLUTTER_XCODE_ARCHS="$$(uname -m)" CARGO_PROFILE_RELEASE_STRIP=none $(FLUTTER) build macos --debug --target lib/main.dart
+
+build-local-release: deps ## Build the same example and app entries for macOS Release
+	cd example && $(FLUTTER) build macos --release --target lib/main.dart
+	cd app && FLUTTER_XCODE_ARCHS="$$(uname -m)" CARGO_PROFILE_RELEASE_STRIP=none $(FLUTTER) build macos --release --target lib/main.dart
+
+build-examples: ## Optional diagnostic builds for individual component examples
 	cd example && $(FLUTTER) build macos --debug --target lib/body.dart
 	cd example && $(FLUTTER) build macos --debug --target lib/reading.dart
 	cd example && $(FLUTTER) build macos --debug --target lib/editor.dart
@@ -117,6 +125,8 @@ check-package: ## Test the actual Pub snapshot in an external Flutter host
 benchmark: ## Run the macOS profile benchmark (pass LABEL=before or after)
 	$(PYTHON) tool/run_benchmark.py --flutter "$(FLUTTER)" --label "$(or $(LABEL),local)" $(BENCHMARK_ARGS)
 
+check-local: check-core check-integrations build-local ## Validate local example/app iteration without external-host acceptance
+
 check: check-core check-integrations check-package ## Run all validation checks
 
 run: ## Run the desktop app on macOS (make run example for the example)
@@ -125,6 +135,9 @@ run: ## Run the desktop app on macOS (make run example for the example)
 # Accept example as a selector for make run.
 example:
 	@:
+
+run-example: ## Run the default example application on macOS
+	cd example && $(FLUTTER) run -d macos --target lib/main.dart
 
 run-app: ## Run the full desktop application on macOS
 	cd app && $(FLUTTER) run -d macos

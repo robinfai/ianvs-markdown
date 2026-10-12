@@ -8,12 +8,16 @@ chooses them. On Linux, the Flutter test runtime needs `libglu1-mesa`.
 ## Local checks
 
 ```sh
+make run-example         # example/lib/main.dart
+make run-app             # app/lib/main.dart
+make check-local         # default: core/app/native checks + both main Debug builds
+make build-local-release # the same two entries, Release
 make check-core          # dependency resolution, formatting, analysis, tests
 make check-api           # resolved exports and declared public member baseline
 make check-package       # actual publication snapshot and external host
 make check-processing-budget # independent processes for pathological input
 make check-integrations  # macOS: app, native clipboard, Mermaid, Quick Look
-make build-examples      # macOS Debug: body, reading, editor, playground
+make build-examples      # optional focused-example diagnostic builds
 make check               # all three groups
 make publish-dry-run     # core + snapshot + workspace Pub validation; no upload
 ```
@@ -50,8 +54,10 @@ CI SDKs upload those logs alongside package evidence. This checks bounded-input
 behavior and source preservation, not a profile frame-time target. See
 [the R2-05 report](benchmark/PROCESSING-BUDGET-2026-10-10.md).
 
-Candidate macOS Profile/Release commands, observed native build requirements,
-and remaining device checks are recorded in [the platform matrix](doc/PLATFORM_SUPPORT.md).
+Current local acceptance uses `example/lib/main.dart` and `app/lib/main.dart`.
+See [the local checklist](doc/R3_ACCEPTANCE.md). The standalone AOT reduction and
+candidate matrix are retained for diagnostics, not prerequisites for local work.
+Historical platform evidence remains in [the platform matrix](doc/PLATFORM_SUPPORT.md).
 
 ## Publication snapshot
 
@@ -69,10 +75,11 @@ the save callback, undoes the change, and switches to reading mode. This is a
 widget integration check. It also verifies migration behavior for default plain-text
 copy (with a mocked platform channel), independent budgets, bounded/legacy history,
 and captured asynchronous saves through cancellation and retry. These checks do
-not substitute for the two real external hosts. See [the migration guide](doc/MIGRATION.md).
-The snapshot also runs the integration-entry
-regressions. Native CI separately builds all four core entries and the Mermaid
-host, which opts into the native clipboard adapter.
+not prove actual UI or durable file behavior. See [the migration guide](doc/MIGRATION.md).
+The snapshot also runs the focused example regressions. Native CI builds the
+example and app main entries in Debug and Release; app exercises the real
+Mermaid, rich clipboard and Quick Look integration. Separate real external
+hosts are outside the current local roadmap.
 The core archive excludes `app/`, `packages/`, `demos/`, benchmarks and internal
 maintenance scripts. Pub's own ignore behavior is described in the
 [official publishing guide](https://dart.dev/tools/pub/publishing).
@@ -95,7 +102,10 @@ the matrix versions are pinned and should be updated explicitly after validation
 `Native integrations` runs for affected core, example, app, adapter, fixture,
 dependency and workflow paths. Manual dispatch forces a complete native run.
 It uses Flutter 3.44.8 so a core SDK upgrade does not silently change native
-rendering baselines.
+rendering baselines. Its build step is `make build-local build-local-release`;
+focused sample entry builds remain available manually through `build-examples`.
+The normal local gate is `make check-local`; CI additionally retains automatic
+package-snapshot checks for publishing hygiene, without requiring external projects.
 
 `main` requires the **Core required** check from GitHub Actions (app ID 15368),
 with the branch up to date. The rule also applies to administrators. Push changes
