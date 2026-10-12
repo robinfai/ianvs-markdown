@@ -41,8 +41,9 @@ void main() {
           messenger.setMockMethodCallHandler(SystemChannels.platform, (
             call,
           ) async {
-            if (call.method == 'Clipboard.setData')
+            if (call.method == 'Clipboard.setData') {
               copied.add((call.arguments as Map)['text'] as String);
+            }
             return null;
           });
           addTearDown(() {
@@ -108,11 +109,12 @@ void main() {
           expect(document.persistedText, fail ? original : saved);
           expect(files.files[document.path], fail ? original : saved);
           expect(document.hasExternalChanges, isFalse);
-          if (fail)
+          if (fail) {
             expect(
               find.textContaining('Test disk unavailable'),
               findsOneWidget,
             );
+          }
           files.completion = null;
           if (nativeMenu) {
             final menu = tester.widget<PlatformMenuBar>(

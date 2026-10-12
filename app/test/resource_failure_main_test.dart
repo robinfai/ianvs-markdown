@@ -22,12 +22,13 @@ void main() {
           () => Directory.systemTemp.createTemp('ianvs-resource-test-'),
         );
         addTearDown(() => directory!.delete(recursive: true));
-        if (!missing)
+        if (!missing) {
           await tester.runAsync(
             () => File(
               '${directory!.path}/bad.svg',
             ).writeAsBytes([0xff, 0xfe, 0xff]),
           );
+        }
         const source = '[Test image](bad.svg)\n\nSource remains intact.';
         final files = MemoryMarkdownFileService()
           ..files['${directory!.path}/index.md'] = source;
@@ -70,7 +71,10 @@ void main() {
         expect(tester.takeException(), isNull);
         expect(find.byType(CircularProgressIndicator), findsNothing);
         expect(find.byType(ErrorWidget), findsNothing);
-        expect(find.byType(SelectableText), findsWidgets);
+        expect(
+          find.textContaining(missing ? 'Cannot open file' : 'FormatException'),
+          findsOneWidget,
+        );
         await tester.tap(find.byTooltip('Close image'));
         await tester.pumpAndSettle();
         expect(document.controller.text, source);
