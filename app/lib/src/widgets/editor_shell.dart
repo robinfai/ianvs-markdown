@@ -316,13 +316,8 @@ class _EditorShellState extends State<EditorShell> {
                                                   inset,
                                                   56,
                                                 ),
-                                                onSaveRequested: (_) async {
-                                                  final saved = await workspace
-                                                      .saveDocument(document);
-                                                  if (!saved) {
-                                                    throw const IanvsMarkdownSaveCancelledException();
-                                                  }
-                                                },
+                                                onSaveRequested: (_) =>
+                                                    _saveFromEditor(document),
                                               );
                                             },
                                           ),
@@ -351,12 +346,27 @@ class _EditorShellState extends State<EditorShell> {
     );
   }
 
+  Future<void> _saveFromEditor(DocumentSession document) async {
+    final bool saved;
+    try {
+      saved = await widget.workspace.saveDocument(document);
+    } on Object catch (error) {
+      _showError(describeFileError(error));
+      // The host has reported the error. Do not let the editor acknowledge
+      // this failed snapshot, or report it again as an unhandled shortcut error.
+      throw const IanvsMarkdownSaveCancelledException();
+    }
+    if (!saved) throw const IanvsMarkdownSaveCancelledException();
+  }
+
   void _guard(Future<dynamic> Function() action) {
-    unawaited(
-      action().catchError((Object error, StackTrace stackTrace) {
+    unawaited(() async {
+      try {
+        await action();
+      } on Object catch (error) {
         _showError(describeFileError(error));
-      }),
-    );
+      }
+    }());
   }
 
   Future<void> _closeDocument(DocumentSession document) async {

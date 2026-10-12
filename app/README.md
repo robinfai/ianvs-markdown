@@ -153,6 +153,11 @@ Implemented application-shell capabilities:
 - Read-mode links to local Markdown and headings, local image previews, and
   external web, HTML, and PDF links
 
+Saving captures the source at the time of the request. Continuing to type or copy
+while a write is pending uses the current draft; a completed older write does not
+clear newer edits. Both the editor shortcut and native File menu show save errors
+without acknowledging the failed snapshot, and allow another save to retry.
+
 Integration boundaries in the current desktop shell:
 
 - Embedded local/remote images and Wiki embeds still need host resolution:
