@@ -1,0 +1,193 @@
+{
+  "schema": 1,
+  "date": "2026-10-12",
+  "scope": "R3 L01/L04 through example/app main; local macOS only",
+  "runtimeAndTestsRevision": "b4aa079da154710d82985d72895ff30989c4af17",
+  "sourceTestsCommit": "d842df4",
+  "environment": {
+    "os": "macOS 27.0.1 (26A434)",
+    "cpu": "arm64",
+    "xcode": "27.0 (27A266a)",
+    "rustc": "1.90.0",
+    "sdkRevision": "058e0af2c2b57e369d905a03ac9748b0ebf543c6",
+    "sdkGitStatusPorcelain": "",
+    "nativeBuildEnv": {
+      "FLUTTER_XCODE_ARCHS": "arm64",
+      "CARGO_PROFILE_RELEASE_STRIP": "none"
+    }
+  },
+  "commands": [
+    {
+      "command": "make check-local build-local-release FLUTTER=/Users/robinfai/development/flutter/bin/flutter DART=/Users/robinfai/development/flutter/bin/cache/dart-sdk/bin/dart",
+      "exitCode": 2,
+      "boundary": "Core/example/API/Python/budget passed; stopped at app unused import. Final app format/analyze/tests rerun after adding mode assertions and fixing queue scheduling."
+    },
+    {
+      "command": "make check-integrations (intermediate run interrupted during failing app tests; later targets did not run)",
+      "exitCode": 130,
+      "boundary": "Intermediate eager future queue caused 11 sidebar regressions; interrupted. Replaced with nullable idle queue; final complete rerun passed."
+    },
+    {
+      "command": "make check-integrations build-local build-local-release FLUTTER=/Users/robinfai/development/flutter/bin/flutter DART=/Users/robinfai/development/flutter/bin/cache/dart-sdk/bin/dart",
+      "exitCode": 0
+    },
+    {
+      "command": "make check-package FLUTTER=/Users/robinfai/development/flutter/bin/flutter DART=/Users/robinfai/development/flutter/bin/cache/dart-sdk/bin/dart",
+      "exitCode": 0,
+      "boundary": "Initial package check at b4aa079; final documentation snapshot results added separately."
+    },
+    {
+      "command": "make check-package FLUTTER=/Users/robinfai/development/flutter/bin/flutter DART=/Users/robinfai/development/flutter/bin/cache/dart-sdk/bin/dart",
+      "exitCode": 0,
+      "boundary": "Final ROADMAP/doc changes included; 167 files, 667 KB, zero warnings."
+    }
+  ],
+  "checks": {
+    "core": 967,
+    "example": 22,
+    "api": 8,
+    "apiExports": 183,
+    "apiDeclarations": 1143,
+    "python": 10,
+    "processingBudget": 32,
+    "appPassed": 281,
+    "appHistoricalOptionalCorpusSkipped": 1,
+    "mermaidFlutter": 9,
+    "mermaidRust": 4,
+    "mermaidExample": 3,
+    "clipboard": 6,
+    "quickLookRust": 8,
+    "quickLookSwift": 10,
+    "nativeImport": "passed"
+  },
+  "artifacts": [
+    {
+      "entry": "example/lib/main.dart",
+      "mode": "Debug",
+      "bundle": "example/build/macos/Build/Products/Debug/Ianvs Markdown Playground.app",
+      "buildExitCode": 0,
+      "uiStarted": false,
+      "executableSha256": "6c6f15c5be143dd6eb3ee3ff394bb71a42a175a2875f93f42ac6d0723029525d",
+      "appFrameworkSha256": "38527492771d79b8111168adf818f1f14aae100af21fa3c019d4f99c93fe70c1"
+    },
+    {
+      "entry": "example/lib/main.dart",
+      "mode": "Release",
+      "bundle": "example/build/macos/Build/Products/Release/Ianvs Markdown Playground.app",
+      "buildExitCode": 0,
+      "uiStarted": true,
+      "executableSha256": "81cf14235334237b32387e7c440c036df2975599a49e2870af76604607d13569",
+      "appFrameworkSha256": "1a302b6b4cfd89265871588d1c3689f8a94072c9e870f7d2159a7cba500f0f55"
+    },
+    {
+      "entry": "app/lib/main.dart",
+      "mode": "Debug",
+      "bundle": "app/build/macos/Build/Products/Debug/Linefold.app",
+      "buildExitCode": 0,
+      "uiStarted": false,
+      "executableSha256": "a95c67b1ab0299040d32e04105f2a090bd89bb76efdde58698ff09694780d3c9",
+      "appFrameworkSha256": "aac6d205eb1ed97bcd5f9e4c22bf29856317c5572fc5c4082b0da44276434a9a"
+    },
+    {
+      "entry": "app/lib/main.dart",
+      "mode": "Release",
+      "bundle": "app/build/macos/Build/Products/Release/Linefold.app",
+      "buildExitCode": 0,
+      "uiStarted": true,
+      "executableSha256": "d63e396dc7cbf73ceb0123a3303ac879c6d2a6c989cac184030200e4aec3a1ef",
+      "appFrameworkSha256": "8c9bf11741bd0d1f4b9e866b52ca3aff08d70241031b08ca96c88fa7df986000"
+    }
+  ],
+  "observedProcesses": [
+    {
+      "pid": 14321,
+      "entry": "example/lib/main.dart",
+      "path": "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/example/build/macos/Build/Products/Release/Ianvs Markdown Playground.app/Contents/MacOS/Ianvs Markdown Playground"
+    },
+    {
+      "pid": 22438,
+      "entry": "app/lib/main.dart",
+      "path": "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/app/build/macos/Build/Products/Release/Linefold.app/Contents/MacOS/Linefold",
+      "normalQuitConfirmedPidAbsent": true
+    }
+  ],
+  "gui": {
+    "example": "Default full sample plus real ASCII marker survived Live/Read/Source; save callback feedback and Reset observed. Custom CRLF full comparison, selection and undo/redo rely on widget tests, not GUI claims.",
+    "app": "CRLF source plus marker, clean file and unnamed draft restored through normal Quit and relaunch; source saved, closed and reopened; saved bytes equal expected.",
+    "snapshotsExactlyEqualImmediatelyAfterRestart": true,
+    "originalDocumentCount": 6,
+    "originalDocumentsTextAndPersistedTextUnchanged": true,
+    "testDocumentsBeforeQuitAndAfterRestart": [
+      {
+        "testDocument": "source.md",
+        "textSha256": "fdf928236037444579152cf20165fcf287a05357ea979b3a423f884bdc8028f8",
+        "persistedTextSha256": "3789fd5862b097728d406e24a124183173d141ce9f16c4739437df044e08ec63",
+        "hasOriginalFilePath": true,
+        "dirty": true,
+        "mode": "source",
+        "activeBeforeAndAfterRestart": false
+      },
+      {
+        "testDocument": "second.md",
+        "textSha256": "53201bbb5099738bc3efa0dfc7607be1ec004942286a305b469960708baf761a",
+        "persistedTextSha256": "53201bbb5099738bc3efa0dfc7607be1ec004942286a305b469960708baf761a",
+        "hasOriginalFilePath": true,
+        "dirty": false,
+        "mode": "livePreview",
+        "activeBeforeAndAfterRestart": false
+      },
+      {
+        "testDocument": "unnamed-draft",
+        "textSha256": "4b0b9f7ea814c5ebb82867d7323b76b8e3beb190889c32322a549fcd41448a54",
+        "persistedTextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "hasOriginalFilePath": false,
+        "dirty": true,
+        "mode": "source",
+        "activeBeforeAndAfterRestart": true
+      }
+    ],
+    "sourceBytesBefore": 208,
+    "sourceBytesAfter": 223,
+    "crlfBeforeAndAfter": 15,
+    "sourceHasBareLf": false,
+    "sourceHasFinalNewline": false,
+    "recoveredUnnamedDraftSavedBytesExact": true,
+    "screenshots": "Viewed in task tool history, not archived as files",
+    "privateData": "Private full session backups, bookmarks and user text excluded from evidence"
+  },
+  "limits": [
+    "No real Chinese IME or screen reader validation",
+    "GUI Quit occurred after debounce; sub-350ms exit flush and storage failure/retry tested with controlled widget store",
+    "No forced termination or real disk fault injection",
+    "No performance baseline rerun",
+    "No independent host or upstream acceptance",
+    "No core API, dependency or SDK modifications"
+  ],
+  "package": {
+    "files": 167,
+    "uncompressedBytes": 2945953,
+    "pubCompressedSize": "667 KB.",
+    "snapshotDryRun": "passed without warnings",
+    "exampleTests": "passed",
+    "externalHostTests": "passed",
+    "workspacePathLeak": false
+  },
+  "evidenceHashes": {
+    "flutter.version.json": "304c26a7987c2ea11d9e9d71168d658ea22fe7ec015a4aa72ab68afd7727cd74",
+    "ianvs-recovery-after.log.gz": "6e51c140ce2cd4fe006b0143ca16d306cbef194552371aac8a37d8398bfeb4ed",
+    "ianvs-recovery-before.log.gz": "a0bdb28eef3997cf387ce4f9c2d456b3d594254ba872c76b2c67819509e42a5b",
+    "ianvs-source-recovery-full.log.gz": "73199b42353d4fd7935474e812f3062d24ed6c0393e103135ef7e8ec4f960161",
+    "ianvs-source-recovery-native-build.log.gz": "49b8d0e25b24de67a599b80b726f61f866800dfa9fe51e6e95000ce4aa08a1a5",
+    "ianvs-source-recovery-package-final.log.gz": "2ae6681aa0fd72e2e805a21afad74b6f7963d5c1c8eac843f5adf02315f5db31",
+    "ianvs-source-recovery-package.log.gz": "87f0415ce7fcb0b5f44c42e774d88aa3ee084f229afba772bd6a061cd70b3dea",
+    "ianvs-source-recovery-queue-regression.log.gz": "010ce6b568d30cdba317eebad5b6c418ccbee340adb9251cdd80be30d6fd0552",
+    "input-hashes.json": "e7d782daf88acad8a517aa7fdaeb1c2642fc4f7d6ca4a51cfdad6ee58f84626a",
+    "package-manifest.json": "b9b5bc3c1ff976ba1e458dfc99fe3f225c5e6f5fa2f75c6430bf18b7b9677b0a",
+    "package-summary.json": "f7db2967bea01efe563dcfec03c9527257c41102a97fbf696b520fdc7f85d60b",
+    "recovered-draft.md": "4b0b9f7ea814c5ebb82867d7323b76b8e3beb190889c32322a549fcd41448a54",
+    "second.md": "53201bbb5099738bc3efa0dfc7607be1ec004942286a305b469960708baf761a",
+    "source-after.md.gz": "3576f56f6c97b8d01af2e98bc0e125577c6e9ce1f48365a70f37bbbfda33c292",
+    "source-before.md.gz": "cbe095a904266e265a0e5ce774e46000c6436592dd29eeff806081ee548eaa76"
+  },
+  "fixtureStorage": "source-before.md.gz and source-after.md.gz retain exact CRLF and trailing spaces; decompress before byte comparison."
+}
