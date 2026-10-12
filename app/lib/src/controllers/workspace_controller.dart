@@ -58,6 +58,8 @@ class WorkspaceController extends ChangeNotifier {
       <String, StreamSubscription<FileSystemEvent>>{};
   final Map<String, Future<bool>> _pendingSaves = <String, Future<bool>>{};
   Timer? _persistTimer;
+  Future<void>? _persistTail;
+  var _persistRevision = 0;
   var _activeIndex = 0;
   var _nextDocumentId = 1;
   var _workspaceFilesRevision = 0;
@@ -83,6 +85,10 @@ class WorkspaceController extends ChangeNotifier {
   Future<void> initialize() async {
     if (_initialized) return;
     if (defaultWorkspaceDirectory != null) await _resolveDefaultWorkspace();
+    // iCloud remains the default when available. Local builds must recover
+    // the workspace the user selected when automatic iCloud is unavailable.
+    final restoreLocalWorkspace =
+        defaultWorkspaceDirectory == null || _cloudRoot == null;
     try {
       final snapshot = await sessionStore.load();
       if (snapshot != null) {
@@ -90,7 +96,7 @@ class WorkspaceController extends ChangeNotifier {
         // Keep them available when a workspace is explicitly selected again.
         browser.restore(snapshot.browserState);
         for (final favorite
-            in defaultWorkspaceDirectory == null
+            in restoreLocalWorkspace
                 ? snapshot.favoriteAccessTokens.entries
                 : <MapEntry<String, String>>[]) {
           final path = await fileService.restorePersistentAccess(
@@ -102,7 +108,7 @@ class WorkspaceController extends ChangeNotifier {
           }
         }
         for (final grant
-            in defaultWorkspaceDirectory == null
+            in restoreLocalWorkspace
                 ? snapshot.operationGrants.entries
                 : <MapEntry<String, String>>[]) {
           final restored = await fileService.restorePersistentAccess(
@@ -110,7 +116,7 @@ class WorkspaceController extends ChangeNotifier {
           );
           if (restored != null) _operationGrants[restored] = grant.value;
         }
-        if (defaultWorkspaceDirectory == null) {
+        if (restoreLocalWorkspace) {
           _workspaceRoot = snapshot.workspaceRoot;
           _workspaceAccessToken = snapshot.workspaceAccessToken;
         }
@@ -127,9 +133,9 @@ class WorkspaceController extends ChangeNotifier {
         for (final documentJson in snapshot.documents) {
           final restored = DocumentSession.fromJson(documentJson);
           var path = restored.path;
-          if (defaultWorkspaceDirectory != null &&
+          if (!restoreLocalWorkspace &&
               path != null &&
-              (_cloudRoot == null || !p.isWithin(_cloudRoot!, path))) {
+              !p.isWithin(_cloudRoot!, path)) {
             if (!restored.controller.isDirty) {
               restored.dispose();
               continue;
@@ -270,6 +276,7 @@ class WorkspaceController extends ChangeNotifier {
       _workspaceAccessToken = null;
       workspaceNotice = null;
     } on Object catch (error) {
+      _cloudRoot = null;
       _workspaceRoot = null;
       workspaceNotice = error is PlatformException
           ? error.message
@@ -403,6 +410,7 @@ class WorkspaceController extends ChangeNotifier {
     _dirtyStates.remove(document.id);
     _unwatch(document.id);
     document.controller.removeListener(_handleDocumentChanged);
+    document.controller.modeListenable.removeListener(_schedulePersist);
     document.dispose();
     if (_documents.isEmpty) {
       _documents.add(
@@ -719,6 +727,7 @@ class WorkspaceController extends ChangeNotifier {
   void _attach(DocumentSession document) {
     _dirtyStates[document.id] = document.controller.isDirty;
     document.controller.addListener(_handleDocumentChanged);
+    document.controller.modeListenable.addListener(_schedulePersist);
     if (document.path != null) _watch(document);
   }
 
@@ -808,6 +817,7 @@ class WorkspaceController extends ChangeNotifier {
 
   void _schedulePersist() {
     if (!_initialized) return;
+    _persistRevision += 1;
     _persistTimer?.cancel();
     _persistTimer = Timer(
       const Duration(milliseconds: 350),
@@ -815,8 +825,29 @@ class WorkspaceController extends ChangeNotifier {
     );
   }
 
-  Future<void> _persistNow() async {
+  /// Waits for recovery storage before a normal, cancellable application exit.
+  /// Edits made while storage is busy are included before this completes.
+  /// Failures reach the caller so the application can remain open for retry.
+  Future<void> flushSession() async {
     if (!_initialized) return;
+    int revision;
+    do {
+      _persistTimer?.cancel();
+      revision = _persistRevision;
+      await _queueSnapshot();
+    } while (revision != _persistRevision);
+  }
+
+  Future<void> _persistNow() async {
+    try {
+      await _queueSnapshot();
+    } on Object catch (error, stackTrace) {
+      debugPrint('Unable to persist workspace: $error\n$stackTrace');
+    }
+  }
+
+  Future<void> _queueSnapshot() {
+    if (!_initialized) return Future<void>.value();
     final active = activeDocument;
     final snapshot = WorkspaceSnapshot(
       documents: _documents
@@ -832,11 +863,23 @@ class WorkspaceController extends ChangeNotifier {
       operationGrants: Map.of(_operationGrants),
       favoriteAccessTokens: Map.of(_favoriteAccessTokens),
     );
-    try {
-      await sessionStore.save(snapshot);
-    } on Object catch (error, stackTrace) {
-      debugPrint('Unable to persist workspace: $error\n$stackTrace');
+    // All snapshots share one temporary file in the desktop store. Preserve
+    // request order and continue after a failed write, without hiding the
+    // failure from callers awaiting this specific snapshot.
+    final writing = _persistTail == null
+        ? sessionStore.save(snapshot)
+        : _persistTail!.then((_) => sessionStore.save(snapshot));
+    late final Future<void> tail;
+    void completed() {
+      if (identical(_persistTail, tail)) _persistTail = null;
     }
+
+    tail = writing.then<void>(
+      (_) => completed(),
+      onError: (Object error, StackTrace stackTrace) => completed(),
+    );
+    _persistTail = tail;
+    return writing;
   }
 
   @override
@@ -850,6 +893,7 @@ class WorkspaceController extends ChangeNotifier {
     _watchers.clear();
     for (final document in _documents) {
       document.controller.removeListener(_handleDocumentChanged);
+      document.controller.modeListenable.removeListener(_schedulePersist);
       document.dispose();
     }
     super.dispose();

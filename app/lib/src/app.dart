@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/material.dart';
 import 'desktop_theme.dart';
@@ -124,6 +125,17 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
       );
     } finally {
       _settingsOpen = false;
+    }
+  }
+
+  @override
+  Future<AppExitResponse> didRequestAppExit() async {
+    try {
+      await _workspace.flushSession();
+      return AppExitResponse.exit;
+    } on Object catch (error) {
+      _showError('Unable to save recovery. Linefold remains open: $error');
+      return AppExitResponse.cancel;
     }
   }
 

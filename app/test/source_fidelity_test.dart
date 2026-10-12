@@ -52,6 +52,10 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(ValueKey('editor-mode-$value')));
         await tester.pumpAndSettle();
+        expect(
+          document.controller.mode,
+          IanvsMarkdownEditorMode.values.byName(value),
+        );
       }
 
       for (final name in ['Source', 'Live Preview', 'Read', 'Source']) {

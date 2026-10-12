@@ -28,14 +28,21 @@ share a **file attachment** and choose **Linefold** (sometimes under **More** or
 documents from Files/iCloud Drive. Imported copies remain available under
 **最近文档**, including after a restart. Linefold never edits the source file.
 
-With iCloud signing enabled, both apps default to the **iCloud · Linefold**
+With iCloud signing enabled and the container available, both apps default to the **iCloud · Linefold**
 workspace on every launch. They use the same `iCloud.work.ianvs.linefold`
 container and its `Documents` directory.
 On iPhone, **切换文件夹 → 选择其他文件夹…** opens a manually selected folder for
 this session. On Mac, use the sidebar folder button; its workspace menu returns
-to iCloud. External workspaces are not automatically reopened at startup.
+to iCloud. When that automatic iCloud workspace is available, external workspaces
+are not automatically reopened at startup.
 Unsaved desktop edits from an external workspace are recovered as untitled-path
 drafts, so selecting a new default never discards the text.
+
+On Mac without automatic iCloud access, Linefold restores the last selected local
+workspace, saved tabs and unsaved drafts using their stored file access bookmarks.
+Clean tabs refresh from disk; dirty tabs retain their recovered text and flag any
+conflict. Unnamed drafts remain unnamed and require Save As. Recovery never writes
+the draft over the Markdown file without a save request.
 
 iCloud container signing requires an Apple Developer team that supports iCloud;
 free Personal Teams cannot provision this capability. Both app targets must be
@@ -161,7 +168,13 @@ Integration boundaries in the current desktop shell:
   Find/replace, export, and an encoding or line-ending selector are not currently
   exposed.
 - Open-document text, modes, and workspace visibility are recovered. Appearance,
-  caret positions, and scroll offsets are not serialized across app launches.
+  caret positions, undo history, and scroll offsets are not serialized across app launches.
+  Snapshot writes are serialized, including mode-only changes. Normal cancellable
+  Quit requests wait for the latest recovery snapshot, including edits made while
+  storage is busy. If recovery storage fails, Quit is cancelled with an error so
+  the user can retry or save files. Forced termination/power loss can still lose
+  changes since the last completed snapshot; the 350 ms debounce is not a durable
+  per-keystroke write guarantee.
 
 The desktop shell integrates the published `ianvs_design: ^0.4.1` package.
 Shared themes and controls use compact density and macOS system fonts.
