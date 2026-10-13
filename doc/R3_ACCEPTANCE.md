@@ -2,7 +2,8 @@
 
 更新：2026-10-13。用户已将当前目标改为围绕仓库内 example / app 推进，不等待上游修复，
 不走独立验收宿主。本文替代 [原 R3 执行规程](https://github.com/robinfai/ianvs-markdown/blob/1f814eb39347716511170d47c32ed74a3d7eb413/doc/R3_ACCEPTANCE.md)；历史 AOT、实验和平台记录保留，未验证能力不补记通过。
-任务状态以 [ROADMAP](../ROADMAP.md) 为准；以下是操作规程，实际结果单独留证。
+任务状态以 [ROADMAP](../ROADMAP.md) 为准；以下是已完成 R3 的操作规程和证据。
+下一阶段转入 [R4 组件持续使用计划](R4_COMPONENT_ROADMAP.md)，保留本清单作为回归基线。
 
 ## 1. 固定两个应用入口
 
