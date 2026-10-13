@@ -84,10 +84,13 @@ abstract class WorkspaceSessionStore {
 }
 
 class DesktopWorkspaceSessionStore implements WorkspaceSessionStore {
-  const DesktopWorkspaceSessionStore();
+  const DesktopWorkspaceSessionStore({this.directory});
+
+  /// Optional isolated storage for diagnostic sessions; normal hosts omit it.
+  final Directory? directory;
 
   Future<File> _sessionFile() async {
-    final support = await getApplicationSupportDirectory();
+    final support = directory ?? await getApplicationSupportDirectory();
     return File(p.join(support.path, 'ianvs-markdown', 'workspace.json'));
   }
 

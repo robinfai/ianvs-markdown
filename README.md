@@ -319,6 +319,10 @@ IanvsMarkdown(data: trustedSource, renderBudget: null)
 
 输入额度不等于布局耗时、堆内存或宿主资源上限，Source 仍排版完整原文。边界、迁移及复现命令见 [预算契约](doc/API_CONTRACTS.md#预算与资源) 与 [R2-05 验证](https://github.com/robinfai/ianvs-markdown/blob/main/benchmark/PROCESSING-BUDGET-2026-10-10.md)。
 
+当前仓库以 example/app 两个实际主入口做性能验收，默认诊断关闭。原版 SDK 的 Profile
+各两轮结果、固定语料、观察线和复验命令见 [R4-02 性能报告](https://github.com/robinfai/ianvs-markdown/blob/main/benchmark/MAIN-ENTRY-PERFORMANCE-2026-10-13.md)。
+该基线保留默认预算，不表示任意大文档都能实时编辑，也不是物理键盘/IME 延迟保证。
+
 ## 来源边界
 
 首版基于 `ianvs-acp` 的 Markdown 代码块、链接、front matter 和文件预览实现整理。ACP 专属输入预算、图片解码账本、工作区路径校验和文件预览导航没有进入本包；对应能力改为通用预算或宿主注入点。

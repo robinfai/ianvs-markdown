@@ -12,6 +12,7 @@ make run-example         # example/lib/main.dart
 make run-app             # app/lib/main.dart
 make check-local         # default: core/app/native checks + both main Debug builds
 make build-local-release # the same two entries, Release
+make build-local-performance MODE=profile LABEL=baseline # opt-in diagnostics in both mains
 make check-core          # dependency resolution, formatting, analysis, tests
 make check-api           # resolved exports and declared public member baseline
 make check-package       # actual publication snapshot and external host
@@ -39,11 +40,21 @@ Quick Look tests locate the packaged Mermaid library through Pub's resolved
 package configuration; they do not require a previous app build or CocoaPods
 plugin symlinks.
 
-Profile performance measurements use `make benchmark LABEL=after`. Read
-[benchmark/README.md](benchmark/README.md) first: the current macOS SDK
-workarounds and incomplete-run handling are separate from widget-test results.
-Only a complete, error-free matched pair satisfies the full baseline gate.
-Partial diagnostics must identify unfinished phases and their limitations.
+Current performance acceptance uses `make build-local-performance MODE=profile
+LABEL=baseline`, which builds and freezes diagnostics inside the two existing
+main entries. Open the Profile app paths listed in `freeze.json` through Finder, run one entry at a
+time, and restart each process for its second complete repetition. Keep the
+window active and unchanged; do not build or test concurrently. Collect every
+run, including failures, with `tool/local_performance.py collect`, then validate
+two complete runs per entry with `tool/analyze_local_performance.py`.
+See the [fixed protocol](benchmark/LOCAL-PERFORMANCE-PROTOCOL.md) and
+[R4-02 report](benchmark/MAIN-ENTRY-PERFORMANCE-2026-10-13.md) for exact commands,
+synthetic-input boundaries, frozen environment, raw data and observation lines.
+Ordinary builds keep diagnostics disabled; the public API is unchanged.
+
+The older `make benchmark LABEL=after` and [benchmark/README.md](benchmark/README.md)
+remain historical R0/R2 attribution tools. They are not acceptance entries for
+the current roadmap, and their results cannot substitute for actual main runs.
 
 `check-core` includes the processing-budget check on the supported Linux/macOS
 validation hosts (the process-group timeout runner requires POSIX). It gives each of 32

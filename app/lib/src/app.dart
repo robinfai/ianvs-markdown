@@ -6,6 +6,7 @@ import 'desktop_theme.dart';
 
 import 'controllers/file_association_controller.dart';
 import 'controllers/workspace_controller.dart';
+import 'local_performance.dart';
 import 'services/file_association_service.dart';
 import 'services/incoming_files_service.dart';
 import 'services/markdown_file_service.dart';
@@ -31,16 +32,19 @@ class LinefoldApp extends StatefulWidget {
 }
 
 class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
+  late final _performanceFiles = LocalPerformanceFiles();
   late final WorkspaceController _workspace =
       widget.workspaceController ??
-      WorkspaceController(
-        fileService: const DesktopMarkdownFileService(
-          workspace: AppleWorkspaceService(),
-        ),
-        sessionStore: const DesktopWorkspaceSessionStore(),
-        defaultWorkspaceDirectory:
-            const AppleWorkspaceService().defaultDirectory,
-      );
+      (localPerformanceEnabled
+          ? localPerformanceWorkspace(_performanceFiles)
+          : WorkspaceController(
+              fileService: const DesktopMarkdownFileService(
+                workspace: AppleWorkspaceService(),
+              ),
+              sessionStore: const DesktopWorkspaceSessionStore(),
+              defaultWorkspaceDirectory:
+                  const AppleWorkspaceService().defaultDirectory,
+            ));
   late final FileAssociationController _fileAssociation =
       widget.fileAssociationController ??
       FileAssociationController(service: const MacOSFileAssociationService());
@@ -48,7 +52,7 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
       widget.incomingFilesService ?? MacOSIncomingFilesService();
   final _navigatorKey = GlobalKey<NavigatorState>();
   final _messengerKey = GlobalKey<ScaffoldMessengerState>();
-  var _themeMode = ThemeMode.system;
+  var _themeMode = localPerformanceEnabled ? ThemeMode.light : ThemeMode.system;
   var _settingsOpen = false;
   var _promptOpen = false;
   StreamSubscription<void>? _cloudChanges;
@@ -57,7 +61,7 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    if (widget.workspaceController == null) {
+    if (widget.workspaceController == null && !localPerformanceEnabled) {
       _cloudChanges = const AppleWorkspaceService().changes.listen((_) {
         if (_workspace.initialized && _workspace.isCloudWorkspace) {
           unawaited(_workspace.browser.refresh());
@@ -69,7 +73,7 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
 
   Future<void> _initialize() async {
     await _workspace.initialize();
-    if (!mounted) return;
+    if (!mounted || localPerformanceEnabled) return;
     try {
       await _incomingFiles.start(_openIncomingFiles);
     } on Object catch (error) {
@@ -157,6 +161,13 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
     super.dispose();
   }
 
+  Widget _withPerformance(Widget child) => localPerformanceEnabled
+      ? LocalPerformancePanel(
+          host: localPerformanceHost(_workspace, _performanceFiles),
+          child: child,
+        )
+      : child;
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -172,17 +183,20 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
         builder: (context) => Semantics(
           container: true,
           explicitChildNodes: true,
-          child: EditorShell(
-            workspace: _workspace,
-            dark: Theme.of(context).brightness == Brightness.dark,
-            onToggleTheme: () => setState(
-              () => _themeMode = Theme.of(context).brightness == Brightness.dark
-                  ? ThemeMode.light
-                  : ThemeMode.dark,
+          child: _withPerformance(
+            EditorShell(
+              workspace: _workspace,
+              dark: Theme.of(context).brightness == Brightness.dark,
+              onToggleTheme: () => setState(
+                () =>
+                    _themeMode = Theme.of(context).brightness == Brightness.dark
+                    ? ThemeMode.light
+                    : ThemeMode.dark,
+              ),
+              onUseSystemTheme: () =>
+                  setState(() => _themeMode = ThemeMode.system),
+              onOpenSettings: _openSettings,
             ),
-            onUseSystemTheme: () =>
-                setState(() => _themeMode = ThemeMode.system),
-            onOpenSettings: _openSettings,
           ),
         ),
       ),

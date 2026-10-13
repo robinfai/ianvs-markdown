@@ -1,8 +1,9 @@
 # R4：Flutter Markdown 组件库的持续使用迭代
 
 日期：2026-10-13。分析基线为 `6e255400b6b05b42cb4210509ba43ed84e4f2992`（PR #21 合入）。
-初次交付为下一阶段计划；现已落地 R4-01，其实现、两入口 GUI 与本轮人工 IME 见
-[命令路由报告](../benchmark/COMMAND-ROUTING-2026-10-13.md)。其他任务尚未实施，性能基线待 R4-02。
+初次交付为下一阶段计划；现已落地 R4-01/R4-02。R4-01 的实现、两入口 GUI 与本轮人工 IME 见
+[命令路由报告](../benchmark/COMMAND-ROUTING-2026-10-13.md)。R4-02 的双入口各两轮基线与原始证据见
+[性能报告](../benchmark/MAIN-ENTRY-PERFORMANCE-2026-10-13.md)，其他任务尚未实施。
 依据是当前源码、测试和 R0–R3 已归档结果；已知限制、代码路径风险和新能力建议分别标记。
 任务状态与总数只在 [ROADMAP 的 R4 表](../ROADMAP.md#r4-下一阶段任务) 维护。
 
@@ -23,7 +24,7 @@ app 验证真实文件和多文档使用。文件读写、授权、工作区和�
 | --- | --- | --- |
 | 打开、编辑、保存、重开与恢复 | [R3 清单](R3_ACCEPTANCE.md) 和 [L07/L08 报告](../benchmark/LARGE-INPUT-FOCUS-2026-10-13.md)：两个 Release 主入口已验证；用户人工确认 Source/Live 四组拼音确认/取消正常 | 已完成基线，继续作为回归条件，不重复登记为待实现功能 |
 | 原生菜单与组件键盘路径是否一致 | R4-01 从两个 main 复现 5 个失败，新增 [显式焦点命令](API_CONTRACTS.md#命令配置与焦点r1-03)，菜单、工具栏与默认编辑键共享局部/文档边界及 composing 保护；删除冲突 accelerator | 已交付：核心 970、example 35、app 296、四个构建及快照通过；两 Release 菜单实测与用户本轮四组 IME 确认。详见 [证据](../benchmark/COMMAND-ROUTING-2026-10-13.md) |
-| 大文档降级后仍有输入/排版成本 | [Source](../lib/src/editor/source_editor.dart) 使用完整文本的 `TextField(maxLines: null)`；[预算](../lib/src/render_budget.dart) 明确只限制处理输入，不是延迟/堆限制。历史 R2 默认 1 MiB 输入 P95 约 371–380 ms；L07 的 CUA 耗时含等待/AX | 已知架构边界；历史数字不能代表当前两入口。R4-02 建立新基线，R4-03 再做有归因的优化 |
+| 大文档降级后仍有输入/排版成本 | [Source](../lib/src/editor/source_editor.dart) 使用完整文本的 `TextField(maxLines: null)`；[预算](../lib/src/render_budget.dart) 明确只限制处理输入，不是延迟/堆限制。历史 R2 默认 1 MiB 输入 P95 约 371–380 ms；L07 的 CUA 耗时含等待/AX | 已知架构边界；历史数字不能代表当前两入口。R4-02 已完成两个 Profile main 各两轮基线，R4-03 再做有归因的优化 |
 | 切模式、切文档后回到原阅读/编辑位置 | [View.didUpdateWidget](../lib/src/ianvs_markdown.dart) 在 data 等变化后 `jumpTo(0)`；[Controller](../lib/src/editor/editor_controller.dart) 有 `revealHeading`，尚无通用范围显露契约；[DocumentSession](../app/lib/src/models/document_session.dart) 持有一个 ScrollController，JSON 不保存选区/视口 | 已确认契约缺口；现有模式续输不等于定位恢复。R4-04 先处理同进程视口与源码范围；重启恢复位置另列候选 |
 | 在当前 Markdown 中查找和替换 | app [文件搜索](../app/lib/src/controllers/file_browser_controller.dart) 匹配路径/文件名；公共 [命令枚举](../lib/src/keyboard.dart) 无查找/替换，已导出 API 没有文内结果集与范围定位组合 | 新能力建议。R4-05 先做当前文档纯文本查找，不扩展为全工作区索引 |
 | 长时间编辑、多标签、关闭后资源是否稳定 | Controller 已有 200 状态 / 32 MiB 历史策略及 dispose；[流式契约](../test/streaming_contract_test.dart)、[异步示例](../example/lib/async_diagram.dart) 和 MermaidView 已处理若干过期响应 | 不能据此声称存在泄漏，也不能将每个 Controller 的历史额度当作进程 RSS 上限。R4-06 补持续工作负载证据，复用已有生命周期逻辑 |
@@ -52,7 +53,7 @@ Pub-selected 快照 176 文件 / 675 KB / 零警告。PR #21 最终头 `18a0f46`
 | 7 | R4-07 键盘与 VoiceOver 使用闭环 | P2 / 中 | 依赖 R4-01、R4-04、R4-05 的最终交互；语义树检查可提前，最终人工验收最后做 |
 
 R4 共 7 项：P1 四项、P2 三项。有依赖的任务不因编号靠后而被默认为可以同时实施。
-先完成一批再启动下一批；R4-01 已完成，下一项 R4-02。任务状态以 ROADMAP 表为准。
+先完成一批再启动下一批；R4-01/R4-02 已完成，下一项 R4-03。任务状态以 ROADMAP 表为准。
 
 ## R4-01 命令路由和输入边界一致
 
@@ -93,6 +94,12 @@ R4 共 7 项：P1 四项、P2 三项。有依赖的任务不因编号靠后而�
 
 建议提交：两个入口语料/采样接线 → 数据格式及有效性校验 → 两轮结果与 R4-03 目标。
 
+R4-02 实际交付：同一 `3956a01` / 原版 Flutter 3.44.8 / Profile，example 和 app 各两轮
+完整有效，2,400 正式 + 600 预热；六次无效轮次保留。协议、60 个场景的观察线、合成输入
+边界、帧归属和文件子区间见 [性能报告](../benchmark/MAIN-ENTRY-PERFORMANCE-2026-10-13.md)。
+10 KiB 为完整 Markdown；100 KiB/1 MiB 为默认 syntaxTokens 降级，未截断编辑/保存原文。
+本项不记为性能改善，旧独立入口没有补入本轮数据。
+
 ## R4-03 大文档编辑成本优化
 
 **使用场景：** 文档超预算后能继续编辑，但完整 TextField 排版、源码扫描和历史仍可能拖慢输入。
@@ -101,10 +108,16 @@ R4 共 7 项：P1 四项、P2 三项。有依赖的任务不因编号靠后而�
 一条路径做小改动；大范围 Source 分块/虚拟化只在较小改动不能达到目标时进入方案评审。
 不能通过更早截断原文、关闭选择/IME、缩小测试语料或偷偷放宽预算换取成绩。
 
+R4-02 后的起点：优先归因 example 默认预算 1 MiB Read→Live（两轮 P95 2625.868 /
+2672.944 ms，回调小于 0.1 ms，归属帧约 66 ms，必须解释其余等待）。首个候选目标为
+两轮 P95 均 ≤ 2100.694 ms，比较快基线改善至少 20%。随后检查 app 1 MiB Source/Live
+输入（约 207–213 ms）及批量插入（约 240–245 ms）的 UI 构建成本；CPU 归因后再冻结对应
+目标。10 KiB Live 尾部、app 打开/保存作为后续调查和非目标观察项；不能从延迟直接断言根因。
+
 验收：
 
 - 编辑、保存、复制、撤销、中文/emoji/CRLF、跨块选择与 IME 仍保真；同时覆盖正常与降级状态。
-- 在优化代码前写下目标场景与改善目标；建议立项门槛为热点动作 P95 至少改善 20%，这是待基线确认的目标，不是已有成绩或跨设备 SLA。
+- 在优化代码前写下目标场景与改善目标；首个热点目标已按上述基线冻结为至少改善 20%；其他目标在实现前依据归因明确，不是已有成绩或跨设备 SLA。
 - 使用 R4-02 同配置做两轮完整候选；每轮核对源文/降级一致，非目标动作不得超出冻结的观察线。
 - 结果达不到目标或布局方案需要架构重做时，保留数据、记录下一批边界，任务保持进行中或明确延期，不能仅凭“代码重构完成”关闭。
 - 两个 Release main 验证编辑和文件闭环；不重做不相关平台矩阵。

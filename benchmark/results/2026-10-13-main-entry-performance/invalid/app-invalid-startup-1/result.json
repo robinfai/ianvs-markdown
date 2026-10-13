@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "protocol": "r4-main-entry-v1",
+  "sourceRevision": "3956a01320945de4916c6480118cc63b1d961f5c",
+  "inputsDigest": "c63fdb070ba5b2f9c6448267439be22fa6e6e74511feb63fc8c569cf45f5641b",
+  "entry": "app",
+  "main": "app/lib/main.dart",
+  "buildMode": "profile",
+  "inputKind": "synthetic-framework; paste excludes OS clipboard; no physical IME/CUA latency",
+  "corpusVersion": 1,
+  "warmup": 5,
+  "samples": 20,
+  "budget": "default",
+  "startedAtUtc": "2026-10-13T05:52:25.892800Z",
+  "finishedAtUtc": "2026-10-13T05:52:35.960447Z",
+  "initialWindow": null,
+  "display": null,
+  "system": {
+    "dart": "3.12.2 (stable) (Tue Jun 9 01:11:39 2026 -0700) on \"macos_arm64\"",
+    "os": "Version 27.0.1 (Build 26A434)",
+    "pid": 75619,
+    "executable": "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/app/build/macos/Build/Products/Profile/Linefold.app/Contents/MacOS/Linefold"
+  },
+  "complete": false,
+  "errors": [
+    "Bad state: Window not ready: {occlusionVisible: false, generation: 0, appHidden: false, miniaturized: false, scale: 2.0, x: 264.0, width: 1200.0, screen: 1, y: 228.0, visible: true, height: 780.0, active: false, onActiveSpace: true}"
+  ],
+  "cases": [],
+  "records": []
+}

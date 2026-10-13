@@ -1,4 +1,13 @@
-# Live editor performance baseline
+# Performance evidence
+
+Current roadmap acceptance uses the existing example/app main entries with opt-in
+sampling. Start with the [R4-02 protocol](LOCAL-PERFORMANCE-PROTOCOL.md) and
+[main-entry results / reproduction](MAIN-ENTRY-PERFORMANCE-2026-10-13.md).
+Both actual Profile mains have two validated repetitions; default builds keep
+sampling disabled. The independent entry below is retained for historical
+R0/R2 diagnostics and does not satisfy the current roadmap.
+
+## Historical live editor performance baseline
 
 Run this benchmark on an idle Mac. It opens the minimal example host, performs
 the workload automatically, writes evidence to `build/benchmark/`, and exits.
