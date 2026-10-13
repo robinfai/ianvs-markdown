@@ -58,12 +58,6 @@ class MainFlutterWindow: NSWindow {
     }
   }
 
-  deinit {
-    for observer in benchmarkObservers {
-      NotificationCenter.default.removeObserver(observer)
-    }
-  }
-
 
   private var fileAccessChannel: FlutterMethodChannel?
   private var fileAssociationChannel: FlutterMethodChannel?
@@ -251,6 +245,9 @@ class MainFlutterWindow: NSWindow {
   }
 
   deinit {
+    for observer in benchmarkObservers {
+      NotificationCenter.default.removeObserver(observer)
+    }
     for url in securityScopedURLs.values {
       url.stopAccessingSecurityScopedResource()
     }
