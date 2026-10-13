@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "protocol": "r4-main-entry-v1",
+  "sourceRevision": "7592ab523ef5e8896057d849e72779f4f0f2ac39",
+  "inputsDigest": "b0b9a7582504bdd2b710c5eb535da6bd6f7c7836271cf2ec50fc2b7408b36b43",
+  "entry": "example",
+  "main": "example/lib/main.dart",
+  "buildMode": "profile",
+  "inputKind": "synthetic-framework; paste excludes OS clipboard; no physical IME/CUA latency",
+  "corpusVersion": 1,
+  "warmup": 5,
+  "samples": 20,
+  "budget": "default",
+  "startedAtUtc": "2026-10-13T05:22:21.558268Z",
+  "finishedAtUtc": "2026-10-13T05:22:31.687226Z",
+  "initialWindow": null,
+  "display": null,
+  "system": {
+    "dart": "3.12.2 (stable) (Tue Jun 9 01:11:39 2026 -0700) on \"macos_arm64\"",
+    "os": "Version 27.0.1 (Build 26A434)",
+    "pid": 33053,
+    "executable": "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/example/build/macos/Build/Products/Profile/Ianvs Markdown Playground.app/Contents/MacOS/Ianvs Markdown Playground"
+  },
+  "complete": false,
+  "errors": [
+    "Bad state: Window not ready: {scale: 2.0, x: 274.0, y: 228.0, generation: 0, miniaturized: false, onActiveSpace: true, visible: true, active: false, occlusionVisible: true, screen: 1, width: 1180.0, height: 780.0, appHidden: false}"
+  ],
+  "cases": [],
+  "records": []
+}

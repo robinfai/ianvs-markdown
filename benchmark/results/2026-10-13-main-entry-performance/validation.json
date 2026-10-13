@@ -1,0 +1,319 @@
+{
+  "runtimeRevision": "3956a01320945de4916c6480118cc63b1d961f5c",
+  "inputsDigest": "c63fdb070ba5b2f9c6448267439be22fa6e6e74511feb63fc8c569cf45f5641b",
+  "valid": true,
+  "formalSamples": 2400,
+  "warmups": 600,
+  "inputStylesMatchPerEntry": true,
+  "corpusHashesMatchAllEntries": true,
+  "machine": {
+    "cpu": "Apple M4 Pro",
+    "memoryBytes": 51539607552
+  },
+  "localGateRevision": "7592ab5",
+  "localGate": {
+    "core": 972,
+    "example": 35,
+    "app": 297,
+    "appHistoricalSkip": 1,
+    "api": 8,
+    "pythonInitial": 20,
+    "pythonFinal": 22,
+    "budgetCases": 32,
+    "defaultMainBuilds": [
+      "example Debug",
+      "example Release",
+      "app Debug",
+      "app Release"
+    ]
+  },
+  "runtimeCI": {
+    "core": "https://github.com/robinfai/ianvs-markdown/actions/runs/38352361201",
+    "native": "https://github.com/robinfai/ianvs-markdown/actions/runs/38352361211",
+    "status": "success"
+  },
+  "runs": {
+    "example-1": {
+      "startedAtUtc": "2026-10-13T05:38:56.288707Z",
+      "finishedAtUtc": "2026-10-13T05:44:34.141180Z",
+      "initialWindow": {
+        "width": 1180.0,
+        "visible": true,
+        "x": 274.0,
+        "screen": 1,
+        "active": true,
+        "onActiveSpace": true,
+        "occlusionVisible": true,
+        "miniaturized": false,
+        "generation": 0,
+        "height": 780.0,
+        "scale": 2.0,
+        "y": 228.0,
+        "appHidden": false
+      },
+      "display": {
+        "physicalWidth": 2360.0,
+        "physicalHeight": 1560.0,
+        "devicePixelRatio": 2.0,
+        "brightness": "light",
+        "textScale14": 14.0,
+        "monoFontFamily": "SF Mono",
+        "monoFontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ]
+      },
+      "system": {
+        "dart": "3.12.2 (stable) (Tue Jun 9 01:11:39 2026 -0700) on \"macos_arm64\"",
+        "os": "Version 27.0.1 (Build 26A434)",
+        "pid": 62508,
+        "executable": "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/example/build/macos/Build/Products/Profile/Ianvs Markdown Playground.app/Contents/MacOS/Ianvs Markdown Playground"
+      },
+      "cases": [
+        {
+          "bytes": 10240,
+          "utf16Units": 10004,
+          "useMarkdown": true,
+          "exceeded": null,
+          "readingBytes": 10240,
+          "truncated": false
+        },
+        {
+          "bytes": 102400,
+          "utf16Units": 100094,
+          "useMarkdown": false,
+          "exceeded": "syntaxTokens",
+          "readingBytes": 65536,
+          "truncated": true
+        },
+        {
+          "bytes": 1048576,
+          "utf16Units": 1025282,
+          "useMarkdown": false,
+          "exceeded": "syntaxTokens",
+          "readingBytes": 65536,
+          "truncated": true
+        }
+      ]
+    },
+    "example-2": {
+      "startedAtUtc": "2026-10-13T05:45:40.101782Z",
+      "finishedAtUtc": "2026-10-13T05:51:22.960387Z",
+      "initialWindow": {
+        "appHidden": false,
+        "miniaturized": false,
+        "occlusionVisible": true,
+        "scale": 2.0,
+        "visible": true,
+        "onActiveSpace": true,
+        "generation": 0,
+        "screen": 1,
+        "active": true,
+        "x": 274.0,
+        "height": 780.0,
+        "width": 1180.0,
+        "y": 228.0
+      },
+      "display": {
+        "physicalWidth": 2360.0,
+        "physicalHeight": 1560.0,
+        "devicePixelRatio": 2.0,
+        "brightness": "light",
+        "textScale14": 14.0,
+        "monoFontFamily": "SF Mono",
+        "monoFontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ]
+      },
+      "system": {
+        "dart": "3.12.2 (stable) (Tue Jun 9 01:11:39 2026 -0700) on \"macos_arm64\"",
+        "os": "Version 27.0.1 (Build 26A434)",
+        "pid": 67939,
+        "executable": "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/example/build/macos/Build/Products/Profile/Ianvs Markdown Playground.app/Contents/MacOS/Ianvs Markdown Playground"
+      },
+      "cases": [
+        {
+          "bytes": 10240,
+          "utf16Units": 10004,
+          "useMarkdown": true,
+          "exceeded": null,
+          "readingBytes": 10240,
+          "truncated": false
+        },
+        {
+          "bytes": 102400,
+          "utf16Units": 100094,
+          "useMarkdown": false,
+          "exceeded": "syntaxTokens",
+          "readingBytes": 65536,
+          "truncated": true
+        },
+        {
+          "bytes": 1048576,
+          "utf16Units": 1025282,
+          "useMarkdown": false,
+          "exceeded": "syntaxTokens",
+          "readingBytes": 65536,
+          "truncated": true
+        }
+      ]
+    },
+    "app-1": {
+      "startedAtUtc": "2026-10-13T05:58:14.061777Z",
+      "finishedAtUtc": "2026-10-13T06:03:28.491528Z",
+      "initialWindow": {
+        "y": 228.0,
+        "scale": 2.0,
+        "height": 780.0,
+        "active": true,
+        "appHidden": false,
+        "onActiveSpace": true,
+        "visible": true,
+        "screen": 1,
+        "miniaturized": false,
+        "x": 264.0,
+        "width": 1200.0,
+        "generation": 1,
+        "occlusionVisible": true
+      },
+      "display": {
+        "physicalWidth": 2400.0,
+        "physicalHeight": 1560.0,
+        "devicePixelRatio": 2.0,
+        "brightness": "light",
+        "textScale14": 14.0,
+        "monoFontFamily": "SF Mono",
+        "monoFontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ]
+      },
+      "system": {
+        "dart": "3.12.2 (stable) (Tue Jun 9 01:11:39 2026 -0700) on \"macos_arm64\"",
+        "os": "Version 27.0.1 (Build 26A434)",
+        "pid": 82529,
+        "executable": "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/app/build/macos/Build/Products/Profile/Linefold.app/Contents/MacOS/Linefold"
+      },
+      "cases": [
+        {
+          "bytes": 10240,
+          "utf16Units": 10004,
+          "useMarkdown": true,
+          "exceeded": null,
+          "readingBytes": 10240,
+          "truncated": false
+        },
+        {
+          "bytes": 102400,
+          "utf16Units": 100094,
+          "useMarkdown": false,
+          "exceeded": "syntaxTokens",
+          "readingBytes": 65536,
+          "truncated": true
+        },
+        {
+          "bytes": 1048576,
+          "utf16Units": 1025282,
+          "useMarkdown": false,
+          "exceeded": "syntaxTokens",
+          "readingBytes": 65536,
+          "truncated": true
+        }
+      ]
+    },
+    "app-2": {
+      "startedAtUtc": "2026-10-13T06:04:04.917046Z",
+      "finishedAtUtc": "2026-10-13T06:09:13.743883Z",
+      "initialWindow": {
+        "onActiveSpace": true,
+        "screen": 1,
+        "appHidden": false,
+        "scale": 2.0,
+        "occlusionVisible": true,
+        "generation": 0,
+        "y": 228.0,
+        "x": 264.0,
+        "miniaturized": false,
+        "height": 780.0,
+        "visible": true,
+        "width": 1200.0,
+        "active": true
+      },
+      "display": {
+        "physicalWidth": 2400.0,
+        "physicalHeight": 1560.0,
+        "devicePixelRatio": 2.0,
+        "brightness": "light",
+        "textScale14": 14.0,
+        "monoFontFamily": "SF Mono",
+        "monoFontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ]
+      },
+      "system": {
+        "dart": "3.12.2 (stable) (Tue Jun 9 01:11:39 2026 -0700) on \"macos_arm64\"",
+        "os": "Version 27.0.1 (Build 26A434)",
+        "pid": 89821,
+        "executable": "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/app/build/macos/Build/Products/Profile/Linefold.app/Contents/MacOS/Linefold"
+      },
+      "cases": [
+        {
+          "bytes": 10240,
+          "utf16Units": 10004,
+          "useMarkdown": true,
+          "exceeded": null,
+          "readingBytes": 10240,
+          "truncated": false
+        },
+        {
+          "bytes": 102400,
+          "utf16Units": 100094,
+          "useMarkdown": false,
+          "exceeded": "syntaxTokens",
+          "readingBytes": 65536,
+          "truncated": true
+        },
+        {
+          "bytes": 1048576,
+          "utf16Units": 1025282,
+          "useMarkdown": false,
+          "exceeded": "syntaxTokens",
+          "readingBytes": 65536,
+          "truncated": true
+        }
+      ]
+    }
+  },
+  "invalidRuns": [
+    "app-invalid-focus-1",
+    "app-invalid-startup-1",
+    "example-invalid-frames-1",
+    "example-invalid-startup-1",
+    "example-invalid-startup-2",
+    "example-invalid-tail-1"
+  ],
+  "limitations": [
+    "synthetic framework input; no physical IME timing",
+    "paste excludes OS clipboard",
+    "endOfFrame is not display presentation",
+    "tail callback includes bounded multi-frame convergence",
+    "local warm files; no iCloud/cold disk/panel timing",
+    "RSS is full process; no leak conclusion",
+    "external product acceptance deferred"
+  ],
+  "finalPackage": {
+    "files": 185,
+    "uncompressedBytes": 3051830,
+    "pubCompressedSize": "695 KB.",
+    "snapshotDryRun": "passed without warnings",
+    "exampleTests": "passed",
+    "externalHostTests": "passed",
+    "workspacePathLeak": false
+  }
+}
