@@ -352,3 +352,18 @@ in [the acceptance record](design/ianvs-macos-acceptance/README.md). Run
 native file-operation checks, and a macOS debug build. The visual fixture also
 covers system-style light/dark surfaces, 840 × 560, 200% text, context menus,
 and root-directory drop feedback.
+
+## Large documents and input focus
+
+The main entry uses the default Markdown processing limits. When a document is
+large or complex, Live falls back to editing its full plain source. Read shows a
+bounded plain-text prefix and an explicit notice when truncated; whole-document
+copy still preserves the full Markdown. The notice is not part of the document.
+These parsing limits do not bound Flutter's full-source text layout or memory.
+
+Returning from Read to a focused Source/Live surface reconnects keyboard input.
+`test/large_document_main_test.dart` covers all three default budget axes;
+`test/input_focus_main_test.dart` covers composition commit/cancel, mode switching
+and undo/redo through this main application. These are framework protocol tests,
+not native IME evidence. Actual local results are recorded in the repository's
+R3 acceptance reports.

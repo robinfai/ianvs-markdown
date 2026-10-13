@@ -281,3 +281,10 @@ final legacy = IanvsMarkdownController(text: initialMarkdown, historyPolicy: nul
 
 `MarkdownBulletBuilder`、`MarkdownBulletParameters`、`MarkdownCheckboxBuilder`、`MarkdownElementBuilder`、`MarkdownImageBuilder`、`MarkdownListItemCrossAxisAlignment`、`MarkdownOnSelectionChangedCallback`、`MarkdownPaddingBuilder`、`MarkdownStyleSheet`、`MarkdownStyleSheetBaseTheme`、`MarkdownTapLinkCallback`
 
+
+### 模式切换后的输入连接
+
+当焦点原本在 LiveEditor 内时，模式切换保留选择并在新编辑 surface 挂载后重新连接文本输入。
+Read 本身不持有可编辑输入连接。使用 mode 快捷键或原生菜单返回 Source / Live 后无需额外点击
+即可继续输入；异步回调检查模式代次、controller 和 FocusNode 身份。两个主应用的输入协议回归
+覆盖组合确认、候选取消、Read 往返和撤销/重做；真实 macOS 候选窗口需另外留证。

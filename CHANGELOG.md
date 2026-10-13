@@ -1,5 +1,11 @@
 ## Unreleased
 
+- Reconnect the text-input client when a focused editor returns from Read to
+  Source or Live, so typing continues without an extra click. Guard deferred
+  callbacks against replaced controllers/focus nodes and newer mode changes.
+  Cover composition commit/cancel and keyboard undo/redo through both main apps;
+  framework input tests do not stand in for native IME acceptance.
+
 - Show localized plain-text and truncated-preview notices for over-budget
   documents, without adding status text to document selection or copies.
   Preserve custom fallback ownership and all existing input limits. Add three

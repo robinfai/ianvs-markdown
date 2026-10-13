@@ -301,6 +301,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     }
   }
 
+  int _modeSurfaceEpoch = 0;
+
   void _handleModeChanged() {
     final controller = widget.controller;
     final next = widget.controller.mode;
@@ -310,6 +312,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             ?.findAncestorStateOfType<_IanvsMarkdownLiveEditorState>() ==
         this;
     _lastMode = next;
+    final epoch = ++_modeSurfaceEpoch;
+    final focus = _focusNode;
     if (next != IanvsMarkdownEditorMode.livePreview) {
       _resetDocumentDragSelection();
       _activeBlockStart = null;
@@ -322,6 +326,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     if (restoreFocus) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted ||
+            epoch != _modeSurfaceEpoch ||
+            !identical(focus, _focusNode) ||
             !identical(widget.controller, controller) ||
             controller.mode != next) {
           return;
@@ -336,8 +342,21 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
               selection.isValid ? selection.extentOffset : 0,
             );
           }
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted &&
+                epoch == _modeSurfaceEpoch &&
+                identical(focus, _focusNode) &&
+                focus.hasFocus &&
+                identical(widget.controller, controller) &&
+                controller.mode == next) {
+              _requestSurfaceKeyboard(_activeEditorKey);
+            }
+          });
         } else {
-          _focusNode.requestFocus();
+          focus.requestFocus();
+          if (next != IanvsMarkdownEditorMode.preview) {
+            _requestSurfaceKeyboard(_sourceEditorKey);
+          }
         }
       });
     }
