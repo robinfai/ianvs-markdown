@@ -57,7 +57,7 @@
 
 正文和 View 新增可选、宿主持有的 `focusNode` / `autofocus`（默认 false）；正文仅在整文档选择开启时使用。替换或卸载不释放宿主焦点对象。内置工具栏的格式/历史/保存动作返回编辑焦点；独立工具栏可传同一 `focusNode`，未传时保持原有行为。Live 在当前组件内触发模式变化后恢复新模式焦点和源码选区；外部输入正持有焦点时，程序更新模式不主动抢焦点，宿主显式 autofocus 另行生效。
 
-接入与兼容说明见 [快捷键与焦点](INTEGRATION_GUIDE.md#快捷键与焦点)。自动证据见 [命令配置回归](../test/keyboard_configuration_test.dart) 与 [包外 smoke host](../tool/package_smoke_test.dart)。真实 IME 候选窗、系统剪贴板和读屏交互仍需按 R3-01 单独验收。
+接入与兼容说明见 [快捷键与焦点](INTEGRATION_GUIDE.md#快捷键与焦点)。自动证据见 [命令配置回归](../test/keyboard_configuration_test.dart) 与 [包外 smoke host](../tool/package_smoke_test.dart)。真实输入和系统剪贴板按当前 [双入口执行清单](R3_ACCEPTANCE.md) 在 example/app 中验收；已记录的本机结果不扩大其他平台或输入法范围。原生 IME 的用户人工确认与自动输入协议分开记载，读屏未执行。
 
 ## 原文、选择与更新
 
