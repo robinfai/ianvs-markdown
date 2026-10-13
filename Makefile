@@ -122,6 +122,10 @@ check-integrations: deps-integrations format-check-integrations analyze-integrat
 check-package: ## Test the actual Pub snapshot in an external Flutter host
 	$(PYTHON) tool/check_package.py --flutter "$(FLUTTER)" --dart "$(DART)"
 
+.PHONY: build-local-performance
+build-local-performance: ## Build and freeze opt-in performance diagnostics in both actual mains
+	$(PYTHON) tool/local_performance.py build --flutter "$(FLUTTER)" --mode "$(or $(MODE),profile)" --tag "$(or $(LABEL),main-profile)"
+
 benchmark: ## Run the macOS profile benchmark (pass LABEL=before or after)
 	$(PYTHON) tool/run_benchmark.py --flutter "$(FLUTTER)" --label "$(or $(LABEL),local)" $(BENCHMARK_ARGS)
 
