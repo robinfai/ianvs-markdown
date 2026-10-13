@@ -30,6 +30,7 @@ import '../markdown_document.dart';
 import '../obsidian_image.dart';
 import '../obsidian_metadata.dart';
 import '../render_budget.dart';
+import '../budget_notice.dart';
 import '../rich_clipboard.dart';
 import '../task_checkbox.dart';
 import '../task_syntax.dart';
@@ -2330,6 +2331,16 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             showModeSwitcher: !showNavigation,
             theme: colors,
           ),
+        ValueListenableBuilder<IanvsMarkdownEditorMode>(
+          valueListenable: widget.controller.modeListenable,
+          builder: (context, mode, _) =>
+              _sourceFallback && mode != IanvsMarkdownEditorMode.preview
+              ? MarkdownBudgetNotice(
+                  message: IanvsMarkdownMessage.documentPlainEditing,
+                  colors: colors,
+                )
+              : const SizedBox.shrink(),
+        ),
         Expanded(
           child: IanvsMarkdownEditorShortcuts(
             enableModeShortcuts: widget.enableModeShortcuts,

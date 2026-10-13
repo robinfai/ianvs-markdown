@@ -26,6 +26,53 @@ void main() {
     },
   );
 
+  testWidgets('budget notices localize and custom fallback retains ownership', (
+    tester,
+  ) async {
+    final source = 'x' * 80;
+    const budget = IanvsMarkdownRenderBudget(
+      maxSourceCodeUnits: 20,
+      maxFallbackBytes: 10,
+    );
+    final view = IanvsMarkdownView(data: source, renderBudget: budget);
+    await tester.pumpWidget(host(view, const IanvsMarkdownStrings.english()));
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        (const IanvsMarkdownStrings.english()).text(
+          IanvsMarkdownMessage.documentPreviewTruncated,
+        ),
+      ),
+      findsOneWidget,
+    );
+    await tester.pumpWidget(
+      host(
+        view,
+        const IanvsMarkdownStrings.chinese(
+          overrides: {IanvsMarkdownMessage.documentPreviewTruncated: '仅显示前缀'},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('仅显示前缀'), findsOneWidget);
+    await tester.pumpWidget(
+      host(
+        IanvsMarkdownView(
+          data: source,
+          renderBudget: budget,
+          fallbackBuilder: (_, _) => const Text('Host fallback'),
+        ),
+        const IanvsMarkdownStrings.english(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Host fallback'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-budget-notice')),
+      findsNothing,
+    );
+  });
+
   for (final live in [false, true]) {
     testWidgets('${live ? 'Live' : 'Source'} updates scoped toolbar labels', (
       tester,

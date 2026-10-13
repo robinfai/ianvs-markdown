@@ -74,6 +74,18 @@ enum IanvsMarkdownMessage {
     '代码过大，已回退为纯文本以保持预览流畅',
     'Code is too large; showing plain text to keep the preview responsive',
   ),
+  documentPlainEditing(
+    '文档较大或复杂，已切换为纯文本编辑。完整原文已保留。',
+    'This document is large or complex. Editing plain text; the full source is preserved.',
+  ),
+  documentPlainReading(
+    '文档较大或复杂，当前以纯文本显示。',
+    'This document is large or complex. Showing plain text.',
+  ),
+  documentPreviewTruncated(
+    '文档较大或复杂，当前仅显示开头部分。完整文档已保留。',
+    'This document is large or complex. Showing only its beginning; the full document is preserved.',
+  ),
   collapseCode('收起', 'Collapse'),
   expandCode('展开', 'Expand'),
   copy('复制', 'Copy'),

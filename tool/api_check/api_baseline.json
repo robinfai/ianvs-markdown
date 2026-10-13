@@ -7628,6 +7628,9 @@
         "sourceLabel",
         "readLabel",
         "codeTooLarge",
+        "documentPlainEditing",
+        "documentPlainReading",
+        "documentPreviewTruncated",
         "collapseCode",
         "expandCode",
         "copy",
@@ -8111,6 +8114,30 @@
       "late": false
     },
     "IanvsMarkdownMessage/field:documentOutline": {
+      "kind": "field",
+      "type": "IanvsMarkdownMessage",
+      "const": true,
+      "final": false,
+      "static": true,
+      "late": false
+    },
+    "IanvsMarkdownMessage/field:documentPlainEditing": {
+      "kind": "field",
+      "type": "IanvsMarkdownMessage",
+      "const": true,
+      "final": false,
+      "static": true,
+      "late": false
+    },
+    "IanvsMarkdownMessage/field:documentPlainReading": {
+      "kind": "field",
+      "type": "IanvsMarkdownMessage",
+      "const": true,
+      "final": false,
+      "static": true,
+      "late": false
+    },
+    "IanvsMarkdownMessage/field:documentPreviewTruncated": {
       "kind": "field",
       "type": "IanvsMarkdownMessage",
       "const": true,

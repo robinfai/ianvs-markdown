@@ -87,6 +87,8 @@ Live 与 Source 在本轮继续使用 Obsidian 编辑语义。**暂不向 Live �
 
 ## 预算与资源
 
+默认降级 UI 显式提示纯文本和截断状态；提示不参与文档选择或复制，完整原文仍由 controller / data 保留。自定义 `fallbackBuilder` 接管整个降级显示，不额外插入默认提示。Live 的源码回退在编辑区上方提示；Reading 提示是否只展示前缀。
+
 默认 `IanvsMarkdownRenderBudget` 同时限制全文 1,048,576 个 UTF-16 单元、每行 4,096 个 UTF-16 单元、4,096 个语法 token，以及最多 64 KiB UTF-8 的显示降级前缀。长度与 token 在昂贵解析前检查，限额本身允许通过，超过才降级。按 LF 分行，CRLF 中的 CR 不计入行长；单独的 CR 计入行长，以覆盖仍按 LF 分行的解析器。全文长度优先报告，之后按扫描时首次超限报告行长或 token；`budgetExceeded` 不代表其他限额都未超出。
 
 | 入口 | 预算与可观察结果 | 超限行为 |

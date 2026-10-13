@@ -1,5 +1,11 @@
 ## Unreleased
 
+- Show localized plain-text and truncated-preview notices for over-budget
+  documents, without adding status text to document selection or copies.
+  Preserve custom fallback ownership and all existing input limits. Add three
+  overridable `IanvsMarkdownMessage` entries; exhaustive enum switches must
+  handle them. Exercise default limits through example and app main entries.
+
 - Add a consolidated [0.3.1 migration guide](doc/MIGRATION.md), external-snapshot
   migration tests and a reviewed public API baseline in core validation. These
   prepare R3 release contracts without freezing 1.0 or changing runtime behavior.

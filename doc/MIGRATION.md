@@ -68,6 +68,8 @@ Controller 在 Widget 前创建，`parseBudget` 不从 Widget 自动继承。
 同理。Controller 的预算在构造时确定；需要切换策略时按文档会话管理 Controller 替换。
 独立文档解析、HTML 转换和折叠辅助函数也要核对自己的 `budget` 参数。
 
+默认超预算显示新增中英文状态提示；截断仅影响 Read 显示，不影响编辑、保存或全文复制。自定义 `fallbackBuilder` 继续拥有全部降级 UI。新增 `IanvsMarkdownMessage.documentPlainEditing`、`documentPlainReading`、`documentPreviewTruncated` 可通过现有文案作用域覆盖；对该 enum 做穷尽 switch 的宿主需补齐三项。预算数值未变。
+
 宿主通过 `controller.parseDecision`、Live 的 `onRenderDecision`、渲染 `fallbackBuilder`
 和复制数据的 `budgetExceeded` / `hasHtml` 观察结果。预算不限制完整源码的 Flutter 排版、
 宿主 builder、图片解码、进程内存或耗时；关闭预算应根据实际文档负载评估，不能推断大文档
