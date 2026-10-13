@@ -265,7 +265,7 @@ class IanvsMarkdown extends StatelessWidget {
       final customFallback = fallbackBuilder?.call(context, decision);
       if (customFallback != null) return customFallback;
       return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           MarkdownBudgetNotice(
             message: decision.truncated
