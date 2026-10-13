@@ -21,7 +21,7 @@
 | sourceType / liveType | 对焦点 EditableText 调用 updateEditingValue 插入 ASCII a；包括输入格式器、组件和宿主同步通知 |
 | sourcePaste / livePaste | 固定重复 32 次的 `paste 中文 😀 plain text. `，从 EditableText.userUpdateTextEditingValue 插入边界计时；与 Flutter 剪贴板读取后的插入路径一致，排除 OS 剪贴板读取，不改系统剪贴板 |
 | liveToSource / sourceToRead / readToLive | 通过各主入口的模式命令回调切换；分别恢复 Live / Source / Read 后再测量 |
-| sourceTail / liveTail | 固定文本下将实际滚动控制器 jumpTo 当前 maxScrollExtent，下一帧核对到达末尾；不是键盘选区导航或通用 reveal API |
+| sourceTail / liveTail | 实际滚动控制器逐帧 jumpTo 当前 maxScrollExtent，连续两帧 offset 与最大范围稳定才返回，最多 100 帧；callbackMs 包含懒布局收敛，记录 tailPasses，随后下一帧再次核对；不是键盘选区导航或通用 reveal API |
 | app open | 先关闭测试文档并完成准备帧，再通过 WorkspaceController.openPath 读取同一临时文件并装载实际主页面；包含文档构建/通知/书签，另记文件读取耗时 |
 | app save | 准备唯一的 `saved-阶段-索引` 后缀，通过 WorkspaceController.saveActive 原子保存；包括宿主完整异步回调，另记文件写入耗时；随后逐字验证磁盘文本和 dirty |
 

@@ -96,6 +96,8 @@ def validate_data(data, trace):
             require(0 <= r['firstFrameNumber'] < stamp <= r['lastFrameNumber'] and stamp not in frame_ids, 'Frame attribution overlap/outside interval')
             frame_ids.add(stamp)
             require(all(isinstance(frame[m], (int, float)) and math.isfinite(frame[m]) and frame[m] >= 0 for m in ('buildMs', 'rasterMs', 'totalMs')), 'Invalid frame duration')
+        if operation.endswith('Tail'):
+            require(2 <= r.get('tailPasses', 0) <= 100, 'Unverified tail arrival')
         if operation in ('open', 'save'):
             io = r['ioMs']['read' if operation == 'open' else 'write']
             require(0 <= io <= r['callbackMs'], 'Disk interval outside callback')

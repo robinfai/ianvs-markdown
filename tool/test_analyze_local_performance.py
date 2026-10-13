@@ -30,6 +30,8 @@ def fixture():
                              firstFrameNumber=frame, lastFrameNumber=frame+2,
                              firstFrameMicros=frame, lastFrameMicros=frame+2, sourcePreserved=True,
                              mode=mode, window=copy.deepcopy(window))
+                    if op.endswith('Tail'):
+                        r['tailPasses'] = 3
                     emit(dict(**copy.deepcopy(r), event='end', atUtc='2026-10-13T00:00:01Z'))
                     r['frames'] = [dict(frameNumber=frame+1, vsyncMicros=frame+1, buildMs=1., rasterMs=.5, totalMs=1.5)]
                     data['records'].append(r)

@@ -254,6 +254,7 @@ class LocalPerformanceRun {
     final first = stamp;
     final firstNumber = PlatformDispatcher.instance.frameData.frameNumber;
     final watch = Stopwatch()..start();
+    int? tailPasses;
     switch (operation) {
       case 'sourceType' || 'liveType' || 'sourcePaste' || 'livePaste':
         if (operation.endsWith('Type')) {
@@ -272,7 +273,27 @@ class LocalPerformanceRun {
       case 'readToLive':
         host.mode(IanvsMarkdownEditorMode.livePreview);
       case 'sourceTail' || 'liveTail':
-        host.scroll().jumpTo(host.scroll().position.maxScrollExtent);
+        // Lazy slivers refine their estimated extent after the first jump.
+        // Measure the complete bounded arrival, including those layout frames.
+        var stable = 0;
+        for (var pass = 1; pass <= 100; pass++) {
+          final scroll = host.scroll();
+          final target = scroll.position.maxScrollExtent;
+          scroll.jumpTo(target);
+          await frame();
+          final current = scroll.position;
+          final arrived =
+              (current.pixels - current.maxScrollExtent).abs() <= 1 &&
+              (target - current.maxScrollExtent).abs() <= 1;
+          stable = arrived ? stable + 1 : 0;
+          if (stable == 2) {
+            tailPasses = pass;
+            break;
+          }
+        }
+        if (tailPasses == null) {
+          throw StateError('Tail did not converge within 100 frames');
+        }
       case 'open':
         await host.open!(filePath);
       case 'save':
@@ -311,6 +332,7 @@ class LocalPerformanceRun {
       'firstFrameMicros': first,
       'lastFrameMicros': last,
       'sourcePreserved': true,
+      'tailPasses': ?tailPasses,
       if (inputField != null)
         'inputStyle': {
           'fontFamily': inputField.widget.style.fontFamily,
