@@ -1,6 +1,6 @@
 # 公共 API 与行为契约
 
-适用范围：2026-10-10 的仓库版本（`0.3.1` + `Unreleased`）。本文件对应 R1-01 / R1-02 / R2-02、R1-03 文案/命令/焦点、R1-04 剪贴板默认行为迁移及 R2-05 预解析/复制预算。后续修改预设、预算或默认行为时必须同步更新。平台范围见 [构建与交互证据](PLATFORM_SUPPORT.md)，不能从 Dart 类型可用推断平台支持。
+适用范围：2026-10-13 的仓库版本（`0.3.1` + `Unreleased`）。本文件对应 R1-01 / R1-02 / R2-02、R1-03 文案/命令/焦点、R1-04 剪贴板默认行为迁移及 R2-05 预解析/复制预算、L07/L08 降级提示和输入连接。后续修改预设、预算或默认行为时必须同步更新。平台范围见 [构建与交互证据](PLATFORM_SUPPORT.md)，不能从 Dart 类型可用推断平台支持。
 
 ## API 漂移校验
 
@@ -57,7 +57,7 @@
 
 正文和 View 新增可选、宿主持有的 `focusNode` / `autofocus`（默认 false）；正文仅在整文档选择开启时使用。替换或卸载不释放宿主焦点对象。内置工具栏的格式/历史/保存动作返回编辑焦点；独立工具栏可传同一 `focusNode`，未传时保持原有行为。Live 在当前组件内触发模式变化后恢复新模式焦点和源码选区；外部输入正持有焦点时，程序更新模式不主动抢焦点，宿主显式 autofocus 另行生效。
 
-接入与兼容说明见 [快捷键与焦点](INTEGRATION_GUIDE.md#快捷键与焦点)。自动证据见 [命令配置回归](../test/keyboard_configuration_test.dart) 与 [包外 smoke host](../tool/package_smoke_test.dart)。真实 IME 候选窗、系统剪贴板和读屏交互仍需按 R3-01 单独验收。
+接入与兼容说明见 [快捷键与焦点](INTEGRATION_GUIDE.md#快捷键与焦点)。自动证据见 [命令配置回归](../test/keyboard_configuration_test.dart) 与 [包外 smoke host](../tool/package_smoke_test.dart)。真实输入和系统剪贴板按当前 [双入口执行清单](R3_ACCEPTANCE.md) 在 example/app 中验收；已记录的本机结果不扩大其他平台或输入法范围。原生 IME 的用户人工确认与自动输入协议分开记载，读屏未执行。
 
 ## 原文、选择与更新
 
@@ -86,6 +86,8 @@
 Live 与 Source 在本轮继续使用 Obsidian 编辑语义。**暂不向 Live 暴露 standard 参数**：它同时影响源码高亮、块分割、投影后的选区/输入映射、嵌套编辑和三模式切换，仅传递给 Reading 会产生模式间语义差异。需要标准 GFM 阅读时使用正文或 View；完整标准编辑作为独立扩展，先具备上述编辑契约和回归，再决定实现，不阻塞本轮只读接入。
 
 ## 预算与资源
+
+默认降级 UI 显式提示纯文本和截断状态；提示不参与文档选择或复制，完整原文仍由 controller / data 保留。自定义 `fallbackBuilder` 接管整个降级显示，不额外插入默认提示。Live 的源码回退在编辑区上方提示；Reading 提示是否只展示前缀。
 
 默认 `IanvsMarkdownRenderBudget` 同时限制全文 1,048,576 个 UTF-16 单元、每行 4,096 个 UTF-16 单元、4,096 个语法 token，以及最多 64 KiB UTF-8 的显示降级前缀。长度与 token 在昂贵解析前检查，限额本身允许通过，超过才降级。按 LF 分行，CRLF 中的 CR 不计入行长；单独的 CR 计入行长，以覆盖仍按 LF 分行的解析器。全文长度优先报告，之后按扫描时首次超限报告行长或 token；`budgetExceeded` 不代表其他限额都未超出。
 
@@ -279,3 +281,10 @@ final legacy = IanvsMarkdownController(text: initialMarkdown, historyPolicy: nul
 
 `MarkdownBulletBuilder`、`MarkdownBulletParameters`、`MarkdownCheckboxBuilder`、`MarkdownElementBuilder`、`MarkdownImageBuilder`、`MarkdownListItemCrossAxisAlignment`、`MarkdownOnSelectionChangedCallback`、`MarkdownPaddingBuilder`、`MarkdownStyleSheet`、`MarkdownStyleSheetBaseTheme`、`MarkdownTapLinkCallback`
 
+
+### 模式切换后的输入连接
+
+当焦点原本在 LiveEditor 内时，模式切换保留选择并在新编辑 surface 挂载后重新连接文本输入。
+Read 本身不持有可编辑输入连接。使用 mode 快捷键或原生菜单返回 Source / Live 后无需额外点击
+即可继续输入；异步回调检查模式代次、controller 和 FocusNode 身份。两个主应用的输入协议回归
+覆盖组合确认、候选取消、Read 往返和撤销/重做；真实 macOS 候选窗口需另外留证。

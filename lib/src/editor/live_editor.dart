@@ -30,6 +30,7 @@ import '../markdown_document.dart';
 import '../obsidian_image.dart';
 import '../obsidian_metadata.dart';
 import '../render_budget.dart';
+import '../budget_notice.dart';
 import '../rich_clipboard.dart';
 import '../task_checkbox.dart';
 import '../task_syntax.dart';
@@ -300,6 +301,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     }
   }
 
+  int _modeSurfaceEpoch = 0;
+
   void _handleModeChanged() {
     final controller = widget.controller;
     final next = widget.controller.mode;
@@ -309,6 +312,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             ?.findAncestorStateOfType<_IanvsMarkdownLiveEditorState>() ==
         this;
     _lastMode = next;
+    final epoch = ++_modeSurfaceEpoch;
+    final focus = _focusNode;
     if (next != IanvsMarkdownEditorMode.livePreview) {
       _resetDocumentDragSelection();
       _activeBlockStart = null;
@@ -321,6 +326,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     if (restoreFocus) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted ||
+            epoch != _modeSurfaceEpoch ||
+            !identical(focus, _focusNode) ||
             !identical(widget.controller, controller) ||
             controller.mode != next) {
           return;
@@ -335,8 +342,21 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
               selection.isValid ? selection.extentOffset : 0,
             );
           }
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted &&
+                epoch == _modeSurfaceEpoch &&
+                identical(focus, _focusNode) &&
+                focus.hasFocus &&
+                identical(widget.controller, controller) &&
+                controller.mode == next) {
+              _requestSurfaceKeyboard(_activeEditorKey);
+            }
+          });
         } else {
-          _focusNode.requestFocus();
+          focus.requestFocus();
+          if (next != IanvsMarkdownEditorMode.preview) {
+            _requestSurfaceKeyboard(_sourceEditorKey);
+          }
         }
       });
     }
@@ -2330,6 +2350,16 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             showModeSwitcher: !showNavigation,
             theme: colors,
           ),
+        ValueListenableBuilder<IanvsMarkdownEditorMode>(
+          valueListenable: widget.controller.modeListenable,
+          builder: (context, mode, _) =>
+              _sourceFallback && mode != IanvsMarkdownEditorMode.preview
+              ? MarkdownBudgetNotice(
+                  message: IanvsMarkdownMessage.documentPlainEditing,
+                  colors: colors,
+                )
+              : const SizedBox.shrink(),
+        ),
         Expanded(
           child: IanvsMarkdownEditorShortcuts(
             enableModeShortcuts: widget.enableModeShortcuts,

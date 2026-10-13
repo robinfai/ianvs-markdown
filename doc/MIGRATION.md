@@ -1,6 +1,6 @@
 # 从 0.3.1 升级到当前 Unreleased
 
-更新：2026-10-11。面向已使用 0.3.1 的宿主，整理当前仓库候选的行为变化与接入步骤。
+更新：2026-10-13。面向已使用 0.3.1 的宿主，整理当前仓库候选的行为变化与接入步骤。
 仓库版本仍是 `0.3.1`，这些变更尚未发布到 pub.dev；不能仅通过更新版本约束获得它们。
 接入验证应锁定候选提交或该提交的 Pub-selected 包快照，并记录文件哈希。
 本指南不表示 1.0 API 已冻结。2026-10-12 起当前迭代改以 example/app 两个 main 为入口，
@@ -67,6 +67,8 @@ Controller 在 Widget 前创建，`parseBudget` 不从 Widget 自动继承。
 `parseBudget: null` 只关闭该 Controller 的保护，不会关闭渲染或复制的保护；其他预算参数
 同理。Controller 的预算在构造时确定；需要切换策略时按文档会话管理 Controller 替换。
 独立文档解析、HTML 转换和折叠辅助函数也要核对自己的 `budget` 参数。
+
+默认超预算显示新增中英文状态提示；截断仅影响 Read 显示，不影响编辑、保存或全文复制。自定义 `fallbackBuilder` 继续拥有全部降级 UI。新增 `IanvsMarkdownMessage.documentPlainEditing`、`documentPlainReading`、`documentPreviewTruncated` 可通过现有文案作用域覆盖；对该 enum 做穷尽 switch 的宿主需补齐三项。预算数值未变。
 
 宿主通过 `controller.parseDecision`、Live 的 `onRenderDecision`、渲染 `fallbackBuilder`
 和复制数据的 `budgetExceeded` / `hasHtml` 观察结果。预算不限制完整源码的 Flutter 排版、

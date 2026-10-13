@@ -93,3 +93,24 @@ late successes and errors cannot overwrite the current preview, even after an
 A → B → A transition. Current failures can be retried. The example ignores
 obsolete completions; a production loader should also cancel expensive work
 where supported. See [the streaming contract](../doc/INTEGRATION_GUIDE.md#持续追加内容r2-03).
+
+## Large documents and input focus
+
+The main entry uses the default Markdown processing limits. When a document is
+large or complex, Live falls back to editing its full plain source. Read shows a
+bounded plain-text prefix and an explicit notice when truncated; whole-document
+copy still preserves the full Markdown. The notice is not part of the document.
+These parsing limits do not bound Flutter's full-source text layout or memory.
+
+Returning from Read to a focused Source/Live surface reconnects keyboard input.
+`test/large_document_main_test.dart` covers all three default budget axes;
+`test/input_focus_main_test.dart` covers composition commit/cancel, mode switching
+and undo/redo through this main application. These are framework protocol tests,
+not native IME evidence. Actual local results are recorded in the repository's
+R3 acceptance reports.
+
+On macOS, the main playground installs a Flutter `PlatformMenuBar` for Edit and
+View commands, matching Linefold's focus-based command routing. This avoids the
+stock Cocoa menu mutating only an accessibility text mirror during automated
+paste. The native menu channel regression checks actual controller content,
+Read full-source copy, and return-to-Source input connection.

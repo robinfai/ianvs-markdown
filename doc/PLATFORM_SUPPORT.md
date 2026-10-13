@@ -1,6 +1,6 @@
 # 平台能力与构建证据
 
-更新：2026-10-12。本文件保留组件库的平台证据与限制；当前 R3 已按用户要求调整为
+更新：2026-10-13。本文件保留组件库的平台证据与限制；当前 R3 已按用户要求调整为
 example/app 两个 main 的本地迭代，见 [执行清单](R3_ACCEPTANCE.md)。旧的全平台/独立宿主
 验收不再是本地推进前置，也未因范围调整被记为通过。范围是 Flutter Markdown 组件库；Linefold 宿主已有界面或某个平台的项目目录不等于核心库完成该平台验收。发布版本仍为 0.3.1，本轮代码在 Unreleased。
 
@@ -15,6 +15,11 @@ example/app 两个 main 的本地迭代，见 [执行清单](R3_ACCEPTANCE.md)�
 | 本机 macOS 27.0.1、Xcode 27.0 (27A266a)、Rust 1.90.0 | 最小 macOS 示例 Profile / Release 候选构建 | 结果见下节；构建通过不等于完成真机交互验收 |
 | 本机 macOS 27.0.1、arm64，Flutter 3.44.8 / Dart 3.12.2，2026-10-10 | 完整 `make check`、Linefold macOS Debug / iOS Simulator Debug 构建通过 | 代码对应 `603187c`；核心 842、示例 6、app 274（跳过 1 项可选语料）；Mermaid Flutter 9 / Rust 4、原生示例 3、Quick Look Rust 8 / Swift 10 和原生导入通过。宿主构建不替代平台交互验收 |
 | 本机 macOS 27.0.1、arm64，Flutter 3.44.8 / Dart 3.12.2，2026-10-10 | `c9dec69` renderer 隔离实现的完整 `make check` 通过 | 核心 925、示例 10、Python 7、独立预算 32 组、app 274（跳过 1 项）、剪贴板 6 与原生/包外快照通过；[完整记录](../benchmark/PERFORMANCE-2026-10-10.md#本轮交付与未完成验收2026-10-10)。未重跑设备交互，完整 GUI 性能基线因锁屏中断且不计验收 |
+
+本机 2026-10-13 补齐两个 main 的 Debug/Release 构建及 Release 1 MiB 编辑/保存/全文复制、
+切模式续输；用户人工确认两个入口 Source/Live 的简体拼音确认和 Esc 取消正常。
+范围和证据来源见 [L07/L08 报告](../benchmark/LARGE-INPUT-FOCUS-2026-10-13.md)；
+读屏、其他输入法和其他平台没有新增通过声明。
 
 Core 的最低 SDK 与较新 SDK 组合都固定在 [CI 工作流](https://github.com/robinfai/ianvs-markdown/blob/main/.github/workflows/core.yml)，原生回归使用 [独立工作流](https://github.com/robinfai/ianvs-markdown/blob/main/.github/workflows/integrations.yml)。SDK 升级需重新验收，不能用某一次本地通过替换整个矩阵。
 

@@ -58,6 +58,7 @@ import 'obsidian_inline.dart';
 import 'obsidian_metadata.dart';
 import 'obsidian_image.dart';
 import 'render_budget.dart';
+import 'budget_notice.dart';
 import 'renderer/scoped_body.dart';
 import 'rich_clipboard.dart';
 import 'strikethrough.dart';
@@ -261,20 +262,33 @@ class IanvsMarkdown extends StatelessWidget {
         fontSize: 14,
         height: 1.55,
       );
-      return fallbackBuilder?.call(context, decision) ??
-          (blockSelectable
-              ? SelectableText(
-                  contextMenuBuilder: (_, state) =>
-                      buildMarkdownSelectableContextMenu(context, state),
-                  decision.text,
-                  key: const ValueKey('ianvs-markdown-plain-fallback'),
-                  style: style,
-                )
-              : Text(
-                  decision.text,
-                  key: const ValueKey('ianvs-markdown-plain-fallback'),
-                  style: style,
-                ));
+      final customFallback = fallbackBuilder?.call(context, decision);
+      if (customFallback != null) return customFallback;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          MarkdownBudgetNotice(
+            message: decision.truncated
+                ? IanvsMarkdownMessage.documentPreviewTruncated
+                : IanvsMarkdownMessage.documentPlainReading,
+            colors: colors,
+          ),
+          if (blockSelectable)
+            SelectableText(
+              contextMenuBuilder: (_, state) =>
+                  buildMarkdownSelectableContextMenu(context, state),
+              decision.text,
+              key: const ValueKey('ianvs-markdown-plain-fallback'),
+              style: style,
+            )
+          else
+            Text(
+              decision.text,
+              key: const ValueKey('ianvs-markdown-plain-fallback'),
+              style: style,
+            ),
+        ],
+      );
     }
 
     final effectiveStyleSheet =

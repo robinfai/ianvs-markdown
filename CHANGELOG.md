@@ -1,5 +1,21 @@
 ## Unreleased
 
+- Route the example's macOS Edit menu through Flutter focus actions and its
+  View/history commands through the document controller. Verify large-document
+  paste and complete Read-mode copies through the native menu channel.
+
+- Reconnect the text-input client when a focused editor returns from Read to
+  Source or Live, so typing continues without an extra click. Guard deferred
+  callbacks against replaced controllers/focus nodes and newer mode changes.
+  Cover composition commit/cancel and keyboard undo/redo through both main apps;
+  framework input tests do not stand in for native IME acceptance.
+
+- Show localized plain-text and truncated-preview notices for over-budget
+  documents, without adding status text to document selection or copies.
+  Preserve custom fallback ownership and all existing input limits. Add three
+  overridable `IanvsMarkdownMessage` entries; exhaustive enum switches must
+  handle them. Exercise default limits through example and app main entries.
+
 - Add a consolidated [0.3.1 migration guide](doc/MIGRATION.md), external-snapshot
   migration tests and a reviewed public API baseline in core validation. These
   prepare R3 release contracts without freezing 1.0 or changing runtime behavior.

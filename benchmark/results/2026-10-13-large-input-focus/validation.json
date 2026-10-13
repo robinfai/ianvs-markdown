@@ -1,0 +1,160 @@
+{
+  "date": "2026-10-13",
+  "sourceRevision": "65f7791266383cb6596db83b6c7265b22a1f9046",
+  "sdk": {
+    "frameworkVersion": "3.44.8",
+    "channel": "stable",
+    "repositoryUrl": "https://github.com/flutter/flutter.git",
+    "frameworkRevision": "058e0af2c2b57e369d905a03ac9748b0ebf543c6",
+    "frameworkCommitDate": "2026-07-23 10:56:21 -0700",
+    "engineRevision": "0cd610717bde95fd88343c64f81c11ba4e5c0010",
+    "engineCommitDate": "2026-07-23 16:11:34.000Z",
+    "engineContentHash": "13ffd72b2f9a5ca4db2a74ea52d5353ec2e8f939",
+    "engineBuildDate": "2026-07-24 00:36:29.809",
+    "dartSdkVersion": "3.12.2",
+    "devToolsVersion": "2.57.0",
+    "flutterVersion": "3.44.8"
+  },
+  "environment": {
+    "os": "macOS 27.0.1 (26A434)",
+    "arch": "arm64",
+    "xcode": "27.0 (27A266a)",
+    "appBuildEnvironment": {
+      "FLUTTER_XCODE_ARCHS": "arm64",
+      "CARGO_PROFILE_RELEASE_STRIP": "none"
+    }
+  },
+  "tests": {
+    "core": 968,
+    "exampleFinal": 30,
+    "app": 291,
+    "appHistoricalOptionalSkipped": 1,
+    "api": 8,
+    "exports": 183,
+    "declarations": 1146,
+    "python": 10,
+    "processingBudgetCases": 32,
+    "mermaidFlutter": 9,
+    "mermaidRust": 4,
+    "mermaidExample": 3,
+    "clipboard": 6,
+    "quicklookRust": 8,
+    "quicklookSwift": 10,
+    "nativeImport": "pass"
+  },
+  "validation": {
+    "checkLocalAndFourBuilds": {
+      "revision": "d2788fc",
+      "exitCode": 0
+    },
+    "exampleMenuFollowup": {
+      "revision": "65f7791",
+      "analyze": "pass",
+      "tests": 30,
+      "debugBuild": "pass",
+      "releaseBuild": "pass"
+    },
+    "packageSnapshot": {
+      "exitCode": 0,
+      "files": 176,
+      "uncompressedBytes": 2976804,
+      "pubCompressedSize": "675 KB.",
+      "snapshotDryRun": "passed without warnings",
+      "exampleTests": "passed",
+      "externalHostTests": "passed",
+      "workspacePathLeak": false,
+      "source": "Final runtime 65f7791 plus accompanying published documentation; manifest records exact package input hashes."
+    }
+  },
+  "artifacts": [
+    {
+      "entry": "example/lib/main.dart",
+      "configuration": "Debug",
+      "bundle": "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/example/build/macos/Build/Products/Debug/Ianvs Markdown Playground.app",
+      "appFrameworkSha256": "a9734410d67a3ae2133b86dbb533cc959ee1bd14f3ed0259a670ccf417998e50",
+      "sourceRevision": "65f7791"
+    },
+    {
+      "entry": "example/lib/main.dart",
+      "configuration": "Release",
+      "bundle": "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/example/build/macos/Build/Products/Release/Ianvs Markdown Playground.app",
+      "appFrameworkSha256": "4b5cad98b56d4e9ea789abfd6f77af7ef79ae9364dec616e5924756f814f8ee3",
+      "sourceRevision": "65f7791"
+    },
+    {
+      "entry": "app/lib/main.dart",
+      "configuration": "Debug",
+      "bundle": "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/app/build/macos/Build/Products/Debug/Linefold.app",
+      "appFrameworkSha256": "9b48b2cee213c2009c27b6ba06f51f45ceca56fa75b7f16eb434d1fd5d62db40",
+      "sourceRevision": "d2788fc"
+    },
+    {
+      "entry": "app/lib/main.dart",
+      "configuration": "Release",
+      "bundle": "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/app/build/macos/Build/Products/Release/Linefold.app",
+      "appFrameworkSha256": "1fa61e96083ebe3b68f1a2641d27986f3039c776c10da63b7030433d6c1ba7d1",
+      "sourceRevision": "d2788fc"
+    }
+  ],
+  "savedFiles": {
+    "source-length.md": {
+      "bytes": 1049624,
+      "sha256": "f0527d7e21544b5f1612c18dc00095c5da68480ba66efc4c85a4a27d87198d42"
+    },
+    "example-copy.md": {
+      "bytes": 1049626,
+      "sha256": "f239774b84fa5ca177349b1fb2495d3d8e01d08b5add094a29dd2ecba2970161"
+    }
+  },
+  "originalWorkspace": {
+    "documentCount": 4,
+    "textAndPersistedTextAndPathsUnchanged": true,
+    "privateBackupPublished": false
+  },
+  "gui": {
+    "largeDocumentApp": "pass: Live tail edit APP, save, Read prefix notice, Source direct typing SRC, save, close and reopen",
+    "largeDocumentExample": "pass after native menu fix: Source paste, Live edit EX, Read prefix notice, full copy saved through app",
+    "exampleFocus": "pass: Read -> Source type SOURCE -> Read -> Live type LIVE, undo and redo; no editor click after switches",
+    "appFocus": "pass: Read -> Source type SRC and save without an editor click",
+    "nativeIme": {
+      "status": "pass",
+      "provenance": "User manual keyboard verification reported in this conversation on 2026-10-13; not an automated observation of the candidate window.",
+      "entries": [
+        "example Source",
+        "example Live",
+        "app Source",
+        "app Live"
+      ],
+      "steps": [
+        "Type zhongwen and confirm 中文",
+        "Type quxiao and press Escape to cancel",
+        "Continue input; check for dropped text, duplicate confirmation and lost input"
+      ],
+      "userReport": "已完成，两入口两模式均正常",
+      "automationBoundary": "Earlier computer-control attempts produced ASCII without an observed candidate window and are not counted as native IME acceptance."
+    },
+    "screenReader": "not executed, not claimed",
+    "releaseProcesses": [
+      {
+        "pid": 28448,
+        "executable": "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/example/build/macos/Build/Products/Release/Ianvs Markdown Playground.app/Contents/MacOS/Ianvs Markdown Playground"
+      },
+      {
+        "pid": 22778,
+        "executable": "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/app/build/macos/Build/Products/Release/Linefold.app/Contents/MacOS/Linefold"
+      }
+    ]
+  },
+  "uiControlRoundTripsMs": {
+    "appOpenFile": 956,
+    "appThreeAsciiCharacters": 1523,
+    "appReadSwitch": 494,
+    "exampleSuccessfulPaste": 1145,
+    "exampleReadSwitch": 564
+  },
+  "timingScope": "Single CUA action + AX observation, includes automation waiting; not input latency, frame timings or benchmark baseline.",
+  "delivery": {
+    "pullRequest": "https://github.com/robinfai/ianvs-markdown/pull/21",
+    "gate": "Merge only after Core matrix, Core required and Native integrations succeed on the final PR head; GitHub Checks is the authoritative receipt."
+  }
+}

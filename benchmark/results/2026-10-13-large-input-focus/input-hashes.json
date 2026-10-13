@@ -1,0 +1,22 @@
+{
+  "line-length.md": {
+    "sha256": "23ed3b97b59078a2866a2c064d588e28b800b7223fa9d7c79b5e63e1ddbbee3c",
+    "bytes": 4116,
+    "utf16": 4110
+  },
+  "syntax-tokens.md": {
+    "sha256": "cac23697480bb67f03b6d9d1f6f16418dd09c4edeecfcb170900ab42487b037b",
+    "bytes": 6618,
+    "utf16": 6612
+  },
+  "source-length.md": {
+    "sha256": "a8bff41c06cce394ee674ba56bc44abc3c403fbbecd46f2868fe15fd77666189",
+    "bytes": 1049618,
+    "utf16": 1049612
+  },
+  "input.md": {
+    "sha256": "af8efc2c8f1d3c25496fe0008b99172ca17502923e9171292b8b8055462e5c60",
+    "bytes": 18,
+    "utf16": 18
+  }
+}
