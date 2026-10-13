@@ -38,8 +38,9 @@ class DesktopMenuBar extends StatelessWidget {
   void _edit(IanvsMarkdownCommand command, Intent fallback) {
     if (IanvsMarkdownShortcuts.invoke(command)) return;
     final context = FocusManager.instance.primaryFocus?.context;
-    if (context != null && context.mounted)
+    if (context != null && context.mounted) {
       Actions.maybeInvoke(context, fallback);
+    }
   }
 
   @override
