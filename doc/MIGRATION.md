@@ -128,6 +128,23 @@ final legacy = IanvsMarkdownController(text: source, historyPolicy: null);
 - 核心、剪贴板适配器和 Mermaid 的分发/版本分别管理；本轮没有发布新版本，也没有扩大
   平台承诺。最终分发范围与版本决策另行安排，不是当前双入口本地迭代的退出条件。
 
+### R4-01 原生菜单与输入边界
+
+新增静态 `IanvsMarkdownShortcuts.invoke`，已有构造参数和 enum 不变。原生菜单/自定义工具栏
+应通过当前焦点分发，传入 controller 可拒绝其他文档；只有返回 false 时才委派普通控件
+Actions。不要在返回 true 后再次调用 controller，composing 抑制也返回 true。
+保存异步完成仍使用 `onSaveRequested`，不能把分发返回值当成已写盘。
+
+默认编辑命令现在和重映射命令一样保护组合输入；调用方应先让输入法确认/取消再重试。
+`bindings: {command: []}` 只禁用按键，菜单点击仍可执行；`enableModeShortcuts:false` 也只
+针对按键。宿主需删除冲突的原生编辑 accelerator，或自行完整同步当前焦点配置；两个
+主入口采用前者，菜单不显示快捷键，键盘仍按组件配置执行。
+
+内置工具栏的属性撤销/保存保留局部焦点，Read 历史按钮禁用；属性/表格上没有局部定义
+的结构格式按钮禁用。独立工具栏没有对应焦点时仍使用传入 controller 与 focusNode。
+默认日期字段 Tab 保持分段导航。升级后应分别验菜单、按键、工具栏与原生 IME；
+框架 composing 回归不能替代目标系统/输入法的人工验收。
+
 ## 7. 按顺序验证升级
 
 1. 固定候选提交/快照，记录原版本、目标平台、SDK 与可选适配器来源；对照上表选择策略。

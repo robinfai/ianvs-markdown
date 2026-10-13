@@ -6,6 +6,7 @@ import 'package:ianvs_markdown/ianvs_markdown.dart';
 
 import '../controllers/workspace_controller.dart';
 import '../tab_shortcuts.dart';
+import '../editor_commands.dart';
 
 /// macOS menu commands share the same callbacks as the window controls.
 class DesktopMenuBar extends StatelessWidget {
@@ -34,27 +35,11 @@ class DesktopMenuBar extends StatelessWidget {
   final VoidCallback? onOpenSettings;
   final Widget child;
 
-  void _undo({required bool redo}) {
-    final focusContext = FocusManager.instance.primaryFocus?.context;
-    final inEditor =
-        focusContext
-            ?.findAncestorWidgetOfExactType<IanvsMarkdownLiveEditor>() !=
-        null;
-    if (inEditor) {
-      final controller = workspace.activeDocument?.controller;
-      if (controller?.mode == IanvsMarkdownEditorMode.preview) return;
-      if (redo) {
-        controller?.redo();
-      } else {
-        controller?.undo();
-      }
-    } else if (focusContext != null) {
-      Actions.maybeInvoke(
-        focusContext,
-        redo
-            ? const RedoTextIntent(SelectionChangedCause.keyboard)
-            : const UndoTextIntent(SelectionChangedCause.keyboard),
-      );
+  void _edit(IanvsMarkdownCommand command, Intent fallback) {
+    if (IanvsMarkdownShortcuts.invoke(command)) return;
+    final context = FocusManager.instance.primaryFocus?.context;
+    if (context != null && context.mounted) {
+      Actions.maybeInvoke(context, fallback);
     }
   }
 
@@ -139,14 +124,7 @@ class DesktopMenuBar extends StatelessWidget {
             ),
             PlatformMenuItemGroup(
               members: [
-                PlatformMenuItem(
-                  label: 'Save',
-                  shortcut: const SingleActivator(
-                    LogicalKeyboardKey.keyS,
-                    meta: true,
-                  ),
-                  onSelected: onSave,
-                ),
+                PlatformMenuItem(label: 'Save', onSelected: onSave),
                 PlatformMenuItem(
                   label: 'Save As…',
                   shortcut: const SingleActivator(
@@ -173,59 +151,47 @@ class DesktopMenuBar extends StatelessWidget {
           menus: [
             PlatformMenuItem(
               label: 'Undo',
-              shortcut: SingleActivator(LogicalKeyboardKey.keyZ, meta: true),
-              onSelected: () => _undo(redo: false),
+              onSelected: () => _edit(
+                IanvsMarkdownCommand.undo,
+                const UndoTextIntent(SelectionChangedCause.keyboard),
+              ),
             ),
             PlatformMenuItem(
               label: 'Redo',
-              shortcut: SingleActivator(
-                LogicalKeyboardKey.keyZ,
-                meta: true,
-                shift: true,
+              onSelected: () => _edit(
+                IanvsMarkdownCommand.redo,
+                const RedoTextIntent(SelectionChangedCause.keyboard),
               ),
-              onSelected: () => _undo(redo: true),
             ),
-            PlatformMenuItemGroup(
-              members: [
-                PlatformMenuItem(
-                  label: 'Cut',
-                  shortcut: SingleActivator(
-                    LogicalKeyboardKey.keyX,
-                    meta: true,
-                  ),
-                  onSelectedIntent: CopySelectionTextIntent.cut(
-                    SelectionChangedCause.keyboard,
-                  ),
+            PlatformMenuItem(
+              label: 'Cut',
+              onSelected: () => _edit(
+                IanvsMarkdownCommand.cut,
+                const CopySelectionTextIntent.cut(
+                  SelectionChangedCause.keyboard,
                 ),
-                PlatformMenuItem(
-                  label: 'Copy',
-                  shortcut: SingleActivator(
-                    LogicalKeyboardKey.keyC,
-                    meta: true,
-                  ),
-                  onSelectedIntent: CopySelectionTextIntent.copy,
-                ),
-                PlatformMenuItem(
-                  label: 'Paste',
-                  shortcut: SingleActivator(
-                    LogicalKeyboardKey.keyV,
-                    meta: true,
-                  ),
-                  onSelectedIntent: PasteTextIntent(
-                    SelectionChangedCause.keyboard,
-                  ),
-                ),
-                PlatformMenuItem(
-                  label: 'Select All',
-                  shortcut: SingleActivator(
-                    LogicalKeyboardKey.keyA,
-                    meta: true,
-                  ),
-                  onSelectedIntent: SelectAllTextIntent(
-                    SelectionChangedCause.keyboard,
-                  ),
-                ),
-              ],
+              ),
+            ),
+            PlatformMenuItem(
+              label: 'Copy',
+              onSelected: () => _edit(
+                IanvsMarkdownCommand.copy,
+                CopySelectionTextIntent.copy,
+              ),
+            ),
+            PlatformMenuItem(
+              label: 'Paste',
+              onSelected: () => _edit(
+                IanvsMarkdownCommand.paste,
+                const PasteTextIntent(SelectionChangedCause.keyboard),
+              ),
+            ),
+            PlatformMenuItem(
+              label: 'Select All',
+              onSelected: () => _edit(
+                IanvsMarkdownCommand.selectAll,
+                const SelectAllTextIntent(SelectionChangedCause.keyboard),
+              ),
             ),
           ],
         ),
@@ -249,18 +215,20 @@ class DesktopMenuBar extends StatelessWidget {
               members: [
                 PlatformMenuItem(
                   label: 'Live Preview',
-                  onSelected: () =>
-                      workspace.setMode(IanvsMarkdownEditorMode.livePreview),
+                  onSelected: () => setEditorMode(
+                    workspace,
+                    IanvsMarkdownEditorMode.livePreview,
+                  ),
                 ),
                 PlatformMenuItem(
                   label: 'Source',
                   onSelected: () =>
-                      workspace.setMode(IanvsMarkdownEditorMode.source),
+                      setEditorMode(workspace, IanvsMarkdownEditorMode.source),
                 ),
                 PlatformMenuItem(
                   label: 'Read',
                   onSelected: () =>
-                      workspace.setMode(IanvsMarkdownEditorMode.preview),
+                      setEditorMode(workspace, IanvsMarkdownEditorMode.preview),
                 ),
               ],
             ),

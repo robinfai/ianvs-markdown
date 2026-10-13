@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../theme.dart';
+import '../keyboard.dart';
 import 'editor_controller.dart';
 import 'editor_models.dart';
 
@@ -37,7 +38,25 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
   final IanvsMarkdownThemeData? theme;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: Listenable.merge([FocusManager.instance, controller]),
+    builder: (context, _) => ListenableBuilder(
+      listenable: Listenable.merge([
+        ?markdownLocalHistory(controller),
+        ?markdownPropertyEditingController(controller),
+      ]),
+      builder: (context, _) =>
+          TextFieldTapRegion(child: _buildToolbar(context)),
+    ),
+  );
+
+  Widget _buildToolbar(BuildContext context) {
+    final localHistory = markdownLocalHistory(controller);
+    final composing = markdownHasComposition(controller);
+    final kind = markdownFocusedKind(controller);
+    final body =
+        kind != MarkdownCommandKind.property &&
+        kind != MarkdownCommandKind.table;
     final colors = IanvsMarkdownThemeData.resolve(context, theme);
     return Material(
       key: const ValueKey('ianvs-markdown-editor-toolbar'),
@@ -53,7 +72,8 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
           child: ValueListenableBuilder<IanvsMarkdownEditorMode>(
             valueListenable: controller.modeListenable,
             builder: (context, mode, _) {
-              final editable = mode != IanvsMarkdownEditorMode.preview;
+              final editable =
+                  mode != IanvsMarkdownEditorMode.preview && !composing;
               return Row(
                 children: [
                   if (showModeSwitcher) ...[
@@ -64,16 +84,26 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
                       icon: Icons.vertical_split_outlined,
                       selected: mode == IanvsMarkdownEditorMode.livePreview,
                       colors: colors,
-                      onPressed: () =>
-                          controller.mode = IanvsMarkdownEditorMode.livePreview,
+                      onPressed: composing
+                          ? null
+                          : () => _invoke(
+                              IanvsMarkdownCommand.livePreview,
+                              () => controller.mode =
+                                  IanvsMarkdownEditorMode.livePreview,
+                            ),
                     ),
                     _ModeButton(
                       tooltip: IanvsMarkdownMessage.sourceMode.resolve(context),
                       icon: Icons.code_rounded,
                       selected: mode == IanvsMarkdownEditorMode.source,
                       colors: colors,
-                      onPressed: () =>
-                          controller.mode = IanvsMarkdownEditorMode.source,
+                      onPressed: composing
+                          ? null
+                          : () => _invoke(
+                              IanvsMarkdownCommand.source,
+                              () => controller.mode =
+                                  IanvsMarkdownEditorMode.source,
+                            ),
                     ),
                     _ModeButton(
                       tooltip: IanvsMarkdownMessage.readingMode.resolve(
@@ -82,31 +112,50 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
                       icon: Icons.menu_book_outlined,
                       selected: mode == IanvsMarkdownEditorMode.preview,
                       colors: colors,
-                      onPressed: () =>
-                          controller.mode = IanvsMarkdownEditorMode.preview,
+                      onPressed: composing
+                          ? null
+                          : () => _invoke(
+                              IanvsMarkdownCommand.reading,
+                              () => controller.mode =
+                                  IanvsMarkdownEditorMode.preview,
+                            ),
                     ),
                     _ToolbarDivider(colors: colors),
                   ],
-                  ValueListenableBuilder<IanvsMarkdownHistoryValue>(
-                    valueListenable: controller.historyListenable,
-                    builder: (context, history, _) {
+                  ListenableBuilder(
+                    listenable: Listenable.merge([
+                      controller.historyListenable,
+                      ?localHistory,
+                    ]),
+                    builder: (context, _) {
+                      final history = controller.historyListenable.value;
                       return Row(
                         children: [
                           _ToolbarButton(
-                            focusNode: focusNode,
                             tooltip: IanvsMarkdownMessage.undo.resolve(context),
                             icon: Icons.undo_rounded,
-                            enabled: history.canUndo,
+                            enabled:
+                                editable &&
+                                (localHistory?.value.canUndo ??
+                                    history.canUndo),
                             colors: colors,
-                            onPressed: controller.undo,
+                            onPressed: () => _invoke(
+                              IanvsMarkdownCommand.undo,
+                              controller.undo,
+                            ),
                           ),
                           _ToolbarButton(
-                            focusNode: focusNode,
                             tooltip: IanvsMarkdownMessage.redo.resolve(context),
                             icon: Icons.redo_rounded,
-                            enabled: history.canRedo,
+                            enabled:
+                                editable &&
+                                (localHistory?.value.canRedo ??
+                                    history.canRedo),
                             colors: colors,
-                            onPressed: controller.redo,
+                            onPressed: () => _invoke(
+                              IanvsMarkdownCommand.redo,
+                              controller.redo,
+                            ),
                           ),
                         ],
                       );
@@ -114,85 +163,95 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
                   ),
                   _ToolbarDivider(colors: colors),
                   _ToolbarButton(
-                    focusNode: focusNode,
                     tooltip: IanvsMarkdownMessage.bold.resolve(context),
                     icon: Icons.format_bold_rounded,
-                    enabled: editable,
+                    enabled: editable && kind != MarkdownCommandKind.property,
                     colors: colors,
-                    onPressed: () => controller.toggleInline('**'),
+                    onPressed: () => _invoke(
+                      IanvsMarkdownCommand.bold,
+                      () => controller.toggleInline('**'),
+                    ),
                   ),
                   _ToolbarButton(
-                    focusNode: focusNode,
                     tooltip: IanvsMarkdownMessage.italic.resolve(context),
                     icon: Icons.format_italic_rounded,
-                    enabled: editable,
+                    enabled: editable && kind != MarkdownCommandKind.property,
                     colors: colors,
-                    onPressed: () => controller.toggleInline('*'),
+                    onPressed: () => _invoke(
+                      IanvsMarkdownCommand.italic,
+                      () => controller.toggleInline('*'),
+                    ),
                   ),
                   _ToolbarButton(
-                    focusNode: focusNode,
                     tooltip: IanvsMarkdownMessage.inlineCode.resolve(context),
                     icon: Icons.data_object_rounded,
-                    enabled: editable,
+                    enabled: editable && body,
                     colors: colors,
-                    onPressed: () => controller.toggleInline('`'),
+                    onPressed: () =>
+                        _bodyAction(() => controller.toggleInline('`')),
                   ),
                   _ToolbarButton(
-                    focusNode: focusNode,
                     tooltip: IanvsMarkdownMessage.link.resolve(context),
                     icon: Icons.link_rounded,
-                    enabled: editable,
+                    enabled: editable && kind != MarkdownCommandKind.property,
                     colors: colors,
-                    onPressed: controller.insertLink,
+                    onPressed: () => _invoke(
+                      IanvsMarkdownCommand.insertLink,
+                      controller.insertLink,
+                    ),
                   ),
                   _ToolbarButton(
-                    focusNode: focusNode,
                     tooltip: IanvsMarkdownMessage.heading.resolve(context),
                     icon: Icons.title_rounded,
-                    enabled: editable,
+                    enabled: editable && body,
                     colors: colors,
-                    onPressed: () => controller.toggleLinePrefix('## '),
+                    onPressed: () =>
+                        _bodyAction(() => controller.toggleLinePrefix('## ')),
                   ),
                   _ToolbarButton(
-                    focusNode: focusNode,
                     tooltip: IanvsMarkdownMessage.bulletList.resolve(context),
                     icon: Icons.format_list_bulleted_rounded,
-                    enabled: editable,
+                    enabled: editable && body,
                     colors: colors,
-                    onPressed: () => controller.toggleLinePrefix('- '),
+                    onPressed: () =>
+                        _bodyAction(() => controller.toggleLinePrefix('- ')),
                   ),
                   _ToolbarButton(
-                    focusNode: focusNode,
                     tooltip: IanvsMarkdownMessage.taskList.resolve(context),
                     icon: Icons.check_box_outlined,
-                    enabled: editable,
+                    enabled: editable && body,
                     colors: colors,
-                    onPressed: () => controller.toggleLinePrefix('- [ ] '),
+                    onPressed: () => _bodyAction(
+                      () => controller.toggleLinePrefix('- [ ] '),
+                    ),
                   ),
                   _ToolbarButton(
-                    focusNode: focusNode,
                     tooltip: IanvsMarkdownMessage.codeBlock.resolve(context),
                     icon: Icons.terminal_rounded,
-                    enabled: editable,
+                    enabled: editable && body,
                     colors: colors,
-                    onPressed: controller.insertCodeFence,
+                    onPressed: () => _bodyAction(controller.insertCodeFence),
                   ),
                   if (onSaveRequested != null) ...[
                     _ToolbarDivider(colors: colors),
                     ValueListenableBuilder<bool>(
                       valueListenable: controller.dirtyListenable,
-                      builder: (context, dirty, _) => _ToolbarButton(
-                        focusNode: focusNode,
-                        tooltip: dirty
-                            ? IanvsMarkdownMessage.save.resolve(context)
-                            : IanvsMarkdownMessage.saved.resolve(context),
-                        icon: dirty
-                            ? Icons.save_outlined
-                            : Icons.cloud_done_outlined,
-                        enabled: dirty,
-                        colors: colors,
-                        onPressed: _save,
-                      ),
+                      builder: (context, dirty, _) {
+                        final pending =
+                            dirty || (localHistory?.value.canUndo ?? false);
+                        return _ToolbarButton(
+                          tooltip: pending
+                              ? IanvsMarkdownMessage.save.resolve(context)
+                              : IanvsMarkdownMessage.saved.resolve(context),
+                          icon: pending
+                              ? Icons.save_outlined
+                              : Icons.cloud_done_outlined,
+                          enabled: pending && !composing,
+                          colors: colors,
+                          onPressed: () =>
+                              _invoke(IanvsMarkdownCommand.save, _save),
+                        );
+                      },
                     ),
                   ],
                 ],
@@ -202,6 +261,24 @@ class IanvsMarkdownEditorToolbar extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  void _invoke(IanvsMarkdownCommand command, VoidCallback fallback) {
+    if (markdownHasComposition(controller)) return;
+    if (IanvsMarkdownShortcuts.invoke(command, controller: controller)) return;
+    fallback();
+    if (!markdownCommandIsMode(command)) focusNode?.requestFocus();
+  }
+
+  void _bodyAction(VoidCallback action) {
+    if (markdownHasComposition(controller)) return;
+    final kind = markdownFocusedKind(controller);
+    if (kind == MarkdownCommandKind.property ||
+        kind == MarkdownCommandKind.table) {
+      return;
+    }
+    action();
+    focusNode?.requestFocus();
   }
 
   Future<void> _save() async {
@@ -231,7 +308,7 @@ class _ModeButton extends StatelessWidget {
   final IconData icon;
   final bool selected;
   final IanvsMarkdownThemeData colors;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -261,13 +338,11 @@ class _ToolbarButton extends StatelessWidget {
     required this.enabled,
     required this.colors,
     required this.onPressed,
-    this.focusNode,
   });
 
   final String tooltip;
   final IconData icon;
   final bool enabled;
-  final FocusNode? focusNode;
   final IanvsMarkdownThemeData colors;
   final VoidCallback onPressed;
 
@@ -275,12 +350,7 @@ class _ToolbarButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return IconButton(
       tooltip: tooltip,
-      onPressed: enabled
-          ? () {
-              onPressed();
-              focusNode?.requestFocus();
-            }
-          : null,
+      onPressed: enabled ? onPressed : null,
       icon: Icon(icon, size: 17),
       color: colors.textSecondary,
       disabledColor: colors.textTertiary.withValues(alpha: .42),

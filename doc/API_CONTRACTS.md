@@ -53,9 +53,33 @@
 
 命令集合：撤销、重做、粗体、斜体、插入链接、删除行、保存、切换阅读、Live/Source/Reading、缩进/反缩进、全选、复制、剪切和粘贴。内部命令边界按当前焦点分发：阅读使用整文档语义（块级选择使用相应文本块），Source 使用源码，Live 活动块保持源码映射，表格格式化与 Tab 使用单元格语义，属性使用本地撤销并阻止正文格式化/删行。属性保存/模式命令先提交局部输入再交给外层。文本箭头、普通输入、控件 Enter 属于平台/控件行为；宿主仍可显式保留这些键。
 
-作用域只处理 Markdown 区域内的焦点。配置的命令与宿主保留键在活跃组合输入期间不执行，不清除 composing；未覆盖的默认行为保持兼容。非重复绑定消费长按重复消息但不重复调用。原始 macOS 消息与标准化键盘路径共用配置并去重；阅读的 HardwareKeyboard 监听也遵守它，防止宿主复制键同时触发正文复制。`enableModeShortcuts: false` 不因重映射而被绕过。标签 API `labelOf` 返回首个可用组合键；命令被禁用或所有组合键均已被覆盖/保留时返回空字符串。
+作用域只处理 Markdown 区域内的焦点。默认编辑命令、配置命令与宿主保留键在活跃组合输入期间不执行，不清除 composing；默认 Tab/Shift+Tab 仍由局部控件处理，保留日期分段导航。非重复绑定消费长按重复消息但不重复调用。原始 macOS 消息与标准化键盘路径共用配置并去重；阅读的 HardwareKeyboard 监听也遵守它，防止宿主复制键同时触发正文复制。`enableModeShortcuts: false` 不因重映射而被绕过。标签 API `labelOf` 返回首个可用组合键；命令被禁用或所有组合键均已被覆盖/保留时返回空字符串。
 
-正文和 View 新增可选、宿主持有的 `focusNode` / `autofocus`（默认 false）；正文仅在整文档选择开启时使用。替换或卸载不释放宿主焦点对象。内置工具栏的格式/历史/保存动作返回编辑焦点；独立工具栏可传同一 `focusNode`，未传时保持原有行为。Live 在当前组件内触发模式变化后恢复新模式焦点和源码选区；外部输入正持有焦点时，程序更新模式不主动抢焦点，宿主显式 autofocus 另行生效。
+`IanvsMarkdownShortcuts.invoke(command, controller: optionalController)` 用于菜单/工具栏的显式操作，
+不需要额外配置 Widget，也不受键位禁用/重映射或 `enableModeShortcuts` 影响。可选 controller
+只用于焦点所属校验；返回 true 表示命令已处理（包括 composing 时抑制），false 表示当前
+焦点没有匹配的 Markdown 目标或未处理。false 后宿主可调用当前普通控件的 Actions，不能
+无条件撤销上一次正文选区。卸载、替换 controller 与脱离渲染树的旧焦点不会收到命令。
+同步返回值只表示分发，不能当成异步保存/剪贴板完成回执；真实完成仍由原有宿主回调负责。
+
+| 当前区域 | 显式命令边界 |
+| --- | --- |
+| Source / Live 正文 | 使用文档历史与源码映射，格式与文本操作沿用现有 Actions |
+| 表格 | 格式化留在单元格，Undo/Redo 使用文档历史；默认 Tab 保持单元格导航 |
+| 属性 | Undo/Redo 使用局部历史；保存/模式先提交草稿；正文格式与删行被抑制 |
+| Read | 文档历史与修改命令不改源文；选择/复制保留完整文档语义 |
+| 活跃 composing | 菜单/工具栏/默认编辑快捷键都不确认、不丢弃候选；调用被消费 |
+| 普通宿主控件 | invoke 返回 false，由宿主 Actions 决定；不操作旧正文选区 |
+
+工具栏 Read 下撤销/重做禁用；属性历史按钮观察局部栈，未提交属性可保存；没有局部语义
+的结构格式按钮在属性/表格中禁用。按钮激活时再次校验 composing，避免可用状态更新间隙。
+两个 macOS main 的原生 Edit/View 及 app Save 不注册编辑 accelerator；快捷键只经 Flutter
+焦点路由，菜单仍可点击执行禁用键位的命令。原生编辑菜单不显示快捷键、保持可点击，
+无可执行操作时由目标消费；宿主 File/Window 的其他快捷键不变。这是明确的宿主策略，
+不是核心自动修改系统菜单。app Save As 在 composing 期间也暂停；Window 的 Cmd+数字
+继续由宿主切文档，`enableModeShortcuts:false` 只禁用组件的模式键。
+
+正文和 View 新增可选、宿主持有的 `focusNode` / `autofocus`（默认 false）；正文仅在整文档选择开启时使用。替换或卸载不释放宿主焦点对象。内置工具栏属于文本输入 TapRegion；格式/历史/保存动作保留当前局部编辑焦点，未找到本 controller 的焦点目标时使用显式传入的编辑焦点；独立工具栏可传同一 `focusNode`，未传时保持原有行为。Live 在当前组件内触发模式变化后恢复新模式焦点和源码选区；外部输入正持有焦点时，程序更新模式不主动抢焦点，宿主显式 autofocus 另行生效。
 
 接入与兼容说明见 [快捷键与焦点](INTEGRATION_GUIDE.md#快捷键与焦点)。自动证据见 [命令配置回归](../test/keyboard_configuration_test.dart) 与 [包外 smoke host](../tool/package_smoke_test.dart)。真实输入和系统剪贴板按当前 [双入口执行清单](R3_ACCEPTANCE.md) 在 example/app 中验收；已记录的本机结果不扩大其他平台或输入法范围。原生 IME 的用户人工确认与自动输入协议分开记载，读屏未执行。
 

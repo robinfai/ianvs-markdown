@@ -8,6 +8,7 @@ import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:path/path.dart' as p;
 
 import '../controllers/workspace_controller.dart';
+import '../editor_commands.dart';
 import '../models/document_session.dart';
 import '../desktop_theme.dart';
 import '../desktop_typography.dart';
@@ -546,80 +547,88 @@ class _EditorModePickerState extends State<_EditorModePicker> {
     super.dispose();
   }
 
+  void _openMenu() {
+    if (hasEditorComposition(widget.workspace)) return;
+    _menu.open();
+  }
+
   @override
   Widget build(
     BuildContext context,
   ) => ValueListenableBuilder<IanvsMarkdownEditorMode>(
     valueListenable: widget.workspace.activeDocument!.controller.modeListenable,
-    builder: (context, selected, _) => MenuAnchor(
-      controller: _menu,
-      childFocusNode: _focus,
-      consumeOutsideTap: true,
-      alignmentOffset: const Offset(0, 4),
-      style: const MenuStyle(
-        alignment: AlignmentDirectional.bottomEnd,
-        minimumSize: WidgetStatePropertyAll(Size(168, 0)),
-      ),
-      menuChildren: [
-        for (final mode in IanvsMarkdownEditorMode.values)
-          MenuItemButton(
-            key: ValueKey('editor-mode-${mode.name}'),
-            autofocus: mode == selected,
-            leadingIcon: Icon(mode.icon, size: 16),
-            trailingIcon: SizedBox(
-              width: 16,
-              child: mode == selected
-                  ? const Icon(AppIcons.check, size: 14)
-                  : null,
-            ),
-            onPressed: () => widget.workspace.setMode(mode),
-            child: Semantics(
-              selected: mode == selected,
-              child: Text(mode.label, semanticsLabel: mode.accessibleLabel),
-            ),
-          ),
-      ],
-      builder: (context, controller, child) => CallbackShortcuts(
-        bindings: {
-          const SingleActivator(LogicalKeyboardKey.arrowDown): controller.open,
-        },
-        child: Tooltip(
-          message: 'Editor mode',
-          excludeFromSemantics: true,
-          child: SizedBox(
-            height: math.max(
-              32,
-              MediaQuery.textScalerOf(context).scale(16) + 8,
-            ),
-            child: TextButton(
-              key: const ValueKey('editor-mode-button'),
-              focusNode: _focus,
-              onPressed: () =>
-                  controller.isOpen ? controller.close() : controller.open(),
-              style: ButtonStyle(
-                minimumSize: const WidgetStatePropertyAll(Size(104, 32)),
-                padding: const WidgetStatePropertyAll(
-                  EdgeInsets.symmetric(horizontal: 10),
-                ),
-                alignment: Alignment.center,
-                visualDensity: VisualDensity.standard,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                textStyle: WidgetStatePropertyAll(DesktopTypography.callout),
-                foregroundColor: WidgetStatePropertyAll(context.ianvs.muted),
+    builder: (context, selected, _) => TextFieldTapRegion(
+      child: MenuAnchor(
+        controller: _menu,
+        childFocusNode: _focus,
+        consumeOutsideTap: true,
+        alignmentOffset: const Offset(0, 4),
+        style: const MenuStyle(
+          alignment: AlignmentDirectional.bottomEnd,
+          minimumSize: WidgetStatePropertyAll(Size(168, 0)),
+        ),
+        menuChildren: [
+          for (final mode in IanvsMarkdownEditorMode.values)
+            MenuItemButton(
+              key: ValueKey('editor-mode-${mode.name}'),
+              autofocus: mode == selected,
+              leadingIcon: Icon(mode.icon, size: 16),
+              trailingIcon: SizedBox(
+                width: 16,
+                child: mode == selected
+                    ? const Icon(AppIcons.check, size: 14)
+                    : null,
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Icon(selected.icon, size: 16),
-                  const SizedBox(width: 8),
-                  Text(
-                    selected.label,
-                    semanticsLabel: 'Editor mode: ${selected.accessibleLabel}',
+              onPressed: () => setEditorMode(widget.workspace, mode),
+              child: Semantics(
+                selected: mode == selected,
+                child: Text(mode.label, semanticsLabel: mode.accessibleLabel),
+              ),
+            ),
+        ],
+        builder: (context, controller, child) => CallbackShortcuts(
+          bindings: {
+            const SingleActivator(LogicalKeyboardKey.arrowDown): _openMenu,
+          },
+          child: Tooltip(
+            message: 'Editor mode',
+            excludeFromSemantics: true,
+            child: SizedBox(
+              height: math.max(
+                32,
+                MediaQuery.textScalerOf(context).scale(16) + 8,
+              ),
+              child: TextButton(
+                key: const ValueKey('editor-mode-button'),
+                focusNode: _focus,
+                onPressed: () =>
+                    controller.isOpen ? controller.close() : _openMenu(),
+                style: ButtonStyle(
+                  minimumSize: const WidgetStatePropertyAll(Size(104, 32)),
+                  padding: const WidgetStatePropertyAll(
+                    EdgeInsets.symmetric(horizontal: 10),
                   ),
-                  const SizedBox(width: 8),
-                  const Icon(AppIcons.tabs, size: 14),
-                ],
+                  alignment: Alignment.center,
+                  visualDensity: VisualDensity.standard,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  textStyle: WidgetStatePropertyAll(DesktopTypography.callout),
+                  foregroundColor: WidgetStatePropertyAll(context.ianvs.muted),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Icon(selected.icon, size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      selected.label,
+                      semanticsLabel:
+                          'Editor mode: ${selected.accessibleLabel}',
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(AppIcons.tabs, size: 14),
+                  ],
+                ),
               ),
             ),
           ),

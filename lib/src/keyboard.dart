@@ -38,7 +38,7 @@ enum IanvsMarkdownCommand {
 /// defaults. Two explicit commands cannot share a key combination.
 ///
 /// The nearest scope replaces outer configuration. Other controls in the
-/// subtree are unaffected. Configured commands and host actions are suppressed
+/// subtree are unaffected. Editing commands and host actions are suppressed
 /// while the focused text field is composing. Keep the maps/lists immutable
 /// and replace the widget's configuration when updating it.
 class IanvsMarkdownShortcuts extends StatefulWidget {
@@ -89,6 +89,29 @@ class IanvsMarkdownShortcuts extends StatefulWidget {
       ].join();
     }
     return '';
+  }
+
+  /// Invokes an explicit menu/toolbar operation on the focused Markdown target.
+  ///
+  /// Keyboard bindings (including disabled bindings) do not affect this call.
+  /// Local properties/cells handle commands before the containing editor.
+  /// Returns true when handled or suppressed during composition. Returns false
+  /// outside Markdown, after disposal, or when [controller] does not own focus;
+  /// hosts may then delegate to the focused control's ordinary Flutter Actions.
+  static bool invoke(
+    IanvsMarkdownCommand command, {
+    TextEditingController? controller,
+  }) {
+    final focused = _focusedMarkdownScope();
+    if (focused == null || !focused.belongsTo(controller)) return false;
+    if (focused.composing) return true;
+    for (final target in focused.targets) {
+      if (!focused.context.mounted) break;
+      if ((target.onInvoke ?? target.onCommand)(command, focused.context)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @override
@@ -146,8 +169,9 @@ class _IanvsMarkdownShortcutsState extends State<IanvsMarkdownShortcuts> {
   _ShortcutRoute? _route(
     _MarkdownKey key,
     MarkdownCommandKind kind,
-    TargetPlatform platform,
-  ) {
+    TargetPlatform platform, {
+    bool modeShortcutsEnabled = true,
+  }) {
     for (final entry in widget.hostShortcuts.entries) {
       if (key.matches(entry.key)) {
         return _ShortcutRoute(entry.key, host: entry.value);
@@ -167,6 +191,23 @@ class _IanvsMarkdownShortcutsState extends State<IanvsMarkdownShortcuts> {
         kind: kind,
       )) {
         if (key.matches(binding)) return _ShortcutRoute(binding);
+      }
+    }
+    for (final command in IanvsMarkdownCommand.values) {
+      if (widget.bindings.containsKey(command) ||
+          command == IanvsMarkdownCommand.indent ||
+          command == IanvsMarkdownCommand.outdent ||
+          (!modeShortcutsEnabled && markdownCommandIsMode(command))) {
+        continue;
+      }
+      for (final binding in defaultMarkdownBindings(
+        command,
+        platform,
+        kind: kind,
+      )) {
+        if (key.matches(binding)) {
+          return _ShortcutRoute(binding, command: command);
+        }
       }
     }
     return null;
@@ -192,7 +233,15 @@ class _IanvsMarkdownShortcutsState extends State<IanvsMarkdownShortcuts> {
     final focused = _focusedMarkdownScope();
     if (focused == null || focused.scope != this) return;
     final key = _MarkdownKey.raw(event);
-    if (_route(key, focused.kind, focused.platform) == null) return;
+    if (_route(
+          key,
+          focused.kind,
+          focused.platform,
+          modeShortcutsEnabled: focused.modeShortcutsEnabled,
+        ) ==
+        null) {
+      return;
+    }
     // RawKeyboard runs before HardwareKeyboard and FocusManager. Retain this
     // identity for their duplicate paths, including raw-only key messages.
     _ownedRawEvent = event;
@@ -203,12 +252,14 @@ class _IanvsMarkdownShortcutsState extends State<IanvsMarkdownShortcuts> {
   }
 
   KeyEventResult _dispatch(_MarkdownKey key, _FocusedMarkdown focused) {
-    final route = _route(key, focused.kind, focused.platform);
+    final route = _route(
+      key,
+      focused.kind,
+      focused.platform,
+      modeShortcutsEnabled: focused.modeShortcutsEnabled,
+    );
     if (route == null) return KeyEventResult.ignored;
-    final editable = focused.context
-        .findAncestorStateOfType<EditableTextState>();
-    final composing = editable?.widget.controller.value.composing;
-    if (composing != null && composing.isValid && !composing.isCollapsed) {
+    if (focused.composing) {
       return KeyEventResult.handled;
     }
     if (key.repeat && !route.binding.includeRepeats) {
@@ -314,10 +365,16 @@ class MarkdownCommandTarget extends InheritedWidget {
     super.key,
     required this.kind,
     required this.onCommand,
+    this.onInvoke,
+    this.controller,
+    this.modeShortcutsEnabled = true,
     required super.child,
   });
   final MarkdownCommandKind kind;
   final bool Function(IanvsMarkdownCommand, BuildContext) onCommand;
+  final bool Function(IanvsMarkdownCommand, BuildContext)? onInvoke;
+  final TextEditingController? controller;
+  final bool modeShortcutsEnabled;
   @override
   bool updateShouldNotify(MarkdownCommandTarget oldWidget) => false;
 }
@@ -325,8 +382,26 @@ class MarkdownCommandTarget extends InheritedWidget {
 class _FocusedMarkdown {
   const _FocusedMarkdown(this.context, this.scope, this.targets);
   final BuildContext context;
-  final _IanvsMarkdownShortcutsState scope;
+  final _IanvsMarkdownShortcutsState? scope;
   final List<MarkdownCommandTarget> targets;
+
+  bool get modeShortcutsEnabled =>
+      targets.every((target) => target.modeShortcutsEnabled);
+
+  bool belongsTo(TextEditingController? controller) =>
+      controller == null ||
+      targets.any((target) => identical(target.controller, controller));
+
+  bool get composing {
+    final value = context
+        .findAncestorStateOfType<EditableTextState>()
+        ?.widget
+        .controller
+        .value;
+    return value != null &&
+        value.composing.isValid &&
+        !value.composing.isCollapsed;
+  }
 
   TargetPlatform get platform =>
       kind == MarkdownCommandKind.table || kind == MarkdownCommandKind.property
@@ -343,10 +418,12 @@ class _FocusedMarkdown {
 _FocusedMarkdown? _focusedMarkdownScope() {
   final context = FocusManager.instance.primaryFocus?.context;
   if (context == null || !context.mounted) return null;
+  // Focus changes settle after build. A removed surface can still be mounted
+  // here, but its render subtree is detached and its ancestors are unsafe.
+  if (context is Element && context.renderObject?.attached != true) return null;
   final scope = context
       .getInheritedWidgetOfExactType<_MarkdownShortcutScopeData>()
       ?.state;
-  if (scope == null) return null;
   final targets = <MarkdownCommandTarget>[];
   context.visitAncestorElements((element) {
     if (element.widget is MarkdownCommandTarget) {
@@ -358,23 +435,79 @@ _FocusedMarkdown? _focusedMarkdownScope() {
   return _FocusedMarkdown(context, scope, targets);
 }
 
+/// Supply default routing without replacing a host's explicit configuration.
+class DefaultMarkdownShortcuts extends StatelessWidget {
+  const DefaultMarkdownShortcuts({required this.child, super.key});
+  final Widget child;
+  @override
+  Widget build(BuildContext context) =>
+      context
+              .dependOnInheritedWidgetOfExactType<
+                _MarkdownShortcutScopeData
+              >() ==
+          null
+      ? IanvsMarkdownShortcuts(child: child)
+      : child;
+}
+
+bool markdownHasComposition(TextEditingController controller) {
+  final composing = controller.value.composing;
+  if (composing.isValid && !composing.isCollapsed) return true;
+  final focused = _focusedMarkdownScope();
+  return focused != null && focused.belongsTo(controller) && focused.composing;
+}
+
+MarkdownCommandKind? markdownFocusedKind(TextEditingController controller) {
+  final focused = _focusedMarkdownScope();
+  return focused != null && focused.belongsTo(controller) ? focused.kind : null;
+}
+
+TextEditingController? markdownPropertyEditingController(
+  TextEditingController controller,
+) {
+  final focused = _focusedMarkdownScope();
+  if (focused == null ||
+      !focused.belongsTo(controller) ||
+      focused.kind != MarkdownCommandKind.property) {
+    return null;
+  }
+  return focused.context
+      .findAncestorStateOfType<EditableTextState>()
+      ?.widget
+      .controller;
+}
+
+UndoHistoryController? markdownLocalHistory(TextEditingController controller) {
+  final focused = _focusedMarkdownScope();
+  if (focused == null ||
+      !focused.belongsTo(controller) ||
+      focused.kind != MarkdownCommandKind.property) {
+    return null;
+  }
+  return focused.context
+      .findAncestorStateOfType<EditableTextState>()
+      ?.widget
+      .undoController;
+}
+
 /// HardwareKeyboard listeners run before FocusManager's early handlers.
 bool markdownShortcutOwnsEvent(KeyEvent event) {
   final focused = _focusedMarkdownScope();
-  if (focused == null) return false;
-  if (focused.scope._ownedRawEvent?.physicalKey == event.physicalKey) {
+  if (focused?.scope == null) return false;
+  if (focused!.scope!._ownedRawEvent?.physicalKey == event.physicalKey) {
     return true;
   }
-  return focused.scope._route(
+  return focused.scope!._route(
         _MarkdownKey.event(event),
         focused.kind,
         focused.platform,
+        modeShortcutsEnabled: focused.modeShortcutsEnabled,
       ) !=
       null;
 }
 
 bool markdownShortcutHandledRaw(RawKeyEvent event) =>
-    identical(_focusedMarkdownScope()?.scope._ownedRawEvent, event);
+    identical(_focusedMarkdownScope()?.scope?._ownedRawEvent, event);
 
 bool invokeMarkdownTextCommand(
   IanvsMarkdownCommand command,

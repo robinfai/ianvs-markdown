@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 
 /// Send macOS menu commands to Flutter's current focus, as the app host does.
@@ -12,6 +11,21 @@ class ExamplePlatformMenu extends StatelessWidget {
   });
   final IanvsMarkdownController controller;
   final Widget child;
+
+  void _edit(IanvsMarkdownCommand command, Intent fallback) {
+    if (IanvsMarkdownShortcuts.invoke(command)) return;
+    final context = FocusManager.instance.primaryFocus?.context;
+    if (context != null && context.mounted) {
+      Actions.maybeInvoke(context, fallback);
+    }
+  }
+
+  void _mode(IanvsMarkdownCommand command, IanvsMarkdownEditorMode mode) {
+    if (IanvsMarkdownShortcuts.invoke(command, controller: controller)) return;
+    final composing = controller.value.composing;
+    if (composing.isValid && !composing.isCollapsed) return;
+    controller.mode = mode;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,51 +54,46 @@ class ExamplePlatformMenu extends StatelessWidget {
           menus: [
             PlatformMenuItem(
               label: 'Undo',
-              shortcut: const SingleActivator(
-                LogicalKeyboardKey.keyZ,
-                meta: true,
+              onSelected: () => _edit(
+                IanvsMarkdownCommand.undo,
+                const UndoTextIntent(SelectionChangedCause.keyboard),
               ),
-              onSelected: () {
-                if (controller.mode != IanvsMarkdownEditorMode.preview) {
-                  controller.undo();
-                }
-              },
             ),
             PlatformMenuItem(
               label: 'Redo',
-              shortcut: const SingleActivator(
-                LogicalKeyboardKey.keyZ,
-                meta: true,
-                shift: true,
+              onSelected: () => _edit(
+                IanvsMarkdownCommand.redo,
+                const RedoTextIntent(SelectionChangedCause.keyboard),
               ),
-              onSelected: () {
-                if (controller.mode != IanvsMarkdownEditorMode.preview) {
-                  controller.redo();
-                }
-              },
             ),
-            const PlatformMenuItem(
+            PlatformMenuItem(
               label: 'Cut',
-              shortcut: SingleActivator(LogicalKeyboardKey.keyX, meta: true),
-              onSelectedIntent: CopySelectionTextIntent.cut(
-                SelectionChangedCause.keyboard,
+              onSelected: () => _edit(
+                IanvsMarkdownCommand.cut,
+                const CopySelectionTextIntent.cut(
+                  SelectionChangedCause.keyboard,
+                ),
               ),
             ),
-            const PlatformMenuItem(
+            PlatformMenuItem(
               label: 'Copy',
-              shortcut: SingleActivator(LogicalKeyboardKey.keyC, meta: true),
-              onSelectedIntent: CopySelectionTextIntent.copy,
+              onSelected: () => _edit(
+                IanvsMarkdownCommand.copy,
+                CopySelectionTextIntent.copy,
+              ),
             ),
-            const PlatformMenuItem(
+            PlatformMenuItem(
               label: 'Paste',
-              shortcut: SingleActivator(LogicalKeyboardKey.keyV, meta: true),
-              onSelectedIntent: PasteTextIntent(SelectionChangedCause.keyboard),
+              onSelected: () => _edit(
+                IanvsMarkdownCommand.paste,
+                const PasteTextIntent(SelectionChangedCause.keyboard),
+              ),
             ),
-            const PlatformMenuItem(
+            PlatformMenuItem(
               label: 'Select All',
-              shortcut: SingleActivator(LogicalKeyboardKey.keyA, meta: true),
-              onSelectedIntent: SelectAllTextIntent(
-                SelectionChangedCause.keyboard,
+              onSelected: () => _edit(
+                IanvsMarkdownCommand.selectAll,
+                const SelectAllTextIntent(SelectionChangedCause.keyboard),
               ),
             ),
           ],
@@ -93,27 +102,26 @@ class ExamplePlatformMenu extends StatelessWidget {
           label: 'View',
           menus: [
             for (final entry
-                in <(String, IanvsMarkdownEditorMode, LogicalKeyboardKey)>[
+                in <(String, IanvsMarkdownCommand, IanvsMarkdownEditorMode)>[
                   (
                     'Live Preview',
+                    IanvsMarkdownCommand.livePreview,
                     IanvsMarkdownEditorMode.livePreview,
-                    LogicalKeyboardKey.digit1,
                   ),
                   (
                     'Source',
+                    IanvsMarkdownCommand.source,
                     IanvsMarkdownEditorMode.source,
-                    LogicalKeyboardKey.digit2,
                   ),
                   (
                     'Read',
+                    IanvsMarkdownCommand.reading,
                     IanvsMarkdownEditorMode.preview,
-                    LogicalKeyboardKey.digit3,
                   ),
                 ])
               PlatformMenuItem(
                 label: entry.$1,
-                shortcut: SingleActivator(entry.$3, meta: true),
-                onSelected: () => controller.mode = entry.$2,
+                onSelected: () => _mode(entry.$2, entry.$3),
               ),
           ],
         ),

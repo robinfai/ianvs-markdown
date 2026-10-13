@@ -1,0 +1,9 @@
+{
+  "files": 180,
+  "uncompressedBytes": 3023923,
+  "pubCompressedSize": "688 KB.",
+  "snapshotDryRun": "passed without warnings",
+  "exampleTests": "passed",
+  "externalHostTests": "passed",
+  "workspacePathLeak": false
+}
