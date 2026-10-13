@@ -7,8 +7,7 @@ class MainFlutterWindow: NSWindow {
   private var benchmarkGeneration = 0
   private var benchmarkChannel: FlutterMethodChannel?
 
-  // Read-only, opt-in instrumentation for the profile benchmark. Ordinary
-  // example entry points never invoke this channel or install observers.
+  // Read-only, opt-in instrumentation. Ordinary launches install no observers.
   private func benchmarkSnapshot() -> [String: Any] {
     let state: [String: Any] = [
       "active": NSApp.isActive,
@@ -17,6 +16,10 @@ class MainFlutterWindow: NSWindow {
       "occlusionVisible": occlusionState.contains(.visible),
       "onActiveSpace": isOnActiveSpace,
       "appHidden": NSApp.isHidden,
+      "x": frame.origin.x,
+      "y": frame.origin.y,
+      "screen": screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? Int ?? -1,
+      "scale": backingScaleFactor,
       "width": frame.width,
       "height": frame.height,
     ]

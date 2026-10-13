@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 
 import 'platform_menu.dart';
+// Repository-only opt-in instrumentation; intentionally not public package API.
+// ignore: implementation_imports
+import 'package:ianvs_markdown/src/diagnostics/local_performance/probe.dart';
 
 void main() => runApp(const ExampleApp());
 
@@ -64,8 +67,11 @@ class _MarkdownExampleState extends State<MarkdownExample> {
     text: exampleMarkdown,
   );
 
+  late final _performanceScroll = ScrollController();
+
   @override
   void dispose() {
+    if (localPerformanceEnabled) _performanceScroll.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -75,43 +81,82 @@ class _MarkdownExampleState extends State<MarkdownExample> {
     final colors = IanvsMarkdownThemeData.resolve(context);
     return ExamplePlatformMenu(
       controller: _controller,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text(
-            'ianvs_markdown example',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-          ),
-          shape: Border(bottom: BorderSide(color: colors.borderSoft)),
-          actions: [
-            IconButton(
-              tooltip: widget.dark ? 'Use light theme' : 'Use dark theme',
-              onPressed: widget.onToggleTheme,
-              icon: Icon(
-                widget.dark
-                    ? Icons.light_mode_outlined
-                    : Icons.dark_mode_outlined,
+      child: _performance(
+        Scaffold(
+          appBar: AppBar(
+            title: const Text(
+              'ianvs_markdown example',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            shape: Border(bottom: BorderSide(color: colors.borderSoft)),
+            actions: [
+              IconButton(
+                tooltip: widget.dark ? 'Use light theme' : 'Use dark theme',
+                onPressed: widget.onToggleTheme,
+                icon: Icon(
+                  widget.dark
+                      ? Icons.light_mode_outlined
+                      : Icons.dark_mode_outlined,
+                ),
               ),
-            ),
-            IconButton(
-              tooltip: 'Reset example',
-              onPressed: _reset,
-              icon: const Icon(Icons.restart_alt_rounded),
-            ),
-          ],
-        ),
-        body: IanvsMarkdownLiveEditor(
-          controller: _controller,
-          showToolbar: true,
-          showNavigationPane: false,
-          showFrontMatter: true,
-          enableHeadingFolding: true,
-          onSaveRequested: (_) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Host save callback invoked')),
-            );
-          },
+              IconButton(
+                tooltip: 'Reset example',
+                onPressed: _reset,
+                icon: const Icon(Icons.restart_alt_rounded),
+              ),
+            ],
+          ),
+          body: IanvsMarkdownLiveEditor(
+            controller: _controller,
+            scrollController: localPerformanceEnabled
+                ? _performanceScroll
+                : null,
+            showToolbar: true,
+            showNavigationPane: false,
+            showFrontMatter: true,
+            enableHeadingFolding: true,
+            onSaveRequested: (_) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Host save callback invoked')),
+              );
+            },
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _performance(Widget child) {
+    if (!localPerformanceEnabled) return child;
+    return LocalPerformancePanel(
+      host: LocalPerformanceHost(
+        entry: 'example',
+        controller: () => _controller,
+        scroll: () => _performanceScroll,
+        prepare: (_, source) async {
+          _controller.value = TextEditingValue(
+            text: source,
+            selection: const TextSelection.collapsed(offset: 2),
+          );
+          _controller.clearHistory();
+          _controller.markSaved();
+        },
+        mode: (mode) {
+          final command = switch (mode) {
+            IanvsMarkdownEditorMode.source => IanvsMarkdownCommand.source,
+            IanvsMarkdownEditorMode.preview => IanvsMarkdownCommand.reading,
+            IanvsMarkdownEditorMode.livePreview =>
+              IanvsMarkdownCommand.livePreview,
+          };
+          if (!IanvsMarkdownShortcuts.invoke(
+            command,
+            controller: _controller,
+          )) {
+            _controller.mode = mode;
+          }
+        },
+      ),
+      child: child,
     );
   }
 
