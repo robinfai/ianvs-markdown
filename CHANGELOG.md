@@ -1,5 +1,9 @@
 ## Unreleased
 
+- Route the example's macOS Edit menu through Flutter focus actions and its
+  View/history commands through the document controller. Verify large-document
+  paste and complete Read-mode copies through the native menu channel.
+
 - Reconnect the text-input client when a focused editor returns from Read to
   Source or Live, so typing continues without an extra click. Guard deferred
   callbacks against replaced controllers/focus nodes and newer mode changes.
