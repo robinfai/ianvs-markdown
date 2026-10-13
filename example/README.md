@@ -108,3 +108,9 @@ Returning from Read to a focused Source/Live surface reconnects keyboard input.
 and undo/redo through this main application. These are framework protocol tests,
 not native IME evidence. Actual local results are recorded in the repository's
 R3 acceptance reports.
+
+On macOS, the main playground installs a Flutter `PlatformMenuBar` for Edit and
+View commands, matching Linefold's focus-based command routing. This avoids the
+stock Cocoa menu mutating only an accessibility text mirror during automated
+paste. The native menu channel regression checks actual controller content,
+Read full-source copy, and return-to-Source input connection.

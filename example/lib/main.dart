@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 
+import 'platform_menu.dart';
+
 void main() => runApp(const ExampleApp());
 
 class ExampleApp extends StatefulWidget {
@@ -71,41 +73,44 @@ class _MarkdownExampleState extends State<MarkdownExample> {
   @override
   Widget build(BuildContext context) {
     final colors = IanvsMarkdownThemeData.resolve(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'ianvs_markdown example',
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-        ),
-        shape: Border(bottom: BorderSide(color: colors.borderSoft)),
-        actions: [
-          IconButton(
-            tooltip: widget.dark ? 'Use light theme' : 'Use dark theme',
-            onPressed: widget.onToggleTheme,
-            icon: Icon(
-              widget.dark
-                  ? Icons.light_mode_outlined
-                  : Icons.dark_mode_outlined,
+    return ExamplePlatformMenu(
+      controller: _controller,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text(
+            'ianvs_markdown example',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+          shape: Border(bottom: BorderSide(color: colors.borderSoft)),
+          actions: [
+            IconButton(
+              tooltip: widget.dark ? 'Use light theme' : 'Use dark theme',
+              onPressed: widget.onToggleTheme,
+              icon: Icon(
+                widget.dark
+                    ? Icons.light_mode_outlined
+                    : Icons.dark_mode_outlined,
+              ),
             ),
-          ),
-          IconButton(
-            tooltip: 'Reset example',
-            onPressed: _reset,
-            icon: const Icon(Icons.restart_alt_rounded),
-          ),
-        ],
-      ),
-      body: IanvsMarkdownLiveEditor(
-        controller: _controller,
-        showToolbar: true,
-        showNavigationPane: false,
-        showFrontMatter: true,
-        enableHeadingFolding: true,
-        onSaveRequested: (_) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Host save callback invoked')),
-          );
-        },
+            IconButton(
+              tooltip: 'Reset example',
+              onPressed: _reset,
+              icon: const Icon(Icons.restart_alt_rounded),
+            ),
+          ],
+        ),
+        body: IanvsMarkdownLiveEditor(
+          controller: _controller,
+          showToolbar: true,
+          showNavigationPane: false,
+          showFrontMatter: true,
+          enableHeadingFolding: true,
+          onSaveRequested: (_) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Host save callback invoked')),
+            );
+          },
+        ),
       ),
     );
   }
