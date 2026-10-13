@@ -9227,6 +9227,27 @@
       "static": false,
       "abstract": false
     },
+    "IanvsMarkdownShortcuts/method:invoke": {
+      "kind": "method",
+      "typeParameters": [],
+      "returnType": "bool",
+      "parameters": [
+        {
+          "name": "command",
+          "type": "IanvsMarkdownCommand",
+          "kind": "positional",
+          "required": true
+        },
+        {
+          "name": "controller",
+          "type": "TextEditingController?",
+          "kind": "named",
+          "required": false
+        }
+      ],
+      "static": true,
+      "abstract": false
+    },
     "IanvsMarkdownShortcuts/method:labelOf": {
       "kind": "method",
       "typeParameters": [],

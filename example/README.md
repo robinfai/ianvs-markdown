@@ -114,3 +114,15 @@ View commands, matching Linefold's focus-based command routing. This avoids the
 stock Cocoa menu mutating only an accessibility text mirror during automated
 paste. The native menu channel regression checks actual controller content,
 Read full-source copy, and return-to-Source input connection.
+
+## Native editing commands (R4-01)
+
+The macOS main entry routes explicit editing menus through
+`IanvsMarkdownShortcuts.invoke`. Edit/View menus (and app Save) do not register
+native editing accelerators; Flutter owns configurable shortcuts. Native menu
+items remain clickable and may safely do nothing in Read or during composition.
+Disabled/remapped keys do not disable an explicit menu action. In example,
+property undo stays local and toolbar Save commits its draft; in app, Search Files
+keeps its own text history and the editor continues to hide front matter.
+See [the command contract](../doc/API_CONTRACTS.md#命令配置与焦点r1-03) and
+[the validation record](../benchmark/COMMAND-ROUTING-2026-10-13.md).

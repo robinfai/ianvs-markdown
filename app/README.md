@@ -367,3 +367,15 @@ Returning from Read to a focused Source/Live surface reconnects keyboard input.
 and undo/redo through this main application. These are framework protocol tests,
 not native IME evidence. Actual local results are recorded in the repository's
 R3 acceptance reports.
+
+## Native editing commands (R4-01)
+
+The macOS main entry routes explicit editing menus through
+`IanvsMarkdownShortcuts.invoke`. Edit/View menus (and app Save) do not register
+native editing accelerators; Flutter owns configurable shortcuts. Native menu
+items remain clickable and may safely do nothing in Read or during composition.
+Disabled/remapped keys do not disable an explicit menu action. In example,
+property undo stays local and toolbar Save commits its draft; in app, Search Files
+keeps its own text history and the editor continues to hide front matter.
+See [the command contract](../doc/API_CONTRACTS.md#命令配置与焦点r1-03) and
+[the validation record](../benchmark/COMMAND-ROUTING-2026-10-13.md).

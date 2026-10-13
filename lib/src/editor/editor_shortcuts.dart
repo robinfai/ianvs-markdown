@@ -38,7 +38,7 @@ class IanvsMarkdownEditorShortcuts extends StatelessWidget {
       IanvsMarkdownCommand.italic: const _ItalicIntent(),
       IanvsMarkdownCommand.insertLink: const _LinkIntent(),
       IanvsMarkdownCommand.save: const _SaveIntent(),
-      if (enableModeShortcuts) ...{
+      ...{
         IanvsMarkdownCommand.togglePreview: const _ToggleModeIntent(),
         IanvsMarkdownCommand.livePreview: const _SetModeIntent(
           IanvsMarkdownEditorMode.livePreview,
@@ -56,11 +56,12 @@ class IanvsMarkdownEditorShortcuts extends StatelessWidget {
     final shortcuts = Shortcuts(
       shortcuts: <ShortcutActivator, Intent>{
         for (final entry in intents.entries)
-          for (final binding in defaultMarkdownBindings(
-            entry.key,
-            Theme.of(context).platform,
-          ))
-            binding: entry.value,
+          if (enableModeShortcuts || !markdownCommandIsMode(entry.key))
+            for (final binding in defaultMarkdownBindings(
+              entry.key,
+              Theme.of(context).platform,
+            ))
+              binding: entry.value,
       },
       child: Actions(
         actions: <Type, Action<Intent>>{
@@ -161,17 +162,27 @@ class IanvsMarkdownEditorShortcuts extends StatelessWidget {
         child: child,
       ),
     );
-    return MarkdownCommandTarget(
-      kind: MarkdownCommandKind.editor,
-      onCommand: (command, focused) {
-        if (intents[command] case final intent?) {
-          Actions.maybeInvoke(focused, intent);
-          return true;
-        }
-        if (markdownCommandIsMode(command)) return true;
-        return invokeMarkdownTextCommand(command, focused);
-      },
-      child: shortcuts,
+    bool invoke(IanvsMarkdownCommand command, BuildContext focused) {
+      if (intents[command] case final intent?) {
+        Actions.maybeInvoke(focused, intent);
+        return true;
+      }
+      return invokeMarkdownTextCommand(command, focused);
+    }
+
+    return DefaultMarkdownShortcuts(
+      child: MarkdownCommandTarget(
+        kind: MarkdownCommandKind.editor,
+        controller: controller,
+        onInvoke: invoke,
+        onCommand: (command, focused) {
+          if (!enableModeShortcuts && markdownCommandIsMode(command)) {
+            return true;
+          }
+          return invoke(command, focused);
+        },
+        child: shortcuts,
+      ),
     );
   }
 

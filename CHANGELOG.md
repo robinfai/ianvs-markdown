@@ -1,5 +1,13 @@
 ## Unreleased
 
+- Add `IanvsMarkdownShortcuts.invoke` for focused explicit menu/toolbar commands,
+  with optional controller ownership. Keep property history local, preserve
+  composition across default shortcuts and explicit commands, and disable Read
+  toolbar history. Preserve property focus and commit drafts before saving.
+  Both macOS main entries drop duplicate editing menu accelerators so remapped
+  or disabled keys stay under Flutter control; explicit menu actions still work.
+  App Save/Save As pause during composition. Default segmented-date Tab stays local.
+
 - Route the example's macOS Edit menu through Flutter focus actions and its
   View/history commands through the document controller. Verify large-document
   paste and complete Read-mode copies through the native menu channel.

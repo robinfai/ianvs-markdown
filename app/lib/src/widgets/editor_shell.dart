@@ -10,6 +10,7 @@ import 'package:ianvs_mermaid/ianvs_mermaid.dart';
 import 'package:path/path.dart' as p;
 
 import '../controllers/workspace_controller.dart';
+import '../editor_commands.dart';
 import '../models/document_session.dart';
 import '../models/workspace_layout.dart';
 import '../services/document_link_service.dart';
@@ -107,8 +108,8 @@ class _EditorShellState extends State<EditorShell> {
           workspace: workspace,
           onOpen: () => _guard(workspace.chooseAndOpenFiles),
           onOpenFolder: () => _guard(workspace.chooseWorkspaceFolder),
-          onSave: () => _guard(workspace.saveActive),
-          onSaveAs: () => _guard(() => workspace.saveActive(saveAs: true)),
+          onSave: () => _saveCommand(),
+          onSaveAs: () => _saveCommand(saveAs: true),
           onClose: () => _guard(() => _closeDocument(document)),
           onToggleTheme: widget.onToggleTheme,
           onUseSystemTheme: widget.onUseSystemTheme,
@@ -141,24 +142,24 @@ class _EditorShellState extends State<EditorShell> {
               ): () =>
                   _guard(workspace.chooseWorkspaceFolder),
               const SingleActivator(LogicalKeyboardKey.keyS, meta: true): () =>
-                  _guard(workspace.saveActive),
+                  _saveCommand(),
               const SingleActivator(
                 LogicalKeyboardKey.keyS,
                 control: true,
               ): () =>
-                  _guard(workspace.saveActive),
+                  _saveCommand(),
               const SingleActivator(
                 LogicalKeyboardKey.keyS,
                 meta: true,
                 shift: true,
               ): () =>
-                  _guard(() => workspace.saveActive(saveAs: true)),
+                  _saveCommand(saveAs: true),
               const SingleActivator(
                 LogicalKeyboardKey.keyS,
                 control: true,
                 shift: true,
               ): () =>
-                  _guard(() => workspace.saveActive(saveAs: true)),
+                  _saveCommand(saveAs: true),
               const SingleActivator(LogicalKeyboardKey.keyW, meta: true): () =>
                   _closeDocument(document),
               const SingleActivator(
@@ -344,6 +345,20 @@ class _EditorShellState extends State<EditorShell> {
         );
       },
     );
+  }
+
+  void _saveCommand({bool saveAs = false}) {
+    final controller = widget.workspace.activeDocument?.controller;
+    if (controller == null) return;
+    if (hasEditorComposition(widget.workspace)) return;
+    if (!saveAs &&
+        IanvsMarkdownShortcuts.invoke(
+          IanvsMarkdownCommand.save,
+          controller: controller,
+        )) {
+      return;
+    }
+    _guard(() => widget.workspace.saveActive(saveAs: saveAs));
   }
 
   Future<void> _saveFromEditor(DocumentSession document) async {
