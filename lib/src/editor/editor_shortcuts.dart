@@ -174,6 +174,7 @@ class IanvsMarkdownEditorShortcuts extends StatelessWidget {
       child: MarkdownCommandTarget(
         kind: MarkdownCommandKind.editor,
         controller: controller,
+        modeShortcutsEnabled: enableModeShortcuts,
         onInvoke: invoke,
         onCommand: (command, focused) {
           if (!enableModeShortcuts && markdownCommandIsMode(command)) {
