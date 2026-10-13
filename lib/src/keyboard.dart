@@ -239,8 +239,9 @@ class _IanvsMarkdownShortcutsState extends State<IanvsMarkdownShortcuts> {
           focused.platform,
           modeShortcutsEnabled: focused.modeShortcutsEnabled,
         ) ==
-        null)
+        null) {
       return;
+    }
     // RawKeyboard runs before HardwareKeyboard and FocusManager. Retain this
     // identity for their duplicate paths, including raw-only key messages.
     _ownedRawEvent = event;

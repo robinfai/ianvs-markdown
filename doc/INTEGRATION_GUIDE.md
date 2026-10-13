@@ -135,7 +135,6 @@ void undoFromMenu() {
 不要在原生菜单重复注册可重映射的编辑快捷键，否则系统可能在 Flutter 前截获旧键位。
 两个 main 用不带编辑 accelerator 的菜单；普通宿主输入框沿用自身 Actions。
 
-
 在组件外放置 `IanvsMarkdownShortcuts`，用 `bindings` 替换指定命令的全部默认键；空列表禁用该命令的键盘入口。`hostShortcuts` 提供保留组合键的宿主回调，优先于组件命令。下例中的 `SingleActivator` / `LogicalKeyboardKey` 来自 Flutter widgets / services，`openCommandPalette` 为宿主自己的动作：
 
 ```dart
