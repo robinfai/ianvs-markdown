@@ -1,7 +1,8 @@
 # R4：Flutter Markdown 组件库的持续使用迭代
 
 日期：2026-10-13。分析基线为 `6e255400b6b05b42cb4210509ba43ed84e4f2992`（PR #21 合入）。
-本轮交付是下一阶段计划，没有实现下列功能，也没有新增 GUI、性能或原生 IME 实测。
+初次交付为下一阶段计划；现已落地 R4-01，其实现、两入口 GUI 与本轮人工 IME 见
+[命令路由报告](../benchmark/COMMAND-ROUTING-2026-10-13.md)。其他任务尚未实施，性能基线待 R4-02。
 依据是当前源码、测试和 R0–R3 已归档结果；已知限制、代码路径风险和新能力建议分别标记。
 任务状态与总数只在 [ROADMAP 的 R4 表](../ROADMAP.md#r4-下一阶段任务) 维护。
 
@@ -21,22 +22,22 @@ app 验证真实文件和多文档使用。文件读写、授权、工作区和�
 | 实际使用问题 | 当前证据 | 判断与去向 |
 | --- | --- | --- |
 | 打开、编辑、保存、重开与恢复 | [R3 清单](R3_ACCEPTANCE.md) 和 [L07/L08 报告](../benchmark/LARGE-INPUT-FOCUS-2026-10-13.md)：两个 Release 主入口已验证；用户人工确认 Source/Live 四组拼音确认/取消正常 | 已完成基线，继续作为回归条件，不重复登记为待实现功能 |
-| 原生菜单与组件键盘路径是否一致 | [组件命令](../lib/src/keyboard.dart) 的 `_dispatch` 按焦点和 composing 路由；[example 菜单](../example/lib/platform_menu.dart) 的 Undo/Redo、模式切换直接访问 Controller；[app 菜单](../app/lib/src/widgets/desktop_menu_bar.dart) 对编辑器内历史也直接调 Controller。Controller 的 `undo` 本身不检查 composing | 路径差异已确认；属性局部撤销、组合输入中调用菜单、重映射后的菜单快捷键是否有故障尚待复现。R4-01 首先验证，不把差异直接写成丢字结论 |
+| 原生菜单与组件键盘路径是否一致 | R4-01 从两个 main 复现 5 个失败，新增 [显式焦点命令](API_CONTRACTS.md#命令配置与焦点r1-03)，菜单、工具栏与默认编辑键共享局部/文档边界及 composing 保护；删除冲突 accelerator | 已交付：核心 970、example 35、app 296、四个构建及快照通过；两 Release 菜单实测与用户本轮四组 IME 确认。详见 [证据](../benchmark/COMMAND-ROUTING-2026-10-13.md) |
 | 大文档降级后仍有输入/排版成本 | [Source](../lib/src/editor/source_editor.dart) 使用完整文本的 `TextField(maxLines: null)`；[预算](../lib/src/render_budget.dart) 明确只限制处理输入，不是延迟/堆限制。历史 R2 默认 1 MiB 输入 P95 约 371–380 ms；L07 的 CUA 耗时含等待/AX | 已知架构边界；历史数字不能代表当前两入口。R4-02 建立新基线，R4-03 再做有归因的优化 |
 | 切模式、切文档后回到原阅读/编辑位置 | [View.didUpdateWidget](../lib/src/ianvs_markdown.dart) 在 data 等变化后 `jumpTo(0)`；[Controller](../lib/src/editor/editor_controller.dart) 有 `revealHeading`，尚无通用范围显露契约；[DocumentSession](../app/lib/src/models/document_session.dart) 持有一个 ScrollController，JSON 不保存选区/视口 | 已确认契约缺口；现有模式续输不等于定位恢复。R4-04 先处理同进程视口与源码范围；重启恢复位置另列候选 |
 | 在当前 Markdown 中查找和替换 | app [文件搜索](../app/lib/src/controllers/file_browser_controller.dart) 匹配路径/文件名；公共 [命令枚举](../lib/src/keyboard.dart) 无查找/替换，已导出 API 没有文内结果集与范围定位组合 | 新能力建议。R4-05 先做当前文档纯文本查找，不扩展为全工作区索引 |
 | 长时间编辑、多标签、关闭后资源是否稳定 | Controller 已有 200 状态 / 32 MiB 历史策略及 dispose；[流式契约](../test/streaming_contract_test.dart)、[异步示例](../example/lib/async_diagram.dart) 和 MermaidView 已处理若干过期响应 | 不能据此声称存在泄漏，也不能将每个 Controller 的历史额度当作进程 RSS 上限。R4-06 补持续工作负载证据，复用已有生命周期逻辑 |
 | 键盘和读屏完成编辑操作 | 表格已有 Semantics，已有焦点/快捷键测试；L08 明确没有执行 VoiceOver | 验证缺口。R4-07 做本机两个实际入口的有限任务验收，不推断其他平台无障碍支持 |
 
-最新已完成校验：核心 968、example 30、app 291（1 项历史可选语料跳过），两入口 Debug/Release，
+R4 规划时的 R3 基线校验：核心 968、example 30、app 291（1 项历史可选语料跳过），两入口 Debug/Release，
 Pub-selected 快照 176 文件 / 675 KB / 零警告。PR #21 最终头 `18a0f46` 的
 [Core](https://github.com/robinfai/ianvs-markdown/actions/runs/38334106441) 与
 [Native](https://github.com/robinfai/ianvs-markdown/actions/runs/38334106451) 成功。
-以上是上一阶段完整验收证据；本次文档交付的检查另行记录，不算 R4 实现或新的交互/性能验收。
+以上为上一阶段证据；R4-01 新增结果单独记录在本批报告中，不算新的性能验收。
 
 ## 优先级与执行顺序
 
-没有本次已复现的数据丢失/不可打开问题，因此不预设 P0。实施中出现源码破坏、保存覆盖或
+初次规划未预设 P0；R4-01 已按复现处理命令与输入边界。后续出现源码破坏、保存覆盖或
 稳定崩溃时，立即提升为 P0 并先修复。P1 解决当前高频操作及其必要测量；P2 增加日常能力和
 长期验证。规模表示耦合程度，不是工期承诺：中等通常跨组件与宿主；大项可能涉及布局/输入架构。
 
@@ -51,7 +52,7 @@ Pub-selected 快照 176 文件 / 675 KB / 零警告。PR #21 最终头 `18a0f46`
 | 7 | R4-07 键盘与 VoiceOver 使用闭环 | P2 / 中 | 依赖 R4-01、R4-04、R4-05 的最终交互；语义树检查可提前，最终人工验收最后做 |
 
 R4 共 7 项：P1 四项、P2 三项。有依赖的任务不因编号靠后而被默认为可以同时实施。
-先完成一批再启动下一批；本次只提交计划，所有 R4 实现任务均为待开始。
+先完成一批再启动下一批；R4-01 已完成，下一项 R4-02。任务状态以 ROADMAP 表为准。
 
 ## R4-01 命令路由和输入边界一致
 
@@ -203,5 +204,5 @@ Markdown/dirty/history 分离，由宿主持有文档身份；先支持同进程
 6. 每批按“实现/回归 → 文档/证据”提交推送；检查最终 PR 头，不能用前一个头的成功代替。
 7. 记录通过、失败、未执行和兼容性成本；未达退出条件保持任务未完成。R0–R3 历史结论不随新增 R4 任务回退。
 
-下一步具体执行 R4-01：以现有两个 main，先复现属性局部 Undo、composing 中菜单模式命令、
-自定义快捷键与原生菜单 accelerator 三类路径，再决定最小公共接口及宿主接线。
+下一步执行 R4-02：冻结 R4-01 后的两个 main、SDK、语料、动作与采样协议，先实现默认关闭
+的主入口诊断，再串行完成两轮有效基线；不能用此前独立 benchmark 或 CUA 往返耗时替代。

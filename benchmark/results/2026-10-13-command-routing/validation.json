@@ -1,0 +1,134 @@
+{
+  "date": "2026-10-13",
+  "sourceRevision": "2320bdd98826c2e7607c36e17d8a3f7b5c355ab8",
+  "sdk": {
+    "frameworkVersion": "3.44.8",
+    "channel": "stable",
+    "repositoryUrl": "https://github.com/flutter/flutter.git",
+    "frameworkRevision": "058e0af2c2b57e369d905a03ac9748b0ebf543c6",
+    "frameworkCommitDate": "2026-07-23 10:56:21 -0700",
+    "engineRevision": "0cd610717bde95fd88343c64f81c11ba4e5c0010",
+    "engineCommitDate": "2026-07-23 16:11:34.000Z",
+    "engineContentHash": "13ffd72b2f9a5ca4db2a74ea52d5353ec2e8f939",
+    "engineBuildDate": "2026-07-24 00:36:29.809",
+    "dartSdkVersion": "3.12.2",
+    "devToolsVersion": "2.57.0",
+    "flutterVersion": "3.44.8"
+  },
+  "tests": {
+    "core": 970,
+    "example": 35,
+    "app": 296,
+    "appHistoricalOptionalSkipped": 1,
+    "api": 8,
+    "exports": 183,
+    "declarations": 1147,
+    "python": 10,
+    "processingBudgetCases": 32,
+    "mermaidFlutter": 9,
+    "mermaidRust": 4,
+    "mermaidExample": 3,
+    "clipboard": 6,
+    "quicklookRust": 8,
+    "quicklookSwift": 10,
+    "nativeImport": "pass"
+  },
+  "validation": {
+    "checkLocalAndFourBuilds": {
+      "exitCode": 0
+    },
+    "packageSnapshot": {
+      "files": 180,
+      "uncompressedBytes": 3023923,
+      "pubCompressedSize": "688 KB.",
+      "snapshotDryRun": "passed without warnings",
+      "exampleTests": "passed",
+      "externalHostTests": "passed",
+      "workspacePathLeak": false
+    },
+    "codeHeadCI": {
+      "revision": "2320bdd98826c2e7607c36e17d8a3f7b5c355ab8",
+      "checks": [
+        "Flutter 3.44.0",
+        "Flutter 3.47.6",
+        "Core required",
+        "macos"
+      ],
+      "result": "all success",
+      "coreRun": "https://github.com/robinfai/ianvs-markdown/actions/runs/38341467973",
+      "nativeRun": "https://github.com/robinfai/ianvs-markdown/actions/runs/38341467976"
+    },
+    "finalDocumentationHeadCI": "Must be checked after final push; canonical receipt: https://github.com/robinfai/ianvs-markdown/pull/23/checks",
+    "packageSnapshotInputs": "Runtime 2320bdd plus final R4 documentation in this evidence commit; manifest records exact selected-file hashes."
+  },
+  "artifacts": [
+    {
+      "entry": "example/lib/main.dart",
+      "mode": "Debug",
+      "bundlePath": "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/example/build/macos/Build/Products/Debug/Ianvs Markdown Playground.app",
+      "sha256": "c97f6a92dbb1886375f19f7305d0c339d900daed63f31bcb8a101297f7c3f04c"
+    },
+    {
+      "entry": "example/lib/main.dart",
+      "mode": "Release",
+      "bundlePath": "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/example/build/macos/Build/Products/Release/Ianvs Markdown Playground.app",
+      "sha256": "01408efb1f1416b471afad69494ecad59bbcc84277eae6707392311e68ee3479"
+    },
+    {
+      "entry": "app/lib/main.dart",
+      "mode": "Debug",
+      "bundlePath": "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/app/build/macos/Build/Products/Debug/Linefold.app",
+      "sha256": "c297bda6133148c6465a480f08e1500d3c71f3ab8c6be98833c166d15b23c3c6"
+    },
+    {
+      "entry": "app/lib/main.dart",
+      "mode": "Release",
+      "bundlePath": "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/app/build/macos/Build/Products/Release/Linefold.app",
+      "sha256": "90cd93666dade1644c86a014382b79d25c04822f2ccb365dcc1641a38d24f628"
+    }
+  ],
+  "gui": {
+    "processes": {
+      "example": 31212,
+      "app": 33546
+    },
+    "example": [
+      "author: Ianvs → R4 Author via input; native Undo → Ianvs; Cmd+Shift+Z → R4 Author; toolbar Undo → Ianvs and property focus retained",
+      "Cmd+2 enters Source; full replacement by R4 IME seed using paste"
+    ],
+    "app": [
+      "actual main New document; Live R4 IME seed input",
+      "native Undo empties document; Cmd+Shift+Z restores 12 characters",
+      "native View Read; native Undo leaves 12 characters unchanged",
+      "native View Source and immediate SOURCE input yields 19 characters",
+      "Cmd+S opens native Save; r4-commands.md written to temporary directory and UI Saved"
+    ],
+    "savedBytes": 19,
+    "savedSha256": "086fbb031c2f6b7a44b5aebc5534000879554cace76974b6005db50472cf32c0",
+    "saveExpectedMatch": true,
+    "openPanelAttempt": "Opening input.md via CUA did not complete; native panel kept Open disabled. Cancelled, then used main New document and native Save successfully. No GUI open/reopen pass claimed in this batch.",
+    "nativeIME": {
+      "status": "passed-user-reported",
+      "date": "2026-10-13",
+      "scope": "example/app Source/Live; zhongwen confirmation, quxiao Escape cancellation, menu Undo/Read while candidates pending, continued input",
+      "report": "四组均正常，候选期间命令未打断输入",
+      "source": "User manual keyboard confirmation in this task; not CUA candidate-window observation; not inherited from L08"
+    },
+    "limitations": [
+      "CUA text injection is not a native IME session",
+      "No performance measurements or VoiceOver checks",
+      "Only this macOS/SDK pair",
+      "Private session backup excluded"
+    ]
+  },
+  "environment": {
+    "os": "macOS 27.0.1 (26A434)",
+    "arch": "arm64",
+    "xcode": "27.0 (27A266a)",
+    "appBuildEnvironment": {
+      "FLUTTER_XCODE_ARCHS": "arm64",
+      "CARGO_PROFILE_RELEASE_STRIP": "none"
+    },
+    "sdkWorkingTree": "clean"
+  }
+}
