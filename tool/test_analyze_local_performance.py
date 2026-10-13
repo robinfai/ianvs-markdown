@@ -27,10 +27,11 @@ def fixture():
                     emit(dict(**identity, event='start', window=copy.deepcopy(window), atUtc='2026-10-13T00:00:00Z'))
                     mode = 'preview' if op == 'sourceToRead' else 'livePreview' if op in ('liveType', 'livePaste', 'readToLive', 'liveTail') else 'source'
                     r = dict(**identity, callbackMs=2., nextFrameMs=5., frameWaitMs=3., rssMiB=100.,
+                             firstFrameNumber=frame, lastFrameNumber=frame+2,
                              firstFrameMicros=frame, lastFrameMicros=frame+2, sourcePreserved=True,
                              mode=mode, window=copy.deepcopy(window))
                     emit(dict(**copy.deepcopy(r), event='end', atUtc='2026-10-13T00:00:01Z'))
-                    r['frames'] = [dict(vsyncMicros=frame+1, buildMs=1., rasterMs=.5, totalMs=1.5)]
+                    r['frames'] = [dict(frameNumber=frame+1, vsyncMicros=frame+1, buildMs=1., rasterMs=.5, totalMs=1.5)]
                     data['records'].append(r)
                     frame += 10
     return data, trace
@@ -64,7 +65,16 @@ class LocalPerformanceValidationTest(unittest.TestCase):
             validate_data(self.data, self.trace)
 
     def test_rejects_frame_from_preparation(self):
-        self.data['records'][0]['frames'][0]['vsyncMicros'] = 0
+        self.data['records'][0]['frames'][0]['frameNumber'] = 0
+        with self.assertRaisesRegex(ValueError, 'attribution'):
+            validate_data(self.data, self.trace)
+
+    def test_uses_frame_identity_despite_clock_rounding(self):
+        self.data['records'][0]['frames'][0]['vsyncMicros'] += 2
+        self.assertEqual(len(validate_data(self.data, self.trace)), 675)
+
+    def test_rejects_frame_after_measured_completion(self):
+        self.data['records'][0]['frames'][0]['frameNumber'] = 4
         with self.assertRaisesRegex(ValueError, 'attribution'):
             validate_data(self.data, self.trace)
 

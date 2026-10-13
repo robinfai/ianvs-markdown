@@ -252,6 +252,7 @@ class LocalPerformanceRun {
       nextInput = local.replaced(local.selection, input);
     }
     final first = stamp;
+    final firstNumber = PlatformDispatcher.instance.frameData.frameNumber;
     final watch = Stopwatch()..start();
     switch (operation) {
       case 'sourceType' || 'liveType' || 'sourcePaste' || 'livePaste':
@@ -284,6 +285,7 @@ class LocalPerformanceRun {
     final latencyMs = watch.elapsedMicroseconds / 1000;
     watch.stop();
     final last = stamp;
+    final lastNumber = PlatformDispatcher.instance.frameData.frameNumber;
     final rss = probeRssMiB;
     if (controller.text != expected) {
       throw StateError('$operation changed source unexpectedly');
@@ -304,6 +306,8 @@ class LocalPerformanceRun {
       'nextFrameMs': latencyMs,
       'frameWaitMs': latencyMs - callbackMs,
       'rssMiB': rss,
+      'firstFrameNumber': firstNumber,
+      'lastFrameNumber': lastNumber,
       'firstFrameMicros': first,
       'lastFrameMicros': last,
       'sourcePreserved': true,
@@ -403,9 +407,10 @@ class LocalPerformanceRun {
             (r) => r['bytes'] == bytes && r['operation'] == operation,
           )) {
             final selected = frames.where((f) {
-              final time = f.timestampInMicroseconds(FramePhase.vsyncStart);
-              return time > (record['firstFrameMicros'] as int) &&
-                  time <= (record['lastFrameMicros'] as int);
+              // Raw begin-frame and vsync clocks can differ by microseconds.
+              // Use the engine's shared frame identity, not timestamp equality.
+              return f.frameNumber > (record['firstFrameNumber'] as int) &&
+                  f.frameNumber <= (record['lastFrameNumber'] as int);
             }).toList();
             if (selected.isEmpty) {
               throw StateError('Missing frame evidence: $operation');
@@ -413,6 +418,7 @@ class LocalPerformanceRun {
             record['frames'] = [
               for (final f in selected)
                 {
+                  'frameNumber': f.frameNumber,
                   'vsyncMicros': f.timestampInMicroseconds(
                     FramePhase.vsyncStart,
                   ),

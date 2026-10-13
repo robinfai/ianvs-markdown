@@ -92,8 +92,8 @@ def validate_data(data, trace):
         require(r['mode'] == mode, f'Wrong mode for {operation}')
         require(r.get('frames'), 'Missing frame evidence')
         for frame in r['frames']:
-            stamp = frame['vsyncMicros']
-            require(r['firstFrameMicros'] < stamp <= r['lastFrameMicros'] and stamp not in frame_ids, 'Frame attribution overlap/outside interval')
+            stamp = frame['frameNumber']
+            require(0 <= r['firstFrameNumber'] < stamp <= r['lastFrameNumber'] and stamp not in frame_ids, 'Frame attribution overlap/outside interval')
             frame_ids.add(stamp)
             require(all(isinstance(frame[m], (int, float)) and math.isfinite(frame[m]) and frame[m] >= 0 for m in ('buildMs', 'rasterMs', 'totalMs')), 'Invalid frame duration')
         if operation in ('open', 'save'):

@@ -33,8 +33,8 @@ example 共 27 组 / 540 正式样本，app 共 33 组 / 660 正式样本。两�
 
 - callbackMs：动作调用到返回/异步完成；nextFrameMs：同一起点到下一帧 endOfFrame。
   frameWaitMs 是两者差值。endOfFrame 不代表像素已到显示器，不称物理输入到显示延迟。
-- FrameTiming 按引擎 vsync 原始时钟 `(起始帧, 完成帧]` 归属动作，分别保存 build、raster、
-  totalSpan 及 vsync。记录所有原始样本，再计算 nearest-rank P50/P95/max。
+- FrameTiming 按引擎共享 frameNumber 的 `(起始帧, 完成帧]` 归属动作，分别保存 build、raster、
+  totalSpan、frameNumber 及 vsync 原始时钟；begin-frame 时间戳与 vsync 可有微秒差，不用于帧身份匹配。记录所有原始样本，再计算 nearest-rank P50/P95/max。
 - RSS 是进程采样值，包含完整宿主、引擎与缓存；不是组件堆用量或泄漏结论。
   app 的文件读写时间嵌套于 callbackMs，不将两者相加；临时文件是暖缓存本地文件，
   不代表 iCloud 同步、冷盘或文件选择面板耗时。
