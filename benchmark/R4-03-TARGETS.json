@@ -1,0 +1,40 @@
+{
+  "baseline": "2026-10-13-main-entry-performance",
+  "improvement": 0.2,
+  "targets": [
+    {
+      "entry": "example",
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "p95MaxMs": 2100.694
+    },
+    {
+      "entry": "app",
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "baselineFasterP95Ms": 240.276,
+      "p95MaxMs": 192.2208
+    },
+    {
+      "entry": "app",
+      "bytes": 1048576,
+      "operation": "liveType",
+      "baselineFasterP95Ms": 207.253,
+      "p95MaxMs": 165.8024
+    },
+    {
+      "entry": "app",
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "baselineFasterP95Ms": 243.325,
+      "p95MaxMs": 194.66
+    },
+    {
+      "entry": "app",
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "baselineFasterP95Ms": 211.575,
+      "p95MaxMs": 169.26
+    }
+  ]
+}

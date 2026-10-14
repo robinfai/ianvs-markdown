@@ -10,10 +10,24 @@ from urllib.request import urlopen
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--source', type=Path, required=True)
+    sources = parser.add_mutually_exclusive_group(required=True)
+    sources.add_argument('--source', type=Path)
+    sources.add_argument('--source-parent', type=Path, help='Wait for a fresh actual-main diagnostic run')
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--timeout', type=int, default=600)
     args = parser.parse_args()
+    deadline = time.monotonic() + args.timeout
+    if args.source_parent:
+        started = time.time()
+        while time.monotonic() < deadline:
+            fresh = [p for p in args.source_parent.glob('ianvs-r402-*/diagnostic.json') if p.stat().st_mtime >= started]
+            if fresh:
+                args.source = max(fresh, key=lambda p: p.stat().st_mtime).parent
+                print(f'Capturing {args.source}', flush=True)
+                break
+            time.sleep(.1)
+        else:
+            raise RuntimeError('Timed out waiting for a new diagnostic run')
     metadata = json.loads((args.source / 'diagnostic.json').read_text())
     uri = metadata['vmService']
     if not uri or urlparse(uri).hostname not in {'127.0.0.1', 'localhost', '::1'}:
@@ -27,6 +41,8 @@ def main():
             raise RuntimeError(value['error'])
         return value['result']
 
+    rpc('setFlag', name='profiler', value='true')
+    enabled_at = rpc('getVMTimelineMicros')['timestamp']
     isolate = next(i['id'] for i in rpc('getVM')['isolates'] if i['name'] == 'main')
     captured = set()
     deadline = time.monotonic() + args.timeout
@@ -38,7 +54,7 @@ def main():
                 event = json.loads(line)
             except json.JSONDecodeError:
                 continue  # A final line may still be being written.
-            if event.get('event') != 'end' or event.get('stage') != 'sample' or event.get('index') != 0:
+            if event.get('event') != 'end' or event.get('stage') != 'sample' or event.get('timelineStartMicros', 0) < enabled_at:
                 continue
             operation = event['operation']
             if operation in captured:
