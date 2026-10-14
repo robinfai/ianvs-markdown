@@ -1,0 +1,571 @@
+{
+  "entry": "app",
+  "operation": "livePaste",
+  "sampleCount": 28,
+  "samplePeriodMicros": 1000,
+  "nextFrameMs": 40.363,
+  "topInclusive": [
+    {
+      "name": "_drawFrame",
+      "owner": "PlatformDispatcher",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/lib/ui/platform_dispatcher.dart",
+      "inclusiveTicks": 18,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "_invoke",
+      "owner": "dart.ui",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/lib/ui/hooks.dart",
+      "inclusiveTicks": 18,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "_handleDrawFrame",
+      "owner": "_MixinApplication28&BindingBase&GestureBinding&SchedulerBinding",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/scheduler/binding.dart",
+      "inclusiveTicks": 18,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "handleDrawFrame",
+      "owner": "_MixinApplication28&BindingBase&GestureBinding&SchedulerBinding",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/scheduler/binding.dart",
+      "inclusiveTicks": 18,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "_invokeFrameCallback",
+      "owner": "_MixinApplication28&BindingBase&GestureBinding&SchedulerBinding",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/scheduler/binding.dart",
+      "inclusiveTicks": 18,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "_handlePersistentFrameCallback",
+      "owner": "_MixinApplication32&BindingBase&GestureBinding&SchedulerBinding&ServicesBinding&PaintingBinding&SemanticsBinding&RendererBinding",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/rendering/binding.dart",
+      "inclusiveTicks": 18,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "drawFrame",
+      "owner": "_MixinApplication33&BindingBase&GestureBinding&SchedulerBinding&ServicesBinding&PaintingBinding&SemanticsBinding&RendererBinding&WidgetsBinding",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/widgets/binding.dart",
+      "inclusiveTicks": 18,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "drawFrame",
+      "owner": "_MixinApplication32&BindingBase&GestureBinding&SchedulerBinding&ServicesBinding&PaintingBinding&SemanticsBinding&RendererBinding",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/rendering/binding.dart",
+      "inclusiveTicks": 18,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "_drawFrame",
+      "owner": "dart.ui",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/lib/ui/hooks.dart",
+      "inclusiveTicks": 18,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "flushSemantics",
+      "owner": "PipelineOwner",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/rendering/object.dart",
+      "inclusiveTicks": 12,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "__updateSemantics$Method$FfiNative",
+      "owner": "FlutterView",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/lib/ui/window.dart",
+      "inclusiveTicks": 11,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "updateSemantics",
+      "owner": "RenderView",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/rendering/view.dart",
+      "inclusiveTicks": 11,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "<anonymous closure>",
+      "owner": "pipelineOwner",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/rendering/binding.dart",
+      "inclusiveTicks": 11,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "sendSemanticsUpdate",
+      "owner": "SemanticsOwner",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/semantics/semantics.dart",
+      "inclusiveTicks": 11,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "_updateSemantics",
+      "owner": "FlutterView",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/lib/ui/window.dart",
+      "inclusiveTicks": 11,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "updateSemantics",
+      "owner": "FlutterView",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/lib/ui/window.dart",
+      "inclusiveTicks": 11,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "updateChild",
+      "owner": "Element",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/widgets/framework.dart",
+      "inclusiveTicks": 8,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "performRebuild",
+      "owner": "ComponentElement",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/widgets/framework.dart",
+      "inclusiveTicks": 8,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "rebuild",
+      "owner": "Element",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/widgets/framework.dart",
+      "inclusiveTicks": 8,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "runLayoutCallback",
+      "owner": "_MixinApplication53&RenderBox&RenderObjectWithChildMixin&RenderObjectWithLayoutCallbackMixin",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/rendering/object.dart",
+      "inclusiveTicks": 6,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "invokeLayoutCallback",
+      "owner": "RenderObject",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/rendering/object.dart",
+      "inclusiveTicks": 6,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "_enableMutationsToDirtySubtrees",
+      "owner": "PipelineOwner",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/rendering/object.dart",
+      "inclusiveTicks": 6,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "<anonymous closure>",
+      "owner": "invokeLayoutCallback",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/rendering/object.dart",
+      "inclusiveTicks": 6,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "<anonymous closure>",
+      "owner": "runLayoutCallback",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/rendering/object.dart",
+      "inclusiveTicks": 6,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "layoutCallback",
+      "owner": "_MixinApplication54&RenderBox&RenderObjectWithChildMixin&RenderObjectWithLayoutCallbackMixin&RenderAbstractLayoutBuilderMixin",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/widgets/layout_builder.dart",
+      "inclusiveTicks": 6,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "_rebuildWithConstraints",
+      "owner": "_LayoutBuilderElement",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/widgets/layout_builder.dart",
+      "inclusiveTicks": 6,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "buildScope",
+      "owner": "BuildOwner",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/widgets/framework.dart",
+      "inclusiveTicks": 6,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "updateChildCallback",
+      "owner": "_rebuildWithConstraints",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/widgets/layout_builder.dart",
+      "inclusiveTicks": 6,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "layoutChild",
+      "owner": "ChildLayoutHelper",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/rendering/layout_helper.dart",
+      "inclusiveTicks": 6,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "performLayout",
+      "owner": "_MixinApplication17&RenderBox&RenderObjectWithChildMixin&RenderProxyBoxMixin",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/rendering/proxy_box.dart",
+      "inclusiveTicks": 6,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "performLayout",
+      "owner": "_RenderLayoutBuilder",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/widgets/layout_builder.dart",
+      "inclusiveTicks": 6,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "performRebuild",
+      "owner": "StatefulElement",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/widgets/framework.dart",
+      "inclusiveTicks": 6,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "layout",
+      "owner": "RenderObject",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/rendering/object.dart",
+      "inclusiveTicks": 6,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "_ExecuteMatch",
+      "owner": "_RegExp",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/third_party/dart/sdk/lib/_internal/vm/lib/regexp_patch.dart",
+      "inclusiveTicks": 5,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "measure",
+      "owner": "IanvsMarkdownEditorDiagnostics",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/lib/src/editor/editor_diagnostics.dart",
+      "inclusiveTicks": 5,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "flushLayout",
+      "owner": "PipelineOwner",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/rendering/object.dart",
+      "inclusiveTicks": 5,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "_layoutWithoutResize",
+      "owner": "RenderObject",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/rendering/object.dart",
+      "inclusiveTicks": 5,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "_computeSizes",
+      "owner": "RenderFlex",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/rendering/flex.dart",
+      "inclusiveTicks": 5,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "performLayout",
+      "owner": "RenderConstrainedBox",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/rendering/proxy_box.dart",
+      "inclusiveTicks": 5,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "performLayout",
+      "owner": "RenderPadding",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/rendering/shifted_box.dart",
+      "inclusiveTicks": 5,
+      "exclusiveTicks": 0
+    }
+  ],
+  "topExclusive": [
+    {
+      "name": "[Stub] _iso_stub_AllocateObjectStub",
+      "owner": null,
+      "kind": "Stub",
+      "source": "",
+      "inclusiveTicks": 2,
+      "exclusiveTicks": 2
+    },
+    {
+      "name": "layer=",
+      "owner": "LayerHandle",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/rendering/layer.dart",
+      "inclusiveTicks": 1,
+      "exclusiveTicks": 1
+    },
+    {
+      "name": "isRoot",
+      "owner": "_RenderObjectSemantics",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/rendering/object.dart",
+      "inclusiveTicks": 1,
+      "exclusiveTicks": 1
+    },
+    {
+      "name": "restoreState",
+      "owner": "ScrollableState",
+      "kind": "Dart",
+      "source": "file:///Users/robinfai/development/flutter/packages/flutter/lib/src/widgets/scrollable.dart",
+      "inclusiveTicks": 1,
+      "exclusiveTicks": 1
+    },
+    {
+      "name": "compareTo",
+      "owner": "_Double",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/third_party/dart/sdk/lib/_internal/vm/lib/double.dart",
+      "inclusiveTicks": 1,
+      "exclusiveTicks": 1
+    },
+    {
+      "name": "length=",
+      "owner": "_GrowableList",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/third_party/dart/sdk/lib/_internal/vm/lib/growable_array.dart",
+      "inclusiveTicks": 1,
+      "exclusiveTicks": 1
+    },
+    {
+      "name": "[]=",
+      "owner": "_List",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/third_party/dart/sdk/lib/_internal/vm/lib/array.dart",
+      "inclusiveTicks": 1,
+      "exclusiveTicks": 1
+    },
+    {
+      "name": "_tlv_get_addr",
+      "owner": null,
+      "kind": "Native",
+      "source": "",
+      "inclusiveTicks": 1,
+      "exclusiveTicks": 1
+    },
+    {
+      "name": "<unknown Dart function>",
+      "owner": null,
+      "kind": "Collected",
+      "source": "",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "[Native] /Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/app/build/macos/Build/Products/Profile/Linefold.app/Contents/Frameworks/App.framework/Versions/A/App+0xc88c",
+      "owner": null,
+      "kind": "Native",
+      "source": "",
+      "inclusiveTicks": 1,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "getRange",
+      "owner": "_CastListBase",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/third_party/dart/sdk/lib/internal/cast.dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "[]",
+      "owner": "_CastListBase",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/third_party/dart/sdk/lib/internal/cast.dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "+",
+      "owner": "__CastListBase&_CastIterableBase&ListMixin",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/third_party/dart/sdk/lib/collection/list.dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "_GrowableList.of",
+      "owner": "_GrowableList",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/third_party/dart/sdk/lib/_internal/vm/lib/growable_array.dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "_GrowableList._ofOther",
+      "owner": "_GrowableList",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/third_party/dart/sdk/lib/_internal/vm/lib/growable_array.dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "add",
+      "owner": "add",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/third_party/dart/sdk/lib/_internal/vm/lib/growable_array.dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "_growToNextCapacity",
+      "owner": "_GrowableList",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/third_party/dart/sdk/lib/_internal/vm/lib/growable_array.dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "_grow",
+      "owner": "_GrowableList",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/third_party/dart/sdk/lib/_internal/vm/lib/growable_array.dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "_allocateData",
+      "owner": "_GrowableList",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/third_party/dart/sdk/lib/_internal/vm/lib/growable_array.dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "_GrowableList",
+      "owner": "_GrowableList",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/third_party/dart/sdk/lib/_internal/vm/lib/growable_array.dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "_GrowableList._ofEfficientLengthIterable",
+      "owner": "_GrowableList",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/third_party/dart/sdk/lib/_internal/vm/lib/growable_array.dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "[Stub] Allocate ConcurrentModificationError",
+      "owner": null,
+      "kind": "Stub",
+      "source": "",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "_GrowableList._ofArray",
+      "owner": "_GrowableList",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/third_party/dart/sdk/lib/_internal/vm/lib/growable_array.dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "_GrowableList._ofGrowableList",
+      "owner": "_GrowableList",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/third_party/dart/sdk/lib/_internal/vm/lib/growable_array.dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "SkipIterable",
+      "owner": "SkipIterable",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/third_party/dart/sdk/lib/internal/iterable.dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "[Stub] Allocate SkipIterable",
+      "owner": null,
+      "kind": "Stub",
+      "source": "",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "_checkCount",
+      "owner": "dart._internal",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/third_party/dart/sdk/lib/internal/iterable.dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "_printClosure",
+      "owner": "dart._internal",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/third_party/dart/sdk/lib/_internal/vm/lib/print_patch.dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "_unsupportedPrint",
+      "owner": "_unsupportedPrint",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/third_party/dart/sdk/lib/_internal/vm/lib/print_patch.dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0
+    },
+    {
+      "name": "_unsupportedPrint",
+      "owner": "dart._internal",
+      "kind": "Dart",
+      "source": "org-dartlang-sdk:///flutter/third_party/dart/sdk/lib/_internal/vm/lib/print_patch.dart",
+      "inclusiveTicks": 0,
+      "exclusiveTicks": 0
+    }
+  ]
+}

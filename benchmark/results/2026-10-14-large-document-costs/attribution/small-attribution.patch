@@ -1,0 +1,44 @@
+diff --git a/lib/src/diagnostics/local_performance/probe.dart b/lib/src/diagnostics/local_performance/probe.dart
+index 9c2b019..b9374b7 100644
+--- a/lib/src/diagnostics/local_performance/probe.dart
++++ b/lib/src/diagnostics/local_performance/probe.dart
+@@ -14,6 +14,10 @@ import 'probe_stub.dart' if (dart.library.io) 'probe_io.dart';
+ 
+ const localPerformanceEnabled = bool.fromEnvironment('IANVS_LOCAL_PERFORMANCE');
+ const _attribution = bool.fromEnvironment('IANVS_PERF_ATTRIBUTION');
++const _attributionBytes = int.fromEnvironment(
++  'IANVS_PERF_ATTRIBUTION_BYTES',
++  defaultValue: 1048576,
++);
+ 
+ /// Host wiring only. The existing main, editor tree and file services remain.
+ class LocalPerformanceHost {
+@@ -417,7 +421,7 @@ class LocalPerformanceRun {
+         'monoFontFamilyFallback': theme.monoFontFamilyFallback,
+       };
+       for (final bytes in localCorpusSizes) {
+-        if (_attribution && bytes != 1048576) continue;
++        if (_attribution && bytes != _attributionBytes) continue;
+         size = bytes;
+         source = localCorpus(bytes);
+         filePath = await storage!.fixture(bytes, source);
+diff --git a/tool/local_performance.py b/tool/local_performance.py
+index 86bfd48..29f55fb 100644
+--- a/tool/local_performance.py
++++ b/tool/local_performance.py
+@@ -65,6 +65,7 @@ def build(args):
+                f"--dart-define=IANVS_PERF_INPUTS={frozen['inputsDigest']}"]
+         if args.attribution:
+             cmd.append('--dart-define=IANVS_PERF_ATTRIBUTION=true')
++            cmd.append(f'--dart-define=IANVS_PERF_ATTRIBUTION_BYTES={args.attribution_bytes}')
+         print(f'Building {entry} main ({args.mode})', flush=True)
+         with (out / f'{entry}.log').open('w') as log:
+             code = subprocess.run(cmd, cwd=ROOT / entry, env=env, stdout=log, stderr=subprocess.STDOUT).returncode
+@@ -130,6 +131,7 @@ def main():
+     p.add_argument('--mode', choices=['profile', 'release'], default='profile')
+     p.add_argument('--tag', required=True)
+     p.add_argument('--attribution', action='store_true', help='CPU-only filtered run, rejected by acceptance validator')
++    p.add_argument('--attribution-bytes', type=int, choices=[10240, 102400, 1048576], default=1048576)
+     p = sub.add_parser('collect')
+     p.add_argument('--freeze', type=Path, required=True)
+     p.add_argument('--source', type=Path, required=True)
