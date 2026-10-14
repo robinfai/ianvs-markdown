@@ -5,8 +5,8 @@
     "app/lib/main.dart"
   ],
   "buildMode": "release",
-  "physicalKeyboard": "pending user result",
-  "voiceOver": "pending user result",
+  "physicalKeyboard": "passed: user reported both entries IME and Cmd+S continued typing normal on 2026-10-14",
+  "voiceOver": "passed: user reported both entries normal on 2026-10-14",
   "cua": {
     "example": [
       "Source paste Chinese/emoji/CRLF displayed correctly",
@@ -21,10 +21,12 @@
     "shortcutObservation": {
       "candidate": "CUA super+s saved then selected full document; next t replaced it; undo restored saved state before exit",
       "textKit2Control": "same Dart source, only app makeFirstResponder compatibility override removed; CUA super+s also selected full document",
-      "interpretation": "not isolated to TextKit 1; no physical keyboard conclusion; user verification requested"
+      "interpretation": "CUA-only observation reproduced in both engines. Current user physical keyboard check reports normal continued typing; do not equate tool keyboard events with physical input."
     },
     "pasteSelection": "CUA paste retained selection; Right explicitly collapsed before typing; super+End did not collapse it"
   },
   "originalSha256": "f82e3372fd4a1cfe73b320c00e3ba5e3a23212523a39297e550ae1948aba0f62",
-  "firstSavedSha256": "efdeeac8f4ba711afcbf5dfc6e6506cba57a4615fc9da698df7bb9927a8004cb"
+  "firstSavedSha256": "efdeeac8f4ba711afcbf5dfc6e6506cba57a4615fc9da698df7bb9927a8004cb",
+  "manualScope": "Current candidate Release; requested Source/Live confirmation/cancellation, commands during composition, Cmd+S then continued typing, VoiceOver field reading/navigation/editing",
+  "manualEvidence": "人工复核已完成，两入口的 IME、⌘S 续输和 VoiceOver 均正常。"
 }
