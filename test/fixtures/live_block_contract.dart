@@ -41,6 +41,30 @@ Future<void> exerciseLiveBlockIdentity(
     expect(controller.isDirty, isTrue);
     expect(tester.element(untouched), same(old));
     expect(tester.getSemantics(untouched).id, semantics);
+    // Retained callbacks must address the new offset, not the old block range.
+    final last = find.byWidgetPredicate(
+      (w) => w is IanvsMarkdown && w.data == 'Last paragraph.',
+    );
+    await tester.tap(last);
+    await tester.pumpAndSettle();
+    final lastField = tester.widget<EditableText>(
+      find.byWidgetPredicate(
+        (w) => w is EditableText && !w.readOnly && w.focusNode.hasFocus,
+      ),
+    );
+    final lastText = '${lastField.controller.text}尾😀';
+    tester.testTextInput.updateEditingValue(
+      TextEditingValue(
+        text: lastText,
+        selection: TextSelection.collapsed(offset: lastText.length),
+      ),
+    );
+    await tester.pumpAndSettle();
+    controller.commitHistoryGroup();
+    expect(controller.text, '${source.replaceRange(2, 2, 'a')}尾😀');
+    controller.undo();
+    await tester.pumpAndSettle();
+    expect(controller.text, source.replaceRange(2, 2, 'a'));
     controller.undo();
     await tester.pumpAndSettle();
     expect(controller.text, source);

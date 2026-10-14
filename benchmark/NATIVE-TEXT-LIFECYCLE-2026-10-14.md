@@ -58,8 +58,8 @@ SDK 本地源码中，`AccessibilityBridgeMac::VALUE_CHANGED` 可调用 `startEd
    未通过则继续保留 R4-03 进行中。
 4. 修改原生输入路径后，在 Release 重做编辑/保存/重开及新的人工 IME/VoiceOver 复核。
 
-候选 TextKit 1 兼容路径目前尚未应用：自动审批认为它与此前诊断保留 TextKit 2
-的约束冲突，已提交具体实验方案等待用户授权。Apple 说明访问 NSLayoutManager API
+TextKit 1 兼容路径已获用户明确授权进行受控实验：此前自动审批认为它与只读诊断
+保留 TextKit 2 的约束冲突，未执行被拒命令；用户授权后才应用。Apple 说明访问 NSLayoutManager API
 会使 NSTextView 进入 TextKit 1 兼容模式；这是一次有行为风险的引擎选择，不是只读观察。
 参考 [Apple TextKit](https://developer.apple.com/documentation/appkit/textkit) 与
 [WWDC22 兼容模式说明](https://developer.apple.com/videos/play/wwdc2022/10090/)。
@@ -87,3 +87,28 @@ Controller 替换会清空身份映射。此策略不承诺任意重排/多处�
 Controller 替换隔离。核心 975 项通过；两个实际 main 的输入/撤销/dirty 与语义
 身份回归通过，app 另外 120 项焦点、标题和目录布局检查通过。
 以上只是行为结果，小文档是否回到原观察线仍须正式测量。
+
+## TextKit 1 受控实验（尚待正式配对和人工复核）
+
+用户明确允许“受控实验，验证后再决定保留”。两个实际 main 的 1 MiB 归因各完整
+125 条。example Read→Live 中位数 1283.526 ms，最大 1297.484 ms；此前 TextKit 2
+为 2587.573 / 2644.772 ms。原生全选写入从约 2.14 秒降至约 1.14 秒，最终仍为
+1,025,282 UTF-16 单元、选区 `{2, 0}`、零宽隐藏视图；snapshot 确认 TextKit 2 已关闭。
+app 1 MiB 中位数 sourceType 165.950、sourcePaste 265.529、liveType 170.128、
+livePaste 266.537、Read→Live 89.383 ms，和原引擎诊断接近。跟踪有桥接成本，均非验收成绩。
+
+随后将条件收窄至 macOS 主版本 27、精确 `FlutterTextInputPlugin` 类、本窗口、视图宽 0、
+没有 marked text 且仍为 TextKit 2。仅访问公开兼容 API，不更换字段、不截断字符串、不屏蔽
+语义事件；`super.makeFirstResponder` 仍调用一次。其他 macOS 版本与普通 NSTextView 不变。
+这是两个宿主的本地兼容措施，不进入 Flutter Markdown 的公共 API，也不承诺其他 SDK。
+
+收窄后 app 10 KiB 归因 125 条完整：Live type 中位数 35.644 / 最大 41.210 ms，
+Live paste 36.233 / 41.680 ms；仍有输入法激活成本，不能称为全面解决历史漂移。
+此前仅组件身份修复的 TextKit 2 对照中位数分别为 35.573 / 37.507 ms。
+一轮因启动时失去前台而 0 样本失效，单独归档，不拼接。
+
+正式候选移除全部方法包装、原生事件跟踪及临时语料开关。是否保留原生兼容路径，要依据
+无跟踪两轮结果、新的 Release 编辑/保存/重开及人工 IME/VoiceOver 结果；本节不提前验收。
+完整本地门禁在组件修复后通过：核心 975、example 35、app 301（另 1 跳过）、API 8、
+Python 27、原生与可选集成；两个 main Debug/Release 成功。发布快照 189 文件、699 KB、
+零警告，快照 example 与包外 smoke 均通过。原生实验后的构建与验收另行追加。

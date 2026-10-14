@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "protocol": "r4-attribution-only-v1",
+  "sourceRevision": "d30d62b08e8989b55ad530f7945e059d36a3d43a",
+  "inputsDigest": "09b52674c35c6a6d5ff5d115cb6c517c966896d874c061371d6d4deabab6840a",
+  "entry": "app",
+  "main": "app/lib/main.dart",
+  "buildMode": "profile",
+  "inputKind": "synthetic-framework; paste excludes OS clipboard; no physical IME/CUA latency",
+  "corpusVersion": 1,
+  "warmup": 5,
+  "samples": 20,
+  "budget": "default",
+  "startedAtUtc": "2026-10-14T08:40:39.315163Z",
+  "finishedAtUtc": "2026-10-14T08:40:39.899091Z",
+  "initialWindow": {
+    "height": 780.0,
+    "scale": 2.0,
+    "y": 228.0,
+    "visible": true,
+    "onActiveSpace": true,
+    "active": true,
+    "occlusionVisible": true,
+    "miniaturized": false,
+    "generation": 0,
+    "x": 264.0,
+    "screen": 1,
+    "appHidden": false,
+    "width": 1200.0
+  },
+  "display": {
+    "physicalWidth": 2400.0,
+    "physicalHeight": 1560.0,
+    "devicePixelRatio": 2.0,
+    "brightness": "light",
+    "textScale14": 14.0,
+    "monoFontFamily": "SF Mono",
+    "monoFontFamilyFallback": [
+      "Menlo",
+      "Monaco",
+      "monospace"
+    ]
+  },
+  "system": {
+    "dart": "3.12.2 (stable) (Tue Jun 9 01:11:39 2026 -0700) on \"macos_arm64\"",
+    "os": "Version 27.0.1 (Build 26A434)",
+    "pid": 64692,
+    "executable": "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/app/build/macos/Build/Products/Profile/Linefold.app/Contents/MacOS/Linefold"
+  },
+  "complete": false,
+  "errors": [
+    "Bad state: Window changed: {height: 780.0, scale: 2.0, y: 228.0, visible: true, onActiveSpace: true, active: false, occlusionVisible: true, miniaturized: false, generation: 1, x: 264.0, screen: 1, width: 1200.0, appHidden: false}"
+  ],
+  "cases": [],
+  "records": []
+}
