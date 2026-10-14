@@ -1,0 +1,9 @@
+{
+  "reason": "Stopped by agent after confirmed sourcePaste regression; not an acceptance run",
+  "complete": false,
+  "resultCheckpointRecords": 50,
+  "traceCompletedRecords": 59,
+  "diagnosticSourcePasteMedianMs": 1672.7905,
+  "originalDiagnosticSourcePasteMedianMs": 200.003,
+  "decision": "reverted; no text-container geometry change retained"
+}
