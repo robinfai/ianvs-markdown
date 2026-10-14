@@ -65,6 +65,23 @@ class MainFlutterWindow: NSWindow {
   private let fileAssociation = MarkdownFileAssociation()
   private var securityScopedURLs: [String: URL] = [:]
 
+  // macOS 27: TextKit 2 lays out a full-document selection when Flutter's
+  // hidden accessibility field starts editing. Use AppKit's compatibility
+  // path only for this engine view, before activation and outside composition.
+  // The full string, selection and semantics stay intact. Remove/revalidate
+  // when changing macOS or Flutter; see benchmark/NATIVE-TEXT-LIFECYCLE-2026-10-14.md.
+  override func makeFirstResponder(_ responder: NSResponder?) -> Bool {
+    if #available(macOS 12.0, *),
+       ProcessInfo.processInfo.operatingSystemVersion.majorVersion == 27,
+       let text = responder as? NSTextView,
+       NSStringFromClass(type(of: text)) == "FlutterTextInputPlugin",
+       text.window === self, text.frame.width == 0,
+       !text.hasMarkedText(), text.textLayoutManager != nil {
+      _ = text.layoutManager
+    }
+    return super.makeFirstResponder(responder)
+  }
+
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
     let windowFrame = self.frame

@@ -16,6 +16,7 @@ import 'package:ianvs_markdown/src/html_text_input.dart';
 import 'package:ianvs_markdown/src/html_time_input.dart';
 import 'package:ianvs_markdown/src/html_temporal_input.dart';
 import 'package:ianvs_markdown/src/list_guide.dart';
+import 'fixtures/live_block_finder.dart';
 
 void main() {
   Widget app(
@@ -229,9 +230,7 @@ void main() {
     await tester.pumpWidget(app(controller));
     await tester.pumpAndSettle();
 
-    final firstBlock = find.byKey(
-      const ValueKey('ianvs-markdown-block-0-unorderedList'),
-    );
+    final firstBlock = findLiveBlock(0, 'unorderedList');
     expect(firstBlock, findsOneWidget);
     expect(tester.getSize(firstBlock).height, lessThanOrEqualTo(36));
 
@@ -6197,9 +6196,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final start = source.indexOf('- - -');
-    final renderedRule = find.byKey(
-      ValueKey('ianvs-markdown-block-$start-thematicBreak'),
-    );
+    final renderedRule = findLiveBlock(start, 'thematicBreak');
     final ruleRect = tester.getRect(renderedRule);
     await tester.tapAt(Offset(ruleRect.left + 16, ruleRect.center.dy));
     await tester.pump();
@@ -6249,9 +6246,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final start = source.indexOf(marker);
-      await tester.tap(
-        find.byKey(ValueKey('ianvs-markdown-block-$start-thematicBreak')),
-      );
+      await tester.tap(findLiveBlock(start, 'thematicBreak'));
       await tester.pump();
 
       expect(
@@ -6534,9 +6529,7 @@ Omega body.
       await tester.pumpWidget(app(controller));
       await tester.pumpAndSettle();
 
-      final frontMatterBlock = find.byKey(
-        const ValueKey('ianvs-markdown-block-0-frontMatter'),
-      );
+      final frontMatterBlock = findLiveBlock(0, 'frontMatter');
       expect(frontMatterBlock, findsOneWidget);
       expect(find.text('Body'), findsOneWidget);
       expect(find.text('笔记属性'), findsNothing);

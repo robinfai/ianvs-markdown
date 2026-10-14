@@ -8,6 +8,7 @@ import 'package:ianvs_markdown/ianvs_markdown.dart';
 
 // Exercise the actual host typography in the package that owns its theme.
 import 'package:linefold/src/desktop_theme.dart';
+import '../../test/fixtures/live_block_finder.dart';
 
 RenderEditable _editableWithin(WidgetTester tester, Finder finder) {
   RenderEditable? editable;
@@ -264,9 +265,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        final block = find.byKey(
-          const ValueKey('ianvs-markdown-block-0-fencedCode'),
-        );
+        final block = findLiveBlock(0, 'fencedCode');
         final height = tester.getSize(block).height;
         final followingTop = tester.getTopLeft(find.text('After')).dy;
         await tester.tap(find.byType(IanvsMarkdownCodeBlock));
@@ -362,11 +361,7 @@ void main() {
               source,
               splitListItems: true,
             ).firstWhere((block) => block.source.contains('Alpha'));
-            final blockFinder = find.byKey(
-              ValueKey(
-                'ianvs-markdown-block-${block.start}-${block.type.name}',
-              ),
-            );
+            final blockFinder = findLiveBlock(block.start, block.type.name);
             final renderedFinder = find
                 .descendant(
                   of: blockFinder,

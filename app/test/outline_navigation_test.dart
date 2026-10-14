@@ -4,6 +4,7 @@ import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:linefold/src/desktop_theme.dart';
 import 'package:linefold/src/models/document_session.dart';
 import 'package:linefold/src/widgets/floating_outline.dart';
+import '../../test/fixtures/live_block_finder.dart';
 
 void main() {
   testWidgets('desktop outline crosses a very tall code block in Live', (
@@ -222,9 +223,7 @@ void _expectTargetVisible(
   final Rect target;
   switch (mode) {
     case IanvsMarkdownEditorMode.livePreview:
-      final heading = find.byKey(
-        ValueKey('ianvs-markdown-block-$offset-heading'),
-      );
+      final heading = findLiveBlock(offset, 'heading');
       expect(heading, findsOneWidget);
       target = tester.getRect(heading);
     case IanvsMarkdownEditorMode.source:

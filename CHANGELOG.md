@@ -1,5 +1,18 @@
 ## Unreleased
 
+- Use the public TextKit 1 compatibility path for the two macOS hosts' hidden
+  Flutter text-input view on macOS 27, before activation and outside composition.
+  Keep full text, selection and accessibility intact. Two paired Profile runs
+  bring the example's 1 MiB Read-to-Live P95 to 1.25–1.35 seconds; all five
+  optimization targets pass, but four small-document observation cases remain
+  open. This host workaround needs revalidation on Flutter/macOS upgrades; see
+  the [measurement and retention decision](benchmark/NATIVE-TEXT-LIFECYCLE-2026-10-14.md).
+
+- Keep unchanged Live blocks mounted when preceding edits shift their source
+  offsets. Preserve their rendered elements and semantics across insertion and
+  undo, while replacing controllers starts a new block lifecycle. Source ranges
+  and callbacks still update synchronously; no text or history is cached away.
+
 - Reuse unchanged heading labels and same-text derived data in the desktop app,
   and compute word/Unicode scalar counts in one pass. Outline offsets and status
   remain synchronous with edits; source, history, budgets and public APIs stay

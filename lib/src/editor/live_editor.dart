@@ -38,6 +38,7 @@ import '../theme.dart';
 import '../wiki_embed.dart';
 import '../wiki_link_reference.dart';
 import 'editor_controller.dart';
+import 'block_identity.dart';
 import 'editor_models.dart';
 import 'editor_shortcuts.dart';
 import 'editor_toolbar.dart';
@@ -189,7 +190,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
 
   late FocusNode _focusNode;
   late ScrollController _scrollController;
-  late List<IanvsMarkdownBlock> _blocks;
+  List<IanvsMarkdownBlock> _blocks = const [];
   late List<TextRange> _crossParagraphHighlightLiteralRuns;
   late List<IanvsMarkdownLivePreviewFootnoteReference>
   _livePreviewFootnoteReferences;
@@ -276,6 +277,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       oldWidget.controller.headingNavigation.removeListener(
         _handleHeadingNavigation,
       );
+      _blocks = const [];
+      _blockKeys.clear();
+      _renderedBlockTapKeys.clear();
       _lastText = widget.controller.text;
       _lastMode = widget.controller.mode;
       _refreshBlocks(_lastText);
@@ -513,6 +517,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   }
 
   void _refreshBlocks(String source) {
+    final previousBlocks = _blocks;
     IanvsMarkdownEditorDiagnostics.recordDocumentParse();
     final decision = IanvsMarkdownEditorDiagnostics.measure(
       'live.preflight',
@@ -567,13 +572,17 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             budgetExceeded: decision.budgetExceeded,
           );
     _headingFoldController.retainIdentities(_headingFoldModel.identities);
-    final starts = _blocks.map((block) => block.start).toSet();
-    _blockKeys.removeWhere((start, _) => !starts.contains(start));
-    _renderedBlockTapKeys.removeWhere((start, _) => !starts.contains(start));
-    for (final block in _blocks) {
-      _blockKeys.putIfAbsent(block.start, GlobalKey.new);
-      _renderedBlockTapKeys.putIfAbsent(block.start, GlobalKey.new);
+    final origins = markdownBlockOrigins(previousBlocks, _blocks);
+    void retainKeys(Map<int, GlobalKey> keys) {
+      final previous = Map<int, GlobalKey>.of(keys);
+      keys.clear();
+      for (final block in _blocks) {
+        keys[block.start] = previous[origins[block.start]] ?? GlobalKey();
+      }
     }
+
+    retainKeys(_blockKeys);
+    retainKeys(_renderedBlockTapKeys);
     final headings = _navigationHeadings;
     if (headings.isEmpty) {
       _activeHeadingStart = null;
@@ -2547,6 +2556,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   }
 
   Widget _buildLiveMode(IanvsMarkdownThemeData colors) {
+    final blockIndices = <Key, int>{
+      for (var i = 0; i < _blocks.length; i++) _blockKeys[_blocks[i].start]!: i,
+    };
     final hiddenBlockIndices = widget.enableHeadingFolding
         ? _headingFoldModel.hiddenBlockIndices(_headingFoldController)
         : const <int>{};
@@ -2575,6 +2587,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
               indent: listIndentStep,
               textDirection: Directionality.of(context),
               child: SliverList.builder(
+                findChildIndexCallback: (key) => blockIndices[key],
                 itemCount: _blocks.length,
                 itemBuilder: (context, index) {
                   final block = _blocks[index];
@@ -2615,8 +2628,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
                   );
                   final activeGapLine =
                       _activeBlockStart == block.start && _activeGapLine;
-                  return KeyedSubtree(
+                  return MarkdownBlockRegion(
                     key: _blockKeys[block.start],
+                    block: block,
                     child: Align(
                       alignment: Alignment.topLeft,
                       child: ConstrainedBox(
@@ -2628,9 +2642,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
                             start: listNestingLevel * listIndentStep,
                           ),
                           child: Column(
-                            key: ValueKey(
-                              'ianvs-markdown-block-${block.start}-${block.type.name}',
-                            ),
+                            key: ValueKey(block.type),
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               if (_activeBlockStart == block.start &&

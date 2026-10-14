@@ -9,6 +9,7 @@ import 'package:linefold/src/widgets/editor_shell.dart';
 import 'package:linefold/src/widgets/middle_ellipsis_text.dart';
 
 import 'support/fakes.dart';
+import '../../test/fixtures/live_block_finder.dart';
 
 void main() {
   late MemoryMarkdownFileService files;
@@ -110,9 +111,7 @@ void main() {
             final Finder column;
             switch (mode) {
               case IanvsMarkdownEditorMode.livePreview:
-                column = find.byKey(
-                  const ValueKey('ianvs-markdown-block-13-paragraph'),
-                );
+                column = findLiveBlock(13, 'paragraph');
               case IanvsMarkdownEditorMode.preview:
                 column = find
                     .descendant(

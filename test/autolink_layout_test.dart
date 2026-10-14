@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
+import 'fixtures/live_block_finder.dart';
 
 RenderEditable _editableWithin(WidgetTester tester, Finder finder) {
   RenderEditable? editable;
@@ -50,9 +51,7 @@ void main() {
             ),
           );
           await tester.pumpAndSettle();
-          final block = find.byKey(
-            const ValueKey('ianvs-markdown-block-8-orderedList'),
-          );
+          final block = findLiveBlock(8, 'orderedList');
           final blockRect = tester.getRect(block);
           final rendered = _editableWithin(
             tester,

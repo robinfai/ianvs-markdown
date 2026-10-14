@@ -6,6 +6,7 @@ import 'package:linefold/src/app.dart';
 import 'package:linefold/src/controllers/workspace_controller.dart';
 
 import '../../test/fixtures/input_focus_contract.dart';
+import '../../test/fixtures/live_block_contract.dart';
 import 'support/fakes.dart';
 
 void main() {
@@ -57,6 +58,7 @@ void main() {
       });
       expect(await workspace.saveActive(), isTrue);
       expect(files.files['/notes/input.md'], 'seed 你好嘛');
+      await exerciseLiveBlockIdentity(tester, document.controller);
       await tester.pumpWidget(const SizedBox());
       await tester.pump(const Duration(milliseconds: 600));
     },
