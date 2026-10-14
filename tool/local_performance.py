@@ -53,7 +53,7 @@ def build(args):
     inputs = sources()
     frozen = {'schemaVersion': 1, 'sourceRevision': command(['git', 'rev-parse', 'HEAD']),
               'inputs': inputs, 'inputsDigest': digest(inputs), 'sdk': sdk_info(args.flutter),
-              'mode': args.mode, 'builds': {}, 'buildStartedUtc': datetime.now(timezone.utc).isoformat(),
+              'mode': args.mode, 'attributionOnly': args.attribution, 'builds': {}, 'buildStartedUtc': datetime.now(timezone.utc).isoformat(),
               'machine': {'arch': platform.machine(), 'macos': command(['sw_vers']),
                           'xcode': command(['xcodebuild', '-version'])}}
     env = dict(os.environ, CARGO_PROFILE_RELEASE_STRIP='none', FLUTTER_XCODE_ARCHS=platform.machine())
@@ -63,6 +63,8 @@ def build(args):
                '--dart-define=IANVS_LOCAL_PERFORMANCE=true',
                f"--dart-define=IANVS_PERF_REVISION={frozen['sourceRevision']}",
                f"--dart-define=IANVS_PERF_INPUTS={frozen['inputsDigest']}"]
+        if args.attribution:
+            cmd.append('--dart-define=IANVS_PERF_ATTRIBUTION=true')
         print(f'Building {entry} main ({args.mode})', flush=True)
         with (out / f'{entry}.log').open('w') as log:
             code = subprocess.run(cmd, cwd=ROOT / entry, env=env, stdout=log, stderr=subprocess.STDOUT).returncode
@@ -127,6 +129,7 @@ def main():
     p.add_argument('--flutter', required=True)
     p.add_argument('--mode', choices=['profile', 'release'], default='profile')
     p.add_argument('--tag', required=True)
+    p.add_argument('--attribution', action='store_true', help='CPU-only filtered run, rejected by acceptance validator')
     p = sub.add_parser('collect')
     p.add_argument('--freeze', type=Path, required=True)
     p.add_argument('--source', type=Path, required=True)

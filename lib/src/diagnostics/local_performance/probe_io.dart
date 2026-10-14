@@ -23,6 +23,9 @@ class ProbeStorage {
         '${const JsonEncoder.withIndent('  ').convert(value)}\n',
         flush: true,
       );
+  Future<void> diagnostic(Map<String, Object?> value) => File(
+    '$path/diagnostic.json',
+  ).writeAsString(jsonEncode(value), flush: true);
   Future<String> read(String path) => File(path).readAsString();
 }
 
