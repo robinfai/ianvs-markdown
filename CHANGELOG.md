@@ -1,5 +1,10 @@
 ## Unreleased
 
+- Keep unchanged Live blocks mounted when preceding edits shift their source
+  offsets. Preserve their rendered elements and semantics across insertion and
+  undo, while replacing controllers starts a new block lifecycle. Source ranges
+  and callbacks still update synchronously; no text or history is cached away.
+
 - Reuse unchanged heading labels and same-text derived data in the desktop app,
   and compute word/Unicode scalar counts in one pass. Outline offsets and status
   remain synchronous with edits; source, history, budgets and public APIs stay

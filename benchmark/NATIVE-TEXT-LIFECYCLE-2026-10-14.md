@@ -66,3 +66,24 @@ SDK 本地源码中，`AccessibilityBridgeMac::VALUE_CHANGED` 可调用 `startEd
 
 证据目录：[2026-10-14-native-text-lifecycle](results/2026-10-14-native-text-lifecycle/)。
 所有有效、无效归因轮与实验均保留；正式两轮结果将在完成后追加。
+
+## 小文档的新增证据与组件修复
+
+app 10 KiB 完整原生归因轮 125 条已保留。第一条正式阶段 Live type 中，字段
+进入 `startEditing` 时长度 0、尚无 currentEditor，但输入插件已持有 48 字符。
+约 24.2 ms 进入、37.2 ms 才开始写入 49 字符；写入自身约 0.67 ms。
+原生 sample 在 `selectText:` 内观察到 `NSTextInputContext.activate →
+MyActivateTSMDocument → IMKInputSessionActivate → invocationAwaitXPCReply`，
+当时线程输入法为 `com.apple.inputmethod.SCIM`。这解释了本轮等待所处路径，
+但旧 R4-02 没有冻结输入法 ID，不能追认其输入法、改变历史线或宣称已解释全部历史漂移。
+
+独立的组件回归证明：修改前部标题会重建未改变的后续 Markdown 元素和语义节点。
+原因是块键和 Column 键使用绝对源码偏移，偏移变化被误当成新的 Widget 身份。
+修复通过未改变的前后连续块复用键，并向 Sliver 提供新的索引映射；源码位置作为
+内部区域元数据单独更新。修改区原有位置只有在身份未被移动时才可复用；文档
+Controller 替换会清空身份映射。此策略不承诺任意重排/多处修改的全量 diff。
+
+先前失败的元素身份回归现在通过，并覆盖语义 ID、重复段落的插入/删除/撤销、
+Controller 替换隔离。核心 975 项通过；两个实际 main 的输入/撤销/dirty 与语义
+身份回归通过，app 另外 120 项焦点、标题和目录布局检查通过。
+以上只是行为结果，小文档是否回到原观察线仍须正式测量。

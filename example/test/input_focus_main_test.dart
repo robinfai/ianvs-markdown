@@ -5,6 +5,7 @@ import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:ianvs_markdown_example/main.dart';
 
 import '../../test/fixtures/input_focus_contract.dart';
+import '../../test/fixtures/live_block_contract.dart';
 
 void main() {
   testWidgets(
@@ -29,6 +30,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(controller.mode, mode);
       });
+      await exerciseLiveBlockIdentity(tester, controller);
       await tester.pumpWidget(const SizedBox());
       await tester.pump(const Duration(milliseconds: 600));
     },
