@@ -51,10 +51,13 @@ R4-02 已在两个实际 Profile main 各完成两轮有效基线：2,400 正式
 六次无效轮次单独保留；动作、原始分布、观察线及 R4-03 目标见
 [双入口性能报告](benchmark/MAIN-ENTRY-PERFORMANCE-2026-10-13.md)。
 
-R4-03 上一批已交付 app 大纲/统计优化，四项 1 MiB 输入两轮改善约 25%–31%，
-完整回归与默认四个构建通过。example Read→Live 仍约 2.66 秒，另有两项小文档
-Live 场景超原观察线（同环境旧实现控制轮也复现），因此仍进行中。详见
-[成本与配对报告](benchmark/LARGE-DOCUMENT-COSTS-2026-10-14.md)。
+R4-03 已交付 app 大纲/统计优化、Live 块身份修复和两宿主受限的 macOS 27 TextKit 1
+兼容路径。最新正式四轮中，example 1 MiB Read→Live P95 为 1247.639 / 1352.428 ms，
+五个预定优化目标全部通过；本轮用户确认两入口 IME、⌘S 续输及 VoiceOver 正常。
+60 项中 56 项通过：app 两项 10 KiB Live、example 10 KiB Source→Read、app 10 KiB
+save 仍有超原观察线的轮次，保留 `passed=false`，R4-03 继续进行中。下一批先归因新增
+帧构建/保存回调长尾，再继续小文档输入法激活。详见 [续批报告](benchmark/NATIVE-TEXT-LIFECYCLE-2026-10-14.md)；
+[上一批数据](benchmark/LARGE-DOCUMENT-COSTS-2026-10-14.md) 保留为历史对照。
 
 P1 四项优先处理高频使用及测量，P2 三项随后增加能力和验证。
 下表是 R4 状态的唯一来源；细分步骤和具体证据在 [执行计划](doc/R4_COMPONENT_ROADMAP.md)。
@@ -518,3 +521,5 @@ make benchmark LABEL=after
 | 2026-10-14 | R4-03 大文档成本与两轮配对 | `1ee8342` 增加同 main CPU 归因；`49f6eaa` 冻结四项 app 输入目标；`a521710` 复用标题解析和统计；`5f7da67` / `6a57e55` 撤回无效语义包装。最终候选恢复为 `6a57e55` 的完整运行输入哈希 | 两 main 各两轮有效，共 2,400 正式 / 600 预热；app 四项 1 MiB 目标通过，改善约 25%–31%。example 约 2.66 秒未达标，app 两项 10 KiB Live 超历史观察线，旧实现完整控制轮亦复现；保留 `passed=false`。核心 972、example 35、app 301（另 1 跳过）、默认四构建、原生和包快照通过，Release 文件字节/撤销/重开已验。总计仍 18 完成、1 进行中、4 待开始，剩余 5；下一批继续原生语义/文本字段生命周期归因，外部产品留到最终分发。见 [报告](benchmark/LARGE-DOCUMENT-COSTS-2026-10-14.md)，最终门禁以 PR #25 最新头为准 |
 
 | 2026-10-14 | R4-03 原生生命周期与小文档续批 | `6cecabe` 原生顺序归因；`d30d62b` 复用未变化 Live 块身份；`373d206` 用户授权的 TextKit 1 受控候选 | example 1 MiB Read→Live 诊断中位数约 2.59→1.28 秒，尚非正式成绩。核心 975、example 35、app 301（另 1 跳过）、包快照与两入口默认四构建通过；Release 文件字节/菜单保存续输已复核。CUA ⌘S 全选在 TextKit 2 控制版也复现，等待本轮物理 IME/快捷键/VoiceOver 结果，再跑无跟踪四个完整进程。候选是否保留尚未决定，PR #26 保持草稿，R4-03 仍进行中、剩余 5 项。见 [续批报告](benchmark/NATIVE-TEXT-LIFECYCLE-2026-10-14.md) |
+
+| 2026-10-14 | R4-03 正式配对与兼容保留决定 | `6a1c102` 归档两 main 各两轮、2,400 正式 / 600 预热及一次 324 条后遮挡中断的无效轮；本轮用户确认 IME、⌘S 续输、VoiceOver 正常 | 5/5 优化目标通过，example 1 MiB Read→Live P95 1247.639 / 1352.428 ms；保留受限 TextKit 1 与块身份修复。全 60 项中 56 通过，app 两项小文档 Live、example 小文档 Source→Read、app 小文档保存仍超原线，未改变阈值，R4-03 继续进行中、剩余 5。下一批执行顺序及复算见 [报告](benchmark/NATIVE-TEXT-LIFECYCLE-2026-10-14.md)；最终 PR #26 头门禁通过后合入，外部宿主仍留最终分发 |
