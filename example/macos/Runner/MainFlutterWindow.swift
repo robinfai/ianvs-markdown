@@ -84,6 +84,25 @@ class MainFlutterWindow: NSWindow {
       binaryMessenger: flutterViewController.engine.binaryMessenger
     )
     benchmarkChannel?.setMethodCallHandler { [weak self] call, result in
+      if call.method == "inputSnapshot", let self = self {
+        var info: [String: Any] = ["responder": String(describing: type(of: self.firstResponder))]
+        if let text = self.firstResponder as? NSTextView {
+          info["class"] = NSStringFromClass(type(of: text))
+          info["textLength"] = text.string.utf16.count
+          info["selectionLocation"] = text.selectedRange().location
+          info["selectionLength"] = text.selectedRange().length
+          info["fieldEditor"] = text.isFieldEditor
+          info["width"] = text.frame.width
+          info["height"] = text.frame.height
+          info["containerWidth"] = text.textContainer?.containerSize.width ?? -1
+          info["containerHeight"] = text.textContainer?.containerSize.height ?? -1
+          if #available(macOS 12.0, *) {
+            info["textKit2"] = text.textLayoutManager != nil
+          }
+        }
+        result(info)
+        return
+      }
       guard call.method == "snapshot", let self = self else {
         result(FlutterMethodNotImplemented)
         return

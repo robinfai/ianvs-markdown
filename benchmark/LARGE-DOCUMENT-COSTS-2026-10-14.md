@@ -38,3 +38,21 @@ example 第一次 profiler 初始关闭，随后手动开启并保留原生 samp
 候选方向：保留当前大纲块识别与完整标题，复用未变化标题的解析结果；状态栏用
 一次 UTF-16 遍历保持当前空白分词和 Unicode scalar 计数语义。选区/composing
 变化复用同一文本结果。所有结果必须在同一帧正确显示，不靠延迟侧栏工作换成绩。
+
+## 第一组候选（待主入口性能验证）
+
+进一步的原生对照记录了两个 main 最终相同的选区 2、完整 1 MiB 文本、TextKit 2
+和输入插件状态，差异发生在语义刷新期间，而非最终文本长度。app 原有 route 内
+`Semantics(container: true, explicitChildNodes: true)`；组件本身此前借用了宿主 route
+节点。新增语义范围回归在原实现失败（scopesRoute=true），独立组件范围后通过，
+并检查 Source→Read→Live 的语义节点稳定与完整正文值仍然存在。
+
+候选一在 LiveEditor 外层建立自己的语义范围；没有移除或截断编辑字段的语义值，
+没有更改焦点/composing 时序。它是否能减少 macOS 桥接耗时仍需真实 Profile 验证。
+核心 Live 编辑器与范围回归 390 项通过。
+
+候选二将 app 大纲解析结果和状态栏统计保留在 DocumentSession 内，文本不变时
+复用，文本变化仍同步更新。大纲继续采用原组件块识别，只缓存当前标题来源的
+inline 解析；过期标题不会累积成历史缓存。统计一次扫描保持原 `\S+` 分词及
+`String.runes.length` 口径，包括 CRLF、组合字符、emoji 和孤立 surrogate。
+4 项派生数据回归及大纲/大文档/输入主入口共 14 项通过。

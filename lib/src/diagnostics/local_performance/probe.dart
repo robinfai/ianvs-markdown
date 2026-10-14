@@ -253,6 +253,11 @@ class LocalPerformanceRun {
       expected = source.replaceRange(offset, offset, input);
       nextInput = local.replaced(local.selection, input);
     }
+    final nativeBefore = _attribution
+        ? await LocalWindowEnvironment.channel.invokeMapMethod<String, Object?>(
+            'inputSnapshot',
+          )
+        : null;
     final first = stamp;
     final firstNumber = PlatformDispatcher.instance.frameData.frameNumber;
     final timelineStart = _attribution ? developer.Timeline.now : null;
@@ -325,9 +330,16 @@ class LocalPerformanceRun {
       throw StateError('Save bytes/dirty mismatch');
     }
     final after = await environment.check();
+    final nativeAfter = _attribution
+        ? await LocalWindowEnvironment.channel.invokeMapMethod<String, Object?>(
+            'inputSnapshot',
+          )
+        : null;
     final record = <String, Object?>{
       ...identity,
       if (_attribution) ...{
+        'nativeBefore': nativeBefore,
+        'nativeAfter': nativeAfter,
         'timelineStartMicros': timelineStart,
         'timelineEndMicros': timelineEnd,
       },
