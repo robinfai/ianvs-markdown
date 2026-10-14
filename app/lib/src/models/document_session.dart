@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 
+import 'document_analysis.dart';
+
 class DocumentSession {
   DocumentSession({
     required this.id,
@@ -53,6 +55,7 @@ class DocumentSession {
   String lineEnding;
   bool hasExternalChanges = false;
   final IanvsMarkdownController controller;
+  final DocumentAnalysis analysis = DocumentAnalysis();
   final ScrollController scrollController = ScrollController();
 
   Map<String, Object?> toJson() => <String, Object?>{

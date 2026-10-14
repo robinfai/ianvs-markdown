@@ -526,7 +526,7 @@ class _DocumentStatusBar extends StatelessWidget {
     return ValueListenableBuilder<TextEditingValue>(
       valueListenable: document.controller,
       builder: (context, value, _) {
-        final words = RegExp(r'\S+').allMatches(value.text).length;
+        final statistics = document.analysis.statistics(value.text);
         return Container(
           width: double.infinity,
           constraints: const BoxConstraints(minHeight: 25),
@@ -546,8 +546,8 @@ class _DocumentStatusBar extends StatelessWidget {
                 Wrap(
                   spacing: 14,
                   children: [
-                    Text('$words words'),
-                    Text('${value.text.runes.length} characters'),
+                    Text('${statistics.words} words'),
+                    Text('${statistics.characters} characters'),
                   ],
                 ),
                 Wrap(
