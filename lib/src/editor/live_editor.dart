@@ -2295,48 +2295,42 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   Widget build(BuildContext context) {
     final colors = IanvsMarkdownThemeData.resolve(context, widget.theme);
     _blockController.syntaxTheme = _livePreviewSyntaxTheme(colors);
-    // Keep changing edit/read surfaces inside the component's own semantics
-    // scope. Hosts should not need a route-level boundary to isolate them.
-    return Semantics(
-      container: true,
-      explicitChildNodes: true,
-      child: ColoredBox(
-        color: colors.surface,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final showNavigation =
-                widget.showNavigationPane &&
-                constraints.maxWidth >= widget.navigationBreakpoint;
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (showNavigation) ...[
-                  SizedBox(
-                    width: widget.navigationWidth,
-                    child: ValueListenableBuilder<IanvsMarkdownEditorMode>(
-                      valueListenable: widget.controller.modeListenable,
-                      builder: (context, mode, _) => _EditorNavigationPane(
-                        mode: mode,
-                        headings: _navigationHeadings,
-                        activeHeadingStart: _activeHeadingStart,
-                        colors: colors,
-                        onModeSelected: (next) => widget.controller.mode = next,
-                        onHeadingSelected: _scrollToNavigationHeading,
-                      ),
+    return ColoredBox(
+      color: colors.surface,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final showNavigation =
+              widget.showNavigationPane &&
+              constraints.maxWidth >= widget.navigationBreakpoint;
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (showNavigation) ...[
+                SizedBox(
+                  width: widget.navigationWidth,
+                  child: ValueListenableBuilder<IanvsMarkdownEditorMode>(
+                    valueListenable: widget.controller.modeListenable,
+                    builder: (context, mode, _) => _EditorNavigationPane(
+                      mode: mode,
+                      headings: _navigationHeadings,
+                      activeHeadingStart: _activeHeadingStart,
+                      colors: colors,
+                      onModeSelected: (next) => widget.controller.mode = next,
+                      onHeadingSelected: _scrollToNavigationHeading,
                     ),
                   ),
-                  VerticalDivider(width: 1, color: colors.border),
-                ],
-                Expanded(
-                  child: _buildEditorSurface(
-                    colors,
-                    showNavigation: showNavigation,
-                  ),
                 ),
+                VerticalDivider(width: 1, color: colors.border),
               ],
-            );
-          },
-        ),
+              Expanded(
+                child: _buildEditorSurface(
+                  colors,
+                  showNavigation: showNavigation,
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
