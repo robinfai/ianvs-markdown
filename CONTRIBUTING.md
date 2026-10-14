@@ -52,6 +52,19 @@ See the [fixed protocol](benchmark/LOCAL-PERFORMANCE-PROTOCOL.md) and
 synthetic-input boundaries, frozen environment, raw data and observation lines.
 Ordinary builds keep diagnostics disabled; the public API is unchanged.
 
+For optimization batches, `tool/compare_local_performance.py` takes four
+`--baseline` and four `--candidate` run directories, a frozen `--targets` JSON,
+an `--output` file and one `--allow-source` per reviewed changed runtime/tool
+path. It rejects environment, corpus, typography or undeclared source changes,
+then checks both candidate repetitions against targets and every remaining
+baseline observation line. A valid measurement that misses a target writes its
+failed result before exiting nonzero; keep that evidence and leave the roadmap
+item open. See [R4-03](benchmark/LARGE-DOCUMENT-COSTS-2026-10-14.md).
+CPU attribution uses `local_performance.py build --attribution` and
+`capture_local_cpu.py` inside the same mains. Its extra profiling and native
+snapshots use a distinct protocol that formal validation rejects; never include
+its VM service address or use its times as acceptance results.
+
 The older `make benchmark LABEL=after` and [benchmark/README.md](benchmark/README.md)
 remain historical R0/R2 attribution tools. They are not acceptance entries for
 the current roadmap, and their results cannot substitute for actual main runs.

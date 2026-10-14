@@ -1,5 +1,11 @@
 ## Unreleased
 
+- Reuse unchanged heading labels and same-text derived data in the desktop app,
+  and compute word/Unicode scalar counts in one pass. Outline offsets and status
+  remain synchronous with edits; source, history, budgets and public APIs stay
+  unchanged. See the [R4-03 evidence](benchmark/LARGE-DOCUMENT-COSTS-2026-10-14.md)
+  for measured scope and the remaining native Read-to-Live cost.
+
 - Add `IanvsMarkdownShortcuts.invoke` for focused explicit menu/toolbar commands,
   with optional controller ownership. Keep property history local, preserve
   composition across default shortcuts and explicit commands, and disable Read

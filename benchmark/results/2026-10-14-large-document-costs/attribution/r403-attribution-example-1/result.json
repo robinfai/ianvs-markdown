@@ -1,0 +1,6414 @@
+{
+  "schemaVersion": 1,
+  "protocol": "r4-attribution-only-v1",
+  "sourceRevision": "1ee8342153a7810a3be204bc9d304d193cc7b677",
+  "inputsDigest": "9a576256c84674d413dfc4153ed0e5e7fbca55198ff51d9ca3105035f8dc23eb",
+  "entry": "example",
+  "main": "example/lib/main.dart",
+  "buildMode": "profile",
+  "inputKind": "synthetic-framework; paste excludes OS clipboard; no physical IME/CUA latency",
+  "corpusVersion": 1,
+  "warmup": 5,
+  "samples": 20,
+  "budget": "default",
+  "startedAtUtc": "2026-10-14T02:29:38.065144Z",
+  "finishedAtUtc": "2026-10-14T02:31:40.678461Z",
+  "initialWindow": {
+    "height": 780.0,
+    "visible": true,
+    "occlusionVisible": true,
+    "y": 228.0,
+    "x": 274.0,
+    "width": 1180.0,
+    "onActiveSpace": true,
+    "screen": 1,
+    "generation": 0,
+    "appHidden": false,
+    "scale": 2.0,
+    "miniaturized": false,
+    "active": true
+  },
+  "display": {
+    "physicalWidth": 2360.0,
+    "physicalHeight": 1560.0,
+    "devicePixelRatio": 2.0,
+    "brightness": "light",
+    "textScale14": 14.0,
+    "monoFontFamily": "SF Mono",
+    "monoFontFamilyFallback": [
+      "Menlo",
+      "Monaco",
+      "monospace"
+    ]
+  },
+  "system": {
+    "dart": "3.12.2 (stable) (Tue Jun 9 01:11:39 2026 -0700) on \"macos_arm64\"",
+    "os": "Version 27.0.1 (Build 26A434)",
+    "pid": 17512,
+    "executable": "/Users/robinfai/.codex/worktrees/streaming-contracts/ianvs-markdown/example/build/macos/Build/Products/Profile/Ianvs Markdown Playground.app/Contents/MacOS/Ianvs Markdown Playground"
+  },
+  "complete": true,
+  "errors": [],
+  "cases": [
+    {
+      "bytes": 1048576,
+      "utf16Units": 1025282,
+      "useMarkdown": false,
+      "exceeded": "syntaxTokens",
+      "readingBytes": 65536,
+      "truncated": true
+    }
+  ],
+  "records": [
+    {
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "stage": "warmup",
+      "index": 0,
+      "timelineStartMicros": 260133646153,
+      "timelineEndMicros": 260133879804,
+      "callbackMs": 6.814,
+      "nextFrameMs": 233.65,
+      "frameWaitMs": 226.836,
+      "rssMiB": 1056.9375,
+      "firstFrameNumber": 91,
+      "lastFrameNumber": 92,
+      "firstFrameMicros": 260133649760,
+      "lastFrameMicros": 260133658093,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 92,
+          "vsyncMicros": 260133649760,
+          "buildMs": 218.99,
+          "rasterMs": 5.202,
+          "totalMs": 227.651
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "stage": "warmup",
+      "index": 1,
+      "timelineStartMicros": 260134112742,
+      "timelineEndMicros": 260134194562,
+      "callbackMs": 7.018,
+      "nextFrameMs": 81.82,
+      "frameWaitMs": 74.80199999999999,
+      "rssMiB": 1077.5,
+      "firstFrameNumber": 108,
+      "lastFrameNumber": 109,
+      "firstFrameMicros": 260134108097,
+      "lastFrameMicros": 260134133098,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 109,
+          "vsyncMicros": 260134124766,
+          "buildMs": 62.057,
+          "rasterMs": 1.992,
+          "totalMs": 64.221
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "stage": "warmup",
+      "index": 2,
+      "timelineStartMicros": 260134429570,
+      "timelineEndMicros": 260134510081,
+      "callbackMs": 7.881,
+      "nextFrameMs": 80.51,
+      "frameWaitMs": 72.629,
+      "rssMiB": 1089.90625,
+      "firstFrameNumber": 125,
+      "lastFrameNumber": 126,
+      "firstFrameMicros": 260134424767,
+      "lastFrameMicros": 260134449767,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 126,
+          "vsyncMicros": 260134441435,
+          "buildMs": 61.108,
+          "rasterMs": 2.232,
+          "totalMs": 63.458
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "stage": "warmup",
+      "index": 3,
+      "timelineStartMicros": 260134746368,
+      "timelineEndMicros": 260134824185,
+      "callbackMs": 5.306,
+      "nextFrameMs": 77.816,
+      "frameWaitMs": 72.51,
+      "rssMiB": 1108.296875,
+      "firstFrameNumber": 142,
+      "lastFrameNumber": 143,
+      "firstFrameMicros": 260134741436,
+      "lastFrameMicros": 260134764041,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 143,
+          "vsyncMicros": 260134755708,
+          "buildMs": 60.793,
+          "rasterMs": 1.986,
+          "totalMs": 62.934
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "stage": "warmup",
+      "index": 4,
+      "timelineStartMicros": 260135063391,
+      "timelineEndMicros": 260135139209,
+      "callbackMs": 5.244,
+      "nextFrameMs": 75.816,
+      "frameWaitMs": 70.572,
+      "rssMiB": 1109.0625,
+      "firstFrameNumber": 161,
+      "lastFrameNumber": 162,
+      "firstFrameMicros": 260135059291,
+      "lastFrameMicros": 260135080968,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 162,
+          "vsyncMicros": 260135072636,
+          "buildMs": 58.789,
+          "rasterMs": 1.827,
+          "totalMs": 60.768
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "stage": "sample",
+      "index": 0,
+      "timelineStartMicros": 260135370555,
+      "timelineEndMicros": 260135445845,
+      "callbackMs": 5.434,
+      "nextFrameMs": 75.289,
+      "frameWaitMs": 69.855,
+      "rssMiB": 1109.09375,
+      "firstFrameNumber": 179,
+      "lastFrameNumber": 180,
+      "firstFrameMicros": 260135370609,
+      "lastFrameMicros": 260135387276,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 180,
+          "vsyncMicros": 260135378943,
+          "buildMs": 59.074,
+          "rasterMs": 1.879,
+          "totalMs": 61.033
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "stage": "sample",
+      "index": 1,
+      "timelineStartMicros": 260135684019,
+      "timelineEndMicros": 260135761744,
+      "callbackMs": 4.932,
+      "nextFrameMs": 77.725,
+      "frameWaitMs": 72.79299999999999,
+      "rssMiB": 1111.5625,
+      "firstFrameNumber": 196,
+      "lastFrameNumber": 197,
+      "firstFrameMicros": 260135678945,
+      "lastFrameMicros": 260135703945,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 197,
+          "vsyncMicros": 260135695613,
+          "buildMs": 58.351,
+          "rasterMs": 1.9,
+          "totalMs": 60.341
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "stage": "sample",
+      "index": 2,
+      "timelineStartMicros": 260136000886,
+      "timelineEndMicros": 260136079322,
+      "callbackMs": 5.127,
+      "nextFrameMs": 78.435,
+      "frameWaitMs": 73.308,
+      "rssMiB": 1112.9375,
+      "firstFrameNumber": 213,
+      "lastFrameNumber": 214,
+      "firstFrameMicros": 260135995615,
+      "lastFrameMicros": 260136020615,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 214,
+          "vsyncMicros": 260136012283,
+          "buildMs": 59.379,
+          "rasterMs": 2.06,
+          "totalMs": 61.521
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "stage": "sample",
+      "index": 3,
+      "timelineStartMicros": 260136317407,
+      "timelineEndMicros": 260136394741,
+      "callbackMs": 5.246,
+      "nextFrameMs": 77.333,
+      "frameWaitMs": 72.087,
+      "rssMiB": 1113.25,
+      "firstFrameNumber": 230,
+      "lastFrameNumber": 231,
+      "firstFrameMicros": 260136312284,
+      "lastFrameMicros": 260136337284,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 231,
+          "vsyncMicros": 260136328952,
+          "buildMs": 58.149,
+          "rasterMs": 1.889,
+          "totalMs": 60.167
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "stage": "sample",
+      "index": 4,
+      "timelineStartMicros": 260136633640,
+      "timelineEndMicros": 260136713362,
+      "callbackMs": 5.117,
+      "nextFrameMs": 79.721,
+      "frameWaitMs": 74.604,
+      "rssMiB": 1113.53125,
+      "firstFrameNumber": 247,
+      "lastFrameNumber": 248,
+      "firstFrameMicros": 260136628954,
+      "lastFrameMicros": 260136653954,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 248,
+          "vsyncMicros": 260136645622,
+          "buildMs": 60.36,
+          "rasterMs": 1.946,
+          "totalMs": 62.405
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "stage": "sample",
+      "index": 5,
+      "timelineStartMicros": 260136949341,
+      "timelineEndMicros": 260137029204,
+      "callbackMs": 5.432,
+      "nextFrameMs": 79.862,
+      "frameWaitMs": 74.42999999999999,
+      "rssMiB": 1113.765625,
+      "firstFrameNumber": 264,
+      "lastFrameNumber": 265,
+      "firstFrameMicros": 260136945623,
+      "lastFrameMicros": 260136970623,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 265,
+          "vsyncMicros": 260136962292,
+          "buildMs": 59.09,
+          "rasterMs": 2.037,
+          "totalMs": 61.362
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "stage": "sample",
+      "index": 6,
+      "timelineStartMicros": 260137266965,
+      "timelineEndMicros": 260137344163,
+      "callbackMs": 5.152,
+      "nextFrameMs": 77.198,
+      "frameWaitMs": 72.04599999999999,
+      "rssMiB": 1115.703125,
+      "firstFrameNumber": 281,
+      "lastFrameNumber": 282,
+      "firstFrameMicros": 260137262293,
+      "lastFrameMicros": 260137287293,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 282,
+          "vsyncMicros": 260137278961,
+          "buildMs": 57.587,
+          "rasterMs": 1.889,
+          "totalMs": 59.584
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "stage": "sample",
+      "index": 7,
+      "timelineStartMicros": 260137584062,
+      "timelineEndMicros": 260137661153,
+      "callbackMs": 5.452,
+      "nextFrameMs": 77.09,
+      "frameWaitMs": 71.638,
+      "rssMiB": 1116.1875,
+      "firstFrameNumber": 298,
+      "lastFrameNumber": 299,
+      "firstFrameMicros": 260137578962,
+      "lastFrameMicros": 260137603963,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 299,
+          "vsyncMicros": 260137595632,
+          "buildMs": 58.138,
+          "rasterMs": 2.069,
+          "totalMs": 60.313
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "stage": "sample",
+      "index": 8,
+      "timelineStartMicros": 260137900421,
+      "timelineEndMicros": 260137976802,
+      "callbackMs": 5.232,
+      "nextFrameMs": 76.38,
+      "frameWaitMs": 71.148,
+      "rssMiB": 1116.25,
+      "firstFrameNumber": 315,
+      "lastFrameNumber": 316,
+      "firstFrameMicros": 260137895632,
+      "lastFrameMicros": 260137920632,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 316,
+          "vsyncMicros": 260137912301,
+          "buildMs": 57.062,
+          "rasterMs": 1.873,
+          "totalMs": 59.103
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "stage": "sample",
+      "index": 9,
+      "timelineStartMicros": 260138199119,
+      "timelineEndMicros": 260138268582,
+      "callbackMs": 5.341,
+      "nextFrameMs": 69.463,
+      "frameWaitMs": 64.122,
+      "rssMiB": 1116.515625,
+      "firstFrameNumber": 333,
+      "lastFrameNumber": 334,
+      "firstFrameMicros": 260138203968,
+      "lastFrameMicros": 260138212301,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 334,
+          "vsyncMicros": 260138203968,
+          "buildMs": 56.7,
+          "rasterMs": 1.849,
+          "totalMs": 59.237
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "stage": "sample",
+      "index": 10,
+      "timelineStartMicros": 260138508602,
+      "timelineEndMicros": 260138585924,
+      "callbackMs": 5.251,
+      "nextFrameMs": 77.32,
+      "frameWaitMs": 72.06899999999999,
+      "rssMiB": 1116.25,
+      "firstFrameNumber": 351,
+      "lastFrameNumber": 352,
+      "firstFrameMicros": 260138503971,
+      "lastFrameMicros": 260138528971,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 352,
+          "vsyncMicros": 260138520639,
+          "buildMs": 57.845,
+          "rasterMs": 1.863,
+          "totalMs": 59.823
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "stage": "sample",
+      "index": 11,
+      "timelineStartMicros": 260138825830,
+      "timelineEndMicros": 260138902639,
+      "callbackMs": 5.459,
+      "nextFrameMs": 76.807,
+      "frameWaitMs": 71.348,
+      "rssMiB": 1116.3125,
+      "firstFrameNumber": 368,
+      "lastFrameNumber": 369,
+      "firstFrameMicros": 260138820640,
+      "lastFrameMicros": 260138845640,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 369,
+          "vsyncMicros": 260138837309,
+          "buildMs": 58.011,
+          "rasterMs": 1.936,
+          "totalMs": 60.071
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "stage": "sample",
+      "index": 12,
+      "timelineStartMicros": 260139142227,
+      "timelineEndMicros": 260139219631,
+      "callbackMs": 5.419,
+      "nextFrameMs": 77.403,
+      "frameWaitMs": 71.98400000000001,
+      "rssMiB": 1116.3125,
+      "firstFrameNumber": 385,
+      "lastFrameNumber": 386,
+      "firstFrameMicros": 260139137310,
+      "lastFrameMicros": 260139162310,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 386,
+          "vsyncMicros": 260139153978,
+          "buildMs": 58.27,
+          "rasterMs": 1.911,
+          "totalMs": 60.315
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "stage": "sample",
+      "index": 13,
+      "timelineStartMicros": 260139458949,
+      "timelineEndMicros": 260139536746,
+      "callbackMs": 5.001,
+      "nextFrameMs": 77.796,
+      "frameWaitMs": 72.795,
+      "rssMiB": 1116.375,
+      "firstFrameNumber": 402,
+      "lastFrameNumber": 403,
+      "firstFrameMicros": 260139453979,
+      "lastFrameMicros": 260139478979,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 403,
+          "vsyncMicros": 260139470647,
+          "buildMs": 58.617,
+          "rasterMs": 2.087,
+          "totalMs": 60.792
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "stage": "sample",
+      "index": 14,
+      "timelineStartMicros": 260139775883,
+      "timelineEndMicros": 260139853091,
+      "callbackMs": 4.874,
+      "nextFrameMs": 77.207,
+      "frameWaitMs": 72.333,
+      "rssMiB": 1116.375,
+      "firstFrameNumber": 419,
+      "lastFrameNumber": 420,
+      "firstFrameMicros": 260139770649,
+      "lastFrameMicros": 260139795649,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 420,
+          "vsyncMicros": 260139787317,
+          "buildMs": 58.436,
+          "rasterMs": 2.001,
+          "totalMs": 60.54
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "stage": "sample",
+      "index": 15,
+      "timelineStartMicros": 260140092572,
+      "timelineEndMicros": 260140169733,
+      "callbackMs": 5.501,
+      "nextFrameMs": 77.16,
+      "frameWaitMs": 71.65899999999999,
+      "rssMiB": 1116.359375,
+      "firstFrameNumber": 436,
+      "lastFrameNumber": 437,
+      "firstFrameMicros": 260140087318,
+      "lastFrameMicros": 260140112318,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 437,
+          "vsyncMicros": 260140103988,
+          "buildMs": 58.324,
+          "rasterMs": 2.057,
+          "totalMs": 60.546
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "stage": "sample",
+      "index": 16,
+      "timelineStartMicros": 260140408802,
+      "timelineEndMicros": 260140485742,
+      "callbackMs": 5.413,
+      "nextFrameMs": 76.939,
+      "frameWaitMs": 71.526,
+      "rssMiB": 1116.40625,
+      "firstFrameNumber": 453,
+      "lastFrameNumber": 454,
+      "firstFrameMicros": 260140403988,
+      "lastFrameMicros": 260140428988,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 454,
+          "vsyncMicros": 260140420657,
+          "buildMs": 57.652,
+          "rasterMs": 1.945,
+          "totalMs": 59.727
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "stage": "sample",
+      "index": 17,
+      "timelineStartMicros": 260140725675,
+      "timelineEndMicros": 260140801690,
+      "callbackMs": 5.215,
+      "nextFrameMs": 76.014,
+      "frameWaitMs": 70.79899999999999,
+      "rssMiB": 1116.46875,
+      "firstFrameNumber": 470,
+      "lastFrameNumber": 471,
+      "firstFrameMicros": 260140720657,
+      "lastFrameMicros": 260140745658,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 471,
+          "vsyncMicros": 260140737327,
+          "buildMs": 56.97,
+          "rasterMs": 1.963,
+          "totalMs": 58.998
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "stage": "sample",
+      "index": 18,
+      "timelineStartMicros": 260141033937,
+      "timelineEndMicros": 260141110722,
+      "callbackMs": 4.806,
+      "nextFrameMs": 76.784,
+      "frameWaitMs": 71.97800000000001,
+      "rssMiB": 1116.5,
+      "firstFrameNumber": 487,
+      "lastFrameNumber": 488,
+      "firstFrameMicros": 260141028994,
+      "lastFrameMicros": 260141053994,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 488,
+          "vsyncMicros": 260141045661,
+          "buildMs": 57.627,
+          "rasterMs": 2.06,
+          "totalMs": 59.78
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourceType",
+      "stage": "sample",
+      "index": 19,
+      "timelineStartMicros": 260141350396,
+      "timelineEndMicros": 260141426921,
+      "callbackMs": 5.527,
+      "nextFrameMs": 76.524,
+      "frameWaitMs": 70.997,
+      "rssMiB": 1116.515625,
+      "firstFrameNumber": 504,
+      "lastFrameNumber": 505,
+      "firstFrameMicros": 260141345663,
+      "lastFrameMicros": 260141370663,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 505,
+          "vsyncMicros": 260141362331,
+          "buildMs": 57.105,
+          "rasterMs": 2.049,
+          "totalMs": 59.271
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "stage": "warmup",
+      "index": 0,
+      "timelineStartMicros": 260142791833,
+      "timelineEndMicros": 260143350695,
+      "callbackMs": 17.75,
+      "nextFrameMs": 558.862,
+      "frameWaitMs": 541.112,
+      "rssMiB": 1350.03125,
+      "firstFrameNumber": 541,
+      "lastFrameNumber": 542,
+      "firstFrameMicros": 260142779010,
+      "lastFrameMicros": 260142820677,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "occlusionVisible": true,
+        "screen": 1,
+        "onActiveSpace": true,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "height": 780.0,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "visible": true
+      },
+      "frames": [
+        {
+          "frameNumber": 542,
+          "vsyncMicros": 260142812343,
+          "buildMs": 224.401,
+          "rasterMs": 2.528,
+          "totalMs": 533.364
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "stage": "warmup",
+      "index": 1,
+      "timelineStartMicros": 260143575196,
+      "timelineEndMicros": 260143695460,
+      "callbackMs": 18.729,
+      "nextFrameMs": 120.263,
+      "frameWaitMs": 101.534,
+      "rssMiB": 1352.109375,
+      "firstFrameNumber": 558,
+      "lastFrameNumber": 559,
+      "firstFrameMicros": 260143579017,
+      "lastFrameMicros": 260143587350,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "occlusionVisible": true,
+        "onActiveSpace": true,
+        "screen": 1,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "visible": true,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "height": 780.0
+      },
+      "frames": [
+        {
+          "frameNumber": 559,
+          "vsyncMicros": 260143579017,
+          "buildMs": 63.771,
+          "rasterMs": 2.101,
+          "totalMs": 111.162
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "stage": "warmup",
+      "index": 2,
+      "timelineStartMicros": 260143924567,
+      "timelineEndMicros": 260144034789,
+      "callbackMs": 17.059,
+      "nextFrameMs": 110.221,
+      "frameWaitMs": 93.162,
+      "rssMiB": 1352.65625,
+      "firstFrameNumber": 576,
+      "lastFrameNumber": 577,
+      "firstFrameMicros": 260143929020,
+      "lastFrameMicros": 260143937354,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 577,
+          "vsyncMicros": 260143929020,
+          "buildMs": 58.334,
+          "rasterMs": 2.198,
+          "totalMs": 100.066
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "stage": "warmup",
+      "index": 3,
+      "timelineStartMicros": 260144268323,
+      "timelineEndMicros": 260144379697,
+      "callbackMs": 17.447,
+      "nextFrameMs": 111.373,
+      "frameWaitMs": 93.926,
+      "rssMiB": 1352.875,
+      "firstFrameNumber": 592,
+      "lastFrameNumber": 593,
+      "firstFrameMicros": 260144262356,
+      "lastFrameMicros": 260144295690,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "occlusionVisible": true,
+        "onActiveSpace": true,
+        "screen": 1,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "visible": true,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "height": 780.0
+      },
+      "frames": [
+        {
+          "frameNumber": 593,
+          "vsyncMicros": 260144287357,
+          "buildMs": 57.574,
+          "rasterMs": 2.191,
+          "totalMs": 87.258
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "stage": "warmup",
+      "index": 4,
+      "timelineStartMicros": 260144608560,
+      "timelineEndMicros": 260144716882,
+      "callbackMs": 16.668,
+      "nextFrameMs": 108.321,
+      "frameWaitMs": 91.65299999999999,
+      "rssMiB": 1352.5625,
+      "firstFrameNumber": 609,
+      "lastFrameNumber": 610,
+      "firstFrameMicros": 260144612360,
+      "lastFrameMicros": 260144620693,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 610,
+          "vsyncMicros": 260144612360,
+          "buildMs": 57.138,
+          "rasterMs": 1.963,
+          "totalMs": 99.305
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "stage": "sample",
+      "index": 0,
+      "timelineStartMicros": 260144942133,
+      "timelineEndMicros": 260145052529,
+      "callbackMs": 17.12,
+      "nextFrameMs": 110.396,
+      "frameWaitMs": 93.276,
+      "rssMiB": 1353.109375,
+      "firstFrameNumber": 626,
+      "lastFrameNumber": 627,
+      "firstFrameMicros": 260144945696,
+      "lastFrameMicros": 260144954029,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "occlusionVisible": true,
+        "onActiveSpace": true,
+        "screen": 1,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "visible": true,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "height": 780.0
+      },
+      "frames": [
+        {
+          "frameNumber": 627,
+          "vsyncMicros": 260144945696,
+          "buildMs": 57.455,
+          "rasterMs": 2.066,
+          "totalMs": 101.575
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "stage": "sample",
+      "index": 1,
+      "timelineStartMicros": 260145275278,
+      "timelineEndMicros": 260145384758,
+      "callbackMs": 16.5,
+      "nextFrameMs": 109.479,
+      "frameWaitMs": 92.979,
+      "rssMiB": 1352.875,
+      "firstFrameNumber": 643,
+      "lastFrameNumber": 644,
+      "firstFrameMicros": 260145279032,
+      "lastFrameMicros": 260145287366,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 644,
+          "vsyncMicros": 260145279033,
+          "buildMs": 58.082,
+          "rasterMs": 2.032,
+          "totalMs": 100.05
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "stage": "sample",
+      "index": 2,
+      "timelineStartMicros": 260145608918,
+      "timelineEndMicros": 260145718317,
+      "callbackMs": 16.391,
+      "nextFrameMs": 109.399,
+      "frameWaitMs": 93.00800000000001,
+      "rssMiB": 1356.703125,
+      "firstFrameNumber": 660,
+      "lastFrameNumber": 661,
+      "firstFrameMicros": 260145612369,
+      "lastFrameMicros": 260145620702,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "occlusionVisible": true,
+        "onActiveSpace": true,
+        "screen": 1,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "visible": true,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "height": 780.0
+      },
+      "frames": [
+        {
+          "frameNumber": 661,
+          "vsyncMicros": 260145612369,
+          "buildMs": 58.366,
+          "rasterMs": 1.972,
+          "totalMs": 100.592
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "stage": "sample",
+      "index": 3,
+      "timelineStartMicros": 260145941818,
+      "timelineEndMicros": 260146050941,
+      "callbackMs": 16.97,
+      "nextFrameMs": 109.121,
+      "frameWaitMs": 92.151,
+      "rssMiB": 1356.3125,
+      "firstFrameNumber": 677,
+      "lastFrameNumber": 678,
+      "firstFrameMicros": 260145945705,
+      "lastFrameMicros": 260145954039,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 678,
+          "vsyncMicros": 260145945706,
+          "buildMs": 57.512,
+          "rasterMs": 1.999,
+          "totalMs": 99.891
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "stage": "sample",
+      "index": 4,
+      "timelineStartMicros": 260146275219,
+      "timelineEndMicros": 260146387655,
+      "callbackMs": 16.94,
+      "nextFrameMs": 112.435,
+      "frameWaitMs": 95.495,
+      "rssMiB": 1356.53125,
+      "firstFrameNumber": 694,
+      "lastFrameNumber": 695,
+      "firstFrameMicros": 260146279041,
+      "lastFrameMicros": 260146287375,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "occlusionVisible": true,
+        "onActiveSpace": true,
+        "screen": 1,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "visible": true,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "height": 780.0
+      },
+      "frames": [
+        {
+          "frameNumber": 695,
+          "vsyncMicros": 260146279042,
+          "buildMs": 59.32,
+          "rasterMs": 2.275,
+          "totalMs": 103.342
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "stage": "sample",
+      "index": 5,
+      "timelineStartMicros": 260146625222,
+      "timelineEndMicros": 260146734788,
+      "callbackMs": 16.88,
+      "nextFrameMs": 109.564,
+      "frameWaitMs": 92.684,
+      "rssMiB": 1356.53125,
+      "firstFrameNumber": 710,
+      "lastFrameNumber": 711,
+      "firstFrameMicros": 260146620711,
+      "lastFrameMicros": 260146654045,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 711,
+          "vsyncMicros": 260146645711,
+          "buildMs": 57.872,
+          "rasterMs": 2.037,
+          "totalMs": 83.633
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "stage": "sample",
+      "index": 6,
+      "timelineStartMicros": 260146967264,
+      "timelineEndMicros": 260147077840,
+      "callbackMs": 16.73,
+      "nextFrameMs": 110.576,
+      "frameWaitMs": 93.84599999999999,
+      "rssMiB": 1356.5625,
+      "firstFrameNumber": 726,
+      "lastFrameNumber": 727,
+      "firstFrameMicros": 260146962381,
+      "lastFrameMicros": 260146995714,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "occlusionVisible": true,
+        "onActiveSpace": true,
+        "screen": 1,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "visible": true,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "height": 780.0
+      },
+      "frames": [
+        {
+          "frameNumber": 727,
+          "vsyncMicros": 260146987381,
+          "buildMs": 57.934,
+          "rasterMs": 2.065,
+          "totalMs": 85.187
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "stage": "sample",
+      "index": 7,
+      "timelineStartMicros": 260147300675,
+      "timelineEndMicros": 260147410558,
+      "callbackMs": 16.501,
+      "nextFrameMs": 109.883,
+      "frameWaitMs": 93.38199999999999,
+      "rssMiB": 1357.578125,
+      "firstFrameNumber": 743,
+      "lastFrameNumber": 744,
+      "firstFrameMicros": 260147304051,
+      "lastFrameMicros": 260147312384,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 744,
+          "vsyncMicros": 260147304051,
+          "buildMs": 57.236,
+          "rasterMs": 2.01,
+          "totalMs": 101.105
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "stage": "sample",
+      "index": 8,
+      "timelineStartMicros": 260147642406,
+      "timelineEndMicros": 260147751496,
+      "callbackMs": 16.633,
+      "nextFrameMs": 109.09,
+      "frameWaitMs": 92.45700000000001,
+      "rssMiB": 1357.71875,
+      "firstFrameNumber": 759,
+      "lastFrameNumber": 760,
+      "firstFrameMicros": 260147637387,
+      "lastFrameMicros": 260147670720,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "occlusionVisible": true,
+        "onActiveSpace": true,
+        "screen": 1,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "visible": true,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "height": 780.0
+      },
+      "frames": [
+        {
+          "frameNumber": 760,
+          "vsyncMicros": 260147662387,
+          "buildMs": 57.743,
+          "rasterMs": 1.972,
+          "totalMs": 83.805
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "stage": "sample",
+      "index": 9,
+      "timelineStartMicros": 260147975251,
+      "timelineEndMicros": 260148086493,
+      "callbackMs": 16.619,
+      "nextFrameMs": 111.241,
+      "frameWaitMs": 94.622,
+      "rssMiB": 1357.703125,
+      "firstFrameNumber": 776,
+      "lastFrameNumber": 777,
+      "firstFrameMicros": 260147979057,
+      "lastFrameMicros": 260147987390,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 777,
+          "vsyncMicros": 260147979057,
+          "buildMs": 59.017,
+          "rasterMs": 2.149,
+          "totalMs": 101.973
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "stage": "sample",
+      "index": 10,
+      "timelineStartMicros": 260148317259,
+      "timelineEndMicros": 260148426051,
+      "callbackMs": 16.673,
+      "nextFrameMs": 108.791,
+      "frameWaitMs": 92.118,
+      "rssMiB": 1358.15625,
+      "firstFrameNumber": 793,
+      "lastFrameNumber": 794,
+      "firstFrameMicros": 260148320726,
+      "lastFrameMicros": 260148329060,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "occlusionVisible": true,
+        "onActiveSpace": true,
+        "screen": 1,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "visible": true,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "height": 780.0
+      },
+      "frames": [
+        {
+          "frameNumber": 794,
+          "vsyncMicros": 260148320727,
+          "buildMs": 57.614,
+          "rasterMs": 1.967,
+          "totalMs": 99.909
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "stage": "sample",
+      "index": 11,
+      "timelineStartMicros": 260148650136,
+      "timelineEndMicros": 260148760379,
+      "callbackMs": 17.203,
+      "nextFrameMs": 110.242,
+      "frameWaitMs": 93.039,
+      "rssMiB": 1357.578125,
+      "firstFrameNumber": 810,
+      "lastFrameNumber": 811,
+      "firstFrameMicros": 260148654055,
+      "lastFrameMicros": 260148662389,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 811,
+          "vsyncMicros": 260148654056,
+          "buildMs": 56.647,
+          "rasterMs": 1.975,
+          "totalMs": 100.965
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "stage": "sample",
+      "index": 12,
+      "timelineStartMicros": 260148991859,
+      "timelineEndMicros": 260149101085,
+      "callbackMs": 16.861,
+      "nextFrameMs": 109.225,
+      "frameWaitMs": 92.36399999999999,
+      "rssMiB": 1357.578125,
+      "firstFrameNumber": 827,
+      "lastFrameNumber": 828,
+      "firstFrameMicros": 260148991550,
+      "lastFrameMicros": 260149024890,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "occlusionVisible": true,
+        "onActiveSpace": true,
+        "screen": 1,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "visible": true,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "height": 780.0
+      },
+      "frames": [
+        {
+          "frameNumber": 828,
+          "vsyncMicros": 260149016557,
+          "buildMs": 57.255,
+          "rasterMs": 2.217,
+          "totalMs": 79.209
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "stage": "sample",
+      "index": 13,
+      "timelineStartMicros": 260149331879,
+      "timelineEndMicros": 260149443534,
+      "callbackMs": 17.44,
+      "nextFrameMs": 111.654,
+      "frameWaitMs": 94.214,
+      "rssMiB": 1357.578125,
+      "firstFrameNumber": 844,
+      "lastFrameNumber": 845,
+      "firstFrameMicros": 260149333236,
+      "lastFrameMicros": 260149358236,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 845,
+          "vsyncMicros": 260149349909,
+          "buildMs": 58.712,
+          "rasterMs": 2.024,
+          "totalMs": 88.35
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "stage": "sample",
+      "index": 14,
+      "timelineStartMicros": 260149675941,
+      "timelineEndMicros": 260149785331,
+      "callbackMs": 16.741,
+      "nextFrameMs": 109.389,
+      "frameWaitMs": 92.648,
+      "rssMiB": 1357.578125,
+      "firstFrameNumber": 861,
+      "lastFrameNumber": 862,
+      "firstFrameMicros": 260149674142,
+      "lastFrameMicros": 260149707755,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "occlusionVisible": true,
+        "onActiveSpace": true,
+        "screen": 1,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "visible": true,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "height": 780.0
+      },
+      "frames": [
+        {
+          "frameNumber": 862,
+          "vsyncMicros": 260149699422,
+          "buildMs": 56.166,
+          "rasterMs": 2.124,
+          "totalMs": 80.428
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "stage": "sample",
+      "index": 15,
+      "timelineStartMicros": 260150012960,
+      "timelineEndMicros": 260150122082,
+      "callbackMs": 16.728,
+      "nextFrameMs": 109.121,
+      "frameWaitMs": 92.393,
+      "rssMiB": 1357.609375,
+      "firstFrameNumber": 878,
+      "lastFrameNumber": 879,
+      "firstFrameMicros": 260150016576,
+      "lastFrameMicros": 260150024909,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 879,
+          "vsyncMicros": 260150016576,
+          "buildMs": 57.631,
+          "rasterMs": 2.108,
+          "totalMs": 100.267
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "stage": "sample",
+      "index": 16,
+      "timelineStartMicros": 260150346306,
+      "timelineEndMicros": 260150456382,
+      "callbackMs": 16.625,
+      "nextFrameMs": 110.075,
+      "frameWaitMs": 93.45,
+      "rssMiB": 1357.578125,
+      "firstFrameNumber": 895,
+      "lastFrameNumber": 896,
+      "firstFrameMicros": 260150349912,
+      "lastFrameMicros": 260150358245,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "occlusionVisible": true,
+        "onActiveSpace": true,
+        "screen": 1,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "visible": true,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "height": 780.0
+      },
+      "frames": [
+        {
+          "frameNumber": 896,
+          "vsyncMicros": 260150349912,
+          "buildMs": 58.105,
+          "rasterMs": 2.135,
+          "totalMs": 100.718
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "stage": "sample",
+      "index": 17,
+      "timelineStartMicros": 260150679531,
+      "timelineEndMicros": 260150788711,
+      "callbackMs": 16.647,
+      "nextFrameMs": 109.18,
+      "frameWaitMs": 92.53300000000002,
+      "rssMiB": 1358.0625,
+      "firstFrameNumber": 912,
+      "lastFrameNumber": 913,
+      "firstFrameMicros": 260150683248,
+      "lastFrameMicros": 260150691582,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 913,
+          "vsyncMicros": 260150683249,
+          "buildMs": 57.816,
+          "rasterMs": 2.082,
+          "totalMs": 100.216
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "stage": "sample",
+      "index": 18,
+      "timelineStartMicros": 260151021483,
+      "timelineEndMicros": 260151131457,
+      "callbackMs": 17.116,
+      "nextFrameMs": 109.973,
+      "frameWaitMs": 92.857,
+      "rssMiB": 1357.578125,
+      "firstFrameNumber": 928,
+      "lastFrameNumber": 929,
+      "firstFrameMicros": 260151016585,
+      "lastFrameMicros": 260151049918,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "occlusionVisible": true,
+        "onActiveSpace": true,
+        "screen": 1,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "visible": true,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "height": 780.0
+      },
+      "frames": [
+        {
+          "frameNumber": 929,
+          "vsyncMicros": 260151041585,
+          "buildMs": 57.55,
+          "rasterMs": 2.038,
+          "totalMs": 84.567
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "sourcePaste",
+      "stage": "sample",
+      "index": 19,
+      "timelineStartMicros": 260151354476,
+      "timelineEndMicros": 260151464175,
+      "callbackMs": 16.575,
+      "nextFrameMs": 109.699,
+      "frameWaitMs": 93.124,
+      "rssMiB": 1357.671875,
+      "firstFrameNumber": 945,
+      "lastFrameNumber": 946,
+      "firstFrameMicros": 260151358255,
+      "lastFrameMicros": 260151366588,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "source",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 946,
+          "vsyncMicros": 260151358255,
+          "buildMs": 57.389,
+          "rasterMs": 2.152,
+          "totalMs": 99.258
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "liveType",
+      "stage": "warmup",
+      "index": 0,
+      "timelineStartMicros": 260152861315,
+      "timelineEndMicros": 260152935600,
+      "callbackMs": 7.614,
+      "nextFrameMs": 74.284,
+      "frameWaitMs": 66.67,
+      "rssMiB": 1358.3125,
+      "firstFrameNumber": 981,
+      "lastFrameNumber": 982,
+      "firstFrameMicros": 260152866602,
+      "lastFrameMicros": 260152874935,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "occlusionVisible": true,
+        "onActiveSpace": true,
+        "screen": 1,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "visible": true,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "height": 780.0
+      },
+      "frames": [
+        {
+          "frameNumber": 982,
+          "vsyncMicros": 260152866603,
+          "buildMs": 59.014,
+          "rasterMs": 1.975,
+          "totalMs": 63.557
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "liveType",
+      "stage": "warmup",
+      "index": 1,
+      "timelineStartMicros": 260153195861,
+      "timelineEndMicros": 260153267043,
+      "callbackMs": 5.742,
+      "nextFrameMs": 71.182,
+      "frameWaitMs": 65.44,
+      "rssMiB": 1359.234375,
+      "firstFrameNumber": 1002,
+      "lastFrameNumber": 1003,
+      "firstFrameMicros": 260153199938,
+      "lastFrameMicros": 260153208271,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "occlusionVisible": true,
+        "screen": 1,
+        "onActiveSpace": true,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "height": 780.0,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "visible": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1003,
+          "vsyncMicros": 260153199939,
+          "buildMs": 58.054,
+          "rasterMs": 1.955,
+          "totalMs": 61.872
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "liveType",
+      "stage": "warmup",
+      "index": 2,
+      "timelineStartMicros": 260153527771,
+      "timelineEndMicros": 260153599146,
+      "callbackMs": 5.185,
+      "nextFrameMs": 71.374,
+      "frameWaitMs": 66.189,
+      "rssMiB": 1362.21875,
+      "firstFrameNumber": 1023,
+      "lastFrameNumber": 1024,
+      "firstFrameMicros": 260153533274,
+      "lastFrameMicros": 260153541608,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "occlusionVisible": true,
+        "onActiveSpace": true,
+        "screen": 1,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "visible": true,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "height": 780.0
+      },
+      "frames": [
+        {
+          "frameNumber": 1024,
+          "vsyncMicros": 260153533275,
+          "buildMs": 58.483,
+          "rasterMs": 2.006,
+          "totalMs": 60.568
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "liveType",
+      "stage": "warmup",
+      "index": 3,
+      "timelineStartMicros": 260153861192,
+      "timelineEndMicros": 260153932897,
+      "callbackMs": 5.771,
+      "nextFrameMs": 71.704,
+      "frameWaitMs": 65.93299999999999,
+      "rssMiB": 1367.375,
+      "firstFrameNumber": 1044,
+      "lastFrameNumber": 1045,
+      "firstFrameMicros": 260153866611,
+      "lastFrameMicros": 260153874944,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1045,
+          "vsyncMicros": 260153866612,
+          "buildMs": 58.384,
+          "rasterMs": 2.045,
+          "totalMs": 60.982
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "liveType",
+      "stage": "warmup",
+      "index": 4,
+      "timelineStartMicros": 260154194647,
+      "timelineEndMicros": 260154266991,
+      "callbackMs": 5.421,
+      "nextFrameMs": 72.344,
+      "frameWaitMs": 66.92299999999999,
+      "rssMiB": 1367.515625,
+      "firstFrameNumber": 1065,
+      "lastFrameNumber": 1066,
+      "firstFrameMicros": 260154199947,
+      "lastFrameMicros": 260154208281,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1066,
+          "vsyncMicros": 260154199948,
+          "buildMs": 58.305,
+          "rasterMs": 2.021,
+          "totalMs": 60.644
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "liveType",
+      "stage": "sample",
+      "index": 0,
+      "timelineStartMicros": 260154527687,
+      "timelineEndMicros": 260154597994,
+      "callbackMs": 5.386,
+      "nextFrameMs": 70.306,
+      "frameWaitMs": 64.92,
+      "rssMiB": 1363.9375,
+      "firstFrameNumber": 1086,
+      "lastFrameNumber": 1087,
+      "firstFrameMicros": 260154533284,
+      "lastFrameMicros": 260154541617,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1087,
+          "vsyncMicros": 260154533285,
+          "buildMs": 57.363,
+          "rasterMs": 1.902,
+          "totalMs": 59.334
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "liveType",
+      "stage": "sample",
+      "index": 1,
+      "timelineStartMicros": 260154852812,
+      "timelineEndMicros": 260154924910,
+      "callbackMs": 5.702,
+      "nextFrameMs": 72.097,
+      "frameWaitMs": 66.395,
+      "rssMiB": 1367.375,
+      "firstFrameNumber": 1107,
+      "lastFrameNumber": 1108,
+      "firstFrameMicros": 260154858286,
+      "lastFrameMicros": 260154866620,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1108,
+          "vsyncMicros": 260154858288,
+          "buildMs": 58.805,
+          "rasterMs": 2.02,
+          "totalMs": 61.24
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "liveType",
+      "stage": "sample",
+      "index": 2,
+      "timelineStartMicros": 260155186065,
+      "timelineEndMicros": 260155257006,
+      "callbackMs": 5.469,
+      "nextFrameMs": 70.94,
+      "frameWaitMs": 65.471,
+      "rssMiB": 1367.515625,
+      "firstFrameNumber": 1128,
+      "lastFrameNumber": 1129,
+      "firstFrameMicros": 260155191623,
+      "lastFrameMicros": 260155199956,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1129,
+          "vsyncMicros": 260155191624,
+          "buildMs": 57.978,
+          "rasterMs": 2.015,
+          "totalMs": 60.11
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "liveType",
+      "stage": "sample",
+      "index": 3,
+      "timelineStartMicros": 260155519540,
+      "timelineEndMicros": 260155590524,
+      "callbackMs": 5.161,
+      "nextFrameMs": 70.983,
+      "frameWaitMs": 65.822,
+      "rssMiB": 1364.0,
+      "firstFrameNumber": 1149,
+      "lastFrameNumber": 1150,
+      "firstFrameMicros": 260155524959,
+      "lastFrameMicros": 260155533293,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1150,
+          "vsyncMicros": 260155524960,
+          "buildMs": 57.988,
+          "rasterMs": 1.985,
+          "totalMs": 60.059
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "liveType",
+      "stage": "sample",
+      "index": 4,
+      "timelineStartMicros": 260155852751,
+      "timelineEndMicros": 260155924565,
+      "callbackMs": 5.837,
+      "nextFrameMs": 71.813,
+      "frameWaitMs": 65.976,
+      "rssMiB": 1367.921875,
+      "firstFrameNumber": 1170,
+      "lastFrameNumber": 1171,
+      "firstFrameMicros": 260155858295,
+      "lastFrameMicros": 260155866629,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1171,
+          "vsyncMicros": 260155858296,
+          "buildMs": 58.399,
+          "rasterMs": 2.214,
+          "totalMs": 61.081
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "liveType",
+      "stage": "sample",
+      "index": 5,
+      "timelineStartMicros": 260156186117,
+      "timelineEndMicros": 260156257038,
+      "callbackMs": 5.74,
+      "nextFrameMs": 70.92,
+      "frameWaitMs": 65.18,
+      "rssMiB": 1367.5625,
+      "firstFrameNumber": 1191,
+      "lastFrameNumber": 1192,
+      "firstFrameMicros": 260156191632,
+      "lastFrameMicros": 260156199965,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1192,
+          "vsyncMicros": 260156191633,
+          "buildMs": 57.748,
+          "rasterMs": 1.986,
+          "totalMs": 60.129
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "liveType",
+      "stage": "sample",
+      "index": 6,
+      "timelineStartMicros": 260156519335,
+      "timelineEndMicros": 260156589577,
+      "callbackMs": 5.136,
+      "nextFrameMs": 70.242,
+      "frameWaitMs": 65.10600000000001,
+      "rssMiB": 1364.1875,
+      "firstFrameNumber": 1212,
+      "lastFrameNumber": 1213,
+      "firstFrameMicros": 260156524968,
+      "lastFrameMicros": 260156533302,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1213,
+          "vsyncMicros": 260156524969,
+          "buildMs": 57.276,
+          "rasterMs": 1.951,
+          "totalMs": 59.303
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "liveType",
+      "stage": "sample",
+      "index": 7,
+      "timelineStartMicros": 260156846577,
+      "timelineEndMicros": 260156918324,
+      "callbackMs": 5.389,
+      "nextFrameMs": 71.746,
+      "frameWaitMs": 66.357,
+      "rssMiB": 1367.765625,
+      "firstFrameNumber": 1233,
+      "lastFrameNumber": 1234,
+      "firstFrameMicros": 260156849971,
+      "lastFrameMicros": 260156858305,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1234,
+          "vsyncMicros": 260156849972,
+          "buildMs": 58.865,
+          "rasterMs": 2.082,
+          "totalMs": 63.038
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "liveType",
+      "stage": "sample",
+      "index": 8,
+      "timelineStartMicros": 260157186107,
+      "timelineEndMicros": 260157258068,
+      "callbackMs": 5.217,
+      "nextFrameMs": 71.961,
+      "frameWaitMs": 66.744,
+      "rssMiB": 1367.890625,
+      "firstFrameNumber": 1254,
+      "lastFrameNumber": 1255,
+      "firstFrameMicros": 260157191641,
+      "lastFrameMicros": 260157199974,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1255,
+          "vsyncMicros": 260157191642,
+          "buildMs": 58.865,
+          "rasterMs": 2.217,
+          "totalMs": 61.158
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "liveType",
+      "stage": "sample",
+      "index": 9,
+      "timelineStartMicros": 260157519449,
+      "timelineEndMicros": 260157590406,
+      "callbackMs": 5.238,
+      "nextFrameMs": 70.957,
+      "frameWaitMs": 65.719,
+      "rssMiB": 1364.40625,
+      "firstFrameNumber": 1275,
+      "lastFrameNumber": 1276,
+      "firstFrameMicros": 260157524977,
+      "lastFrameMicros": 260157533311,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1276,
+          "vsyncMicros": 260157524978,
+          "buildMs": 57.922,
+          "rasterMs": 2.051,
+          "totalMs": 60.054
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "liveType",
+      "stage": "sample",
+      "index": 10,
+      "timelineStartMicros": 260157852775,
+      "timelineEndMicros": 260157923432,
+      "callbackMs": 5.633,
+      "nextFrameMs": 70.657,
+      "frameWaitMs": 65.024,
+      "rssMiB": 1368.265625,
+      "firstFrameNumber": 1296,
+      "lastFrameNumber": 1297,
+      "firstFrameMicros": 260157858314,
+      "lastFrameMicros": 260157866647,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1297,
+          "vsyncMicros": 260157858314,
+          "buildMs": 57.65,
+          "rasterMs": 2.036,
+          "totalMs": 59.962
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "liveType",
+      "stage": "sample",
+      "index": 11,
+      "timelineStartMicros": 260158186172,
+      "timelineEndMicros": 260158256964,
+      "callbackMs": 5.718,
+      "nextFrameMs": 70.791,
+      "frameWaitMs": 65.073,
+      "rssMiB": 1367.890625,
+      "firstFrameNumber": 1317,
+      "lastFrameNumber": 1318,
+      "firstFrameMicros": 260158191650,
+      "lastFrameMicros": 260158199984,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1318,
+          "vsyncMicros": 260158191651,
+          "buildMs": 57.443,
+          "rasterMs": 2.035,
+          "totalMs": 59.918
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "liveType",
+      "stage": "sample",
+      "index": 12,
+      "timelineStartMicros": 260158527624,
+      "timelineEndMicros": 260158598660,
+      "callbackMs": 5.282,
+      "nextFrameMs": 71.035,
+      "frameWaitMs": 65.753,
+      "rssMiB": 1364.28125,
+      "firstFrameNumber": 1338,
+      "lastFrameNumber": 1339,
+      "firstFrameMicros": 260158533320,
+      "lastFrameMicros": 260158541653,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1339,
+          "vsyncMicros": 260158533321,
+          "buildMs": 57.973,
+          "rasterMs": 2.072,
+          "totalMs": 60.125
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "liveType",
+      "stage": "sample",
+      "index": 13,
+      "timelineStartMicros": 260158862585,
+      "timelineEndMicros": 260158934015,
+      "callbackMs": 5.771,
+      "nextFrameMs": 71.428,
+      "frameWaitMs": 65.657,
+      "rssMiB": 1360.109375,
+      "firstFrameNumber": 1359,
+      "lastFrameNumber": 1360,
+      "firstFrameMicros": 260158866656,
+      "lastFrameMicros": 260158874990,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1360,
+          "vsyncMicros": 260158866657,
+          "buildMs": 58.122,
+          "rasterMs": 2.114,
+          "totalMs": 62.129
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "liveType",
+      "stage": "sample",
+      "index": 14,
+      "timelineStartMicros": 260159194293,
+      "timelineEndMicros": 260159264179,
+      "callbackMs": 5.437,
+      "nextFrameMs": 69.886,
+      "frameWaitMs": 64.449,
+      "rssMiB": 1365.640625,
+      "firstFrameNumber": 1380,
+      "lastFrameNumber": 1381,
+      "firstFrameMicros": 260159199993,
+      "lastFrameMicros": 260159208326,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1381,
+          "vsyncMicros": 260159199994,
+          "buildMs": 56.878,
+          "rasterMs": 2.012,
+          "totalMs": 58.979
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "liveType",
+      "stage": "sample",
+      "index": 15,
+      "timelineStartMicros": 260159521083,
+      "timelineEndMicros": 260159590570,
+      "callbackMs": 5.501,
+      "nextFrameMs": 69.486,
+      "frameWaitMs": 63.98500000000001,
+      "rssMiB": 1356.640625,
+      "firstFrameNumber": 1401,
+      "lastFrameNumber": 1402,
+      "firstFrameMicros": 260159524996,
+      "lastFrameMicros": 260159533329,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1402,
+          "vsyncMicros": 260159524997,
+          "buildMs": 56.649,
+          "rasterMs": 2.181,
+          "totalMs": 60.604
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "liveType",
+      "stage": "sample",
+      "index": 16,
+      "timelineStartMicros": 260159852801,
+      "timelineEndMicros": 260159924212,
+      "callbackMs": 5.928,
+      "nextFrameMs": 71.41,
+      "frameWaitMs": 65.482,
+      "rssMiB": 1365.59375,
+      "firstFrameNumber": 1422,
+      "lastFrameNumber": 1423,
+      "firstFrameMicros": 260159858332,
+      "lastFrameMicros": 260159866666,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1423,
+          "vsyncMicros": 260159858333,
+          "buildMs": 58.081,
+          "rasterMs": 2.133,
+          "totalMs": 60.783
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "liveType",
+      "stage": "sample",
+      "index": 17,
+      "timelineStartMicros": 260160186162,
+      "timelineEndMicros": 260160257964,
+      "callbackMs": 7.193,
+      "nextFrameMs": 71.8,
+      "frameWaitMs": 64.607,
+      "rssMiB": 1360.265625,
+      "firstFrameNumber": 1443,
+      "lastFrameNumber": 1444,
+      "firstFrameMicros": 260160191669,
+      "lastFrameMicros": 260160200002,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1444,
+          "vsyncMicros": 260160191669,
+          "buildMs": 57.174,
+          "rasterMs": 2.088,
+          "totalMs": 61.143
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "liveType",
+      "stage": "sample",
+      "index": 18,
+      "timelineStartMicros": 260160519430,
+      "timelineEndMicros": 260160590550,
+      "callbackMs": 5.367,
+      "nextFrameMs": 71.119,
+      "frameWaitMs": 65.752,
+      "rssMiB": 1361.84375,
+      "firstFrameNumber": 1464,
+      "lastFrameNumber": 1465,
+      "firstFrameMicros": 260160525005,
+      "lastFrameMicros": 260160533339,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1465,
+          "vsyncMicros": 260160525006,
+          "buildMs": 58.037,
+          "rasterMs": 2.004,
+          "totalMs": 60.122
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "liveType",
+      "stage": "sample",
+      "index": 19,
+      "timelineStartMicros": 260160852883,
+      "timelineEndMicros": 260160926020,
+      "callbackMs": 6.885,
+      "nextFrameMs": 73.136,
+      "frameWaitMs": 66.25099999999999,
+      "rssMiB": 1360.484375,
+      "firstFrameNumber": 1485,
+      "lastFrameNumber": 1486,
+      "firstFrameMicros": 260160858342,
+      "lastFrameMicros": 260160866675,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1486,
+          "vsyncMicros": 260160858342,
+          "buildMs": 58.491,
+          "rasterMs": 2.169,
+          "totalMs": 62.312
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "stage": "warmup",
+      "index": 0,
+      "timelineStartMicros": 260162319678,
+      "timelineEndMicros": 260162431203,
+      "callbackMs": 16.021,
+      "nextFrameMs": 111.523,
+      "frameWaitMs": 95.502,
+      "rssMiB": 1367.984375,
+      "firstFrameNumber": 1526,
+      "lastFrameNumber": 1527,
+      "firstFrameMicros": 260162325022,
+      "lastFrameMicros": 260162333355,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "occlusionVisible": true,
+        "screen": 1,
+        "onActiveSpace": true,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "height": 780.0,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "visible": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1527,
+          "vsyncMicros": 260162325022,
+          "buildMs": 58.697,
+          "rasterMs": 2.275,
+          "totalMs": 101.193
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "stage": "warmup",
+      "index": 1,
+      "timelineStartMicros": 260162694392,
+      "timelineEndMicros": 260162803921,
+      "callbackMs": 16.684,
+      "nextFrameMs": 109.528,
+      "frameWaitMs": 92.84400000000001,
+      "rssMiB": 1369.671875,
+      "firstFrameNumber": 1546,
+      "lastFrameNumber": 1547,
+      "firstFrameMicros": 260162700025,
+      "lastFrameMicros": 260162708359,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1547,
+          "vsyncMicros": 260162700026,
+          "buildMs": 56.862,
+          "rasterMs": 2.027,
+          "totalMs": 97.975
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "stage": "warmup",
+      "index": 2,
+      "timelineStartMicros": 260163061802,
+      "timelineEndMicros": 260163173835,
+      "callbackMs": 17.29,
+      "nextFrameMs": 112.032,
+      "frameWaitMs": 94.74199999999999,
+      "rssMiB": 1372.171875,
+      "firstFrameNumber": 1566,
+      "lastFrameNumber": 1567,
+      "firstFrameMicros": 260163066695,
+      "lastFrameMicros": 260163075029,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "occlusionVisible": true,
+        "screen": 1,
+        "onActiveSpace": true,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "height": 780.0,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "visible": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1567,
+          "vsyncMicros": 260163066695,
+          "buildMs": 58.139,
+          "rasterMs": 2.339,
+          "totalMs": 101.131
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "stage": "warmup",
+      "index": 3,
+      "timelineStartMicros": 260163437941,
+      "timelineEndMicros": 260163545979,
+      "callbackMs": 15.322,
+      "nextFrameMs": 108.036,
+      "frameWaitMs": 92.714,
+      "rssMiB": 1364.265625,
+      "firstFrameNumber": 1587,
+      "lastFrameNumber": 1588,
+      "firstFrameMicros": 260163441699,
+      "lastFrameMicros": 260163450032,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1588,
+          "vsyncMicros": 260163441699,
+          "buildMs": 57.865,
+          "rasterMs": 2.121,
+          "totalMs": 98.797
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "stage": "warmup",
+      "index": 4,
+      "timelineStartMicros": 260163802661,
+      "timelineEndMicros": 260163911905,
+      "callbackMs": 16.471,
+      "nextFrameMs": 109.243,
+      "frameWaitMs": 92.77199999999999,
+      "rssMiB": 1368.28125,
+      "firstFrameNumber": 1607,
+      "lastFrameNumber": 1608,
+      "firstFrameMicros": 260163808369,
+      "lastFrameMicros": 260163816702,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "occlusionVisible": true,
+        "screen": 1,
+        "onActiveSpace": true,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "height": 780.0,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "visible": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1608,
+          "vsyncMicros": 260163808369,
+          "buildMs": 57.332,
+          "rasterMs": 2.154,
+          "totalMs": 98.431
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "stage": "sample",
+      "index": 0,
+      "timelineStartMicros": 260164169320,
+      "timelineEndMicros": 260164278545,
+      "callbackMs": 17.087,
+      "nextFrameMs": 109.224,
+      "frameWaitMs": 92.137,
+      "rssMiB": 1370.1875,
+      "firstFrameNumber": 1627,
+      "lastFrameNumber": 1628,
+      "firstFrameMicros": 260164175039,
+      "lastFrameMicros": 260164183372,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1628,
+          "vsyncMicros": 260164175039,
+          "buildMs": 57.683,
+          "rasterMs": 2.186,
+          "totalMs": 98.401
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "stage": "sample",
+      "index": 1,
+      "timelineStartMicros": 260164536653,
+      "timelineEndMicros": 260164646600,
+      "callbackMs": 15.484,
+      "nextFrameMs": 109.946,
+      "frameWaitMs": 94.462,
+      "rssMiB": 1372.234375,
+      "firstFrameNumber": 1647,
+      "lastFrameNumber": 1648,
+      "firstFrameMicros": 260164541708,
+      "lastFrameMicros": 260164550042,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "occlusionVisible": true,
+        "screen": 1,
+        "onActiveSpace": true,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "height": 780.0,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "visible": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1648,
+          "vsyncMicros": 260164541709,
+          "buildMs": 58.216,
+          "rasterMs": 2.191,
+          "totalMs": 98.788
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "stage": "sample",
+      "index": 2,
+      "timelineStartMicros": 260164903019,
+      "timelineEndMicros": 260165012711,
+      "callbackMs": 16.647,
+      "nextFrameMs": 109.692,
+      "frameWaitMs": 93.04499999999999,
+      "rssMiB": 1370.1875,
+      "firstFrameNumber": 1667,
+      "lastFrameNumber": 1668,
+      "firstFrameMicros": 260164908379,
+      "lastFrameMicros": 260164916712,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1668,
+          "vsyncMicros": 260164908379,
+          "buildMs": 58.201,
+          "rasterMs": 2.114,
+          "totalMs": 99.165
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "stage": "sample",
+      "index": 3,
+      "timelineStartMicros": 260165269473,
+      "timelineEndMicros": 260165378381,
+      "callbackMs": 15.863,
+      "nextFrameMs": 108.907,
+      "frameWaitMs": 93.044,
+      "rssMiB": 1367.453125,
+      "firstFrameNumber": 1687,
+      "lastFrameNumber": 1688,
+      "firstFrameMicros": 260165275048,
+      "lastFrameMicros": 260165283382,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "occlusionVisible": true,
+        "screen": 1,
+        "onActiveSpace": true,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "height": 780.0,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "visible": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1688,
+          "vsyncMicros": 260165275049,
+          "buildMs": 57.898,
+          "rasterMs": 2.141,
+          "totalMs": 98.369
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "stage": "sample",
+      "index": 4,
+      "timelineStartMicros": 260165637333,
+      "timelineEndMicros": 260165747333,
+      "callbackMs": 15.614,
+      "nextFrameMs": 109.999,
+      "frameWaitMs": 94.38499999999999,
+      "rssMiB": 1364.296875,
+      "firstFrameNumber": 1707,
+      "lastFrameNumber": 1708,
+      "firstFrameMicros": 260165641718,
+      "lastFrameMicros": 260165650052,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1708,
+          "vsyncMicros": 260165641719,
+          "buildMs": 57.934,
+          "rasterMs": 2.25,
+          "totalMs": 100.442
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "stage": "sample",
+      "index": 5,
+      "timelineStartMicros": 260166002753,
+      "timelineEndMicros": 260166112065,
+      "callbackMs": 16.22,
+      "nextFrameMs": 109.311,
+      "frameWaitMs": 93.09100000000001,
+      "rssMiB": 1368.78125,
+      "firstFrameNumber": 1727,
+      "lastFrameNumber": 1728,
+      "firstFrameMicros": 260166008389,
+      "lastFrameMicros": 260166016722,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "occlusionVisible": true,
+        "screen": 1,
+        "onActiveSpace": true,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "height": 780.0,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "visible": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1728,
+          "vsyncMicros": 260166008389,
+          "buildMs": 57.956,
+          "rasterMs": 2.116,
+          "totalMs": 98.541
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "stage": "sample",
+      "index": 6,
+      "timelineStartMicros": 260166369474,
+      "timelineEndMicros": 260166479126,
+      "callbackMs": 16.717,
+      "nextFrameMs": 109.651,
+      "frameWaitMs": 92.934,
+      "rssMiB": 1370.296875,
+      "firstFrameNumber": 1747,
+      "lastFrameNumber": 1748,
+      "firstFrameMicros": 260166375059,
+      "lastFrameMicros": 260166383392,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1748,
+          "vsyncMicros": 260166375059,
+          "buildMs": 58.311,
+          "rasterMs": 2.09,
+          "totalMs": 98.777
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "stage": "sample",
+      "index": 7,
+      "timelineStartMicros": 260166736194,
+      "timelineEndMicros": 260166846602,
+      "callbackMs": 16.851,
+      "nextFrameMs": 110.407,
+      "frameWaitMs": 93.556,
+      "rssMiB": 1372.734375,
+      "firstFrameNumber": 1767,
+      "lastFrameNumber": 1768,
+      "firstFrameMicros": 260166741729,
+      "lastFrameMicros": 260166750062,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "occlusionVisible": true,
+        "screen": 1,
+        "onActiveSpace": true,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "height": 780.0,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "visible": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1768,
+          "vsyncMicros": 260166741729,
+          "buildMs": 57.88,
+          "rasterMs": 2.21,
+          "totalMs": 99.022
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "stage": "sample",
+      "index": 8,
+      "timelineStartMicros": 260167102935,
+      "timelineEndMicros": 260167214883,
+      "callbackMs": 16.824,
+      "nextFrameMs": 111.947,
+      "frameWaitMs": 95.123,
+      "rssMiB": 1368.234375,
+      "firstFrameNumber": 1787,
+      "lastFrameNumber": 1788,
+      "firstFrameMicros": 260167108399,
+      "lastFrameMicros": 260167116732,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1788,
+          "vsyncMicros": 260167108399,
+          "buildMs": 59.997,
+          "rasterMs": 2.321,
+          "totalMs": 101.37
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "stage": "sample",
+      "index": 9,
+      "timelineStartMicros": 260167477884,
+      "timelineEndMicros": 260167589489,
+      "callbackMs": 16.003,
+      "nextFrameMs": 111.604,
+      "frameWaitMs": 95.601,
+      "rssMiB": 1368.734375,
+      "firstFrameNumber": 1808,
+      "lastFrameNumber": 1809,
+      "firstFrameMicros": 260167483402,
+      "lastFrameMicros": 260167491736,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "occlusionVisible": true,
+        "screen": 1,
+        "onActiveSpace": true,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "height": 780.0,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "visible": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1809,
+          "vsyncMicros": 260167483403,
+          "buildMs": 59.852,
+          "rasterMs": 2.209,
+          "totalMs": 100.807
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "stage": "sample",
+      "index": 10,
+      "timelineStartMicros": 260167852851,
+      "timelineEndMicros": 260167964028,
+      "callbackMs": 16.087,
+      "nextFrameMs": 111.177,
+      "frameWaitMs": 95.09,
+      "rssMiB": 1367.96875,
+      "firstFrameNumber": 1828,
+      "lastFrameNumber": 1829,
+      "firstFrameMicros": 260167858406,
+      "lastFrameMicros": 260167866739,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1829,
+          "vsyncMicros": 260167858406,
+          "buildMs": 59.094,
+          "rasterMs": 2.11,
+          "totalMs": 100.281
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "stage": "sample",
+      "index": 11,
+      "timelineStartMicros": 260168219438,
+      "timelineEndMicros": 260168327739,
+      "callbackMs": 16.319,
+      "nextFrameMs": 108.299,
+      "frameWaitMs": 91.98,
+      "rssMiB": 1368.265625,
+      "firstFrameNumber": 1848,
+      "lastFrameNumber": 1849,
+      "firstFrameMicros": 260168225076,
+      "lastFrameMicros": 260168233409,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "occlusionVisible": true,
+        "screen": 1,
+        "onActiveSpace": true,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "height": 780.0,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "visible": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1849,
+          "vsyncMicros": 260168225076,
+          "buildMs": 57.142,
+          "rasterMs": 2.054,
+          "totalMs": 97.25
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "stage": "sample",
+      "index": 12,
+      "timelineStartMicros": 260168586360,
+      "timelineEndMicros": 260168695760,
+      "callbackMs": 15.851,
+      "nextFrameMs": 109.4,
+      "frameWaitMs": 93.549,
+      "rssMiB": 1368.03125,
+      "firstFrameNumber": 1868,
+      "lastFrameNumber": 1869,
+      "firstFrameMicros": 260168591746,
+      "lastFrameMicros": 260168600079,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1869,
+          "vsyncMicros": 260168591746,
+          "buildMs": 58.278,
+          "rasterMs": 2.234,
+          "totalMs": 98.68
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "stage": "sample",
+      "index": 13,
+      "timelineStartMicros": 260168952849,
+      "timelineEndMicros": 260169061883,
+      "callbackMs": 16.185,
+      "nextFrameMs": 109.033,
+      "frameWaitMs": 92.848,
+      "rssMiB": 1368.265625,
+      "firstFrameNumber": 1888,
+      "lastFrameNumber": 1889,
+      "firstFrameMicros": 260168958416,
+      "lastFrameMicros": 260168966749,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "occlusionVisible": true,
+        "screen": 1,
+        "onActiveSpace": true,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "height": 780.0,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "visible": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1889,
+          "vsyncMicros": 260168958416,
+          "buildMs": 57.669,
+          "rasterMs": 2.165,
+          "totalMs": 98.536
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "stage": "sample",
+      "index": 14,
+      "timelineStartMicros": 260169319579,
+      "timelineEndMicros": 260169428022,
+      "callbackMs": 15.576,
+      "nextFrameMs": 108.442,
+      "frameWaitMs": 92.86599999999999,
+      "rssMiB": 1367.546875,
+      "firstFrameNumber": 1908,
+      "lastFrameNumber": 1909,
+      "firstFrameMicros": 260169325086,
+      "lastFrameMicros": 260169333419,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1909,
+          "vsyncMicros": 260169325086,
+          "buildMs": 57.95,
+          "rasterMs": 2.241,
+          "totalMs": 97.974
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "stage": "sample",
+      "index": 15,
+      "timelineStartMicros": 260169686001,
+      "timelineEndMicros": 260169794765,
+      "callbackMs": 15.688,
+      "nextFrameMs": 108.763,
+      "frameWaitMs": 93.075,
+      "rssMiB": 1367.875,
+      "firstFrameNumber": 1928,
+      "lastFrameNumber": 1929,
+      "firstFrameMicros": 260169691756,
+      "lastFrameMicros": 260169700089,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "occlusionVisible": true,
+        "screen": 1,
+        "onActiveSpace": true,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "height": 780.0,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "visible": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1929,
+          "vsyncMicros": 260169691756,
+          "buildMs": 58.115,
+          "rasterMs": 2.048,
+          "totalMs": 97.733
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "stage": "sample",
+      "index": 16,
+      "timelineStartMicros": 260170052897,
+      "timelineEndMicros": 260170159365,
+      "callbackMs": 15.639,
+      "nextFrameMs": 106.467,
+      "frameWaitMs": 90.828,
+      "rssMiB": 1367.21875,
+      "firstFrameNumber": 1948,
+      "lastFrameNumber": 1949,
+      "firstFrameMicros": 260170058426,
+      "lastFrameMicros": 260170066760,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1949,
+          "vsyncMicros": 260170058426,
+          "buildMs": 56.296,
+          "rasterMs": 2.295,
+          "totalMs": 96.145
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "stage": "sample",
+      "index": 17,
+      "timelineStartMicros": 260170421361,
+      "timelineEndMicros": 260170529446,
+      "callbackMs": 14.899,
+      "nextFrameMs": 108.083,
+      "frameWaitMs": 93.184,
+      "rssMiB": 1364.390625,
+      "firstFrameNumber": 1968,
+      "lastFrameNumber": 1969,
+      "firstFrameMicros": 260170425096,
+      "lastFrameMicros": 260170433430,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "occlusionVisible": true,
+        "screen": 1,
+        "onActiveSpace": true,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "height": 780.0,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "visible": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1969,
+          "vsyncMicros": 260170425096,
+          "buildMs": 57.615,
+          "rasterMs": 2.12,
+          "totalMs": 99.256
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "stage": "sample",
+      "index": 18,
+      "timelineStartMicros": 260170786127,
+      "timelineEndMicros": 260170896705,
+      "callbackMs": 16.492,
+      "nextFrameMs": 110.578,
+      "frameWaitMs": 94.086,
+      "rssMiB": 1368.890625,
+      "firstFrameNumber": 1988,
+      "lastFrameNumber": 1989,
+      "firstFrameMicros": 260170791766,
+      "lastFrameMicros": 260170800100,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 1989,
+          "vsyncMicros": 260170791767,
+          "buildMs": 58.546,
+          "rasterMs": 2.089,
+          "totalMs": 99.592
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "livePaste",
+      "stage": "sample",
+      "index": 19,
+      "timelineStartMicros": 260171153032,
+      "timelineEndMicros": 260171262904,
+      "callbackMs": 16.469,
+      "nextFrameMs": 109.871,
+      "frameWaitMs": 93.40199999999999,
+      "rssMiB": 1369.890625,
+      "firstFrameNumber": 2008,
+      "lastFrameNumber": 2009,
+      "firstFrameMicros": 260171158436,
+      "lastFrameMicros": 260171166770,
+      "sourcePreserved": true,
+      "inputStyle": {
+        "fontFamily": "SF Mono",
+        "fontFamilyFallback": [
+          "Menlo",
+          "Monaco",
+          "monospace"
+        ],
+        "fontSize": 13.5,
+        "height": 1.62,
+        "letterSpacing": 0.5
+      },
+      "mode": "livePreview",
+      "window": {
+        "occlusionVisible": true,
+        "screen": 1,
+        "onActiveSpace": true,
+        "miniaturized": false,
+        "y": 228.0,
+        "x": 274.0,
+        "appHidden": false,
+        "generation": 0,
+        "height": 780.0,
+        "active": true,
+        "scale": 2.0,
+        "width": 1180.0,
+        "visible": true
+      },
+      "frames": [
+        {
+          "frameNumber": 2009,
+          "vsyncMicros": 260171158437,
+          "buildMs": 57.941,
+          "rasterMs": 2.192,
+          "totalMs": 99.146
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "stage": "warmup",
+      "index": 0,
+      "timelineStartMicros": 260172685265,
+      "timelineEndMicros": 260174965282,
+      "callbackMs": 0.068,
+      "nextFrameMs": 2280.016,
+      "frameWaitMs": 2279.948,
+      "rssMiB": 1280.5,
+      "firstFrameNumber": 2044,
+      "lastFrameNumber": 2045,
+      "firstFrameMicros": 260172691783,
+      "lastFrameMicros": 260172700117,
+      "sourcePreserved": true,
+      "mode": "livePreview",
+      "window": {
+        "generation": 0,
+        "x": 274.0,
+        "active": true,
+        "scale": 2.0,
+        "height": 780.0,
+        "appHidden": false,
+        "y": 228.0,
+        "onActiveSpace": true,
+        "miniaturized": false,
+        "occlusionVisible": true,
+        "width": 1180.0,
+        "visible": true,
+        "screen": 1
+      },
+      "frames": [
+        {
+          "frameNumber": 2045,
+          "vsyncMicros": 260172691785,
+          "buildMs": 72.089,
+          "rasterMs": 0.555,
+          "totalMs": 72.746
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "stage": "warmup",
+      "index": 1,
+      "timelineStartMicros": 260175193260,
+      "timelineEndMicros": 260177784961,
+      "callbackMs": 0.018,
+      "nextFrameMs": 2591.7,
+      "frameWaitMs": 2591.682,
+      "rssMiB": 1275.734375,
+      "firstFrameNumber": 2065,
+      "lastFrameNumber": 2066,
+      "firstFrameMicros": 260175200140,
+      "lastFrameMicros": 260175208473,
+      "sourcePreserved": true,
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 2066,
+          "vsyncMicros": 260175200140,
+          "buildMs": 65.656,
+          "rasterMs": 0.505,
+          "totalMs": 66.271
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "stage": "warmup",
+      "index": 2,
+      "timelineStartMicros": 260178018567,
+      "timelineEndMicros": 260180609605,
+      "callbackMs": 0.028,
+      "nextFrameMs": 2591.037,
+      "frameWaitMs": 2591.009,
+      "rssMiB": 1291.578125,
+      "firstFrameNumber": 2086,
+      "lastFrameNumber": 2087,
+      "firstFrameMicros": 260178025166,
+      "lastFrameMicros": 260178033499,
+      "sourcePreserved": true,
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 2087,
+          "vsyncMicros": 260178025166,
+          "buildMs": 57.804,
+          "rasterMs": 0.499,
+          "totalMs": 58.411
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "stage": "warmup",
+      "index": 3,
+      "timelineStartMicros": 260180835839,
+      "timelineEndMicros": 260183418129,
+      "callbackMs": 0.034,
+      "nextFrameMs": 2582.29,
+      "frameWaitMs": 2582.256,
+      "rssMiB": 1292.78125,
+      "firstFrameNumber": 2107,
+      "lastFrameNumber": 2108,
+      "firstFrameMicros": 260180841858,
+      "lastFrameMicros": 260180850192,
+      "sourcePreserved": true,
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 2108,
+          "vsyncMicros": 260180841859,
+          "buildMs": 62.393,
+          "rasterMs": 0.477,
+          "totalMs": 62.963
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "stage": "warmup",
+      "index": 4,
+      "timelineStartMicros": 260183651313,
+      "timelineEndMicros": 260186299867,
+      "callbackMs": 0.027,
+      "nextFrameMs": 2648.553,
+      "frameWaitMs": 2648.526,
+      "rssMiB": 1282.875,
+      "firstFrameNumber": 2128,
+      "lastFrameNumber": 2129,
+      "firstFrameMicros": 260183658551,
+      "lastFrameMicros": 260183666884,
+      "sourcePreserved": true,
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 2129,
+          "vsyncMicros": 260183658551,
+          "buildMs": 59.039,
+          "rasterMs": 0.503,
+          "totalMs": 59.658
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "stage": "sample",
+      "index": 0,
+      "timelineStartMicros": 260186527186,
+      "timelineEndMicros": 260189172564,
+      "callbackMs": 0.031,
+      "nextFrameMs": 2645.377,
+      "frameWaitMs": 2645.346,
+      "rssMiB": 1293.953125,
+      "firstFrameNumber": 2149,
+      "lastFrameNumber": 2150,
+      "firstFrameMicros": 260186533577,
+      "lastFrameMicros": 260186541911,
+      "sourcePreserved": true,
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 2150,
+          "vsyncMicros": 260186533578,
+          "buildMs": 60.69,
+          "rasterMs": 0.437,
+          "totalMs": 61.247
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "stage": "sample",
+      "index": 1,
+      "timelineStartMicros": 260189411259,
+      "timelineEndMicros": 260191957927,
+      "callbackMs": 0.03,
+      "nextFrameMs": 2546.668,
+      "frameWaitMs": 2546.638,
+      "rssMiB": 1294.75,
+      "firstFrameNumber": 2170,
+      "lastFrameNumber": 2171,
+      "firstFrameMicros": 260189416938,
+      "lastFrameMicros": 260189425271,
+      "sourcePreserved": true,
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 2171,
+          "vsyncMicros": 260189416939,
+          "buildMs": 62.032,
+          "rasterMs": 0.563,
+          "totalMs": 62.795
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "stage": "sample",
+      "index": 2,
+      "timelineStartMicros": 260192194973,
+      "timelineEndMicros": 260194880223,
+      "callbackMs": 0.031,
+      "nextFrameMs": 2685.249,
+      "frameWaitMs": 2685.218,
+      "rssMiB": 1287.40625,
+      "firstFrameNumber": 2190,
+      "lastFrameNumber": 2191,
+      "firstFrameMicros": 260192200296,
+      "lastFrameMicros": 260192208630,
+      "sourcePreserved": true,
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 2191,
+          "vsyncMicros": 260192200297,
+          "buildMs": 64.097,
+          "rasterMs": 0.488,
+          "totalMs": 64.75
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "stage": "sample",
+      "index": 3,
+      "timelineStartMicros": 260195105648,
+      "timelineEndMicros": 260197726839,
+      "callbackMs": 0.029,
+      "nextFrameMs": 2621.19,
+      "frameWaitMs": 2621.161,
+      "rssMiB": 1297.984375,
+      "firstFrameNumber": 2215,
+      "lastFrameNumber": 2216,
+      "firstFrameMicros": 260195110539,
+      "lastFrameMicros": 260195117498,
+      "sourcePreserved": true,
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 2216,
+          "vsyncMicros": 260195109164,
+          "buildMs": 56.779,
+          "rasterMs": 0.498,
+          "totalMs": 57.464
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "stage": "sample",
+      "index": 4,
+      "timelineStartMicros": 260197968901,
+      "timelineEndMicros": 260200565724,
+      "callbackMs": 0.03,
+      "nextFrameMs": 2596.823,
+      "frameWaitMs": 2596.7929999999997,
+      "rssMiB": 1289.703125,
+      "firstFrameNumber": 2236,
+      "lastFrameNumber": 2237,
+      "firstFrameMicros": 260197975350,
+      "lastFrameMicros": 260197983683,
+      "sourcePreserved": true,
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 2237,
+          "vsyncMicros": 260197975350,
+          "buildMs": 61.586,
+          "rasterMs": 0.519,
+          "totalMs": 62.21
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "stage": "sample",
+      "index": 5,
+      "timelineStartMicros": 260200794161,
+      "timelineEndMicros": 260203353639,
+      "callbackMs": 0.034,
+      "nextFrameMs": 2559.477,
+      "frameWaitMs": 2559.4429999999998,
+      "rssMiB": 1298.34375,
+      "firstFrameNumber": 2257,
+      "lastFrameNumber": 2258,
+      "firstFrameMicros": 260200800375,
+      "lastFrameMicros": 260200808709,
+      "sourcePreserved": true,
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 2258,
+          "vsyncMicros": 260200800376,
+          "buildMs": 62.7,
+          "rasterMs": 0.418,
+          "totalMs": 63.2
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "stage": "sample",
+      "index": 6,
+      "timelineStartMicros": 260203587151,
+      "timelineEndMicros": 260206185456,
+      "callbackMs": 0.041,
+      "nextFrameMs": 2598.304,
+      "frameWaitMs": 2598.263,
+      "rssMiB": 1296.96875,
+      "firstFrameNumber": 2277,
+      "lastFrameNumber": 2278,
+      "firstFrameMicros": 260203592068,
+      "lastFrameMicros": 260203600401,
+      "sourcePreserved": true,
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 2278,
+          "vsyncMicros": 260203592069,
+          "buildMs": 61.924,
+          "rasterMs": 0.539,
+          "totalMs": 62.552
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "stage": "sample",
+      "index": 7,
+      "timelineStartMicros": 260206430397,
+      "timelineEndMicros": 260209234893,
+      "callbackMs": 0.033,
+      "nextFrameMs": 2804.495,
+      "frameWaitMs": 2804.462,
+      "rssMiB": 1347.9375,
+      "firstFrameNumber": 2297,
+      "lastFrameNumber": 2298,
+      "firstFrameMicros": 260206433761,
+      "lastFrameMicros": 260206442094,
+      "sourcePreserved": true,
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 2298,
+          "vsyncMicros": 260206433761,
+          "buildMs": 63.294,
+          "rasterMs": 0.438,
+          "totalMs": 63.81
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "stage": "sample",
+      "index": 8,
+      "timelineStartMicros": 260209472607,
+      "timelineEndMicros": 260212140018,
+      "callbackMs": 0.034,
+      "nextFrameMs": 2667.411,
+      "frameWaitMs": 2667.377,
+      "rssMiB": 1344.296875,
+      "firstFrameNumber": 2317,
+      "lastFrameNumber": 2318,
+      "firstFrameMicros": 260209475455,
+      "lastFrameMicros": 260209483789,
+      "sourcePreserved": true,
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 2318,
+          "vsyncMicros": 260209475456,
+          "buildMs": 58.948,
+          "rasterMs": 0.564,
+          "totalMs": 59.612
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "stage": "sample",
+      "index": 9,
+      "timelineStartMicros": 260212368782,
+      "timelineEndMicros": 260214979800,
+      "callbackMs": 0.028,
+      "nextFrameMs": 2611.017,
+      "frameWaitMs": 2610.989,
+      "rssMiB": 1353.59375,
+      "firstFrameNumber": 2338,
+      "lastFrameNumber": 2339,
+      "firstFrameMicros": 260212375482,
+      "lastFrameMicros": 260212383816,
+      "sourcePreserved": true,
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 2339,
+          "vsyncMicros": 260212375483,
+          "buildMs": 59.786,
+          "rasterMs": 0.482,
+          "totalMs": 60.357
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "stage": "sample",
+      "index": 10,
+      "timelineStartMicros": 260215222057,
+      "timelineEndMicros": 260217788199,
+      "callbackMs": 0.033,
+      "nextFrameMs": 2566.141,
+      "frameWaitMs": 2566.108,
+      "rssMiB": 1351.828125,
+      "firstFrameNumber": 2358,
+      "lastFrameNumber": 2359,
+      "firstFrameMicros": 260215225508,
+      "lastFrameMicros": 260215233842,
+      "sourcePreserved": true,
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 2359,
+          "vsyncMicros": 260215225509,
+          "buildMs": 57.827,
+          "rasterMs": 0.438,
+          "totalMs": 58.35
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "stage": "sample",
+      "index": 11,
+      "timelineStartMicros": 260218019827,
+      "timelineEndMicros": 260220605230,
+      "callbackMs": 0.027,
+      "nextFrameMs": 2585.403,
+      "frameWaitMs": 2585.3759999999997,
+      "rssMiB": 1355.53125,
+      "firstFrameNumber": 2379,
+      "lastFrameNumber": 2380,
+      "firstFrameMicros": 260218025535,
+      "lastFrameMicros": 260218033868,
+      "sourcePreserved": true,
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 2380,
+          "vsyncMicros": 260218025536,
+          "buildMs": 60.513,
+          "rasterMs": 0.537,
+          "totalMs": 61.139
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "stage": "sample",
+      "index": 12,
+      "timelineStartMicros": 260220844281,
+      "timelineEndMicros": 260223401750,
+      "callbackMs": 0.027,
+      "nextFrameMs": 2557.469,
+      "frameWaitMs": 2557.442,
+      "rssMiB": 1347.75,
+      "firstFrameNumber": 2400,
+      "lastFrameNumber": 2401,
+      "firstFrameMicros": 260220850561,
+      "lastFrameMicros": 260220858894,
+      "sourcePreserved": true,
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 2401,
+          "vsyncMicros": 260220850562,
+          "buildMs": 60.271,
+          "rasterMs": 0.435,
+          "totalMs": 60.813
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "stage": "sample",
+      "index": 13,
+      "timelineStartMicros": 260223635634,
+      "timelineEndMicros": 260226213290,
+      "callbackMs": 0.033,
+      "nextFrameMs": 2577.655,
+      "frameWaitMs": 2577.6220000000003,
+      "rssMiB": 1360.46875,
+      "firstFrameNumber": 2421,
+      "lastFrameNumber": 2422,
+      "firstFrameMicros": 260223642254,
+      "lastFrameMicros": 260223650587,
+      "sourcePreserved": true,
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 2422,
+          "vsyncMicros": 260223642254,
+          "buildMs": 62.571,
+          "rasterMs": 0.441,
+          "totalMs": 63.132
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "stage": "sample",
+      "index": 14,
+      "timelineStartMicros": 260226453673,
+      "timelineEndMicros": 260233332478,
+      "callbackMs": 0.034,
+      "nextFrameMs": 6878.803,
+      "frameWaitMs": 6878.769,
+      "rssMiB": 1361.375,
+      "firstFrameNumber": 2441,
+      "lastFrameNumber": 2442,
+      "firstFrameMicros": 260226458947,
+      "lastFrameMicros": 260226467280,
+      "sourcePreserved": true,
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 2442,
+          "vsyncMicros": 260226458947,
+          "buildMs": 63.177,
+          "rasterMs": 0.567,
+          "totalMs": 63.848
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "stage": "sample",
+      "index": 15,
+      "timelineStartMicros": 260234332057,
+      "timelineEndMicros": 260240701953,
+      "callbackMs": 0.17,
+      "nextFrameMs": 6369.895,
+      "frameWaitMs": 6369.725,
+      "rssMiB": 1378.75,
+      "firstFrameNumber": 2449,
+      "lastFrameNumber": 2450,
+      "firstFrameMicros": 260234217349,
+      "lastFrameMicros": 260234342352,
+      "sourcePreserved": true,
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 2450,
+          "vsyncMicros": 260234334020,
+          "buildMs": 386.319,
+          "rasterMs": 4.011,
+          "totalMs": 391.339
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "stage": "sample",
+      "index": 16,
+      "timelineStartMicros": 260240935641,
+      "timelineEndMicros": 260243495669,
+      "callbackMs": 0.034,
+      "nextFrameMs": 2560.027,
+      "frameWaitMs": 2559.993,
+      "rssMiB": 1388.484375,
+      "firstFrameNumber": 2470,
+      "lastFrameNumber": 2471,
+      "firstFrameMicros": 260240942413,
+      "lastFrameMicros": 260240950746,
+      "sourcePreserved": true,
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 2471,
+          "vsyncMicros": 260240942414,
+          "buildMs": 57.481,
+          "rasterMs": 0.46,
+          "totalMs": 58.006
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "stage": "sample",
+      "index": 17,
+      "timelineStartMicros": 260243722447,
+      "timelineEndMicros": 260246295601,
+      "callbackMs": 0.033,
+      "nextFrameMs": 2573.153,
+      "frameWaitMs": 2573.12,
+      "rssMiB": 1387.359375,
+      "firstFrameNumber": 2490,
+      "lastFrameNumber": 2491,
+      "firstFrameMicros": 260243725772,
+      "lastFrameMicros": 260243734106,
+      "sourcePreserved": true,
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 2491,
+          "vsyncMicros": 260243725772,
+          "buildMs": 63.217,
+          "rasterMs": 0.485,
+          "totalMs": 63.803
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "stage": "sample",
+      "index": 18,
+      "timelineStartMicros": 260246521753,
+      "timelineEndMicros": 260249119712,
+      "callbackMs": 0.032,
+      "nextFrameMs": 2597.957,
+      "frameWaitMs": 2597.9249999999997,
+      "rssMiB": 1392.515625,
+      "firstFrameNumber": 2510,
+      "lastFrameNumber": 2511,
+      "firstFrameMicros": 260246525798,
+      "lastFrameMicros": 260246534131,
+      "sourcePreserved": true,
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "width": 1180.0,
+        "onActiveSpace": true,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 2511,
+          "vsyncMicros": 260246525799,
+          "buildMs": 64.029,
+          "rasterMs": 0.496,
+          "totalMs": 64.631
+        }
+      ]
+    },
+    {
+      "bytes": 1048576,
+      "operation": "readToLive",
+      "stage": "sample",
+      "index": 19,
+      "timelineStartMicros": 260249344391,
+      "timelineEndMicros": 260251958701,
+      "callbackMs": 0.033,
+      "nextFrameMs": 2614.309,
+      "frameWaitMs": 2614.2760000000003,
+      "rssMiB": 1383.90625,
+      "firstFrameNumber": 2531,
+      "lastFrameNumber": 2532,
+      "firstFrameMicros": 260249350824,
+      "lastFrameMicros": 260249359158,
+      "sourcePreserved": true,
+      "mode": "livePreview",
+      "window": {
+        "height": 780.0,
+        "visible": true,
+        "occlusionVisible": true,
+        "y": 228.0,
+        "x": 274.0,
+        "onActiveSpace": true,
+        "width": 1180.0,
+        "screen": 1,
+        "generation": 0,
+        "appHidden": false,
+        "scale": 2.0,
+        "miniaturized": false,
+        "active": true
+      },
+      "frames": [
+        {
+          "frameNumber": 2532,
+          "vsyncMicros": 260249350826,
+          "buildMs": 63.471,
+          "rasterMs": 0.503,
+          "totalMs": 64.071
+        }
+      ]
+    }
+  ]
+}

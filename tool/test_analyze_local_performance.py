@@ -46,6 +46,11 @@ class LocalPerformanceValidationTest(unittest.TestCase):
     def test_accepts_full_workload(self):
         self.assertEqual(len(validate_data(self.data, self.trace)), 675)
 
+    def test_rejects_attribution_protocol(self):
+        self.data['protocol'] = 'r4-attribution-only-v1'
+        with self.assertRaisesRegex(ValueError, 'protocol'):
+            validate_data(self.data, self.trace)
+
     def test_rejects_missing_sample(self):
         self.data['records'].pop()
         with self.assertRaisesRegex(ValueError, 'samples'):

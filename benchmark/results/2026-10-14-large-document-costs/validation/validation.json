@@ -1,0 +1,85 @@
+{
+  "runtimeRevision": "6a57e55bf2fb21df3d4786c5fc7a67349ffee79d",
+  "date": "2026-10-14",
+  "checkLocalBuildLocalRelease": {
+    "exitCode": 0,
+    "coreTests": 972,
+    "exampleTests": 35,
+    "appTests": 301,
+    "appExistingSkipped": 1,
+    "apiTests": 8,
+    "pythonTests": 27,
+    "processingBudgetCases": 32,
+    "mermaidFlutterTests": 9,
+    "mermaidRustTests": 4,
+    "nativeExampleTests": 3,
+    "clipboardTests": 6,
+    "quickLookRustTests": 8,
+    "quickLookSwiftChecks": 10,
+    "nativeImport": "passed",
+    "mainBuilds": [
+      "example Debug",
+      "app Debug",
+      "example Release",
+      "app Release"
+    ]
+  },
+  "checkPackage": {
+    "exitCode": 0,
+    "files": 185,
+    "uncompressedBytes": 3055129,
+    "pubCompressedSize": "697 KB",
+    "warnings": 0,
+    "exampleTests": "passed",
+    "externalSnapshotTests": "passed",
+    "workspacePathLeak": false
+  },
+  "gui": {
+    "buildMode": "Release (default diagnostics disabled)",
+    "example": [
+      "Source full replacement with Chinese, emoji and combining mark",
+      "undo/redo of replacement",
+      "Host save callback invoked observed",
+      "Source to Read to Live preserves displayed text"
+    ],
+    "app": [
+      "original CRLF 81 bytes: 10 words, 57 Unicode scalars, two outline labels",
+      "replace title and text: 11 words, 55 Unicode scalars, outline updates",
+      "undo restores original outline, statistics and Saved state",
+      "undo plus save restores all original CRLF bytes",
+      "redo plus save matches all 79 LF bytes of replacement",
+      "Read and Live display same content",
+      "close and reopen file: Saved, updated outline and statistics"
+    ],
+    "limits": [
+      "CUA text/selection actions are not a new physical keyboard or native IME acceptance",
+      "CUA attempted caret movement after mode change left the Flutter selection active; subsequent keystroke replaced that selection and entered composition; cancellation and undo restored the saved snapshot",
+      "No VoiceOver run; no accessibility support claim"
+    ]
+  },
+  "artifacts": {
+    "check-local-release.log.gz": "d58bbb309324f6cb3597d30402dc27ca6a9c4e20a6a947a1eca9b810357390fa",
+    "final-check-package.log.gz": "6beb361f1e09d52dd37bf5f8dfc80482b3108ea23a79540fc15da0ddf629dbf7",
+    "check-package.log.gz": "4b829f03595f7713ea41baf5d38c3888036f4cf5bb07a9a115119c92cbf44aa1",
+    "gui/edited-lf.md": "fed88e87de4799835273b767ab32ef83bb9baf16202378f2968919a5691ed148",
+    "gui/original-crlf.md": "ad020bd827ad27d2282d4a28ae811e9dd51ae8209670898d57c20a6624ba450b"
+  },
+  "finalCheckPackage": {
+    "exitCode": 0,
+    "files": 185,
+    "uncompressedBytes": 3055744,
+    "pubCompressedSize": "697 KB",
+    "warnings": 0,
+    "exampleTests": "passed",
+    "externalSnapshotTests": "passed",
+    "workspacePathLeak": false
+  },
+  "candidateRuntimeRestoredToFrozenInputs": true,
+  "measuredRuntimeCI": {
+    "revision": "6a57e55bf2fb21df3d4786c5fc7a67349ffee79d",
+    "core": "https://github.com/robinfai/ianvs-markdown/actions/runs/38504975875",
+    "native": "https://github.com/robinfai/ianvs-markdown/actions/runs/38504975881",
+    "conclusion": "success",
+    "finalDocumentationHead": "must be checked separately on PR #25"
+  }
+}

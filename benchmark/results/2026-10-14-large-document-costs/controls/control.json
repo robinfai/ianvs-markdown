@@ -1,0 +1,19 @@
+{
+  "purpose": "Same-environment causal control; not a replacement baseline or candidate repetition",
+  "sourceRevision": "6a57e55bf2fb21df3d4786c5fc7a67349ffee79d",
+  "restoreFrom": "e12b701fac98d82013f3a63f22e5cdb96eba6a22",
+  "restoredAppFiles": [
+    "app/lib/src/models/document_session.dart",
+    "app/lib/src/widgets/editor_shell.dart",
+    "app/lib/src/widgets/floating_outline.dart"
+  ],
+  "unusedFile": "document_analysis.dart remains on disk but is not referenced by the restored app",
+  "temporaryDiagnosticPatch": "../attribution/small-attribution.patch",
+  "controlProfilerEnabled": false,
+  "fullProtocolValidation": "825 records, complete, source/window/frame/file hashes valid",
+  "observedSmallP95Ms": {
+    "liveType": 45.182,
+    "livePaste": 44.068
+  },
+  "limit": "One full control plus CPU controls supports non-attribution to this app optimization; does not explain historical native wait drift or satisfy original observation lines."
+}

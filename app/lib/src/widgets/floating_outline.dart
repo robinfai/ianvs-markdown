@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 
 import '../models/document_session.dart';
+import '../models/document_analysis.dart';
 import '../desktop_theme.dart';
 import '../desktop_typography.dart';
 import '../app_icons.dart';
@@ -43,7 +44,7 @@ class FloatingOutline extends StatelessWidget {
                 child: ValueListenableBuilder<TextEditingValue>(
                   valueListenable: document.controller,
                   builder: (context, value, _) {
-                    final headings = _headings(value.text);
+                    final headings = document.analysis.headings(value.text);
                     if (headings.isEmpty) {
                       return Center(
                         child: Padding(
@@ -104,36 +105,7 @@ class FloatingOutline extends StatelessWidget {
   }
 }
 
-class _OutlineHeading {
-  const _OutlineHeading({
-    required this.offset,
-    required this.level,
-    required this.text,
-  });
-
-  final int offset;
-  final int level;
-  final String text;
-}
-
-List<_OutlineHeading> _headings(String source) {
-  final result = <_OutlineHeading>[];
-  for (final block in parseMarkdownBlocks(source)) {
-    if (block.type != IanvsMarkdownBlockType.heading) continue;
-    final parsed = parseMarkdownHeadings(block.source);
-    if (parsed.isEmpty) continue;
-    result.add(
-      _OutlineHeading(
-        offset: block.start,
-        level: parsed.first.level,
-        text: parsed.first.text,
-      ),
-    );
-  }
-  return result;
-}
-
-bool _isSelectedHeading(List<_OutlineHeading> headings, int index, int offset) {
+bool _isSelectedHeading(List<DocumentHeading> headings, int index, int offset) {
   final current = headings[index];
   final next = index + 1 < headings.length ? headings[index + 1] : null;
   return offset >= current.offset && (next == null || offset < next.offset);
@@ -146,7 +118,7 @@ class _OutlineTile extends StatelessWidget {
     required this.onTap,
   });
 
-  final _OutlineHeading heading;
+  final DocumentHeading heading;
   final bool selected;
   final VoidCallback onTap;
 

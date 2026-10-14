@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:ui' show FramePhase, PlatformDispatcher;
 
 import 'package:flutter/foundation.dart';
@@ -12,6 +13,7 @@ import 'corpus.dart';
 import 'probe_stub.dart' if (dart.library.io) 'probe_io.dart';
 
 const localPerformanceEnabled = bool.fromEnvironment('IANVS_LOCAL_PERFORMANCE');
+const _attribution = bool.fromEnvironment('IANVS_PERF_ATTRIBUTION');
 
 /// Host wiring only. The existing main, editor tree and file services remain.
 class LocalPerformanceHost {
@@ -251,8 +253,14 @@ class LocalPerformanceRun {
       expected = source.replaceRange(offset, offset, input);
       nextInput = local.replaced(local.selection, input);
     }
+    final nativeBefore = _attribution
+        ? await LocalWindowEnvironment.channel.invokeMapMethod<String, Object?>(
+            'inputSnapshot',
+          )
+        : null;
     final first = stamp;
     final firstNumber = PlatformDispatcher.instance.frameData.frameNumber;
+    final timelineStart = _attribution ? developer.Timeline.now : null;
     final watch = Stopwatch()..start();
     int? tailPasses;
     switch (operation) {
@@ -305,6 +313,7 @@ class LocalPerformanceRun {
     await frame();
     final latencyMs = watch.elapsedMicroseconds / 1000;
     watch.stop();
+    final timelineEnd = _attribution ? developer.Timeline.now : null;
     final last = stamp;
     final lastNumber = PlatformDispatcher.instance.frameData.frameNumber;
     final rss = probeRssMiB;
@@ -321,8 +330,19 @@ class LocalPerformanceRun {
       throw StateError('Save bytes/dirty mismatch');
     }
     final after = await environment.check();
+    final nativeAfter = _attribution
+        ? await LocalWindowEnvironment.channel.invokeMapMethod<String, Object?>(
+            'inputSnapshot',
+          )
+        : null;
     final record = <String, Object?>{
       ...identity,
+      if (_attribution) ...{
+        'nativeBefore': nativeBefore,
+        'nativeAfter': nativeAfter,
+        'timelineStartMicros': timelineStart,
+        'timelineEndMicros': timelineEnd,
+      },
       'callbackMs': callbackMs,
       'nextFrameMs': latencyMs,
       'frameWaitMs': latencyMs - callbackMs,
@@ -361,6 +381,14 @@ class LocalPerformanceRun {
         throw StateError('Opt-in Profile/Release main required');
       }
       storage = await ProbeStorage.create(host.entry);
+      if (_attribution) {
+        final info = await developer.Service.getInfo();
+        await storage!.diagnostic({
+          'vmService': info.serverUri?.toString(),
+          'entry': host.entry,
+          'purpose': 'CPU attribution only; never acceptance',
+        });
+      }
       updateStatus('Running ${host.entry}; keep this window in front');
       FlutterError.onError = (details) {
         errors.add(details.exceptionAsString());
@@ -389,6 +417,7 @@ class LocalPerformanceRun {
         'monoFontFamilyFallback': theme.monoFontFamilyFallback,
       };
       for (final bytes in localCorpusSizes) {
+        if (_attribution && bytes != 1048576) continue;
         size = bytes;
         source = localCorpus(bytes);
         filePath = await storage!.fixture(bytes, source);
@@ -408,6 +437,16 @@ class LocalPerformanceRun {
           if (host.open != null) 'open',
           if (host.save != null) 'save',
         ]) {
+          if (_attribution &&
+              !const {
+                'readToLive',
+                'sourceType',
+                'liveType',
+                'sourcePaste',
+                'livePaste',
+              }.contains(operation)) {
+            continue;
+          }
           updateStatus(
             '${host.entry}: $bytes / $operation\nEvidence: ${storage!.path}',
           );
@@ -475,7 +514,7 @@ class LocalPerformanceRun {
 
   Map<String, Object?> result(bool complete) => {
     'schemaVersion': 1,
-    'protocol': 'r4-main-entry-v1',
+    'protocol': _attribution ? 'r4-attribution-only-v1' : 'r4-main-entry-v1',
     'sourceRevision': const String.fromEnvironment('IANVS_PERF_REVISION'),
     'inputsDigest': const String.fromEnvironment('IANVS_PERF_INPUTS'),
     'entry': host.entry,
