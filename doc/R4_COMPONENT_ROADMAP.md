@@ -5,6 +5,8 @@
 [命令路由报告](../benchmark/COMMAND-ROUTING-2026-10-13.md)。R4-02 的双入口各两轮基线与原始证据见
 [性能报告](../benchmark/MAIN-ENTRY-PERFORMANCE-2026-10-13.md)。R4-03 已完成热点归因及
 app 最小计算优化和两轮有效配对，目标未全部满足；详见 [本批报告](../benchmark/LARGE-DOCUMENT-COSTS-2026-10-14.md)。
+原生生命周期续批已定位全文写入和小文档输入法激活，交付 Live 块身份修复，并完成获授权的
+TextKit 1 诊断实验；新人工复核与无跟踪两轮仍待完成，候选尚未决定保留。见 [续批报告](../benchmark/NATIVE-TEXT-LIFECYCLE-2026-10-14.md)。
 依据是当前源码、测试和 R0–R3 已归档结果；已知限制、代码路径风险和新能力建议分别标记。
 任务状态与总数只在 [ROADMAP 的 R4 表](../ROADMAP.md#r4-下一阶段任务) 维护。
 

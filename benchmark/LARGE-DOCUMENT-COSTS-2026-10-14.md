@@ -6,6 +6,9 @@ example Read→Live 仍约 2.66 秒。另有两项 10 KiB Live 场景超出历�
 同环境旧实现控制轮也复现。配对结果为 `valid=true, passed=false`，不关闭 R4-03。
 交付通过 [PR #25](https://github.com/robinfai/ianvs-markdown/pull/25) 分步提交。
 
+后续原生激活顺序、Live 块身份与 TextKit 兼容实验见 [续批报告](NATIVE-TEXT-LIFECYCLE-2026-10-14.md)。
+本文件保留 PR #25 的历史结论，后续结果不覆盖旧样本。
+
 ## 实现前的目标和归因方案
 
 沿用 [R4-02 协议](LOCAL-PERFORMANCE-PROTOCOL.md) 与两轮冻结证据。example 1 MiB

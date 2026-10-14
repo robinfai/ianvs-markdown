@@ -112,3 +112,40 @@ Live paste 36.233 / 41.680 ms；仍有输入法激活成本，不能称为全面
 完整本地门禁在组件修复后通过：核心 975、example 35、app 301（另 1 跳过）、API 8、
 Python 27、原生与可选集成；两个 main Debug/Release 成功。发布快照 189 文件、699 KB、
 零警告，快照 example 与包外 smoke 均通过。原生实验后的构建与验收另行追加。
+
+## Release 复核与当前接续点
+
+受控候选提交 `373d206`，已移除诊断补丁；两个 main 的普通 Debug/Release 与
+正式 Profile 构建成功。对照期间只重建 app Release，随后恢复候选；Profile 两个
+可执行文件及 App.framework 的 SHA-256 均仍与冻结一致。
+
+电脑工具复核：example Source 的中文/emoji/CRLF、保存回调、输入与撤销正常；Live
+段落输入后撤销恢复原文。app 使用本轮临时 `native-input.md`，Live 插入 x 后保存的
+磁盘字节精确等于原文加该字符，11 个 CRLF 保留；菜单 File→Save 后直接输入 q，
+仍在同一段落末尾，撤销回到 Saved；重开后正文和表格正确。
+
+同时发现工具路径的限制：CUA `super+s` 后出现全文选区，下一次输入会覆盖该选区；
+已撤销未保存的替换。以相同 Dart 代码、仅移除 app 原生兼容 override 的 TextKit 2
+Release 控制，也复现同样全选。因此不能认定由 TextKit 1 引入，也不能据此声称物理
+键盘正常。CUA paste 自身也可能保留选区；工具的 End 没有折叠，Right 后续输有效。
+这些观察独立记在 `gui/automated-release.json`，不隐去，不计作物理键盘验收。
+
+已准备并保留两个候选 Release 窗口，向用户请求本轮两入口 Source/Live 的物理拼音
+确认/取消、候选期间 Undo/Read、⌘S 后直接续输，以及有限 VoiceOver 定位/朗读/续输。
+**目前尚未收到这轮人工结果。原生候选未作保留决定，PR #26 保持草稿，未合入主线。**
+
+接续顺序：
+
+1. 记录本轮人工结果；若出现候选回退，保留证据并撤回原生 override，不能沿用旧 IME 验收。
+2. 人工操作结束后关闭两个 Release，使用冻结于 `builds/r403-native-candidate/freeze.json`
+   的两个无跟踪 Profile main。串行跑 example-1、example-2、app-1、app-2 四个新进程。
+   采样期间不构建、不运行测试、不打开其他窗口；失焦轮整轮保留并重测。
+3. 按原协议收集 2,400 正式 / 600 预热，以原 R4-02 四轮和原 R4-03 目标比较全部 60 项。
+   不把本报告中的归因轮充当正式两轮，不改变 39.03 / 40.6548 ms 小文档观察线。
+4. 完整记录结论与是否保留兼容措施；只在验收满足时关闭 R4-03。最终提交头的 Core / Native
+   CI 通过后再合入，随后同步主工作区。外部真实宿主留到最终分发阶段提醒。
+
+提交顺序：`6cecabe` 记录激活顺序及撤回宽度实验；`d30d62b` 保留 Live 块身份；
+`373d206` 提交受控的 macOS 27 TextKit 候选与诊断。当前候选的双 SDK Core CI 已通过，
+Native CI 仍在运行；文档提交的最终门禁以 [PR #26 Checks](https://github.com/robinfai/ianvs-markdown/pull/26/checks)
+为准。正式性能配对尚未开始，R4-03 状态不变。
