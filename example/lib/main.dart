@@ -40,13 +40,9 @@ class _ExampleAppState extends State<ExampleApp> {
           IanvsMarkdownThemeData.dark,
         ],
       ),
-      home: Semantics(
-        container: true,
-        explicitChildNodes: true,
-        child: MarkdownExample(
-          dark: _dark,
-          onToggleTheme: () => setState(() => _dark = !_dark),
-        ),
+      home: MarkdownExample(
+        dark: _dark,
+        onToggleTheme: () => setState(() => _dark = !_dark),
       ),
     );
   }
