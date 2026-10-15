@@ -1,0 +1,276 @@
+{
+  "r403-small-tk1-example-invalid-1": {
+    "complete": false,
+    "errors": [
+      "Bad state: Window changed: {miniaturized: false, onActiveSpace: true, y: 228.0, width: 1180.0, active: false, scale: 2.0, height: 780.0, occlusionVisible: true, generation: 1, appHidden: false, visible: true, screen: 1, x: 274.0}"
+    ],
+    "records": 150,
+    "operations": {
+      "sourceToRead": {
+        "p50": 89.666,
+        "p95": 94.637,
+        "maximum": 98.044
+      },
+      "liveType": {
+        "p50": 29.008,
+        "p95": 35.205,
+        "maximum": 35.895
+      },
+      "livePaste": {
+        "p50": 31.185,
+        "p95": 33.809,
+        "maximum": 33.823
+      }
+    },
+    "batch": "2026-10-15"
+  },
+  "r403-small-identity-after": {
+    "complete": true,
+    "errors": [],
+    "records": 125,
+    "operations": {
+      "liveType": {
+        "p50": 35.05,
+        "p95": 38.913,
+        "maximum": 40.83
+      },
+      "livePaste": {
+        "p50": 37.209,
+        "p95": 41.454,
+        "maximum": 41.576
+      }
+    },
+    "batch": "previous-batch-context-only"
+  },
+  "r403-small-before": {
+    "complete": true,
+    "errors": [],
+    "records": 125,
+    "operations": {
+      "liveType": {
+        "p50": 41.145,
+        "p95": 45.627,
+        "maximum": 46.517
+      },
+      "livePaste": {
+        "p50": 42.654,
+        "p95": 46.252,
+        "maximum": 46.646
+      }
+    },
+    "batch": "previous-batch-context-only"
+  },
+  "r403-small-identity-invalid-1": {
+    "complete": false,
+    "errors": [
+      "Bad state: Window changed: {height: 780.0, scale: 2.0, y: 228.0, visible: true, onActiveSpace: true, active: false, occlusionVisible: true, miniaturized: false, generation: 1, x: 264.0, screen: 1, width: 1200.0, appHidden: false}"
+    ],
+    "records": 0,
+    "operations": {},
+    "batch": "previous-batch-context-only"
+  },
+  "r403-small-tk1-example-deferred": {
+    "complete": true,
+    "errors": [],
+    "records": 150,
+    "operations": {
+      "sourceToRead": {
+        "p50": 89.706,
+        "p95": 95.849,
+        "maximum": 97.547
+      },
+      "liveType": {
+        "p50": 29.698,
+        "p95": 33.157,
+        "maximum": 33.511
+      },
+      "livePaste": {
+        "p50": 32.534,
+        "p95": 35.009,
+        "maximum": 38.225
+      }
+    },
+    "batch": "2026-10-15"
+  },
+  "r403-small-tk2-example-invalid-1": {
+    "complete": false,
+    "errors": [
+      "Bad state: Window changed: {miniaturized: false, x: 274.0, visible: true, width: 1180.0, y: 228.0, occlusionVisible: true, screen: 1, onActiveSpace: true, scale: 2.0, generation: 1, active: false, appHidden: false, height: 780.0}"
+    ],
+    "records": 75,
+    "operations": {
+      "liveType": {
+        "p50": 30.147,
+        "p95": 32.363,
+        "maximum": 32.382
+      }
+    },
+    "batch": "2026-10-15"
+  },
+  "r403-small-lifecycle-before": {
+    "complete": true,
+    "errors": [],
+    "records": 125,
+    "operations": {
+      "liveType": {
+        "p50": 39.319,
+        "p95": 42.139,
+        "maximum": 42.213
+      },
+      "livePaste": {
+        "p50": 43.123,
+        "p95": 83.206,
+        "maximum": 94.079
+      }
+    },
+    "batch": "previous-batch-context-only"
+  },
+  "r403-small-tk1-app-deferred": {
+    "complete": true,
+    "errors": [],
+    "records": 175,
+    "operations": {
+      "sourceToRead": {
+        "p50": 79.362,
+        "p95": 83.074,
+        "maximum": 86.163
+      },
+      "liveType": {
+        "p50": 34.127,
+        "p95": 40.283,
+        "maximum": 41.68
+      },
+      "livePaste": {
+        "p50": 37.194,
+        "p95": 41.542,
+        "maximum": 41.996
+      },
+      "save": {
+        "p50": 24.699,
+        "p95": 30.602,
+        "maximum": 38.317
+      }
+    },
+    "batch": "2026-10-15"
+  },
+  "r403-small-tk1-example": {
+    "complete": true,
+    "errors": [],
+    "records": 150,
+    "operations": {
+      "sourceToRead": {
+        "p50": 94.84,
+        "p95": 271.805,
+        "maximum": 273.891
+      },
+      "liveType": {
+        "p50": 29.635,
+        "p95": 31.741,
+        "maximum": 31.923
+      },
+      "livePaste": {
+        "p50": 32.539,
+        "p95": 33.741,
+        "maximum": 34.003
+      }
+    },
+    "batch": "2026-10-15"
+  },
+  "r403-small-tk1-app": {
+    "complete": true,
+    "errors": [],
+    "records": 175,
+    "operations": {
+      "sourceToRead": {
+        "p50": 81.978,
+        "p95": 90.707,
+        "maximum": 295.787
+      },
+      "liveType": {
+        "p50": 35.08,
+        "p95": 246.689,
+        "maximum": 251.434
+      },
+      "livePaste": {
+        "p50": 39.831,
+        "p95": 248.622,
+        "maximum": 249.465
+      },
+      "save": {
+        "p50": 25.791,
+        "p95": 38.887,
+        "maximum": 106.134
+      }
+    },
+    "batch": "2026-10-15"
+  },
+  "r403-small-tk2-app": {
+    "complete": true,
+    "errors": [],
+    "records": 175,
+    "operations": {
+      "sourceToRead": {
+        "p50": 80.964,
+        "p95": 85.107,
+        "maximum": 85.409
+      },
+      "liveType": {
+        "p50": 38.789,
+        "p95": 41.703,
+        "maximum": 43.098
+      },
+      "livePaste": {
+        "p50": 39.009,
+        "p95": 42.798,
+        "maximum": 43.261
+      },
+      "save": {
+        "p50": 21.562,
+        "p95": 28.981,
+        "maximum": 29.414
+      }
+    },
+    "batch": "2026-10-15"
+  },
+  "r403-small-tk2-example": {
+    "complete": true,
+    "errors": [],
+    "records": 150,
+    "operations": {
+      "sourceToRead": {
+        "p50": 87.934,
+        "p95": 92.991,
+        "maximum": 95.964
+      },
+      "liveType": {
+        "p50": 29.991,
+        "p95": 31.923,
+        "maximum": 32.197
+      },
+      "livePaste": {
+        "p50": 33.835,
+        "p95": 36.374,
+        "maximum": 36.639
+      }
+    },
+    "batch": "2026-10-15"
+  },
+  "r403-small-current": {
+    "complete": true,
+    "errors": [],
+    "records": 125,
+    "operations": {
+      "liveType": {
+        "p50": 39.943,
+        "p95": 44.19,
+        "maximum": 44.724
+      },
+      "livePaste": {
+        "p50": 42.077,
+        "p95": 46.432,
+        "maximum": 47.239
+      }
+    },
+    "batch": "previous-batch-context-only"
+  }
+}

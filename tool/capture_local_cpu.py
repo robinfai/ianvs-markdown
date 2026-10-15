@@ -1,11 +1,29 @@
 #!/usr/bin/env python3
 """Capture CPU attribution from an opt-in actual main; not a latency baseline."""
 import argparse
+from collections import Counter
 import json
 from pathlib import Path
 import time
 from urllib.parse import urlencode, urlparse
 from urllib.request import urlopen
+
+
+def summarize_functions(profile):
+    inclusive, exclusive = Counter(), Counter()
+    for sample in profile['samples']:
+        stack = sample['stack']
+        inclusive.update(set(stack))
+        if stack:
+            exclusive[stack[0]] += 1
+    functions = []
+    for index, item in enumerate(profile['functions']):
+        ref = item['function']
+        functions.append(dict(name=ref.get('name'), owner=ref.get('owner', {}).get('name'),
+                              kind=item['kind'], source=item.get('resolvedUrl'),
+                              inclusiveTicks=inclusive[index],
+                              exclusiveTicks=exclusive[index]))
+    return functions
 
 
 def main():
@@ -16,7 +34,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--timeout', type=int, default=600)
     parser.add_argument('--operations', nargs='+', default=['sourceType', 'sourcePaste', 'liveType', 'livePaste', 'readToLive'])
-    parser.add_argument('--all-samples', action='store_true', help='Keep every measured interval, including zero-CPU waits')
+    parser.add_argument('--all-samples', action='store_true', help='Extract all intervals after completion, including zero-CPU waits')
     args = parser.parse_args()
     deadline = time.monotonic() + args.timeout
     if args.source_parent:
@@ -49,6 +67,19 @@ def main():
     captured = set()
     deadline = time.monotonic() + args.timeout
     while time.monotonic() < deadline:
+        if args.all_samples:
+            # getCpuSamples can pause the UI isolate at a safepoint. Extract only
+            # after the entire run; never query the VM between timed actions.
+            result_file = args.source / 'result.json'
+            try:
+                result = json.loads(result_file.read_text()) if result_file.exists() else {}
+            except json.JSONDecodeError:
+                result = {}
+            if result.get('errors'):
+                raise RuntimeError(f"Diagnostic run invalid: {result['errors']}")
+            if not result.get('complete'):
+                time.sleep(.2)
+                continue
         trace = args.source / 'trace.jsonl'
         lines = trace.read_text().splitlines() if trace.exists() else []
         for line in lines:
@@ -71,13 +102,7 @@ def main():
                 raise RuntimeError(f'No CPU samples for {operation}')
             profile['action'] = event
             (args.output / f'{key}.cpu.json').write_text(json.dumps(profile, indent=2) + '\n')
-            functions = []
-            for item in profile['functions']:
-                ref = item['function']
-                functions.append(dict(name=ref.get('name'), owner=ref.get('owner', {}).get('name'),
-                                      kind=item['kind'], source=item.get('resolvedUrl'),
-                                      inclusiveTicks=int(item.get('inclusiveTicks', 0)),
-                                      exclusiveTicks=int(item.get('exclusiveTicks', 0))))
+            functions = summarize_functions(profile)
             summary = dict(entry=metadata['entry'], operation=operation, sampleCount=profile['sampleCount'],
                            samplePeriodMicros=profile['samplePeriod'], nextFrameMs=event['nextFrameMs'],
                            topInclusive=sorted(functions, key=lambda f: f['inclusiveTicks'], reverse=True)[:40],
