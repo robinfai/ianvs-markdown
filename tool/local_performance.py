@@ -65,6 +65,7 @@ def build(args):
                f"--dart-define=IANVS_PERF_INPUTS={frozen['inputsDigest']}"]
         if args.attribution:
             cmd.append('--dart-define=IANVS_PERF_ATTRIBUTION=true')
+            cmd.append(f'--dart-define=IANVS_PERF_ATTRIBUTION_BYTES={args.attribution_bytes}')
         print(f'Building {entry} main ({args.mode})', flush=True)
         with (out / f'{entry}.log').open('w') as log:
             code = subprocess.run(cmd, cwd=ROOT / entry, env=env, stdout=log, stderr=subprocess.STDOUT).returncode
@@ -130,6 +131,7 @@ def main():
     p.add_argument('--mode', choices=['profile', 'release'], default='profile')
     p.add_argument('--tag', required=True)
     p.add_argument('--attribution', action='store_true', help='CPU-only filtered run, rejected by acceptance validator')
+    p.add_argument('--attribution-bytes', type=int, choices=[10240, 102400, 1048576], default=1048576)
     p = sub.add_parser('collect')
     p.add_argument('--freeze', type=Path, required=True)
     p.add_argument('--source', type=Path, required=True)
