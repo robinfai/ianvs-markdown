@@ -141,6 +141,8 @@ class IanvsMarkdownController extends TextEditingController {
   IanvsMarkdownRenderDecision get parseDecision => _parseDecision;
 
   void _refreshParseState(String source) {
+    _syntaxSpanKey = null;
+    _syntaxSpan = null;
     _parseDecision = IanvsMarkdownEditorDiagnostics.measure(
       'controller.preflight',
       () => scanMarkdownForRendering(source, budget: parseBudget),
@@ -164,6 +166,8 @@ class IanvsMarkdownController extends TextEditingController {
   late TextEditingValue _lastObservedValue;
   late MarkdownLinkReferenceContext _linkReferences;
   String _savedText;
+  Object? _syntaxSpanKey;
+  TextSpan? _syntaxSpan;
   Timer? _coalescingTimer;
   var _historyIndex = 0;
   var _historyTextBytes = 0;
@@ -823,13 +827,20 @@ class IanvsMarkdownController extends TextEditingController {
   }) {
     final syntax = syntaxTheme;
     if (syntax == null || !parseDecision.useMarkdown) {
+      _syntaxSpanKey = null;
+      _syntaxSpan = null;
       return super.buildTextSpan(
         context: context,
         style: style,
         withComposing: withComposing,
       );
     }
-    return IanvsMarkdownEditorDiagnostics.measure(
+    // A save/host rebuild can request the same styled source repeatedly.
+    // Keep only the current value, including selection/composing and every
+    // style input. Theme objects are recreated by the source widget each build.
+    final key = (value, style, withComposing, _syntaxThemeKey(syntax));
+    if (_syntaxSpanKey == key) return _syntaxSpan!;
+    final span = IanvsMarkdownEditorDiagnostics.measure(
       'source.syntaxSpans',
       () => buildMarkdownSourceTextSpan(
         value,
@@ -839,11 +850,15 @@ class IanvsMarkdownController extends TextEditingController {
         linkReferenceLabels: _linkReferences.labels,
       ),
     );
+    _syntaxSpanKey = key;
+    return _syntaxSpan = span;
   }
 
   @override
   void dispose() {
     _disposed = true;
+    _syntaxSpanKey = null;
+    _syntaxSpan = null;
     removeListener(_handleValueChanged);
     _coalescingTimer?.cancel();
     _mode.dispose();
@@ -853,6 +868,37 @@ class IanvsMarkdownController extends TextEditingController {
     super.dispose();
   }
 }
+
+// Internal bridge: the controller refreshes references before any listener.
+// A stricter controller budget may leave them unparsed; Live then parses under
+// its own budget instead. No source or selection is changed.
+MarkdownLinkReferenceContext? ianvsMarkdownControllerReferences(
+  IanvsMarkdownController controller,
+  String source,
+) =>
+    controller.text == source &&
+        controller._lastObservedValue.text == source &&
+        controller.parseDecision.useMarkdown
+    ? controller._linkReferences
+    : null;
+
+Object _syntaxThemeKey(IanvsMarkdownSyntaxTheme theme) => (
+  theme.heading,
+  theme.marker,
+  theme.link,
+  theme.code,
+  theme.comment,
+  theme.inlineCodeMarker,
+  theme.codeBlock,
+  theme.strong,
+  theme.emphasis,
+  theme.strikethrough,
+  theme.wikiLink,
+  theme.tag,
+  theme.highlight,
+  theme.math,
+  theme.darkCodeHighlighting,
+);
 
 final _markdownInlineWordPattern = RegExp(r'[\p{L}\p{N}_]+', unicode: true);
 
