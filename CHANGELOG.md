@@ -1,5 +1,11 @@
 ## Unreleased
 
+- Reuse source spans for unchanged editing values and styles after saving or
+  rebuilding, share current reference definitions with Live, and keep a bounded
+  cache of code-background vector paths. Preserve composing, full source,
+  budgets, storage durability and original pixels. Measurement scope is tracked
+  in the [small-document report](benchmark/SMALL-DOCUMENT-LATENCY-2026-10-15.md).
+
 - Use the public TextKit 1 compatibility path for the two macOS hosts' hidden
   Flutter text-input view on macOS 27, before activation and outside composition.
   Keep full text, selection and accessibility intact. Two paired Profile runs
