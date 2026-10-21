@@ -50,6 +50,7 @@ import 'inline_code.dart';
 import 'inline_link.dart';
 import 'list_guide.dart';
 import 'markdown_table_syntax.dart';
+import 'table_layout.dart';
 import 'math.dart';
 import 'markdown_document.dart';
 import 'obsidian_autolink.dart';
@@ -2409,6 +2410,7 @@ MarkdownStyleSheet ianvsMarkdownStyleSheet(
       fontSize: 14.5,
       height: 1.58,
     ),
+    tableColumnWidth: const AdaptiveMarkdownColumnWidth(),
     tableBorder: TableBorder.all(color: colors.borderSoft),
     tableHead: TextStyle(
       color: colors.textPrimary,

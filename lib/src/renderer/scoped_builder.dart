@@ -7,6 +7,11 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:markdown/markdown.dart' as md;
 
+import '../table_layout.dart';
+import '../inline_link.dart';
+import '../inline_code.dart';
+import '../theme.dart';
+
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 const Set<String> _standardBlockTags = <String>{
@@ -45,6 +50,9 @@ class _BlockElement {
 
 class _TableElement {
   final List<TableRow> rows = <TableRow>[];
+  final List<List<String>> labels = <List<String>>[];
+  final List<List<InlineSpan>> spans = <List<InlineSpan>>[];
+  final List<List<double>> extraWidths = <List<double>>[];
 }
 
 /// A collection of widgets that should be placed adjacent to (inline with)
@@ -263,6 +271,9 @@ class ScopedMarkdownBuilder implements md.NodeVisitor {
         } else {
           decoration = null;
         }
+        _tables.single.labels.add(<String>[]);
+        _tables.single.spans.add(<InlineSpan>[]);
+        _tables.single.extraWidths.add(<double>[]);
         _tables.single.rows.add(
           TableRow(
             decoration: decoration,
@@ -495,7 +506,9 @@ class ScopedMarkdownBuilder implements md.NodeVisitor {
           );
         }
       } else if (tag == 'table') {
-        if (styleSheet.tableColumnWidth is FixedColumnWidth ||
+        if (styleSheet.tableColumnWidth is AdaptiveMarkdownColumnWidth) {
+          child = _buildAdaptiveTable();
+        } else if (styleSheet.tableColumnWidth is FixedColumnWidth ||
             styleSheet.tableColumnWidth is IntrinsicColumnWidth) {
           child = _ScrollControllerBuilder(
             builder:
@@ -607,6 +620,10 @@ class ScopedMarkdownBuilder implements md.NodeVisitor {
           isHeader: isHeaderCell,
         );
         _tables.single.rows.last.children.add(child);
+        final measure = _tableCellMeasure(element);
+        _tables.single.labels.last.add(measure.$1.toPlainText());
+        _tables.single.spans.last.add(measure.$1);
+        _tables.single.extraWidths.last.add(measure.$2);
       } else if (tag == 'a') {
         if (!builders.containsKey('a')) {
           _linkHandlers.removeLast();
@@ -648,22 +665,120 @@ class ScopedMarkdownBuilder implements md.NodeVisitor {
     _lastVisitedTag = tag;
   }
 
-  Widget _buildTable() {
-    final Table table = Table(
+  // Preserve built-in inline typography and control chrome in width hints.
+  // Custom widgets keep their explicit host column-width escape hatch.
+  (TextSpan, double) _tableCellMeasure(md.Node node) {
+    if (node is md.Text) return (TextSpan(text: node.text), 0);
+    if (node is! md.Element) return (const TextSpan(), 0);
+    if (node.tag == 'br') return (const TextSpan(text: '\n'), 0);
+    if (node.tag == 'img') {
+      return (TextSpan(text: node.attributes['alt'] ?? ''), 0);
+    }
+    var style = styleSheet.styles[node.tag];
+    var extra = 0.0;
+    if (node.tag == 'ianvs-inline-code') style = styleSheet.code;
+    final codeBuilder = builders[node.tag];
+    if (codeBuilder is IanvsMarkdownInlineCodeBuilder) {
+      style = (style ?? const TextStyle()).merge(
+        ianvsMarkdownInlineCodeStyle(
+          IanvsMarkdownThemeData.resolve(delegate.context, codeBuilder.theme),
+        ),
+      );
+    }
+    final linkBuilder = builders['a'];
+    if (node.tag == 'a' && linkBuilder is IanvsMarkdownInlineLinkBuilder) {
+      final wiki = node.attributes['data-ianvs-wiki-link'] == 'true';
+      final tag = node.attributes['data-ianvs-tag'] == 'true';
+      final href = node.attributes['href'];
+      final file =
+          !wiki &&
+          !tag &&
+          linkBuilder.enableFileLinkChips &&
+          looksLikeMarkdownFileReference(href, node.textContent);
+      if (file || tag) {
+        style = (style ?? const TextStyle()).copyWith(
+          fontSize: 12.5,
+          height: 1.25,
+          fontWeight: FontWeight.w600,
+        );
+        // Include icon, gap, padding and border, not the hidden destination.
+        extra = file ? 33 : 14;
+      } else {
+        final scheme = Uri.tryParse(href ?? '')?.scheme.toLowerCase();
+        extra = wiki ? 4 : (scheme == 'http' || scheme == 'https' ? 18 : 5);
+      }
+    }
+    final children = <InlineSpan>[];
+    for (final child in node.children ?? const <md.Node>[]) {
+      final measured = _tableCellMeasure(child);
+      children.add(measured.$1);
+      extra += measured.$2;
+    }
+    return (TextSpan(style: style, children: children), extra);
+  }
+
+  Widget _buildAdaptiveTable() {
+    final model = _tables.removeLast();
+    final context = delegate.context;
+    final inherited = DefaultTextStyle.of(context).style;
+    final padding = styleSheet.tablePadding ?? EdgeInsets.zero;
+    return MarkdownTableLayout(
+      rows: model.labels,
+      spans: model.spans,
+      extraWidths: model.extraWidths,
+      bodyStyle: inherited.merge(styleSheet.tableBody),
+      headerStyle: inherited.merge(styleSheet.tableHead),
+      textScaler: styleSheet.textScaler ?? MediaQuery.textScalerOf(context),
+      textDirection: Directionality.of(context),
+      locale: Localizations.maybeLocaleOf(context),
+      horizontalPadding: styleSheet.tableCellsPadding!.horizontal,
+      headerHorizontalPadding: styleSheet.tableHeadCellsPadding?.horizontal,
+      horizontalInset: padding.horizontal,
+      builder: (context, widths) {
+        final width = widths.fold(0.0, (sum, width) => sum + width);
+        return _ScrollControllerBuilder(
+          builder: (context, controller, child) => Scrollbar(
+            controller: controller,
+            thumbVisibility: styleSheet.tableScrollbarThumbVisibility,
+            child: SingleChildScrollView(
+              controller: controller,
+              scrollDirection: Axis.horizontal,
+              padding: padding,
+              child: child,
+            ),
+          ),
+          child: SizedBox(
+            width: width,
+            child: _tableWithRows(
+              model.rows,
+              columnWidths: {
+                for (var index = 0; index < widths.length; index++)
+                  index: FixedColumnWidth(widths[index]),
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTable() => _tableWithRows(_tables.removeLast().rows);
+
+  Widget _tableWithRows(
+    List<TableRow> rows, {
+    Map<int, TableColumnWidth>? columnWidths,
+  }) {
+    final table = Table(
       defaultColumnWidth: styleSheet.tableColumnWidth!,
+      columnWidths: columnWidths,
       defaultVerticalAlignment: styleSheet.tableVerticalAlignment,
       border: styleSheet.tableBorder,
-      children: _tables.removeLast().rows,
+      children: rows,
     );
-
-    // Clip the table to the border radius if one is specified
-    final BorderRadiusGeometry? borderRadius =
-        styleSheet.tableBorder?.borderRadius;
-    if (borderRadius != null) {
-      return ClipRRect(borderRadius: borderRadius, child: table);
-    }
-
-    return table;
+    final borderRadius = styleSheet.tableBorder?.borderRadius;
+    return borderRadius == null
+        ? table
+        : ClipRRect(borderRadius: borderRadius, child: table);
   }
 
   Widget _buildImage(String src, String? title, String? alt) {

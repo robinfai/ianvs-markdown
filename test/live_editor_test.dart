@@ -15080,10 +15080,18 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
           .width,
       greaterThan(700),
     );
-    expect(tester.getSize(find.byType(Table)).width, greaterThan(670));
-    expect(table.defaultColumnWidth, isA<IntrinsicColumnWidth>());
-    expect(table.columnWidths?[0], isA<IntrinsicColumnWidth>());
-    expect(table.columnWidths?[1], isA<IntrinsicColumnWidth>());
+    expect(
+      tester.getSize(find.byType(Table)).width,
+      lessThanOrEqualTo(
+        tester
+            .getSize(
+              find.byKey(const ValueKey('ianvs-markdown-editable-table')),
+            )
+            .width,
+      ),
+    );
+    expect(table.columnWidths?[0], isA<FixedColumnWidth>());
+    expect(table.columnWidths?[1], isA<FixedColumnWidth>());
     final border = table.border!;
     expect(border.top.color, IanvsMarkdownThemeData.light.borderSoft);
     expect(

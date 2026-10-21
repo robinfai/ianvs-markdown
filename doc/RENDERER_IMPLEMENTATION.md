@@ -12,7 +12,7 @@
 
 | 文件 | 来源与有意差异 |
 | --- | --- |
-| `scoped_builder.dart` | 上游 `lib/src/builder.dart`；类型改名，块标签改为每次构建独立的 Set。核心要求提供图片回调，因此移除不可达的默认文件/网络加载分支；URI 分段和回调参数保持原语义 |
+| `scoped_builder.dart` | 上游 `lib/src/builder.dart`；类型改名，块标签改为每次构建独立的 Set。核心要求提供图片回调，因此移除不可达的默认文件/网络加载分支；URI 分段和回调参数保持原语义。默认 Markdown 表格使用内部内容感知列宽与横向滚动，显式宿主列宽策略保持上游行为，见 [表格布局](TABLE_LAYOUT.md) |
 | `scoped_body.dart` | 上游 `lib/src/widget.dart` 的 State 桥接；继续使用公共 `MarkdownBody` 构造和布局；调用内部 builder，增加默认关闭的解析/Widget 构建阶段计时 |
 | `fallback_style_io.dart` / `fallback_style_web.dart` | 上游同名平台辅助文件中的样式回退部分；保持原有 native 平台和 Web user-agent 判定及 text scaler |
 

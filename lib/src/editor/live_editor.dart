@@ -35,6 +35,7 @@ import '../rich_clipboard.dart';
 import '../task_checkbox.dart';
 import '../task_syntax.dart';
 import '../theme.dart';
+import '../table_layout.dart';
 import '../wiki_embed.dart';
 import '../wiki_link_reference.dart';
 import 'editor_controller.dart';

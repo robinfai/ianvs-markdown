@@ -200,6 +200,7 @@ class _EditableMarkdownTable extends StatefulWidget {
 class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
   static const double _handleExtent = 16;
   static const double _minimumCellHeight = 32;
+  static const double _cellCursorWidth = 1.5;
 
   final GlobalKey _tableGeometryKey = GlobalKey(
     debugLabel: 'ianvs-markdown-table-geometry',
@@ -213,6 +214,16 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
   final Map<int, double> _rowHandleLengths = {};
   final Map<int, double> _columnHandleLengths = {};
   late _EditableTableModel _model;
+  final ScrollController _horizontalScrollController = ScrollController();
+  MarkdownTableMetrics? _widthMetrics;
+  String? _metricsSource;
+  TextStyle? _metricsStyle;
+  TextStyle? _metricsCodeStyle;
+  TextStyle? _metricsStrongStyle;
+  TextStyle? _metricsEmphasisStyle;
+  TextScaler? _metricsScaler;
+  TextDirection? _metricsDirection;
+  Locale? _metricsLocale;
   String? _pendingFocusKey;
   _TableFocusPlacement _pendingFocusPlacement = _TableFocusPlacement.start;
   _TableDragAxis? _dragAxis;
@@ -300,7 +311,36 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
   }
 
   void _handleCellFocusChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {});
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      for (final entry in _focusNodes.entries) {
+        if (!entry.value.hasFocus) continue;
+        final target = _cellGeometryKeys[entry.key]?.currentContext
+            ?.findRenderObject();
+        if (target != null && _horizontalScrollController.hasClients) {
+          final position = _horizontalScrollController.position;
+          // Both edges matter: Tab may move off the trailing edge, while
+          // Shift+Tab / backward arrows may move off the leading edge. These
+          // zero-duration calls leave an already visible cell in place and
+          // only scroll this table, not the document's vertical viewport.
+          unawaited(
+            position.ensureVisible(
+              target,
+              alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+            ),
+          );
+          unawaited(
+            position.ensureVisible(
+              target,
+              alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtStart,
+            ),
+          );
+        }
+        break;
+      }
+    });
   }
 
   void _handleCellControllerChanged(
@@ -822,6 +862,7 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
 
   @override
   void dispose() {
+    _horizontalScrollController.dispose();
     for (final controller in _controllers.values) {
       controller.dispose();
     }
@@ -846,13 +887,61 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
     final direction = Directionality.of(context);
     final rowCount = _model.rows.length;
     final columnCount = _model.rows.first.length;
+    final textScaler = MediaQuery.textScalerOf(context);
+    final locale = Localizations.maybeLocaleOf(context);
+    final theme = Theme.of(context);
+    final inputStyle = theme.useMaterial3
+        ? theme.textTheme.bodyLarge!
+        : theme.textTheme.titleMedium!;
+    final measurementStyle = inputStyle.copyWith(
+      fontSize: 13.5,
+      height: 1.35,
+      fontWeight: FontWeight.w400,
+    );
+    if (_widthMetrics == null ||
+        _metricsSource != widget.block.source ||
+        _metricsStyle != measurementStyle ||
+        _metricsCodeStyle != syntaxTheme.code ||
+        _metricsStrongStyle != syntaxTheme.strong ||
+        _metricsEmphasisStyle != syntaxTheme.emphasis ||
+        _metricsScaler != textScaler ||
+        _metricsDirection != direction ||
+        _metricsLocale != locale) {
+      final spans = [
+        for (final row in _model.rows)
+          [
+            for (final cell in row)
+              _tableCellDisplaySpan(cell.text, syntaxTheme: syntaxTheme),
+          ],
+      ];
+      _widthMetrics = MarkdownTableMetrics.measure(
+        rows: [
+          for (final row in spans) [for (final span in row) span.toPlainText()],
+        ],
+        spans: spans,
+        bodyStyle: measurementStyle,
+        headerStyle: measurementStyle.copyWith(fontWeight: FontWeight.w600),
+        textScaler: textScaler,
+        textDirection: direction,
+        locale: locale,
+        // RenderEditable reserves cursorWidth + a 1px caret gap in addition
+        // to InputDecoration padding, including in an unfocused cell.
+        horizontalPadding: 20 + _cellCursorWidth + 1,
+      );
+      _metricsSource = widget.block.source;
+      _metricsStyle = measurementStyle;
+      _metricsCodeStyle = syntaxTheme.code;
+      _metricsStrongStyle = syntaxTheme.strong;
+      _metricsEmphasisStyle = syntaxTheme.emphasis;
+      _metricsScaler = textScaler;
+      _metricsDirection = direction;
+      _metricsLocale = locale;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _syncTableHandleLengths();
     });
-    return SizedBox(
-      key: const ValueKey('ianvs-markdown-editable-table'),
-      width: double.infinity,
-      child: Semantics(
+    Widget tableSurface(List<double> widths) {
+      return Semantics(
         container: true,
         explicitChildNodes: true,
         label: IanvsMarkdownMessage.editableTable.resolve(context),
@@ -865,7 +954,10 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                 key: _tableGeometryKey,
                 defaultVerticalAlignment: TableCellVerticalAlignment.middle,
                 defaultColumnWidth: const IntrinsicColumnWidth(),
-                columnWidths: _obsidianTableColumnWidths(_model),
+                columnWidths: {
+                  for (var column = 0; column < widths.length; column++)
+                    column: FixedColumnWidth(widths[column]),
+                },
                 border: TableBorder.all(color: widget.colors.borderSoft),
                 children: [
                   for (final row in _model.rows)
@@ -968,7 +1060,7 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                                               : FontWeight.w400,
                                         ),
                                         cursorColor: widget.colors.accent,
-                                        cursorWidth: 1.5,
+                                        cursorWidth: _cellCursorWidth,
                                         decoration: const InputDecoration(
                                           // The table owns cell backgrounds; host
                                           // form-field fills must not cover them.
@@ -1156,6 +1248,36 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
             ),
           ],
         ),
+      );
+    }
+
+    return SizedBox(
+      key: const ValueKey('ianvs-markdown-editable-table'),
+      width: double.infinity,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final widths = _widthMetrics!.resolve(
+            constraints.maxWidth - _handleExtent * 2,
+          );
+          final width = widths.fold(0.0, (sum, value) => sum + value);
+          return Scrollbar(
+            controller: _horizontalScrollController,
+            child: SingleChildScrollView(
+              key: const ValueKey('ianvs-markdown-table-horizontal-scroll'),
+              // Structural drags own pointer movement; do not also pan the
+              // viewport underneath the reorder target geometry.
+              physics: _dragAxis == null
+                  ? null
+                  : const NeverScrollableScrollPhysics(),
+              controller: _horizontalScrollController,
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: width + _handleExtent * 2,
+                child: tableSurface(widths),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -1439,55 +1561,13 @@ final class _EditableTableModel {
 
 enum _EditableTableAlignment { none, left, center, right }
 
-Map<int, TableColumnWidth> _obsidianTableColumnWidths(
-  _EditableTableModel model,
-) {
-  if (model.rows.isEmpty || model.rows.first.isEmpty) {
-    return const <int, TableColumnWidth>{};
-  }
-  final columnCount = model.rows.first.length;
-  final contentScores = List<int>.filled(columnCount, 1);
-  for (final row in model.rows) {
-    for (var column = 0; column < row.length; column += 1) {
-      final score = _tableCellDisplayScore(row[column].text);
-      if (score > contentScores[column]) contentScores[column] = score;
-    }
-  }
-  final largestScore = contentScores.reduce((left, right) {
-    return left > right ? left : right;
-  });
-  final flexibleThreshold = largestScore * .8;
-  return <int, TableColumnWidth>{
-    for (var column = 0; column < columnCount; column += 1)
-      column: _WrappingIntrinsicColumnWidth(
-        columnCount: columnCount,
-        flex: contentScores[column] >= flexibleThreshold ? 1 : null,
-      ),
-  };
-}
+String _tableCellDisplayText(String source) =>
+    _tableCellDisplaySpan(source).toPlainText();
 
-final class _WrappingIntrinsicColumnWidth extends IntrinsicColumnWidth {
-  const _WrappingIntrinsicColumnWidth({required this.columnCount, super.flex});
-
-  final int columnCount;
-
-  @override
-  double minIntrinsicWidth(Iterable<RenderBox> cells, double containerWidth) {
-    // Long tokens can exceed the document width. Let them wrap so columns stay
-    // inside the table's painted and interactive bounds, while retaining their
-    // content-based preferred widths and flex allocation.
-    return math.min(
-      super.minIntrinsicWidth(cells, containerWidth),
-      containerWidth / columnCount,
-    );
-  }
-}
-
-int _tableCellDisplayScore(String source) {
-  return _tableCellDisplayText(source).runes.length;
-}
-
-String _tableCellDisplayText(String source) {
+TextSpan _tableCellDisplaySpan(
+  String source, {
+  IanvsMarkdownSyntaxTheme? syntaxTheme,
+}) {
   var visible = _protectTableCellEscapes(source).replaceAllMapped(
     RegExp(r'\[\[([^\]|]+)(?:\|([^\]]+))?\]\]'),
     (match) => match.group(2) ?? match.group(1) ?? '',
@@ -1501,11 +1581,28 @@ String _tableCellDisplayText(String source) {
     (match) => match.group(1) ?? '',
   );
   final document = md.Document(extensionSet: md.ExtensionSet.gitHubFlavored);
-  final plain = document
-      .parseInline(visible)
-      .map((node) => node.textContent)
-      .join();
-  return _restoreTableCellEscapes(plain);
+  TextSpan spanFor(md.Node node) {
+    if (node is md.Text) {
+      return TextSpan(text: _restoreTableCellEscapes(node.text));
+    }
+    if (node is! md.Element) return const TextSpan();
+    if (node.tag == 'br') return const TextSpan(text: '\n');
+    return TextSpan(
+      style: switch (node.tag) {
+        'code' => syntaxTheme?.code,
+        'strong' => syntaxTheme?.strong,
+        'em' => syntaxTheme?.emphasis,
+        _ => null,
+      },
+      children: [
+        for (final child in node.children ?? <md.Node>[]) spanFor(child),
+      ],
+    );
+  }
+
+  return TextSpan(
+    children: document.parseInline(visible).map(spanFor).toList(),
+  );
 }
 
 const _tableEscapePlaceholderBase = 0xf0000;
