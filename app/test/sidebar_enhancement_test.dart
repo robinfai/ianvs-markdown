@@ -17,6 +17,16 @@ void main() {
   late MemoryWorkspaceSessionStore store;
   final errors = <String>[];
   setUp(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('work.ianvs.linefold/workspace'),
+          (call) async => call.method == 'normalizeAttachmentPaths'
+              ? [
+                  for (final value in (call.arguments as Map)['values'] as List)
+                    (value as String).toLowerCase(),
+                ]
+              : null,
+        );
     files = _FailingFiles()..selectedFolder = '/vault';
     files.files.addAll({
       '/vault/a.md': '# A',
@@ -38,6 +48,11 @@ void main() {
     errors.clear();
   });
   tearDown(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('work.ianvs.linefold/workspace'),
+          null,
+        );
     workspace.dispose();
     await files.dispose();
   });
@@ -147,6 +162,10 @@ void main() {
       await tester.tap(find.widgetWithText(ListTile, 'docs'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Move Here'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('move-without-updating-links')),
+      );
       await tester.pumpAndSettle();
       expect(files.files['/vault/docs/a.md'], '# A');
       expect(files.files['/vault/b.md'], '# B');
@@ -324,6 +343,11 @@ void main() {
       await tester.enterText(editor, 'renamed.md');
       await tester.testTextInput.receiveAction(TextInputAction.done);
       await tester.pumpAndSettle();
+      expect(workspace.activeDocument?.path, '/vault/新笔记.md');
+      await tester.tap(
+        find.byKey(const ValueKey('move-without-updating-links')),
+      );
+      await tester.pumpAndSettle();
       expect(workspace.activeDocument?.path, '/vault/renamed.md');
       expect(workspace.activeDocument?.controller.text, 'draft');
       expect(workspace.activeDocument?.controller.isDirty, isTrue);
@@ -376,6 +400,9 @@ void main() {
     await tester.tap(find.widgetWithText(ListTile, 'docs'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Move Here'));
+    await tester.pumpAndSettle();
+    expect(files.files, containsPair('/vault/a.md', '# A'));
+    await tester.tap(find.byKey(const ValueKey('move-without-updating-links')));
     await tester.pumpAndSettle();
     expect(files.files, containsPair('/vault/docs/a.md', '# A'));
     expect(files.files, containsPair('/vault/docs/b.md', '# B'));
@@ -466,6 +493,8 @@ void main() {
     await tester.pump();
     await drag.up();
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('move-without-updating-links')));
+    await tester.pumpAndSettle();
     expect(files.files['/vault/deep.md'], '# Deep');
     expect(files.files, isNot(contains('/vault/docs/deep.md')));
     expect(errors, isEmpty);
@@ -492,6 +521,8 @@ void main() {
     await tester.pump();
     expect(find.text('Move to vault'), findsOneWidget);
     await drag.up();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('move-without-updating-links')));
     await tester.pumpAndSettle();
     expect(files.files['/vault/deep.md'], '# Deep');
     expect(files.files, isNot(contains('/vault/docs/deep.md')));
@@ -539,6 +570,8 @@ void main() {
     expect(find.text('Move to vault'), findsOneWidget);
     await drag.up();
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('move-without-updating-links')));
+    await tester.pumpAndSettle();
     expect(files.files['/vault/deep.md'], '# Deep');
     expect(files.files['/vault/a.md'], '# A');
     expect(errors, isEmpty);
@@ -574,6 +607,8 @@ void main() {
     await tester.pump();
     await drag.up();
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('move-without-updating-links')));
+    await tester.pumpAndSettle();
     expect(document.path, '/vault/nested/draft.md');
     expect(document.controller.text, 'unsaved');
     expect(document.controller.isDirty, isTrue);
@@ -600,6 +635,8 @@ void main() {
     await tester.pump();
     await gesture.up();
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('move-without-updating-links')));
+    await tester.pumpAndSettle();
     expect(files.files, contains('/vault/docs/a.md'));
     await tester.tap(find.text('docs'));
     await tester.pumpAndSettle();
@@ -614,6 +651,8 @@ void main() {
     await back.moveTo(tester.getCenter(find.text('vault')));
     await tester.pump();
     await back.up();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('move-without-updating-links')));
     await tester.pumpAndSettle();
     expect(files.files, contains('/vault/a.md'));
     expect(errors, isEmpty);

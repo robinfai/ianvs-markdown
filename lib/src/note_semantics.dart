@@ -151,6 +151,17 @@ IanvsMarkdownNoteSemantics parseIanvsMarkdownNoteSemantics(String source) {
     final active = <IanvsMarkdownSemanticSourceRegion>[];
     final document = md.Document(extensionSet: md.ExtensionSet.gitHubFlavored);
     for (final region in regions) {
+      final unsupportedContext = region.unsupportedContext;
+      if (unsupportedContext != null) {
+        collector.issue(
+          unsupportedContext,
+          unsupportedContext == 'calloutContext'
+              ? 'Recursive callout renderer contexts are not source-indexed.'
+              : 'Inline footnote expansion is not source-indexed.',
+          range: region.originalRange(0, region.source.length),
+        );
+        continue;
+      }
       switch (region.type) {
         case IanvsMarkdownBlockType.fencedCode:
         case IanvsMarkdownBlockType.indentedCode:
@@ -158,11 +169,9 @@ IanvsMarkdownNoteSemantics parseIanvsMarkdownNoteSemantics(String source) {
         case IanvsMarkdownBlockType.frontMatter:
           continue;
         case IanvsMarkdownBlockType.table:
-          collector.issue(
-            'tableContext',
-            'Table cell source projections are not yet indexed.',
-            range: region.originalRange(0, region.source.length),
-          );
+          // Each table region is already one native TableSyntax cell. Cells
+          // contain inline Markdown, never global reference definitions.
+          active.add(region);
           continue;
         case IanvsMarkdownBlockType.html:
           // The renderer has host-extensible HTML blocks. Do not claim complete
@@ -405,10 +414,11 @@ final class _SemanticCollector {
     IanvsMarkdownSemanticSourceRegion region,
     Map<String, md.LinkReference> linkReferences,
   ) {
-    if (RegExp(
-      r'^ {0,3}\[\^[^\]\n]+\]:',
-      multiLine: true,
-    ).hasMatch(region.source)) {
+    if (region.type != IanvsMarkdownBlockType.table &&
+        RegExp(
+          r'^ {0,3}\[\^[^\]\n]+\]:',
+          multiLine: true,
+        ).hasMatch(region.source)) {
       issue(
         'footnoteContext',
         'Footnote definition bodies are not source-indexed.',
@@ -563,10 +573,15 @@ final class _SemanticCollector {
       localDestination.end,
     );
     final raw = original.textInside(source);
-    if (raw != localDestination.textInside(region.source)) {
+    final projectedRaw = localDestination.textInside(region.source);
+    if (!region.matchesOriginalSource(
+      localDestination.start,
+      localDestination.end,
+      source,
+    )) {
       issue(
         'nonContiguousDestination',
-        'Comments or container prefixes interrupt the source destination.',
+        'The destination crosses a source transformation that cannot be rewritten safely.',
         range: original,
       );
       return null;
@@ -574,13 +589,13 @@ final class _SemanticCollector {
     final wiki =
         kind == IanvsMarkdownSourceReferenceKind.wikiLink ||
         kind == IanvsMarkdownSourceReferenceKind.wikiEmbed;
-    final href = semantic ?? raw;
+    final href = semantic ?? projectedRaw;
     if (!wiki &&
         (semantic == null ||
             (authoritativeRawDestination != null
-                ? raw != authoritativeRawDestination
+                ? projectedRaw != authoritativeRawDestination
                 : !_matchesInlineDestination(
-                    raw,
+                    projectedRaw,
                     semantic,
                     angle:
                         localDestination.start > 0 &&
@@ -597,14 +612,14 @@ final class _SemanticCollector {
       return null;
     }
     final hash = href.indexOf('#');
-    final rawHash = _rawDelimiterOffset(raw, '#', wiki: wiki);
+    final rawHash = _rawDelimiterOffset(projectedRaw, '#', wiki: wiki);
     final question = wiki ? -1 : href.indexOf('?');
     final query = question >= 0 && (hash < 0 || question < hash)
         ? question
         : -1;
     final rawQuestion = wiki
         ? null
-        : _rawDelimiterOffset(raw, '?', wiki: false);
+        : _rawDelimiterOffset(projectedRaw, '?', wiki: false);
     final rawQuery = query >= 0 ? rawQuestion : null;
     if ((hash >= 0) != (rawHash != null) || (query >= 0 && rawQuery == null)) {
       issue(
@@ -630,9 +645,9 @@ final class _SemanticCollector {
 
     final ref = IanvsMarkdownSourceReference(
       range: range,
-      destinationRange: TextRange(
-        start: original.start,
-        end: original.start + (rawQuery ?? rawHash ?? raw.length),
+      destinationRange: region.originalRange(
+        localDestination.start,
+        localDestination.start + (rawQuery ?? rawHash ?? projectedRaw.length),
       ),
       rawDestination: raw,
       target: decode(
@@ -799,6 +814,17 @@ final class _WikiSyntax extends md.InlineSyntax {
   _WikiSyntax(this.collector, this.region) : super(r'!?\[\[([^\]\n]+)\]\]');
   final _SemanticCollector collector;
   final IanvsMarkdownSemanticSourceRegion region;
+  @override
+  bool tryMatch(md.InlineParser parser, [int? startMatchPos]) {
+    // The renderer has a block embed syntax, not an inline embed syntax.
+    // Let its normal image/link grammar decide this form inside a table cell.
+    if (region.type == IanvsMarkdownBlockType.table &&
+        parser.source.startsWith('![[', startMatchPos ?? parser.pos)) {
+      return false;
+    }
+    return super.tryMatch(parser, startMatchPos);
+  }
+
   @override
   bool onMatch(md.InlineParser parser, Match match) {
     final body = match.group(1)!;

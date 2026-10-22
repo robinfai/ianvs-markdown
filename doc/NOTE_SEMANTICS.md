@@ -1,4 +1,4 @@
-# 源码保真笔记语义（P1f）
+# 源码保真笔记语义（P1f / P1g1）
 
 `parseIanvsMarkdownNoteSemantics(String source)` 是核心包的纯同步解析入口，不读取
 文件、不解析工作区路径、不建立全局图、不执行重命名、不改写原文。结果可用于应用层
@@ -67,6 +67,43 @@ bare destination 中的 tab 目前也是路径字符，而不是 title 分隔。
 路径中的前导 U+FEFF（原字符或 `%EF%BB%BF`）在一次 URI 解码时保留，不能误当
 传输 BOM 丢弃并指向另一个文件；Wiki 仍沿用既有 body grammar。
 
+## 表格逐 cell 源码投影（P1g1）
+
+表格不再整体返回 `tableContext`。先保持现有 Ianvs renderer 的 irregular-table
+padding 判定，再由 `package:markdown` 7.3.1 的真实 `TableSyntax` 验证 header 数量、
+消费行边界、生成 cell。逐字符 source projection 必须逐 cell 与其 `UnparsedContent`
+完全一致；然后独立运行 inline parser，不跨 cell 配对 code span、Wiki 或 Markdown 链接。
+
+- renderer 对符合条件的原始行会扩充 header/delimiter，所以这些 body 额外列是真实可见
+  内容，必须索引；未获扩充的容器表格或 CRLF 输入，额外列仍按原生列数裁掉。不得一律
+  扫描或一律丢弃 overflow。synthetic 空 cell 没有源码引用，不生成猜测位置。
+- 每个 `\|` 在 inline parsing 之前变成 pipe；投影保留对应完整原始 token 的起止位置。
+  例如 `[x](\|A\|B.md#H)` 的 target 是 `|A|B.md`，路径源码仍覆盖 `\|A\|B.md`；
+  `[[Wiki\|Alias]]` 的 target 是 Wiki、alias 是 Alias。query/fragment 的边界按投影定位后
+  回到原文，不能用已变短的偏移直接相加。
+- 路径必须逐 token 证明连续且不变，唯一许可的表格转换是原始 `\|` 到 pipe；comment
+  或容器前缀打断路径时仍返回 `nonContiguousDestination`，不暴露可写范围。
+- cell 使用文档全局 first-definition-wins 引用。`[ref]: Target.md` 在 table body 内
+  不会自动成为 definition；是否结束 table 由原生 block grammar 决定。
+- 真实 renderer 只提供 standalone block embed syntax。表格内 `![[Note]]` 遵循普通
+  inline image/link grammar，不伪造 `wikiEmbed`；表格外既有 embed 契约不在此阶段改变。
+- CRLF、BOM、emoji 与 list/blockquote 投影继续保持原始 UTF-16 坐标。header 不匹配的
+  普通文字不强行切 cell。任何无法证明的 cell 投影返回 `parserLimit`，不声称 complete。
+
+Callout 的标题和 body 会创建独立、递归的 `IanvsMarkdown` renderer，并再次执行
+preprocessing、padding 和 definition 解析；不能把一次普通 dequote 当作这些上下文的
+完整 source map。当前整个 callout 返回 `calloutContext`（包括折叠的 body），保留其他
+区域的已确认引用与 YAML aliases，但禁止把该快照当作可安全改写的完整输入。
+
+Inline footnote 在 renderer 拆分 table 之前会展开并移到独立 definition，原本被裁掉的
+cell 内容也可能因此可见。当前在全局 comment 投影之后、任何 table clipping 之前，
+使用既有 footnote source-range grammar 检测，返回 `inlineFootnoteContext`；代码、
+comment 与转义的 literal marker 不因此变成未知。不能用已裁剪的 cell 去反推没有引用。
+
+回归不仅比较直接 `TableSyntax`，也遍历真实 widget 树中所有 `ScopedMarkdownBody`
+取得各层最终渲染文本与语法集进行差分，而不是仅检查首个 body；覆盖 padding、截断列、
+转义、代码跨 cell、引用、容器、递归 callout 和 inline footnote 的 false-complete 边界。
+
 ## 独立 YAML 元数据解析
 
 仅解析文首 `---` 包围的 YAML mapping，兼容 BOM/CRLF。64 KiB 上限按 YAML 内容的
@@ -93,10 +130,6 @@ list 元素 span 必须落在当前属性 value 内。带引号的普通 `"&name
   另附一条 `occurrenceBudget` 终止标记，包括不计入 renderer syntax tokens 的 tag-heavy
   或 automatic-URL-heavy 输入。
 - source-mapped container 嵌套最多 64 层；超限或无法建立语义时返回 `parserLimit`。
-- tables 暂不索引任何正文 references/tags，并返回 `tableContext`。真实 renderer 按 cell
-  分割并解转义 pipe；在逐 cell 精确源码投影完成前，不跨 cell 猜测链接或扫描未渲染额外列。
-  YAML aliases 的独立完整性不受影响。逐 cell 源码映射与相应回归仍是未完成项，
-  是后续安全 rename 支持表格的前置条件；P1f 不声称正文语法全覆盖。
 - HTML blocks/inline HTML、automatic URL/email links、footnote definition bodies、
   Wiki alias 内的嵌套链接/tags 目前各自返回 issue。不猜测宿主扩展或将其默认为空。
 - 无效 URI 编码、无法安全映射的 definition/destination/query/fragment 也返回 issue。

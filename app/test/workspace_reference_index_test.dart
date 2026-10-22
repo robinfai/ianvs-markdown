@@ -474,7 +474,7 @@ void main() {
   }
 
   test(
-    'table unknown cannot manufacture backlinks or complete rename impact',
+    'per-cell table parsing cannot manufacture cross-cell backlinks',
     () async {
       source.note(
         'Origin.md',
@@ -483,9 +483,9 @@ void main() {
       source.note('Target.md', 'target');
       final result = await references.refresh();
       expect(result.backlinks('Target.md'), hasLength(1));
-      expect(result.complete, isFalse);
+      expect(result.complete, isTrue);
       expect(result.aliases.complete, isTrue);
-      expect(references.previewImpact('Target.md').complete, isFalse);
+      expect(references.previewImpact('Target.md').complete, isTrue);
       expect(result.tags.keys, ['outside']);
     },
   );
