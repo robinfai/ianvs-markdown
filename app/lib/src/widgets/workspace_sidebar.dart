@@ -28,11 +28,13 @@ class WorkspaceSidebar extends StatefulWidget {
     required this.onSave,
     required this.onError,
     this.width,
+    this.onSearchSource,
   });
   final WorkspaceController workspace;
   final Future<bool> Function(DocumentSession) onSave;
   final ValueChanged<String> onError;
   final double? width;
+  final VoidCallback? onSearchSource;
   @override
   State<WorkspaceSidebar> createState() => _WorkspaceSidebarState();
 }
@@ -377,6 +379,19 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                         child: const Text('重试 iCloud'),
                       ),
                     ],
+                  ),
+                ),
+              if (widget.onSearchSource != null)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    key: const ValueKey('workspace-source-search-button'),
+                    onPressed: widget.onSearchSource,
+                    icon: const Icon(Icons.manage_search, size: 16),
+                    label: const Text(
+                      'Search source',
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ),
               if (hasFiles)

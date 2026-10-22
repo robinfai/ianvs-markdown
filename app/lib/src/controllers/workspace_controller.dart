@@ -12,6 +12,8 @@ import 'file_browser_controller.dart';
 import '../models/workspace_layout.dart';
 import '../services/markdown_file_service.dart';
 import '../services/workspace_session_store.dart';
+import '../services/workspace_index.dart';
+import '../services/workspace_index_source.dart';
 
 enum SaveConflictChoice { cancel, keepBoth, overwrite }
 
@@ -23,10 +25,21 @@ class WorkspaceController extends ChangeNotifier {
     required this.fileService,
     required this.sessionStore,
     this.defaultWorkspaceDirectory,
+    WorkspaceIndexSource? indexSource,
   }) {
-    browser = FileBrowserController(fileService)..addListener(_schedulePersist);
+    index = WorkspaceIndex(
+      source:
+          indexSource ??
+          (fileService is WorkspaceIndexSource
+              ? fileService as WorkspaceIndexSource
+              : const AppleWorkspaceIndexSource()),
+    );
+    browser = FileBrowserController(fileService, index: index)
+      ..addListener(_schedulePersist);
   }
   late final FileBrowserController browser;
+  late final WorkspaceIndex index;
+  final _documentListeners = <String, VoidCallback>{};
   final _operationGrants = <String, String>{};
   final _favoriteAccessTokens = <String, String>{};
   final _dirtyStates = <String, bool>{};
@@ -34,6 +47,10 @@ class WorkspaceController extends ChangeNotifier {
 
   @override
   void notifyListeners() {
+    index.configure(_workspaceRoot);
+    for (final document in _documents) {
+      _indexDocument(document);
+    }
     browser.configure(
       _workspaceRoot,
       _documents
@@ -207,6 +224,10 @@ class WorkspaceController extends ChangeNotifier {
         await _unwatch(document.id);
         document.dispose();
       }
+      for (final document in _documents) {
+        index.removeBuffer(document.id);
+      }
+      _documentListeners.clear();
       _documents.clear();
       _dirtyStates.clear();
       _operationGrants.clear();
@@ -531,7 +552,9 @@ class WorkspaceController extends ChangeNotifier {
     _documents.removeAt(index);
     _dirtyStates.remove(document.id);
     _unwatch(document.id);
-    document.controller.removeListener(_handleDocumentChanged);
+    final listener = _documentListeners.remove(document.id);
+    if (listener != null) document.controller.removeListener(listener);
+    this.index.removeBuffer(document.id);
     document.controller.modeListenable.removeListener(_schedulePersist);
     document.dispose();
     if (_documents.isEmpty) {
@@ -848,9 +871,26 @@ class WorkspaceController extends ChangeNotifier {
 
   void _attach(DocumentSession document) {
     _dirtyStates[document.id] = document.controller.isDirty;
-    document.controller.addListener(_handleDocumentChanged);
+    void listener() {
+      _indexDocument(document);
+      _handleDocumentChanged();
+    }
+
+    _documentListeners[document.id] = listener;
+    document.controller.addListener(listener);
+    _indexDocument(document);
     document.controller.modeListenable.addListener(_schedulePersist);
     if (document.path != null) _watch(document);
+  }
+
+  void _indexDocument(DocumentSession document) {
+    index.updateBuffer(
+      sessionId: document.id,
+      path: document.path,
+      name: document.name,
+      text: document.controller.text,
+      externalConflict: document.hasExternalChanges,
+    );
   }
 
   void _handleDocumentChanged() {
@@ -1038,10 +1078,13 @@ class WorkspaceController extends ChangeNotifier {
     }
     _watchers.clear();
     for (final document in _documents) {
-      document.controller.removeListener(_handleDocumentChanged);
+      final listener = _documentListeners.remove(document.id);
+      if (listener != null) document.controller.removeListener(listener);
+      index.removeBuffer(document.id);
       document.controller.modeListenable.removeListener(_schedulePersist);
       document.dispose();
     }
+    index.dispose();
     super.dispose();
   }
 }

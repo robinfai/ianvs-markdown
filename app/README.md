@@ -20,6 +20,26 @@ See [the execution checklist](../doc/R3_ACCEPTANCE.md) for save/reopen, recovery
 multiple-document, resource and input checks. Build success alone does not
 claim those interactions passed.
 
+## Workspace source search
+
+On Mac, choose **Search source** in the sidebar or press **Command-Shift-F**
+(**Control-Shift-F** also works). This is separate from filename search and searches
+literal Markdown source, including code and front matter. Open unsaved buffers
+always take precedence. Clicking a result opens its existing session and locates
+it in the temporary Source Find view, without changing the document's mode or
+saving it.
+
+Only locally available documents inside the selected workspace and open buffers
+are searched. Selecting one file does not grant a scan of its parent folder.
+Search never downloads the entire iCloud library. Cloud-only, inaccessible,
+changed, invalid UTF-8 or files over 5 MiB are reported as incomplete coverage.
+Results show up to 500 snippets while counting continues. Use **Refresh metadata**
+after provider changes; providers are not guaranteed to update live. Very large
+or slow directory listings can also be incomplete and are explicitly labelled.
+
+The iOS reader shares the safe native source contract but does not yet expose the
+workspace search interface.
+
 ## iOS reading preview
 
 The iOS version supports iPhone and iPad on iOS 15 or later. In another app,

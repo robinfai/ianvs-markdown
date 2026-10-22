@@ -1,8 +1,9 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
+
+import '../services/literal_source_matcher.dart';
 
 /// Literal, non-overlapping search over the current unsaved source buffer.
 ///
@@ -136,17 +137,14 @@ class DocumentFindController extends ChangeNotifier {
     final source = _source;
     final searchQuery = _effectiveQuery;
     final matchCase = _matchCase;
-    late final pattern = RegExp(
-      RegExp.escape(searchQuery),
-      caseSensitive: matchCase,
-      unicode: true,
+    final scanner = LiteralSourceMatcher(
+      source,
+      searchQuery,
+      matchCase: matchCase,
     );
     if (source.length < _synchronousLimit) {
       _publish(
-        pattern
-            .allMatches(source)
-            .map((match) => TextRange(start: match.start, end: match.end))
-            .toList(growable: false),
+        scanner.next(chunkSize: _synchronousLimit),
         reveal: reveal,
         anchor: anchor,
       );
@@ -155,7 +153,6 @@ class DocumentFindController extends ChangeNotifier {
 
     _isSearching = true;
     final matches = <TextRange>[];
-    var offset = 0;
     bool isCurrent() =>
         !_disposed &&
         generation == _generation &&
@@ -166,32 +163,8 @@ class DocumentFindController extends ChangeNotifier {
 
     void scanChunk() {
       if (!isCurrent()) return;
-      final end = _scalarBoundary(
-        source,
-        math.min(offset + _chunkSize, source.length),
-      );
-      // Literal Unicode matching uses simple case folding, not normalization or
-      // expansions. Look ahead enough to find a match beginning before `end`,
-      // without splitting an emoji/surrogate pair at either window boundary.
-      final windowEnd = _scalarBoundary(
-        source,
-        math.min(end + searchQuery.length - 1, source.length),
-      );
-      var nextOffset = end;
-      for (final match in pattern.allMatches(
-        source.substring(offset, windowEnd),
-      )) {
-        if (offset + match.start >= end) break;
-        final range = TextRange(
-          start: offset + match.start,
-          end: offset + match.end,
-        );
-        matches.add(range);
-        // Carry non-overlap across windows, even for a match crossing `end`.
-        nextOffset = math.max(nextOffset, range.end);
-      }
-      offset = nextOffset;
-      if (offset < source.length) {
+      matches.addAll(scanner.next(chunkSize: _chunkSize));
+      if (!scanner.complete) {
         _searchTimer = Timer(Duration.zero, scanChunk);
       } else if (isCurrent()) {
         _searchTimer = null;
@@ -201,20 +174,6 @@ class DocumentFindController extends ChangeNotifier {
     }
 
     _searchTimer = Timer(_debounce, scanChunk);
-  }
-
-  static int _scalarBoundary(String source, int offset) {
-    if (offset > 0 && offset < source.length) {
-      final previous = source.codeUnitAt(offset - 1);
-      final next = source.codeUnitAt(offset);
-      if (previous >= 0xD800 &&
-          previous <= 0xDBFF &&
-          next >= 0xDC00 &&
-          next <= 0xDFFF) {
-        return offset + 1;
-      }
-    }
-    return offset;
   }
 
   void _publish(List<TextRange> matches, {required bool reveal, int? anchor}) {
