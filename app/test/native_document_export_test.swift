@@ -6,6 +6,10 @@ import PDFKit
 struct NativeDocumentExportAcceptance {
   @MainActor
   static func main() throws {
+    func phase(_ name: String) {
+      FileHandle.standardOutput.write(Data("PHASE: \(name)\n".utf8))
+    }
+    phase("destination safety and source preservation")
     let fm = FileManager.default
     let root = fm.temporaryDirectory.appendingPathComponent("linefold-export-tests-\(UUID().uuidString)")
     try fm.createDirectory(at: root, withIntermediateDirectories: false)
@@ -53,6 +57,7 @@ struct NativeDocumentExportAcceptance {
     try fm.createDirectory(at: evidence, withIntermediateDirectories: true)
     let output = evidence.appendingPathComponent("pagination.pdf")
     if fm.fileExists(atPath: output.path) { try fm.removeItem(at: output) }
+    phase("AppKit acceptance window startup")
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
     app.finishLaunching()
@@ -64,6 +69,7 @@ struct NativeDocumentExportAcceptance {
         RunLoop.main.run(until: Date().addingTimeInterval(0.005))
       }
     }
+    phase("lifecycle deadlines and once-only cleanup")
     var callbacks = 0
     var cancellations = 0
     var results = [Result<Bool, Error>]()
@@ -112,6 +118,7 @@ struct NativeDocumentExportAcceptance {
       "Loading timeout must hold the job through terminal cleanup exactly once")
     assert(!fm.fileExists(atPath: loadingTemporary.path))
 
+    phase("offline WebKit rendering and native paged PDF")
     let job = OfflineDocumentPrintJob()
     var outcome: Result<Bool, Error>?
     job.run(html: try String(contentsOf: fixture, encoding: .utf8), window: window, pdfDestination: output) { outcome = $0 }
@@ -121,6 +128,7 @@ struct NativeDocumentExportAcceptance {
     }
     guard let outcome else { fatalError("Native PDF generation exceeded 90 seconds") }
     guard try outcome.get() else { fatalError("Native PDF generation was cancelled") }
+    phase("PDF page geometry, selectable Chinese and table-cell validation")
     guard let pdf = PDFDocument(url: output), pdf.pageCount >= 3 else { fatalError("Expected real multi-page PDF") }
     let text = pdf.string ?? ""
     assert(text.contains("中文文档"), "Chinese must be selectable text, not a screenshot")

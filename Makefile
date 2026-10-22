@@ -126,7 +126,17 @@ check-api: deps-core ## Validate the public API baseline and its checker
 
 check-core: check-api format-check-core analyze-core test test-example test-tools check-processing-budget ## Validate core without Apple or Mermaid integration checks
 
-check-integrations: test-native-guarded-save test-native-sync-metadata test-native-attachments deps-integrations format-check-integrations analyze-integrations test-app test-mermaid test-mermaid-example test-clipboard test-quicklook test-native-import test-native-document-export ## Validate the app and native integrations (macOS)
+check-integrations: check-document-export check-integrations-rest ## Validate the app and native integrations (macOS)
+
+.PHONY: check-document-export test-document-export-fixture check-integrations-rest
+check-document-export: deps-integrations test-document-export-fixture test-native-document-export ## Diagnose export first with a bounded real-PDF process
+
+test-document-export-fixture: ## Validate snapshot/export generation and create the production HTML fixture
+	cd app && $(FLUTTER) test test/document_export_service_test.dart test/document_export_flow_test.dart
+
+# CI invokes export and this remainder separately so a blocked native process
+# has a visible stage. check-integrations still includes every original gate.
+check-integrations-rest: test-native-guarded-save test-native-sync-metadata test-native-attachments deps-integrations format-check-integrations analyze-integrations test-app test-mermaid test-mermaid-example test-clipboard test-quicklook test-native-import ## Validate all remaining host/native gates (after check-document-export)
 
 check-package: ## Test the actual Pub snapshot in an external Flutter host
 	$(PYTHON) tool/check_package.py --flutter "$(FLUTTER)" --dart "$(DART)"
@@ -170,5 +180,5 @@ publish-dry-run: check-core check-package ## Validate core and publication witho
 	$(DART) pub publish --dry-run
 
 .PHONY: test-native-document-export
-test-native-document-export: ## Verify real paged offline PDF and export destination safety (after test-app)
+test-native-document-export: ## Verify real paged offline PDF and export destination safety (after test-document-export-fixture)
 	bash app/tool/test_native_document_export.sh

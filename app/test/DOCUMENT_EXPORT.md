@@ -96,11 +96,15 @@ Linux local checks (Flutter 3.44.0 / Dart 3.12.0):
 
 The following native gate is implemented but **not run on Linux**:
 
-1. `test-app` writes `build/export-qa/pagination.html` using the production
+1. `test-document-export-fixture` (also included in `test-app`) writes `build/export-qa/pagination.html` using the production
    generator: CJK/emoji, 150 rows x 4 columns, repeated header and long code.
 2. `make test-native-document-export` compiles the actual native export source,
    produces a real PDF and tests source SHA-256, overwrite/collision, aliases,
-   permission failure and offline placeholders.
+   permission failure and offline placeholders. An independent Python watchdog
+   enforces a 120-second process deadline even if AppKit blocks the main thread.
+   A timeout is a failed gate (exit 124), prints the last flushed phase marker,
+   and kills only the isolated synthetic test process group. Portable regressions
+   cover success, failure and stopping a blocked test with its child process.
 3. Native lifecycle fixtures check loading/output timeouts, cancellation,
    ignored late completion, loading-timeout owner release/terminal cleanup exactly
    once, and an interactive print panel with no time limit.
@@ -109,7 +113,9 @@ The following native gate is implemented but **not run on Linux**:
    repeated header on each table page, complete long code and no horizontal
    out-of-page character bounds. It retains PDF, extracted text and first/last
    page PNGs in `build/export-qa/native` for visual review.
-5. Native integrations CI runs this after app tests and uploads the evidence.
+5. Native integrations CI runs the focused fixture and bounded PDF first, then
+   all remaining original host/native gates without repeating the native PDF,
+   and uploads the evidence. `check-integrations` still aggregates every gate.
    It also builds the actual macOS app and unsigned iOS reader. Passing Dart
    mocks or source inspection is not evidence that native printing works.
 6. All four Debug/Release + Local entitlement files declare app sandbox and
