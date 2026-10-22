@@ -964,16 +964,36 @@ struct NativeNoteTransactionAcceptance {
     for scenario in ["success", "renameFailure", "syncFailure"] {
       let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
       let request = try f.request(); let prepared = try f.prepare(executor, request)
+      func traceSourceMetadata(_ stage: String) throws {
+        let attributes = try f.attributes(f.source)
+        let count = listxattr(f.url(f.source).path, nil, 0, XATTR_NOFOLLOW)
+        var names = [CChar](repeating: 0, count: max(0, count))
+        let actual = names.withUnsafeMutableBufferPointer {
+          listxattr(f.url(f.source).path, $0.baseAddress, $0.count, XATTR_NOFOLLOW)
+        }
+        let xattrs = actual > 0 ? String(decoding: names.prefix(actual).map { UInt8(bitPattern: $0) }, as: UTF8.self)
+          .split(separator: "\u{0}").map(String.init) : []
+        print("PRESENTER \(scenario) \(stage): revision=\(try f.revision(f.source)) mode=\(attributes.st_mode) flags=\(attributes.st_flags) xattrCount=\(count)/\(actual) names=\(xattrs)")
+        fflush(stdout)
+      }
+      try traceSourceMetadata("beforeRegistration")
       let presenter = MovePresenter(url: f.url(f.source))
       NSFileCoordinator.addFilePresenter(presenter)
       defer { NSFileCoordinator.removeFilePresenter(presenter) }
-      if scenario == "renameFailure" {
-        executor.fault = { point in if point == "beforeExclusiveRename" { try f.write(f.destination, Data("Unrelated destination".utf8)) } }
-      } else if scenario == "syncFailure" {
-        executor.fault = { point in if point == "beforeMoveParentSync" || point == "beforeRepairMoveParentSync" { throw InjectedFailure(boundary: point) } }
+      try traceSourceMetadata("afterRegistration")
+      var points: [String] = []
+      executor.fault = { point in
+        points.append(point)
+        if scenario == "renameFailure" && point == "beforeExclusiveRename" {
+          try f.write(f.destination, Data("Unrelated destination".utf8))
+        } else if scenario == "syncFailure" && (point == "beforeMoveParentSync" || point == "beforeRepairMoveParentSync") {
+          throw InjectedFailure(boundary: point)
+        }
       }
       let result = try f.invoke(executor, "executeWorkspaceNoteMove", f.command(request, token: prepared["token"]))
+      print("PRESENTER \(scenario): result=\(result) sourceExists=\(f.exists(f.source)) destinationExists=\(f.exists(f.destination)) points=\(points)"); fflush(stdout)
       let notified = presenter.moved.wait(timeout: .now() + (scenario == "renameFailure" ? 0.2 : 3)) == .success
+      print("PRESENTER \(scenario): notified=\(notified) presentedURL=\(String(describing: presenter.presentedItemURL))"); fflush(stdout)
       if scenario == "renameFailure" {
         try require(!notified && presenter.presentedItemURL?.resolvingSymlinksInPath() == f.url(f.source).resolvingSymlinksInPath(), "Failed RENAME_EXCL must not send a false didMove notification")
       } else {
