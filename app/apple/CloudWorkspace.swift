@@ -182,12 +182,16 @@ final class CloudWorkspace {
   /// Compares and replaces inside one file-coordinator claim. The caller may
   /// approve only the exact observed version, never a blanket "overwrite" flag.
   static func writeGuarded(_ url: URL, contents: String, expectedContents: String?) throws {
+    // Coordination may provide a different URL. Check the requested leaf as
+    // well, without following links or reusing cached URL resource metadata.
+    try rejectSymbolicLink(url)
     if (try? url.resourceValues(forKeys: [.isUbiquitousItemKey]).isUbiquitousItem) == true {
       try FileManager.default.startDownloadingUbiquitousItem(at: url)
     }
     // A modification claim needs the old bytes, unlike a replacement-only
     // claim, so iCloud can materialize the existing document for validation.
     try coordinatedWrite(url, contents: contents, options: []) { coordinated in
+      try rejectSymbolicLink(url)
       let current = try currentContents(coordinated)
       // Swift String equality normalizes Unicode. Compare UTF-8 instead: source
       // edits, including normalization, BOM and line endings, are significant.
@@ -205,22 +209,35 @@ final class CloudWorkspace {
   ) throws {
     try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
     var coordinationError: NSError?
-    var writeError: Error?
+    // Follow the coordinator's failure-sentinel contract: success must come
+    // from a completed accessor, never merely from an empty NSError slot.
+    var outcome: Result<Void, Error> = .failure(WorkspaceError.unavailable)
     NSFileCoordinator().coordinate(writingItemAt: url, options: options, error: &coordinationError) { coordinated in
-      do {
+      outcome = Result {
         try validate?(coordinated)
         try Data(contents.utf8).write(to: coordinated, options: .atomic)
       }
-      catch { writeError = error }
     }
     if let coordinationError { throw coordinationError }
-    if let writeError { throw writeError }
+    try outcome.get()
+  }
+
+  private static func rejectSymbolicLink(_ url: URL) throws {
+    do {
+      let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+      guard attributes[.type] as? FileAttributeType != .typeSymbolicLink else { throw WorkspaceError.invalidPath }
+    } catch let error as NSError {
+      // A missing logical iCloud URL may materialize during coordination; do
+      // not require it to exist here. Other metadata failures must fail closed.
+      guard error.domain == NSCocoaErrorDomain,
+            error.code == NSFileReadNoSuchFileError || error.code == NSFileNoSuchFileError else { throw error }
+    }
   }
 
   private static func currentContents(_ url: URL) throws -> String? {
     do {
-      let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
-      guard values.isRegularFile == true, values.isSymbolicLink != true else { throw WorkspaceError.invalidPath }
+      let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+      guard attributes[.type] as? FileAttributeType == .typeRegular else { throw WorkspaceError.invalidPath }
       return try decodeText(Data(contentsOf: url))
     } catch let error as NSError {
       // fileExists can turn access errors into false. Only a real missing-file

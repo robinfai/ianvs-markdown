@@ -239,6 +239,7 @@ class _EditorShellState extends State<EditorShell> {
                               WorkspaceSidebar(
                                 key: ValueKey(workspace.workspaceRoot),
                                 workspace: workspace,
+                                onSave: _saveDocument,
                                 width: sidebarWidth,
                                 onError: _showError,
                               ),
@@ -262,6 +263,7 @@ class _EditorShellState extends State<EditorShell> {
                           children: [
                             TitleTabsBar(
                               workspace: workspace,
+                              onSave: _saveDocument,
                               onClose: _closeDocument,
                             ),
                             if (workspace.recoveryError != null ||

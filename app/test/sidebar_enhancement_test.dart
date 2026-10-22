@@ -49,6 +49,7 @@ void main() {
             alignment: Alignment.topLeft,
             child: WorkspaceSidebar(
               workspace: workspace,
+              onSave: workspace.saveDocument,
               width: width,
               onError: errors.add,
             ),

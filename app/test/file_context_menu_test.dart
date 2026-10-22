@@ -49,6 +49,7 @@ void main() {
         home: Scaffold(
           body: WorkspaceSidebar(
             workspace: workspace,
+            onSave: workspace.saveDocument,
             onError: (error) => fail(error),
           ),
         ),
@@ -77,6 +78,7 @@ void main() {
         home: Scaffold(
           body: TitleTabsBar(
             workspace: workspace,
+            onSave: workspace.saveDocument,
             onClose: workspace.removeDocument,
           ),
         ),
@@ -100,6 +102,7 @@ void main() {
         home: Scaffold(
           body: TitleTabsBar(
             workspace: workspace,
+            onSave: workspace.saveDocument,
             onClose: workspace.removeDocument,
           ),
         ),

@@ -21,10 +21,12 @@ class TitleTabsBar extends StatelessWidget {
   const TitleTabsBar({
     super.key,
     required this.workspace,
+    required this.onSave,
     required this.onClose,
   });
 
   final WorkspaceController workspace;
+  final Future<bool> Function(DocumentSession, {bool saveAs}) onSave;
   final FutureOr<void> Function(DocumentSession) onClose;
 
   @override
@@ -68,6 +70,7 @@ class TitleTabsBar extends StatelessWidget {
                   Expanded(
                     child: _DocumentTabs(
                       workspace: workspace,
+                      onSave: onSave,
                       onClose: onClose,
                     ),
                   ),
@@ -257,8 +260,13 @@ double _tabWidth(BuildContext context, DocumentSession document) {
 }
 
 class _DocumentTabs extends StatefulWidget {
-  const _DocumentTabs({required this.workspace, required this.onClose});
+  const _DocumentTabs({
+    required this.workspace,
+    required this.onSave,
+    required this.onClose,
+  });
   final WorkspaceController workspace;
+  final Future<bool> Function(DocumentSession, {bool saveAs}) onSave;
   final FutureOr<void> Function(DocumentSession) onClose;
 
   @override
@@ -376,10 +384,10 @@ class _DocumentTabsState extends State<_DocumentTabs> {
                 path: document.path,
                 actions: [
                   FileMenuAction('Save', () async {
-                    await widget.workspace.saveDocument(document);
+                    await widget.onSave(document);
                   }),
                   FileMenuAction('Save As…', () async {
-                    await widget.workspace.saveDocument(document, saveAs: true);
+                    await widget.onSave(document, saveAs: true);
                   }),
                   FileMenuAction('Close Tab', () => widget.onClose(document)),
                 ],
