@@ -73,6 +73,11 @@ cleanup (not deleted while still being written), and a subsequent PDF/Print
 fails clearly rather than starting
 a second active operation. HTML export remains available. These run-loop timers
 are not a hard process-kill guarantee if AppKit blocks the main thread entirely.
+WebKit's printing operation keeps its default secondary-thread output mode;
+its delegate callback is explicitly marshalled back to the main actor. Because
+NSPrintOperation.current is thread-local, an application-wide main-actor lease
+excludes another print until the terminal callback, including after timeout.
+An old callback cannot release a newer lease.
 Interactive print panels have no automatic timeout while the user is choosing.
 HTML does not require a WebView. Direct PDF uses WKWebView's NSPrintOperation with A4 pages, print CSS
 and a private temporary output, then checks it with PDFKit before committing the
@@ -109,6 +114,9 @@ The following native gate is implemented but **not run on Linux**:
    ignored late completion, loading-timeout owner release/terminal cleanup exactly
    once, and an interactive print panel with no time limit.
    Destination tests include a symlink source with a hard-link output alias.
+   Print lease fixtures reject concurrent and stale-owner release, and reject a
+   held-worker retry before invoking the stateful native factory; actual PDF
+   completion verifies main-thread delivery.
 4. PDFKit verifies at least three A4 pages, selectable Chinese, all 600 cells,
    repeated header on each table page, complete long code and no horizontal
    out-of-page character bounds. It retains PDF, extracted text and first/last
@@ -146,3 +154,10 @@ Apple API references:
 - https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.security.print
 - https://developer.apple.com/documentation/appkit/nsprintinfo/pmprintsession()
 - https://developer.apple.com/documentation/applicationservices/core_printing
+
+WebKit's upstream implementation sets `canSpawnSeparateThread = YES`; its
+printing view distinguishes final secondary-thread output from main-thread
+preview. These sources explain why the adapter must not override it to false:
+
+- https://github.com/WebKit/WebKit/blob/main/Source/WebKit/UIProcess/mac/WebViewImpl.mm
+- https://github.com/WebKit/WebKit/blob/main/Source/WebKit/UIProcess/mac/WKPrintingView.mm

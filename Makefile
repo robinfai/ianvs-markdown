@@ -136,7 +136,7 @@ test-document-export-fixture: ## Validate snapshot/export generation and create 
 
 # CI invokes export and this remainder separately so a blocked native process
 # has a visible stage. check-integrations still includes every original gate.
-check-integrations-rest: test-native-guarded-save test-native-sync-metadata test-native-attachments deps-integrations format-check-integrations analyze-integrations test-app test-mermaid test-mermaid-example test-clipboard test-quicklook test-native-import ## Validate all remaining host/native gates (after check-document-export)
+check-integrations-rest: test-native-note-transactions test-native-guarded-save test-native-sync-metadata test-native-attachments deps-integrations format-check-integrations analyze-integrations test-app test-mermaid test-mermaid-example test-clipboard test-quicklook test-native-import ## Validate all remaining host/native gates (after check-document-export)
 
 check-package: ## Test the actual Pub snapshot in an external Flutter host
 	$(PYTHON) tool/check_package.py --flutter "$(FLUTTER)" --dart "$(DART)"
@@ -182,3 +182,7 @@ publish-dry-run: check-core check-package ## Validate core and publication witho
 .PHONY: test-native-document-export
 test-native-document-export: ## Verify real paged offline PDF and export destination safety (after test-document-export-fixture)
 	bash app/tool/test_native_document_export.sh
+
+.PHONY: test-native-note-transactions
+test-native-note-transactions: ## Verify recoverable native note move transactions using synthetic fixtures
+	FLUTTER="$(FLUTTER)" PYTHON="$(PYTHON)" bash app/tool/test_native_note_transactions.sh

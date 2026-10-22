@@ -140,29 +140,52 @@ final class DocumentExportLifecycle {
   }
 }
 
+/// NSPrintOperation.current is thread-local. Once WebKit prints on its worker
+/// thread, keep a main-actor lease until the actual terminal callback, including
+/// after timeout. A stale callback must never release a newer operation's lease.
+@MainActor
+final class DocumentExportPrintLease {
+  static let shared = DocumentExportPrintLease()
+  private var owner: UUID?
+
+  func acquire(_ token: UUID) -> Bool {
+    guard owner == nil else { return false }
+    owner = token
+    return true
+  }
+
+  func release(_ token: UUID) {
+    if owner == token { owner = nil }
+  }
+}
+
 /// One transient, offline rendering job. No scripts, file URL load, browser
 /// profile, arbitrary URL navigation, or user-document read is permitted.
 @MainActor
 final class OfflineDocumentPrintJob: NSObject, WKNavigationDelegate {
   typealias RuleCompiler = (String, @escaping (WKContentRuleList?, Error?) -> Void) -> Void
+  typealias PrintOperationFactory = @MainActor (WKWebView, NSPrintInfo) -> NSPrintOperation
   private let loadingTimeout: TimeInterval
   private let outputTimeout: TimeInterval
   private let compileRules: RuleCompiler
+  private let makePrintOperation: PrintOperationFactory
 
   init(loadingTimeout: TimeInterval = 30, outputTimeout: TimeInterval = 60,
-       compileRules: RuleCompiler? = nil) {
+       compileRules: RuleCompiler? = nil, makePrintOperation: PrintOperationFactory? = nil) {
     self.loadingTimeout = loadingTimeout
     self.outputTimeout = outputTimeout
     self.compileRules = compileRules ?? { rules, callback in
       WKContentRuleListStore.default().compileContentRuleList(
         forIdentifier: "linefold-offline-export-v1", encodedContentRuleList: rules, completionHandler: callback)
     }
+    self.makePrintOperation = makePrintOperation ?? { view, info in view.printOperation(with: info) }
     super.init()
   }
 
   private weak var window: NSWindow?
   private var webView: WKWebView?
   private var operation: NSPrintOperation?
+  private let printLeaseToken = UUID()
   private var lifecycle: DocumentExportLifecycle?
   // AppKit uses a delegate callback. Keep that delegate alive while cancellation
   // unwinds; never destroy an in-flight print context or call private APIs.
@@ -222,6 +245,12 @@ final class OfflineDocumentPrintJob: NSObject, WKNavigationDelegate {
       finish(.failure(DocumentExportError(message: "A previous print operation is still stopping. Retry, or restart the app if it does not stop.")))
       return
     }
+    // NSPrintOperation's factory changes the current operation on this thread.
+    // Reject a held worker lease BEFORE invoking that stateful factory.
+    guard DocumentExportPrintLease.shared.acquire(printLeaseToken) else {
+      finish(.failure(DocumentExportError(message: "A previous print operation is still stopping. Retry, or restart the app if it does not stop.")))
+      return
+    }
     let info = NSPrintInfo()
     info.paperSize = NSSize(width: 595.276, height: 841.89)
     info.topMargin = 51.024
@@ -238,18 +267,29 @@ final class OfflineDocumentPrintJob: NSObject, WKNavigationDelegate {
     }
     // Unlike WKWebView.createPDF's rectangular snapshot, AppKit's print
     // operation applies paged print CSS and produces actual paper-sized pages.
-    let operation = webView.printOperation(with: info)
+    let operation = makePrintOperation(webView, info)
     operation.view?.frame = NSRect(origin: .zero, size: info.paperSize)
     operation.showsPrintPanel = pdfDestination == nil
     operation.showsProgressPanel = pdfDestination == nil
-    operation.canSpawnSeparateThread = false
+    // WebKit configures this true: its secondary-thread path prepares the full
+    // paginated PDF, while the main-thread path is asynchronous print preview.
+    // Do not force final output down the preview path.
+    operation.canSpawnSeparateThread = true
     self.operation = operation
     retainedUntilPrintReturn = self
     operation.runModal(for: window, delegate: self,
       didRun: #selector(printOperationDidRun(_:success:contextInfo:)), contextInfo: nil)
   }
 
-  @objc private func printOperationDidRun(_ operation: NSPrintOperation, success: Bool, contextInfo: UnsafeMutableRawPointer?) {
+  @objc nonisolated private func printOperationDidRun(_ operation: NSPrintOperation, success: Bool, contextInfo: UnsafeMutableRawPointer?) {
+    // AppKit may invoke this delegate on the spawned printing thread. Carry only
+    // the result across actors, not its non-Sendable operation/context pointer.
+    // The task strongly owns this delegate until terminal cleanup finishes.
+    Task { @MainActor [self] in completePrinting(success: success) }
+  }
+
+  private func completePrinting(success: Bool) {
+    DocumentExportPrintLease.shared.release(printLeaseToken)
     retainedUntilPrintReturn = nil
     self.operation = nil
     defer { cleanUpIfTerminal() }

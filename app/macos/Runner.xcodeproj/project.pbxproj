@@ -23,6 +23,7 @@
 /* Begin PBXBuildFile section */
 		E2A000000000000000000001 /* DocumentExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2A000000000000000000002 /* DocumentExport.swift */; };
 		C10D00000000000000000001 /* CloudWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10D00000000000000000002 /* CloudWorkspace.swift */; };
+		C10D00000000000000000031 /* WorkspaceNoteTransaction.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10D00000000000000000032 /* WorkspaceNoteTransaction.swift */; };
 		331C80D8294CF71000263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C80D7294CF71000263BE5 /* RunnerTests.swift */; };
 		335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */ = {isa = PBXBuildFile; fileRef = 335BBD1A22A9A15E00E9071D /* GeneratedPluginRegistrant.swift */; };
 		33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33CC10F02044A3C60003C045 /* AppDelegate.swift */; };
@@ -89,6 +90,7 @@
 /* Begin PBXFileReference section */
 		E2A000000000000000000002 /* DocumentExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentExport.swift; sourceTree = "<group>"; };
 		C10D00000000000000000002 /* CloudWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../apple/CloudWorkspace.swift; sourceTree = SOURCE_ROOT; };
+		C10D00000000000000000032 /* WorkspaceNoteTransaction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../apple/WorkspaceNoteTransaction.swift; sourceTree = SOURCE_ROOT; };
 		002B081F75F73A0931080287 /* LinefoldQuickLook.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LinefoldQuickLook.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		11C6ECABBEDCF7EB0FFAD64C /* PreviewBridge.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = PreviewBridge.h; sourceTree = "<group>"; };
 		1D932F6320F67743880FB223 /* QuickLook.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = QuickLook.xcconfig; sourceTree = "<group>"; };
@@ -241,6 +243,7 @@
 			isa = PBXGroup;
 			children = (
 				C10D00000000000000000002 /* CloudWorkspace.swift */,
+				C10D00000000000000000032 /* WorkspaceNoteTransaction.swift */,
 				33CC10F02044A3C60003C045 /* AppDelegate.swift */,
 				33CC11122044BFA00003C045 /* MainFlutterWindow.swift */,
 				F103D3012026092300000002 /* DesktopIntegration.swift */,
@@ -615,6 +618,7 @@
 				F103D3012026092300000001 /* DesktopIntegration.swift in Sources */,
 				E2A000000000000000000001 /* DocumentExport.swift in Sources */,
 				C10D00000000000000000001 /* CloudWorkspace.swift in Sources */,
+				C10D00000000000000000031 /* WorkspaceNoteTransaction.swift in Sources */,
 				33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */,
 				335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */,
 			);

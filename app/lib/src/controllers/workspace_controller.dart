@@ -18,6 +18,7 @@ import '../services/workspace_index.dart';
 import '../services/workspace_index_source.dart';
 import '../services/workspace_reference_index.dart';
 import '../services/workspace_note_move_plan.dart';
+import '../services/workspace_note_transaction.dart';
 import '../services/attachment_repository.dart';
 import '../services/attachment_resolver.dart';
 
@@ -27,12 +28,21 @@ typedef SaveConflictResolver =
     Future<SaveConflictChoice> Function(MarkdownSaveConflict conflict);
 
 class WorkspaceController extends ChangeNotifier {
+  static bool _isRetainedArtifactRedirect(String? source, String? restored) =>
+      restored != null &&
+      restored != source &&
+      RegExp(
+        r'^\.linefold-note-move-[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}-[0-9]+\.md$',
+        caseSensitive: false,
+      ).hasMatch(p.basename(restored));
+
   WorkspaceController({
     required this.fileService,
     required this.sessionStore,
     this.defaultWorkspaceDirectory,
     WorkspaceIndexSource? indexSource,
     DocumentSyncSource? syncSource,
+    this.noteTransactions = const AppleWorkspaceNoteTransactionStore(),
   }) {
     final metadataSource =
         syncSource ??
@@ -76,6 +86,25 @@ class WorkspaceController extends ChangeNotifier {
       identity: (_workspaceRoot, activeDocument?.id),
     );
     index.configure(_workspaceRoot);
+    if (_noteMoveRecoveryEpoch != index.epoch) {
+      _noteMoveRecoveryEpoch = index.epoch;
+      _noteMoveRecords = const [];
+      noteMoveRecoveryNotice = null;
+      if (_workspaceRoot != null) {
+        final epoch = index.epoch;
+        unawaited(
+          refreshNoteMoveRecovery().catchError((Object error) {
+            if (!_disposed &&
+                epoch == index.epoch &&
+                error is! MissingPluginException) {
+              noteMoveRecoveryNotice = 'Note move recovery needs review';
+              notifyListeners();
+            }
+            return const WorkspaceNoteMoveJournalList();
+          }),
+        );
+      }
+    }
     for (final document in _documents) {
       _indexDocument(document);
     }
@@ -97,6 +126,13 @@ class WorkspaceController extends ChangeNotifier {
   }
 
   final MarkdownFileService fileService;
+  final WorkspaceNoteTransactionStore noteTransactions;
+  Completer<void>? _activeNoteMove;
+  int _noteMoveGeneration = 0;
+  int _noteMoveRecoveryEpoch = -1;
+  String? noteMoveRecoveryNotice;
+  List<WorkspaceNoteMoveRecord> _noteMoveRecords = const [];
+  List<WorkspaceNoteMoveRecord> get noteMoveRecords => _noteMoveRecords;
   final WorkspaceSessionStore sessionStore;
   final Future<String> Function()? defaultWorkspaceDirectory;
   String? _cloudRoot;
@@ -185,6 +221,11 @@ class WorkspaceController extends ChangeNotifier {
           final path = await fileService.restorePersistentAccess(
             favorite.value,
           );
+          if (_isRetainedArtifactRedirect(favorite.key, path)) {
+            recoveryNotice =
+                'An old favorite bookmark pointed to a retained note-move original. Review note move recovery before opening it.';
+            continue;
+          }
           if (path != null) {
             _favoriteAccessTokens[path] = favorite.value;
             if (path != favorite.key) browser.remap(favorite.key, path);
@@ -233,8 +274,15 @@ class WorkspaceController extends ChangeNotifier {
             restored.accessToken = null;
           }
           if (restored.accessToken case final token?) {
-            path = await fileService.restorePersistentAccess(token) ?? path;
-            restored.path = path;
+            final resolved = await fileService.restorePersistentAccess(token);
+            if (_isRetainedArtifactRedirect(path, resolved)) {
+              restored.accessToken = null;
+              recoveryNotice =
+                  'An old bookmark pointed to a retained note-move original. Open the intended note from the workspace or review note move recovery.';
+            } else {
+              path = resolved ?? path;
+              restored.path = path;
+            }
           }
           if (restored.id.isEmpty) {
             restored.dispose();
@@ -567,6 +615,14 @@ class WorkspaceController extends ChangeNotifier {
     bool saveAs = false,
     SaveConflictResolver? onConflict,
   }) {
+    if (_activeNoteMove != null) {
+      return Future.error(
+        StateError(
+          'A recoverable note move is running. Save again after it finishes.',
+        ),
+      );
+    }
+    final moveGeneration = _noteMoveGeneration;
     _saveRevision += 1;
     _saveFailures.remove(document.id);
     if (identical(activeDocument, document)) sync.invalidate();
@@ -583,14 +639,19 @@ class WorkspaceController extends ChangeNotifier {
         }
       }
       try {
-        final result = await _serializeFileOperation(
-          () => _saveDocumentSnapshot(
+        final result = await _serializeFileOperation(() {
+          if (moveGeneration != _noteMoveGeneration) {
+            throw StateError(
+              'A note move changed the save context. Save again after reviewing its result.',
+            );
+          }
+          return _saveDocumentSnapshot(
             document,
             savedText,
             saveAs: saveAs,
             onConflict: onConflict,
-          ),
-        );
+          );
+        });
         if (result) _saveFailures.remove(document.id);
         return result;
       } on Object {
@@ -1043,6 +1104,452 @@ class WorkspaceController extends ChangeNotifier {
     );
   }
 
+  /// Called only after the user approves this exact, displayed proposal.
+  /// No automatic fallback to the unmaintained file operation is permitted.
+  Future<WorkspaceNoteMoveRecord> executeNoteMove(
+    WorkspaceNoteMovePlan plan,
+  ) => _serializeFileOperation(() async {
+    _validateNoteMovePlan(plan);
+    final root = plan.root!;
+    final epoch = index.epoch;
+    final id = newWorkspaceNoteTransactionId();
+    final pending = Completer<void>();
+    _activeNoteMove = pending;
+    _noteMoveGeneration++;
+    _saveRevision++;
+    WorkspaceNoteMoveRecord? record;
+    var receiptValidated = false;
+    try {
+      try {
+        record = await noteTransactions.prepare(plan, id);
+      } on Object catch (error) {
+        // prepare never mutates a user note. A lost reply may nevertheless have
+        // left a private journal, so query it without executing or retrying.
+        try {
+          record = await noteTransactions.reconcile(root, id);
+          _validateNoteMoveReceipt(plan, id, record);
+          receiptValidated = true;
+          return record;
+        } on Object {
+          throw WorkspaceNoteMoveUncertain(id, error);
+        }
+      }
+      if (record.phase == 'blocked' &&
+          record.entries.isEmpty &&
+          record.transactionId == id) {
+        return record; // Preflight did not change any user note.
+      }
+      _validateNoteMoveReceipt(plan, id, record);
+      receiptValidated = true;
+      if (record.phase != 'prepared' || record.token == null) return record;
+      final baseline = {
+        for (final entry in plan.snapshot.catalog.entries)
+          entry.relativePath: entry.revision,
+      };
+      if (record.entries.any(
+        (entry) => !entry.unchanged || entry.revision != baseline[entry.path],
+      )) {
+        receiptValidated = false;
+        throw WorkspaceNoteMoveUncertain(
+          id,
+          const FormatException(
+            'The prepared native baseline was not verified.',
+          ),
+        );
+      }
+      final oldDocumentTokens = <DocumentSession, (String?, String)>{};
+      final oldFavoriteTokens = <String, String>{};
+      try {
+        _validateNoteMovePlan(plan);
+        // A retained SWAP artifact keeps the old inode alive. An old bookmark
+        // can therefore reopen that artifact after a crash instead of the note.
+        // Persist its invalidation before native is allowed to mutate anything.
+        for (final file in plan.files) {
+          final path = p.posix.join(root, file.path);
+          for (final document in _documents.where(
+            (document) =>
+                document.id == file.source.sessionId || document.path == path,
+          )) {
+            if (document.accessToken case final token?) {
+              oldDocumentTokens[document] = (document.path, token);
+            }
+            document.accessToken = null;
+          }
+          for (final favoritePath in {
+            path,
+            p.posix.join(root, file.destination),
+          }) {
+            if (_favoriteAccessTokens.remove(favoritePath) case final token?) {
+              oldFavoriteTokens[favoritePath] = token;
+            }
+          }
+        }
+        _schedulePersist();
+        await _queueSnapshot();
+        _validateNoteMovePlan(plan);
+      } on Object catch (error, stackTrace) {
+        // execute has not been invoked. Cancellation only affects the private
+        // journal, so these original bookmarks remain valid even if its reply
+        // is lost. Do not lose independent file scope on a cancelled preview.
+        try {
+          await noteTransactions.cancelPrepared(root, id, record.token!);
+        } on Object {
+          /* A prepared journal may remain; no vault mutation was requested. */
+        }
+        if (!_disposed) {
+          for (final entry in oldDocumentTokens.entries) {
+            if (_documents.contains(entry.key) &&
+                entry.key.path == entry.value.$1 &&
+                entry.key.accessToken == null) {
+              entry.key.accessToken = entry.value.$2;
+            }
+          }
+          for (final entry in oldFavoriteTokens.entries) {
+            if (browser.hasFavorite(entry.key)) {
+              _favoriteAccessTokens.putIfAbsent(entry.key, () => entry.value);
+            }
+          }
+          // Surface the original failure. Recovery storage already exposes a
+          // separate notice if restoring this snapshot cannot be persisted.
+          await _persistNow();
+        }
+        Error.throwWithStackTrace(error, stackTrace);
+      }
+      receiptValidated = false;
+      if (_noteMoveTouchesActiveDocument(plan)) sync.invalidate();
+      try {
+        record = await noteTransactions.execute(root, id, record.token!);
+      } on Object catch (error) {
+        // Do not replay execute after a timeout or lost platform response.
+        try {
+          record = await noteTransactions.reconcile(root, id);
+        } on Object {
+          throw WorkspaceNoteMoveUncertain(id, error);
+        }
+      }
+      _validateNoteMoveReceipt(plan, id, record);
+      receiptValidated = true;
+      if (_workspaceRoot == root && index.epoch == epoch && !_disposed) {
+        record = await _reconcileNoteMoveBuffers(
+          plan,
+          record,
+          persistentAccessExpected:
+              Platform.isMacOS ||
+              oldDocumentTokens.isNotEmpty ||
+              oldFavoriteTokens.isNotEmpty,
+        );
+      } else {
+        record = _noteMoveObservationFailed(
+          record,
+          plan.files.map((file) => file.path).toSet(),
+          'The workspace changed before the result could be verified. Review the original workspace journal; do not repeat the move.',
+        );
+      }
+      return record;
+    } finally {
+      if (!pending.isCompleted) pending.complete();
+      if (identical(_activeNoteMove, pending)) _activeNoteMove = null;
+      if (_workspaceRoot == root && index.epoch == epoch && !_disposed) {
+        if (record != null && receiptValidated) {
+          _noteMoveRecords = List.unmodifiable([
+            ..._noteMoveRecords.where((entry) => entry.transactionId != id),
+            record,
+          ]);
+        }
+        await _afterFileOperation([
+          for (final file in plan.files)
+            p.posix.dirname(p.posix.join(root, file.path)),
+          p.posix.dirname(p.posix.join(root, plan.destinationPath)),
+        ]);
+        if (_workspaceRoot == root &&
+            index.epoch == epoch &&
+            !_disposed &&
+            _noteMoveTouchesActiveDocument(plan)) {
+          // Same-path backlinks keep the same document identity. Their old
+          // cloud observation must not survive a local inode/content rewrite.
+          sync.invalidate();
+          sync.scheduleRefresh();
+        }
+      }
+    }
+  });
+
+  bool _noteMoveTouchesActiveDocument(WorkspaceNoteMovePlan plan) {
+    final document = activeDocument;
+    if (document == null) return false;
+    return plan.files.any(
+      (file) =>
+          document.id == file.source.sessionId ||
+          document.path == p.posix.join(plan.root!, file.path) ||
+          document.path == p.posix.join(plan.root!, file.destination),
+    );
+  }
+
+  void _validateNoteMoveReceipt(
+    WorkspaceNoteMovePlan plan,
+    String id,
+    WorkspaceNoteMoveRecord record,
+  ) {
+    final receipts = {for (final entry in record.entries) entry.path: entry};
+    if (record.transactionId != id ||
+        receipts.length != record.entries.length ||
+        receipts.length != plan.files.length ||
+        plan.files.any(
+          (file) => receipts[file.path]?.destinationPath != file.destination,
+        ) ||
+        record.phase == 'completed' &&
+            (!record.completed ||
+                plan.files.any(
+                  (file) => receipts[file.path]?.actualPath != file.destination,
+                ))) {
+      throw WorkspaceNoteMoveUncertain(
+        id,
+        const FormatException(
+          'The native receipt differs from the approved plan.',
+        ),
+      );
+    }
+  }
+
+  void _validateNoteMovePlan(WorkspaceNoteMovePlan plan) {
+    if (_disposed || !plan.complete || !plan.isCurrent(index)) {
+      throw StateError(
+        'The preview changed. Refresh and confirm a new preview.',
+      );
+    }
+    for (final file in plan.files) {
+      final source = file.source;
+      for (final document in _documents.where(
+        (document) =>
+            document.id == source.sessionId ||
+            document.path == p.posix.join(plan.root!, file.path),
+      )) {
+        if (document.controller.isDirty ||
+            document.hasExternalChanges ||
+            document.controller.text != source.text) {
+          throw StateError(
+            'Save or resolve ${file.path}, then refresh the preview.',
+          );
+        }
+      }
+    }
+  }
+
+  WorkspaceNoteMoveRecord _noteMoveObservationFailed(
+    WorkspaceNoteMoveRecord record,
+    Set<String> paths,
+    String message,
+  ) => WorkspaceNoteMoveRecord(
+    transactionId: record.transactionId,
+    phase: 'partial',
+    code: 'client_verification_failed',
+    message: message,
+    entries: [
+      for (final entry in record.entries)
+        if (paths.contains(entry.path))
+          WorkspaceNoteMoveReceipt(
+            path: entry.path,
+            destinationPath: entry.destinationPath,
+            state: 'current_state_unverified',
+          )
+        else
+          entry,
+    ],
+    recoveryPaths: record.recoveryPaths,
+    retainedArtifacts: record.retainedArtifacts,
+    recoveryEntries: record.recoveryEntries,
+  );
+
+  Future<WorkspaceNoteMoveRecord> _reconcileNoteMoveBuffers(
+    WorkspaceNoteMovePlan plan,
+    WorkspaceNoteMoveRecord record, {
+    required bool persistentAccessExpected,
+  }) async {
+    final root = plan.root!;
+    final epoch = index.epoch;
+    final seen = <String>{};
+    final failed = <String>{};
+    var bookmarkUnavailable = false;
+    bool current() =>
+        !_disposed && _workspaceRoot == root && index.epoch == epoch;
+    WorkspaceNoteMoveRecord changedScope() => _noteMoveObservationFailed(
+      record,
+      plan.files.map((file) => file.path).toSet(),
+      'The workspace changed while verifying the result. Review the original workspace journal; do not repeat the move.',
+    );
+    for (final file in plan.files) {
+      if (!current()) return changedScope();
+      final receipt = record.entries
+          .where((entry) => entry.path == file.path)
+          .singleOrNull;
+      final matching = _documents
+          .where(
+            (document) =>
+                document.id == file.source.sessionId ||
+                document.path == p.posix.join(root, file.path),
+          )
+          .toList();
+      if (receipt == null ||
+          !seen.add(receipt.path) ||
+          (!receipt.applied && !receipt.unchanged) ||
+          receipt.actualPath == null ||
+          receipt.revision == null ||
+          receipt.destinationPath != file.destination) {
+        if (receipt?.unchanged != true) {
+          for (final document in matching) {
+            document.hasExternalChanges = true;
+          }
+        }
+        continue;
+      }
+      final actual = receipt.actualPath!;
+      // Native may report a partial operation with updated contents still at
+      // the old name. Accept only those two exact approved locations.
+      if (actual != file.path && actual != file.destination) {
+        for (final document in matching) {
+          document.hasExternalChanges = true;
+        }
+        continue;
+      }
+      var verified = false;
+      final expectedText = receipt.applied ? file.contents : file.source.text;
+      try {
+        final read = await index.source.readWorkspaceText(
+          root,
+          actual,
+          workspaceTextMaximumBytes,
+        );
+        verified =
+            read.text == expectedText && read.revision == receipt.revision;
+      } on Object {
+        /* Keep the original buffer and its baseline on uncertainty. */
+      }
+      if (!current()) return changedScope();
+      if (!verified) {
+        failed.add(file.path);
+        for (final document in matching) {
+          document.hasExternalChanges = true;
+        }
+        continue;
+      }
+      final newPath = p.posix.join(root, actual);
+      final oldPath = p.posix.join(root, file.path);
+      final favorite =
+          browser.hasFavorite(oldPath) || browser.hasFavorite(newPath);
+      for (final document in matching) {
+        if (!_documents.contains(document)) continue;
+        unawaited(_unwatch(document.id));
+        document
+          ..path = newPath
+          ..name = p.posix.basename(newPath)
+          ..accessToken = null;
+        if (document.controller.text == file.source.text &&
+            !document.controller.isDirty) {
+          document.replaceFromDisk(expectedText, preserveHistory: true);
+        } else {
+          // A keystroke during native work remains unsaved. Never replace it.
+          document.hasExternalChanges = true;
+        }
+        _watch(document);
+      }
+      if (file.path == plan.sourcePath && actual == plan.destinationPath) {
+        browser.remap(p.posix.join(root, file.path), newPath);
+      }
+      if (matching.isNotEmpty || favorite) {
+        String? token;
+        try {
+          token = await fileService.createPersistentAccessToken(newPath);
+        } on Object {
+          // Current folder access still works, but do not restore an old token.
+          bookmarkUnavailable = true;
+        }
+        if (!current()) return changedScope();
+        bookmarkUnavailable |= token == null && persistentAccessExpected;
+        for (final document in matching) {
+          if (_documents.contains(document) && document.path == newPath) {
+            document.accessToken = token;
+          }
+        }
+        if (favorite && browser.hasFavorite(newPath)) {
+          if (token != null) _favoriteAccessTokens[newPath] = token;
+        }
+      }
+    }
+    if (failed.isNotEmpty) {
+      return _noteMoveObservationFailed(
+        record,
+        failed,
+        'The native operation returned, but current file contents or identity could not be verified. Review the journal and affected files; do not repeat the move.',
+      );
+    }
+    if (bookmarkUnavailable) {
+      return WorkspaceNoteMoveRecord(
+        transactionId: record.transactionId,
+        phase: record.phase,
+        entries: record.entries,
+        code: record.code ?? 'persistent_access_unavailable',
+        message: [
+          if (record.message != null) record.message!,
+          'Persistent access for some verified entries could not be renewed. You may need to reselect the workspace after reopening the app.',
+        ].join(' '),
+        recoveryPaths: record.recoveryPaths,
+        retainedArtifacts: record.retainedArtifacts,
+        recoveryEntries: record.recoveryEntries,
+      );
+    }
+    return record;
+  }
+
+  Future<WorkspaceNoteMoveJournalList> refreshNoteMoveRecovery() async {
+    final root = _workspaceRoot;
+    final epoch = index.epoch;
+    if (root == null) return const WorkspaceNoteMoveJournalList();
+    final records = await noteTransactions.list(root);
+    if (!_disposed && root == _workspaceRoot && epoch == index.epoch) {
+      _noteMoveRecords = List.unmodifiable(records.transactions);
+      noteMoveRecoveryNotice =
+          records.unavailableRecords > 0 ||
+              records.storageBlocked ||
+              records.transactions.any(
+                (record) => !record.completed && record.phase != 'cancelled',
+              )
+          ? 'Note move recovery needs review'
+          : null;
+      notifyListeners();
+    }
+    return records;
+  }
+
+  Future<WorkspaceNoteMoveRecord> recoverNoteMoveCopies(
+    String transactionId, {
+    String relativeDirectory = '',
+  }) {
+    final root = _workspaceRoot;
+    final epoch = index.epoch;
+    return _serializeFileOperation(() async {
+      if (_disposed ||
+          root == null ||
+          root != _workspaceRoot ||
+          epoch != index.epoch) {
+        throw StateError(
+          'The workspace changed. Confirm recovery again in the original workspace.',
+        );
+      }
+      final result = await noteTransactions.recoverCopies(
+        root,
+        transactionId,
+        relativeDirectory,
+      );
+      if (!_disposed && root == _workspaceRoot && epoch == index.epoch) {
+        await _afterFileOperation([p.posix.join(root, relativeDirectory)]);
+        if (!_disposed && root == _workspaceRoot && epoch == index.epoch) {
+          await refreshNoteMoveRecovery();
+        }
+      }
+      return result;
+    });
+  }
+
   Future<String> duplicateFileEntry(
     String source,
   ) => _serializeFileOperation(() async {
@@ -1192,6 +1699,9 @@ class WorkspaceController extends ChangeNotifier {
         document.path != null &&
         p.equals(document.path!, path);
     while (isWatching()) {
+      final move = _activeNoteMove;
+      if (move != null) await move.future;
+      if (!isWatching()) return;
       final saveRevision = _saveRevision;
       final pendingSave = _pendingSaves[document.id];
       if (pendingSave != null) {

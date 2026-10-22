@@ -1,6 +1,7 @@
 import AppKit
 import CryptoKit
 import PDFKit
+import WebKit
 
 @main
 struct NativeDocumentExportAcceptance {
@@ -70,6 +71,20 @@ struct NativeDocumentExportAcceptance {
       }
     }
     phase("lifecycle deadlines and once-only cleanup")
+    let printLease = DocumentExportPrintLease()
+    let firstPrint = UUID()
+    let secondPrint = UUID()
+    assert(printLease.acquire(firstPrint))
+    assert(!printLease.acquire(secondPrint), "An in-flight worker excludes a second print")
+    printLease.release(secondPrint)
+    assert(!printLease.acquire(secondPrint), "An unrelated callback cannot clear the lease")
+    printLease.release(firstPrint)
+    assert(printLease.acquire(secondPrint))
+    printLease.release(firstPrint)
+    assert(!printLease.acquire(firstPrint), "A late old callback cannot clear a new print")
+    printLease.release(secondPrint)
+    assert(printLease.acquire(firstPrint))
+    printLease.release(firstPrint)
     var callbacks = 0
     var cancellations = 0
     var results = [Result<Bool, Error>]()
@@ -118,10 +133,34 @@ struct NativeDocumentExportAcceptance {
       "Loading timeout must hold the job through terminal cleanup exactly once")
     assert(!fm.fileExists(atPath: loadingTemporary.path))
 
+    phase("held worker lease rejects before native operation factory")
+    let heldPrintToken = UUID()
+    assert(NSPrintOperation.current == nil)
+    assert(DocumentExportPrintLease.shared.acquire(heldPrintToken))
+    var rejectedFactoryCalls = 0
+    var rejectedPrint: Result<Bool, Error>?
+    let rejectedJob = OfflineDocumentPrintJob(compileRules: { _, _ in }, makePrintOperation: { view, info in
+      rejectedFactoryCalls += 1
+      return view.printOperation(with: info)
+    })
+    rejectedJob.run(html: "<p>synthetic</p>", window: window, pdfDestination: output) { rejectedPrint = $0 }
+    let rejectionConfiguration = WKWebViewConfiguration()
+    rejectionConfiguration.websiteDataStore = .nonPersistent()
+    let rejectionView = WKWebView(frame: .zero, configuration: rejectionConfiguration)
+    // Drive the didFinish boundary without loading another document or printing.
+    rejectedJob.webView(rejectionView, didFinish: nil)
+    guard case .some(.failure(_)) = rejectedPrint else { fatalError("Held print lease must reject retry") }
+    assert(rejectedFactoryCalls == 0 && NSPrintOperation.current == nil,
+      "A rejected retry cannot invoke the stateful factory or leave current occupied")
+    DocumentExportPrintLease.shared.release(heldPrintToken)
+
     phase("offline WebKit rendering and native paged PDF")
     let job = OfflineDocumentPrintJob()
     var outcome: Result<Bool, Error>?
-    job.run(html: try String(contentsOf: fixture, encoding: .utf8), window: window, pdfDestination: output) { outcome = $0 }
+    job.run(html: try String(contentsOf: fixture, encoding: .utf8), window: window, pdfDestination: output) {
+      assert(Thread.isMainThread, "Native print completion must return to the main actor")
+      outcome = $0
+    }
     let deadline = Date().addingTimeInterval(90)
     while outcome == nil && Date() < deadline {
       RunLoop.main.run(until: Date().addingTimeInterval(0.05))
