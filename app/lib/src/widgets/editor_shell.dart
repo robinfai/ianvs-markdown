@@ -35,6 +35,8 @@ import '../desktop_theme.dart';
 import '../desktop_typography.dart';
 import 'floating_outline.dart';
 import 'desktop_menu_bar.dart';
+import 'document_export_dialog.dart';
+import '../services/document_export_service.dart';
 import '../app_icons.dart';
 import '../tab_shortcuts.dart';
 import 'title_tabs_bar.dart';
@@ -71,6 +73,7 @@ class EditorShell extends StatefulWidget {
 
 class _EditorShellState extends State<EditorShell> {
   var _draggingFiles = false;
+  final _documentExport = DocumentExportFlow();
   final _mermaidRenderer = NativeMermanRenderer();
   final _editorFocus = FocusNode();
   final _findFocus = FocusNode();
@@ -768,6 +771,7 @@ class _EditorShellState extends State<EditorShell> {
 
   @override
   void dispose() {
+    _documentExport.dispose();
     _documentInputTarget.dispose();
     widget.workspace.removeListener(_workspaceChanged);
     _find?.document.modeListenable.removeListener(_findModeChanged);
@@ -860,6 +864,30 @@ class _EditorShellState extends State<EditorShell> {
           onSave: () => _saveCommand(),
           onSaveAs: () => _saveCommand(saveAs: true),
           onImportImage: () => unawaited(_importImage()),
+          onExportHtml: () => unawaited(
+            _documentExport.run(
+              context,
+              workspace,
+              DocumentExportAction.html,
+              attachmentSource: widget.attachmentSource,
+            ),
+          ),
+          onExportPdf: () => unawaited(
+            _documentExport.run(
+              context,
+              workspace,
+              DocumentExportAction.pdf,
+              attachmentSource: widget.attachmentSource,
+            ),
+          ),
+          onPrint: () => unawaited(
+            _documentExport.run(
+              context,
+              workspace,
+              DocumentExportAction.print,
+              attachmentSource: widget.attachmentSource,
+            ),
+          ),
           onClose: () => _guard(() => _closeDocument(document)),
           onToggleTheme: widget.onToggleTheme,
           onUseSystemTheme: widget.onUseSystemTheme,

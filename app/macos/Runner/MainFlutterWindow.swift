@@ -59,6 +59,8 @@ class MainFlutterWindow: NSWindow {
   }
 
 
+  private var exportChannel: FlutterMethodChannel?
+  private lazy var documentExport = DocumentExportCoordinator(window: self)
   private var fileAccessChannel: FlutterMethodChannel?
   private var fileAssociationChannel: FlutterMethodChannel?
   private var incomingFilesChannel: FlutterMethodChannel?
@@ -105,6 +107,20 @@ class MainFlutterWindow: NSWindow {
     CloudWorkspace.shared.attach(to: flutterViewController.engine.binaryMessenger)
     registerFileAccessChannel(with: flutterViewController)
     registerDesktopIntegration(with: flutterViewController)
+    exportChannel = FlutterMethodChannel(name: "work.ianvs.linefold/document_export",
+      binaryMessenger: flutterViewController.engine.binaryMessenger)
+    exportChannel?.setMethodCallHandler { [weak self] call, result in
+      guard let self, let arguments = call.arguments as? [String: Any] else {
+        result(FlutterError(code: "export_unavailable", message: "The document window is unavailable.", details: nil))
+        return
+      }
+      self.documentExport.perform(call.method, arguments: arguments) { output in
+        switch output {
+        case .success(let completed): result(completed)
+        case .failure(let error): result(FlutterError(code: "export_failed", message: error.localizedDescription, details: nil))
+        }
+      }
+    }
 
     benchmarkChannel = FlutterMethodChannel(
       name: "ianvs_markdown/benchmark_environment",

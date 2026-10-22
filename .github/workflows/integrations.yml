@@ -48,12 +48,16 @@ jobs:
         run: make check-integrations
       - name: Build the example and app main entries
         run: make build-local build-local-release
+      - name: Check actual sandbox app printing declarations
+        run: python3 app/tool/check_document_export_entitlements.py --built-apps
       - name: Save native rendering evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: native-rendering
-          path: packages/ianvs_mermaid/build/visual-regression/
+          path: |
+            packages/ianvs_mermaid/build/visual-regression/
+            app/build/export-qa/
           if-no-files-found: ignore
 
   ios-simulator:

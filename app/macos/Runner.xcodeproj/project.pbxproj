@@ -21,6 +21,7 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		E2A000000000000000000001 /* DocumentExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2A000000000000000000002 /* DocumentExport.swift */; };
 		C10D00000000000000000001 /* CloudWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10D00000000000000000002 /* CloudWorkspace.swift */; };
 		331C80D8294CF71000263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C80D7294CF71000263BE5 /* RunnerTests.swift */; };
 		335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */ = {isa = PBXBuildFile; fileRef = 335BBD1A22A9A15E00E9071D /* GeneratedPluginRegistrant.swift */; };
@@ -86,6 +87,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		E2A000000000000000000002 /* DocumentExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentExport.swift; sourceTree = "<group>"; };
 		C10D00000000000000000002 /* CloudWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../apple/CloudWorkspace.swift; sourceTree = SOURCE_ROOT; };
 		002B081F75F73A0931080287 /* LinefoldQuickLook.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LinefoldQuickLook.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		11C6ECABBEDCF7EB0FFAD64C /* PreviewBridge.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = PreviewBridge.h; sourceTree = "<group>"; };
@@ -242,6 +244,7 @@
 				33CC10F02044A3C60003C045 /* AppDelegate.swift */,
 				33CC11122044BFA00003C045 /* MainFlutterWindow.swift */,
 				F103D3012026092300000002 /* DesktopIntegration.swift */,
+				E2A000000000000000000002 /* DocumentExport.swift */,
 				33E51913231747F40026EE4D /* DebugProfile.entitlements */,
 				33E51914231749380026EE4D /* Release.entitlements */,
 				51A100000000000000000002 /* DebugProfileLocal.entitlements */,
@@ -610,6 +613,7 @@
 			files = (
 				33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */,
 				F103D3012026092300000001 /* DesktopIntegration.swift in Sources */,
+				E2A000000000000000000001 /* DocumentExport.swift in Sources */,
 				C10D00000000000000000001 /* CloudWorkspace.swift in Sources */,
 				33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */,
 				335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */,
