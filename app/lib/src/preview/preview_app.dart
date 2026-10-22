@@ -7,16 +7,24 @@ import 'package:ianvs_markdown_clipboard/ianvs_markdown_clipboard.dart';
 import 'package:ianvs_mermaid/ianvs_mermaid.dart';
 
 import '../widgets/document_diagram.dart';
+import '../widgets/document_attachment_scope.dart';
+import '../services/attachment_repository.dart';
 import '../services/apple_workspace_service.dart';
 import 'preview_controller.dart';
 import 'preview_library.dart';
 import 'preview_platform.dart';
 
 class LinefoldPreviewApp extends StatefulWidget {
-  const LinefoldPreviewApp({super.key, this.controller, this.platform});
+  const LinefoldPreviewApp({
+    super.key,
+    this.controller,
+    this.platform,
+    this.attachmentSource = const AppleAttachmentSource(),
+  });
 
   final PreviewController? controller;
   final PreviewPlatform? platform;
+  final AttachmentSource attachmentSource;
 
   @override
   State<LinefoldPreviewApp> createState() => _LinefoldPreviewAppState();
@@ -158,6 +166,9 @@ class _LinefoldPreviewAppState extends State<LinefoldPreviewApp>
                     : _PreviewReader(
                         key: ValueKey(_controller.activePath),
                         contents: _controller.contents!,
+                        documentPath: _controller.activePath,
+                        root: _controller.library.workspace?.path,
+                        attachmentSource: widget.attachmentSource,
                         renderer: _renderer,
                         platform: _platform,
                         onError: _controller.reportError,
@@ -298,12 +309,18 @@ class _PreviewReader extends StatefulWidget {
   const _PreviewReader({
     super.key,
     required this.contents,
+    required this.documentPath,
+    required this.root,
+    required this.attachmentSource,
     required this.renderer,
     required this.platform,
     required this.onError,
   });
 
   final String contents;
+  final String? documentPath;
+  final String? root;
+  final AttachmentSource attachmentSource;
   final MermaidRenderer renderer;
   final PreviewPlatform platform;
   final ValueChanged<String> onError;
@@ -391,19 +408,28 @@ class _PreviewReaderState extends State<_PreviewReader> {
       Expanded(
         child: widget.contents.isEmpty
             ? const Center(child: Text('这是一个空文档'))
-            : IanvsMarkdownView(
-                data: widget.contents,
-                clipboardWriter: (data) => writeIanvsMarkdownRichClipboard(
-                  markdown: data.markdown,
-                  html: data.html,
+            : DocumentAttachmentScope(
+                root: widget.root,
+                documentPath: widget.documentPath,
+                source: widget.attachmentSource,
+                builder: (context, images) => IanvsMarkdownView(
+                  imageBuilder: images.image,
+                  wikiEmbedBuilder: images.wiki,
+                  data: widget.contents,
+                  clipboardWriter: (data) => writeIanvsMarkdownRichClipboard(
+                    markdown: data.markdown,
+                    html: data.html,
+                  ),
+                  showOutline: false,
+                  headingNavigation: _navigation,
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+                  contentMaxWidth: 720,
+                  onTapLink: (_, href, _) => unawaited(_openLink(href)),
+                  diagramBuilder: (context, source) => DocumentDiagram(
+                    source: source,
+                    renderer: widget.renderer,
+                  ),
                 ),
-                showOutline: false,
-                headingNavigation: _navigation,
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
-                contentMaxWidth: 720,
-                onTapLink: (_, href, _) => unawaited(_openLink(href)),
-                diagramBuilder: (context, source) =>
-                    DocumentDiagram(source: source, renderer: widget.renderer),
               ),
       ),
       const Divider(height: 1),
