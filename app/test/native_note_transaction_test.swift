@@ -22,6 +22,14 @@ private struct InjectedFailure: Error {
   let boundary: String
 }
 
+private func fixtureRelativePath(_ file: URL, under canonicalBase: URL) throws -> String {
+  let baseComponents = canonicalBase.standardizedFileURL.pathComponents
+  let components = file.standardizedFileURL.pathComponents
+  try require(components.starts(with: baseComponents) && components.count > baseComponents.count,
+              "Enumerated fixture file must remain under the canonical base")
+  return components.dropFirst(baseComponents.count).joined(separator: "/")
+}
+
 private final class MovePresenter: NSObject, NSFilePresenter {
   private let lock = NSLock()
   private var location: URL
@@ -137,13 +145,17 @@ private final class Fixture {
   }
 
   func relativeFiles(under base: URL) throws -> [String] {
-    guard let enumerator = manager.enumerator(at: base, includingPropertiesForKeys: [.isRegularFileKey]) else {
+    // Foundation can return /private/var URLs when the supplied base used the
+    // /var alias. Slice path components from the same canonical base, not raw
+    // character offsets from a differently spelled URL.
+    let canonicalBase = base.resolvingSymlinksInPath().standardizedFileURL
+    guard let enumerator = manager.enumerator(at: canonicalBase, includingPropertiesForKeys: [.isRegularFileKey]) else {
       throw TestFailure(description: "Unable to inspect synthetic test directory")
     }
     var result: [String] = []
     for case let file as URL in enumerator {
       if try file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true {
-        result.append(String(file.path.dropFirst(base.path.count + 1)))
+        result.append(try fixtureRelativePath(file, under: canonicalBase))
       }
     }
     return result.sorted()
@@ -198,27 +210,59 @@ private extension Fixture {
 @main
 struct NativeNoteTransactionAcceptance {
   static func main() throws {
-    try preflight()
-    try journalFaultsAndBounds()
-    try metadataProtection()
-    try successAndRestart()
-    try finalDependencyChanges()
-    try lostSemanticReceipt()
-    try lostSemanticReceiptLiveToken()
-    try executionFaults()
-    try writerConflicts()
-    try scopedRaces()
-    try offlineAndSymlinks()
-    try recoveryFaults()
-    try durableSyncRepairs()
-    try semanticScanFailures()
-    try capacityAndParentPreflight()
-    try maximumPlanAndLowSpaceListing()
-    try journalDirectoryDurabilityAndPrivacy()
-    try inheritedRecoveryACL()
-    try recoveryIndependentOfOldReadSet()
-    try presenterMoveNotifications()
+    try run("relativePathProjection", relativePathProjection)
+    try run("preflight", preflight)
+    try run("journalFaultsAndBounds", journalFaultsAndBounds)
+    try run("metadataProtection", metadataProtection)
+    try run("successAndRestart", successAndRestart)
+    try run("finalDependencyChanges", finalDependencyChanges)
+    try run("lostSemanticReceipt", lostSemanticReceipt)
+    try run("lostSemanticReceiptLiveToken", lostSemanticReceiptLiveToken)
+    try run("executionFaults", executionFaults)
+    try run("writerConflicts", writerConflicts)
+    try run("scopedRaces", scopedRaces)
+    try run("offlineAndSymlinks", offlineAndSymlinks)
+    try run("recoveryFaults", recoveryFaults)
+    try run("durableSyncRepairs", durableSyncRepairs)
+    try run("semanticScanFailures", semanticScanFailures)
+    try run("capacityAndParentPreflight", capacityAndParentPreflight)
+    try run("maximumPlanAndLowSpaceListing", maximumPlanAndLowSpaceListing)
+    try run("journalDirectoryDurabilityAndPrivacy", journalDirectoryDurabilityAndPrivacy)
+    try run("inheritedRecoveryACL", inheritedRecoveryACL)
+    try run("recoveryIndependentOfOldReadSet", recoveryIndependentOfOldReadSet)
+    try run("presenterMoveNotifications", presenterMoveNotifications)
     print("PASS: synthetic atomic note transactions, receipts, recovery, races, bounds and privacy")
+  }
+  private static func run(_ name: String, _ body: () throws -> Void) throws {
+    print("RUN: \(name)"); fflush(stdout)
+    try body()
+    print("PASS: \(name)"); fflush(stdout)
+  }
+  private static func relativePathProjection() throws {
+    let f = try Fixture()
+    let child = f.journal.appendingPathComponent("nested/原文.md")
+    try f.manager.createDirectory(at: child.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try Data("synthetic".utf8).write(to: child)
+    let alias = f.directory.appendingPathComponent("journal-alias")
+    try f.manager.createSymbolicLink(at: alias, withDestinationURL: f.journal)
+    try require(try f.relativeFiles(under: f.journal) == ["nested/原文.md"], "Real base must yield exact relative components")
+    try require(try f.relativeFiles(under: alias) == ["nested/原文.md"], "An alias base must yield the same relative components")
+    let canonicalBase = f.journal.resolvingSymlinksInPath().standardizedFileURL
+    let components = canonicalBase.pathComponents
+    if components.starts(with: ["/", "private", "var"]) {
+      let varAlias = URL(fileURLWithPath: "/var", isDirectory: true)
+        .appendingPathComponent(components.dropFirst(3).joined(separator: "/"), isDirectory: true)
+      try require(try f.relativeFiles(under: canonicalBase) == ["nested/原文.md"], "The /private/var base must project exactly")
+      try require(try f.relativeFiles(under: varAlias) == ["nested/原文.md"], "The /var alias must project identically")
+      print("PASS: system /var and /private/var fixture aliases"); fflush(stdout)
+    }
+    for sibling in ["private-journal-backup/note.md", "outside/note.md"] {
+      let other = canonicalBase.deletingLastPathComponent().appendingPathComponent(sibling)
+      var rejected = false
+      do { _ = try fixtureRelativePath(other, under: canonicalBase) }
+      catch is TestFailure { rejected = true }
+      try require(rejected, "Sibling paths must not be treated as children, even when names share a prefix")
+    }
   }
   private static func preflight() throws {
     do {
