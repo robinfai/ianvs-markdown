@@ -28,6 +28,17 @@ final class WorkspaceNoteTransaction {
   var parentDeviceOverride: ((String, Int32) -> Int32)?
   var parentAccessOverride: ((String, Bool) -> Bool)?
   var forceDependencyTimeout = false
+  // Read-only synthetic-test observer. Never exposed on the Flutter channel;
+  // the production singleton leaves it nil and emits no path diagnostics.
+  struct CoordinationObservation {
+    let expectedSource: URL
+    let observedSource: URL
+    let expectedDestination: URL?
+    let observedDestination: URL?
+    let moving: Bool
+    let deadlineExpired: Bool
+  }
+  var coordinationObserver: ((CoordinationObservation) -> Void)?
   private let journalURL: URL
   private let journalBaseURL: URL
   private var journalIdentity: String?
@@ -679,6 +690,9 @@ final class WorkspaceNoteTransaction {
       coordinator.coordinate(writingItemAt: url, options: moving ? .forMoving : [],
         writingItemAt: target, options: [], error: &coordinationError) { a, b in
         outcome = Result {
+          coordinationObserver?(CoordinationObservation(expectedSource: url, observedSource: a,
+            expectedDestination: target, observedDestination: b, moving: moving,
+            deadlineExpired: DispatchTime.now().uptimeNanoseconds >= deadline.uptimeNanoseconds))
           guard DispatchTime.now().uptimeNanoseconds < deadline.uptimeNanoseconds,
                 a.standardizedFileURL == url.standardizedFileURL, b.standardizedFileURL == target.standardizedFileURL else {
             throw Failure("coordinator_redirected")
@@ -689,6 +703,9 @@ final class WorkspaceNoteTransaction {
     } else {
       coordinator.coordinate(writingItemAt: url, options: [], error: &coordinationError) { current in
         outcome = Result {
+          coordinationObserver?(CoordinationObservation(expectedSource: url, observedSource: current,
+            expectedDestination: nil, observedDestination: nil, moving: false,
+            deadlineExpired: DispatchTime.now().uptimeNanoseconds >= deadline.uptimeNanoseconds))
           guard DispatchTime.now().uptimeNanoseconds < deadline.uptimeNanoseconds,
                 current.standardizedFileURL == url.standardizedFileURL else { throw Failure("coordinator_redirected") }
           try WorkspaceFileScope.withoutMaterialization(body)

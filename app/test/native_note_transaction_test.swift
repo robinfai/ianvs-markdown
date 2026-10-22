@@ -982,6 +982,41 @@ struct NativeNoteTransactionAcceptance {
       defer { NSFileCoordinator.removeFilePresenter(presenter) }
       try traceSourceMetadata("afterRegistration")
       var points: [String] = []
+      var coordinationSnapshots: [String] = []
+      func describeURL(_ url: URL?) -> String {
+        guard let url else { return "nil" }
+        // Canonicalization is synthetic diagnostic evidence only, never an
+        // executor acceptance check. Do not log paths outside this fixture.
+        let canonical = url.resolvingSymlinksInPath().standardizedFileURL
+        guard url.isFileURL,
+              canonical.pathComponents.starts(with: f.root.resolvingSymlinksInPath().standardizedFileURL.pathComponents) else {
+          return "outside-synthetic-root (suppressed)"
+        }
+        var attributes = stat()
+        let metadata: String
+        if lstat(url.path, &attributes) == 0 {
+          metadata = "dev:ino=\(attributes.st_dev):\(attributes.st_ino) revision=\(WorkspaceFileScope.revision(attributes)) " +
+            "mode=\(attributes.st_mode) flags=\(attributes.st_flags)"
+        } else {
+          metadata = errno == ENOENT ? "absent" : "lstat-error=\(errno)"
+        }
+        return "raw=\(url.absoluteString) standardized=\(url.standardizedFileURL.absoluteString) " +
+          "canonical=\(canonical.absoluteString) lstat={\(metadata)}"
+      }
+      executor.coordinationObserver = { observation in
+        let artifacts: String
+        do {
+          let paths = try f.relativeFiles(under: f.root).filter {
+            $0.split(separator: "/").last?.hasPrefix(".linefold") == true
+          }
+          artifacts = paths.map { "\($0)={\(describeURL(f.url($0)))}" }.joined(separator: "; ")
+        } catch { artifacts = "synthetic-artifact-enumeration-failed" }
+        coordinationSnapshots.append("moving=\(observation.moving) expired=\(observation.deadlineExpired) " +
+          "sourceOptions=\(observation.moving ? "forMoving" : "[]") destinationOptions=[] " +
+          "expectedSource={\(describeURL(observation.expectedSource))} observedSource={\(describeURL(observation.observedSource))} " +
+          "expectedDestination={\(describeURL(observation.expectedDestination))} observedDestination={\(describeURL(observation.observedDestination))} " +
+          "artifacts=[\(artifacts)] presenter={\(describeURL(presenter.presentedItemURL))}")
+      }
       executor.fault = { point in
         points.append(point)
         if scenario == "renameFailure" && point == "beforeExclusiveRename" {
@@ -991,6 +1026,7 @@ struct NativeNoteTransactionAcceptance {
         }
       }
       let result = try f.invoke(executor, "executeWorkspaceNoteMove", f.command(request, token: prepared["token"]))
+      for snapshot in coordinationSnapshots { print("PRESENTER \(scenario) coordination: \(snapshot)") }
       print("PRESENTER \(scenario): result=\(result) sourceExists=\(f.exists(f.source)) destinationExists=\(f.exists(f.destination)) points=\(points)"); fflush(stdout)
       let notified = presenter.moved.wait(timeout: .now() + (scenario == "renameFailure" ? 0.2 : 3)) == .success
       print("PRESENTER \(scenario): notified=\(notified) presentedURL=\(String(describing: presenter.presentedItemURL))"); fflush(stdout)
