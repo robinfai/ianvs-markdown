@@ -285,17 +285,21 @@ void main() {
     (const Size(1200, 780), 3.0),
   ]) {
     testWidgets(
-      'context action stays reachable at $size and ${textScale}x text',
+      'three context actions stay reachable at $size and ${textScale}x text',
       (tester) async {
         tester.view.physicalSize = size;
+        var imagePickerCalls = 0;
         tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
           AppleWorkspaceService.channel,
-          (call) async => call.method == 'normalizeAttachmentPaths'
-              ? (call.arguments['values'] as List)
-                    .cast<String>()
-                    .map((path) => path.toLowerCase())
-                    .toList()
-              : null,
+          (call) async {
+            if (call.method == 'pickAttachmentImage') imagePickerCalls++;
+            return call.method == 'normalizeAttachmentPaths'
+                ? (call.arguments['values'] as List)
+                      .cast<String>()
+                      .map((path) => path.toLowerCase())
+                      .toList()
+                : null;
+          },
         );
         addTearDown(
           () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
@@ -330,6 +334,22 @@ void main() {
         expect(row.contains(bounds.bottomRight), isTrue);
         expect(bounds.right, lessThan(mode.left));
         expect(bounds.center.dy, closeTo(row.center.dy, 0.5));
+        var previousRight = row.left;
+        for (final key in [
+          'import-image-button',
+          'workspace-backlinks-button',
+          'insert-wiki-link-button',
+        ]) {
+          final button = tester.getRect(find.byKey(ValueKey(key)));
+          expect(button.width, greaterThanOrEqualTo(32), reason: key);
+          expect(button.height, greaterThanOrEqualTo(32), reason: key);
+          expect(row.contains(button.topLeft), isTrue, reason: key);
+          expect(row.contains(button.bottomRight), isTrue, reason: key);
+          expect(button.left, greaterThanOrEqualTo(previousRight), reason: key);
+          expect(button.right, lessThan(mode.left), reason: key);
+          expect(button.center.dy, closeTo(row.center.dy, 0.5), reason: key);
+          previousRight = button.right;
+        }
         expect(
           tester.getRect(find.byType(IanvsMarkdownLiveEditor)).top,
           closeTo(row.bottom, 0.5),
@@ -338,6 +358,8 @@ void main() {
         final semantics = tester.ensureSemantics();
         await tester.pump();
         expect(find.bySemanticsLabel('Insert note link'), findsOneWidget);
+        expect(find.bySemanticsLabel('Import image'), findsOneWidget);
+        expect(find.bySemanticsLabel('Backlinks'), findsOneWidget);
         semantics.dispose();
 
         final outlineScroll = find.descendant(
@@ -357,6 +379,22 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byType(WikiNotePicker), findsOneWidget);
         await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+        expect(workspace.activeDocument!.controller.text, '');
+        await tester.tap(find.byKey(const ValueKey('import-image-button')));
+        await tester.pumpAndSettle();
+        expect(imagePickerCalls, 1);
+        await tester.tap(
+          find.byKey(const ValueKey('workspace-backlinks-button')),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.text(
+            'Backlinks · A very long document title 中文 with spaces and more words.md',
+          ),
+          findsOneWidget,
+        );
+        await tester.tap(find.byTooltip('Close references'));
         await tester.pumpAndSettle();
         expect(workspace.activeDocument!.controller.text, '');
         expect(tester.takeException(), isNull);

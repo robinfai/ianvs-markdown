@@ -106,7 +106,7 @@ class _WikiNotePickerState extends State<WikiNotePicker> {
                   const SizedBox(height: 8),
                   Text(
                     widget.notice ??
-                        'Current workspace .md notes only. YAML aliases, heading and block targets are not available yet.',
+                        'Filename-based workspace .md picker. YAML aliases resolve when following links; heading and block navigation are not available.',
                   ),
                   if (_normalizationIssue)
                     const Text(

@@ -398,3 +398,103 @@ final class _Dedent {
   final int remainingSpaces;
   final int? partialTabIndex;
 }
+
+/// Internal source-mapped leaf block used by semantic analysis.
+///
+/// Container prefixes are removed using the same projection as code exclusion.
+/// All offsets still map to the unchanged original UTF-16 source.
+final class IanvsMarkdownSemanticSourceRegion {
+  IanvsMarkdownSemanticSourceRegion._(this._projection, this.type);
+
+  final _MarkdownProjection _projection;
+  final IanvsMarkdownBlockType type;
+  String get source => _projection.source;
+
+  TextRange originalRange(int start, int end) {
+    final length = source.length;
+    final first = start < length
+        ? _projection.originalCodeUnitOffset(start)
+        : length == 0
+        ? 0
+        : _projection.originalCodeUnitOffset(length - 1) + 1;
+    return TextRange(
+      start: first,
+      end: start == end
+          ? first
+          : _projection.originalCodeUnitOffset(end - 1) + 1,
+    );
+  }
+}
+
+/// Internal leaf-block projections for a bounded semantic parse.
+List<IanvsMarkdownSemanticSourceRegion> ianvsMarkdownSemanticSourceRegions(
+  String source, {
+  List<TextRange> removedRanges = const [],
+}) {
+  final root = _MarkdownProjection.root(source);
+  final builder = _MarkdownProjectionBuilder(root);
+  var cursor = 0;
+  for (final range in removedRanges) {
+    builder.appendRange(cursor, range.start);
+    // Reading comments preserve line breaks, not horizontal placeholder spaces.
+    for (var index = range.start; index < range.end; index++) {
+      if (source.codeUnitAt(index) == 0x0a ||
+          source.codeUnitAt(index) == 0x0d) {
+        builder.appendRange(index, index + 1);
+      }
+    }
+    cursor = range.end;
+  }
+  builder.appendRange(cursor, source.length);
+  final regions = <IanvsMarkdownSemanticSourceRegion>[];
+  _collectSemanticSourceRegions(builder.build(), regions);
+  return regions;
+}
+
+void _collectSemanticSourceRegions(
+  _MarkdownProjection projection,
+  List<IanvsMarkdownSemanticSourceRegion> regions, [
+  int depth = 0,
+]) {
+  if (depth > 64) {
+    throw const FormatException('Semantic container depth exceeds 64.');
+  }
+  for (final block in parseMarkdownBlocks(
+    projection.source,
+    groupStandaloneComments: false,
+  )) {
+    if (block.type == IanvsMarkdownBlockType.blockquote) {
+      final child = _dequoteBlock(projection, block.start, block.end);
+      if (child.source.isNotEmpty) {
+        _collectSemanticSourceRegions(child, regions, depth + 1);
+      }
+      continue;
+    }
+    final paragraphMarker = block.type == IanvsMarkdownBlockType.paragraph
+        ? _paragraphListMarker(projection, block.start, block.end)
+        : null;
+    if (block.type == IanvsMarkdownBlockType.unorderedList ||
+        block.type == IanvsMarkdownBlockType.orderedList ||
+        block.type == IanvsMarkdownBlockType.taskList ||
+        paragraphMarker != null) {
+      for (final child in _listItemProjections(
+        projection,
+        block.start,
+        block.end,
+        ordered:
+            paragraphMarker?.ordered ??
+            block.type == IanvsMarkdownBlockType.orderedList,
+      )) {
+        if (child.source.isNotEmpty) {
+          _collectSemanticSourceRegions(child, regions, depth + 1);
+        }
+      }
+      continue;
+    }
+    final builder = _MarkdownProjectionBuilder(projection)
+      ..appendRange(block.start, block.end);
+    regions.add(
+      IanvsMarkdownSemanticSourceRegion._(builder.build(), block.type),
+    );
+  }
+}

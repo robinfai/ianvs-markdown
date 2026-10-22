@@ -14,6 +14,7 @@ import '../services/markdown_file_service.dart';
 import '../services/workspace_session_store.dart';
 import '../services/workspace_index.dart';
 import '../services/workspace_index_source.dart';
+import '../services/workspace_reference_index.dart';
 
 enum SaveConflictChoice { cancel, keepBoth, overwrite }
 
@@ -34,11 +35,13 @@ class WorkspaceController extends ChangeNotifier {
               ? fileService as WorkspaceIndexSource
               : const AppleWorkspaceIndexSource()),
     );
+    references = WorkspaceReferenceIndex(index);
     browser = FileBrowserController(fileService, index: index)
       ..addListener(_schedulePersist);
   }
   late final FileBrowserController browser;
   late final WorkspaceIndex index;
+  late final WorkspaceReferenceIndex references;
   final _documentListeners = <String, VoidCallback>{};
   final _operationGrants = <String, String>{};
   final _favoriteAccessTokens = <String, String>{};
@@ -1214,6 +1217,7 @@ class WorkspaceController extends ChangeNotifier {
       document.controller.modeListenable.removeListener(_schedulePersist);
       document.dispose();
     }
+    references.dispose();
     index.dispose();
     super.dispose();
   }

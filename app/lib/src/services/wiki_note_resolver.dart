@@ -36,14 +36,65 @@ class WikiNoteResolution {
   final int epoch;
 }
 
+/// Bounded YAML aliases from the same effective source snapshot as references.
+/// Keys are real catalog paths; values are native NFC/lowercase comparison keys.
+class WikiAliasSnapshot {
+  const WikiAliasSnapshot({
+    required this.byPath,
+    required this.complete,
+    required this.epoch,
+  });
+  final Map<String, Set<String>> byPath;
+  final bool complete;
+  final int epoch;
+}
+
+/// Immutable lookup for resolving many references without rescanning candidates.
+class WikiCandidateLookup {
+  WikiCandidateLookup(
+    List<WikiNoteCandidate> notes,
+    WikiAliasSnapshot? aliases,
+  ) {
+    for (final note in notes) {
+      _paths.putIfAbsent(note.comparisonPath, () => []).add(note);
+      _names
+          .putIfAbsent(p.posix.basename(note.comparisonPath), () => [])
+          .add(note);
+      for (final alias in aliases?.byPath[note.relativePath] ?? <String>{}) {
+        _aliases.putIfAbsent(alias, () => []).add(note);
+      }
+    }
+  }
+  final _paths = <String, List<WikiNoteCandidate>>{};
+  final _names = <String, List<WikiNoteCandidate>>{};
+  final _aliases = <String, List<WikiNoteCandidate>>{};
+  List<WikiNoteCandidate> matches(
+    String key, {
+    required bool byPath,
+    String? aliasKey,
+  }) {
+    if (byPath) return List.of(_paths[key] ?? const []);
+    final matches = <String, WikiNoteCandidate>{
+      for (final note in _names[key] ?? const <WikiNoteCandidate>[])
+        note.relativePath: note,
+      for (final note in _aliases[aliasKey] ?? const <WikiNoteCandidate>[])
+        note.relativePath: note,
+    };
+    return matches.values.toList()
+      ..sort((a, b) => a.relativePath.compareTo(b.relativePath));
+  }
+}
+
 /// The application's deliberately conservative Wiki policy, not a claim about
 /// Obsidian's undocumented duplicate-name priority. Raw Wiki paths are NOT URIs.
-/// Display aliases never become destination aliases; YAML aliases are deferred.
+/// Filename identities and YAML aliases contribute separate candidate matches.
 class WikiNoteResolver {
   WikiNoteResolver(this.index, {WikiPathNormalizer? normalize})
     : normalize = normalize ?? const AppleAttachmentSource().normalize;
   final WorkspaceIndex index;
   final WikiPathNormalizer normalize;
+
+  Future<List<String>> comparisonKeys(List<String> paths) => _keys(paths);
 
   Future<List<String>> _keys(List<String> paths) async {
     final keys = <String>[];
@@ -65,14 +116,17 @@ class WikiNoteResolver {
   }
 
   Future<List<WikiNoteCandidate>> candidates(
-    WorkspaceCatalogSnapshot catalog,
-  ) async {
+    WorkspaceCatalogSnapshot catalog, {
+    bool allMarkdownExtensions = false,
+  }) async {
+    bool included(String path) => allMarkdownExtensions
+        ? isMarkdownName(path)
+        : path.toLowerCase().endsWith('.md');
     final root = index.root;
     if (root == null || catalog.epoch != index.epoch) return [];
     final entries = <String, WikiNoteCandidate>{};
     for (final entry in catalog.entries) {
-      if (entry.isDirectory ||
-          !entry.relativePath.toLowerCase().endsWith('.md')) {
+      if (entry.isDirectory || !included(entry.relativePath)) {
         continue;
       }
       entries[entry.relativePath] = WikiNoteCandidate(
@@ -83,9 +137,7 @@ class WikiNoteResolver {
     }
     for (final buffer in index.buffers) {
       final path = buffer.path;
-      if (path == null ||
-          !p.posix.isWithin(root, path) ||
-          !path.toLowerCase().endsWith('.md')) {
+      if (path == null || !p.posix.isWithin(root, path) || !included(path)) {
         continue;
       }
       var relative = p.posix.relative(path, from: root);
@@ -143,6 +195,10 @@ class WikiNoteResolver {
     String rawTarget, {
     required String? originPath,
     bool refresh = false,
+    WorkspaceCatalogSnapshot? catalog,
+    List<WikiNoteCandidate>? knownCandidates,
+    WikiAliasSnapshot? aliases,
+    WikiCandidateLookup? lookup,
   }) async {
     final epoch = index.epoch;
     WikiNoteResolution unavailable(String message) => WikiNoteResolution(
@@ -198,20 +254,30 @@ class WikiNoteResolver {
     }
     final proposed = path.toLowerCase().endsWith('.md') ? path : '$path.md';
     try {
-      final catalog = await index.catalog(refresh: refresh);
-      final notes = await candidates(catalog);
+      catalog ??= await index.catalog(refresh: refresh);
+      if (catalog.epoch != epoch ||
+          (aliases != null && aliases.epoch != epoch)) {
+        return unavailable('The workspace changed. Follow the link again.');
+      }
+      final notes = knownCandidates ?? await candidates(catalog);
       final key = (await _keys([proposed])).single;
       if (epoch != index.epoch) {
         return unavailable('The workspace changed. Follow the link again.');
       }
       final byPath = relative || anchored || target.contains('/');
-      final matches = notes
-          .where(
-            (note) => byPath
-                ? note.comparisonPath == key
-                : p.posix.basename(note.comparisonPath) == key,
-          )
-          .toList();
+      final aliasKey = !byPath && aliases != null
+          ? (await _keys([target])).single
+          : null;
+      if (epoch != index.epoch) {
+        return unavailable('The workspace changed. Follow the link again.');
+      }
+      final complete =
+          catalog.complete && (byPath || aliases == null || aliases.complete);
+      final matches = (lookup ?? WikiCandidateLookup(notes, aliases)).matches(
+        key,
+        byPath: byPath,
+        aliasKey: aliasKey,
+      );
       if (matches.length > 1) {
         return WikiNoteResolution(
           WikiNoteStatus.ambiguous,
@@ -219,12 +285,16 @@ class WikiNoteResolver {
           candidates: matches,
           message:
               'Choose a note. Names differing only by case or Unicode normalization are also ambiguous.'
-              '${catalog.complete ? '' : ' The catalog is incomplete; only known candidates are shown.'}',
+              '${complete ? '' : ' The catalog or aliases are incomplete; only known candidates are shown.'}',
         );
       }
-      if (!catalog.complete) {
-        return unavailable(
-          'The note catalog is incomplete or unavailable. Retry after files are locally available; no missing note will be created.',
+      if (!complete) {
+        return WikiNoteResolution(
+          WikiNoteStatus.unavailable,
+          epoch: epoch,
+          candidates: matches,
+          message:
+              'The note catalog or aliases are incomplete or unavailable. Use an explicit workspace path, or retry after files are locally available; no missing note will be created.',
         );
       }
       if (matches.length == 1) {
@@ -255,7 +325,7 @@ class WikiNoteResolver {
         createPath: createPath,
         message: createPath == null
             ? 'The note is missing and its parent folder is unavailable or ambiguous. Create the folder yourself first.'
-            : 'No matching .md note. Create "$createPath"? YAML aliases are not searched in this version.',
+            : 'No matching .md note${aliases == null ? ' (aliases were not searched)' : ' or alias'}. Create "$createPath"?',
       );
     } on Object catch (error) {
       return unavailable(
