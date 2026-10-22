@@ -7,6 +7,7 @@ import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:linefold/src/preview/preview_app.dart';
 import 'package:linefold/src/preview/preview_controller.dart';
 import 'package:linefold/src/preview/preview_draft_store.dart';
+import 'package:linefold/src/preview/preview_library.dart';
 
 import 'preview_test_support.dart';
 
@@ -39,6 +40,46 @@ void main() {
   }
 
   final source = find.byKey(const ValueKey('mobile-source'));
+
+  testWidgets(
+    'foreground native-canonical import enters Source and saves in the selected root',
+    (tester) async {
+      const canonicalRoot = '/private/vault';
+      const importedPath = '$canonicalRoot/Imports/copy/中文 分享.MD';
+      const original =
+          '\ufeff# Shared\r\n- [ ] Task 📝\r\n![图](../图片/照片.png)\r\n';
+      const edited =
+          '\ufeff# Shared\r\n- [x] Task 📝\r\n![图](../图片/照片.png)\r\n';
+      library.workspace = const PreviewWorkspace(
+        path: canonicalRoot,
+        name: 'App-owned copies',
+        isCloud: false,
+        workspaceToken: 'native-epoch',
+      );
+      library.files
+        ..clear()
+        ..[importedPath] = original;
+      platform.initial = [];
+      await launch(tester);
+      await platform.onFiles!([importedPath]);
+      await tester.pumpAndSettle();
+      expect(preview.activeRoot, canonicalRoot);
+      expect(preview.activePath, importedPath);
+      await tester.tap(find.byTooltip('编辑源码'));
+      await tester.pumpAndSettle();
+      expect(source, findsOneWidget);
+      expect(tester.widget<TextField>(source).controller!.text, original);
+      await tester.enterText(source, edited);
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+      expect(library.writes, [(importedPath, edited, original)]);
+      expect(library.files[importedPath], edited);
+      expect(source, findsNothing);
+      expect(tester.takeException(), isNull);
+      await finish(tester);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
 
   testWidgets(
     'explicit source editing task toggle Save returns reader, Cancel confirms dirty loss',
