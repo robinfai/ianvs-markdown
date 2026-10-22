@@ -300,3 +300,80 @@ Unicode windows, and navigation. They are not measured end-user latency, memory
 or Apple provider performance. Native synthetic filesystem tests, macOS build,
 and unsigned iOS build are CI gates. Real sandbox/iCloud/Files behavior and
 profile performance still need Apple-device acceptance.
+
+## Wiki note links (P1d)
+
+The reusable renderer reports `IanvsMarkdownLinkTarget` with an explicit
+`markdown`, `wiki` or `tag` kind. Hosts may opt in without removing the legacy
+`onTapLink`; only one callback is invoked. The app routes Wiki targets to
+`WikiNoteResolver`, not through URI decoding or extension guesses in the existing
+Markdown link service. Raw Wiki `%` characters remain filename characters.
+Ordinary Markdown links and anchors keep their original behavior.
+
+The resolver uses the session's `WorkspaceIndex.catalog()` and metadata-only
+`catalogSnapshot`, sharing directory cache, single-flight reads, reconciliation,
+partial status and lifecycle invalidation with the tree and source search. It
+never creates a second filesystem catalog or reads bodies to find names.
+Only `.md` notes inside the current selected workspace are candidates. Existing
+sessions, including dirty or externally conflicted buffers, win over disk.
+Case/NFC path aliases are coalesced only after scoped native file-descriptor
+identity and actual stored-path verification; two real case-sensitive files are
+never merged merely because their comparison keys match. Each new linked tab
+retains the minimum per-file bookmark, so selecting another workspace does not
+drop its authorized access at the next sandboxed launch.
+Root-relative full paths (`folder/Note` or `/folder/Note`), explicit relative paths
+(`./Note`, `../Note`) and unique bare basenames accept an optional `.md` suffix.
+No path-suffix fallback is used for a missing explicit full path. NFC/case
+comparison keys never replace actual filesystem identity; collisions require
+choosing a full path, even if one candidate matches the exact spelling. An
+incomplete catalog cannot prove uniqueness or absence.
+
+The **Insert note link** action (Command/Control-Shift-K) filters the shared local
+catalog and inserts an explicit vault-root path. At an unfinished `[[target`, it
+completes that target without consuming following prose. Existing `#fragment`,
+`|display alias`, delimiters, all unrelated UTF-16 source units and line endings
+are preserved. The edit is one undo unit and is rejected after source, selection,
+mode, composition, tab or workspace changes. This is an explicit picker, not an
+automatically opening suggestion menu on every `[[` keystroke.
+The compact action shares the existing document-context row; it does not consume
+an extra toolbar row. Its tooltip, semantic label and keyboard shortcut remain
+available at larger text scales. Empty outline guidance and the picker body can
+scroll rather than clipping when vertical space is limited. In Live mode, a
+focused local table/property editor is not assumed to map to the source caret:
+use the document body or Source mode instead. That local target remains remembered
+across toolbar focus changes and invalidates an already pending insertion.
+
+Clicking a missing note offers **Create note**, with the exact root-relative
+filename. Cancel writes nothing. Confirmation is followed by fresh catalog
+reconciliation; a changed target requires another click. Creation is an empty
+`.md` file through a separate root-relative native capability. Creation cooperates
+with `NSFileCoordinator` on a dedicated write queue, with a five-second cancellation
+deadline so a stalled presenter does not block catalog reads. The selected root
+and existing parent descriptors use no-follow traversal; the final open uses
+`O_CREAT | O_EXCL | O_NOFOLLOW`. It never creates parents, borrows favorites or
+operation-folder grants, downloads provider files, truncates or replaces a file.
+Root, parent and target identities are checked before/after creation. Observed
+changes fail without navigation, retry or deletion. This is not a cross-directory
+atomic transaction against non-cooperating external renames: an originally
+authorized parent can be moved outside the vault in the final syscall window,
+leaving an empty file in that moved directory even though verification reports
+failure. Flush failure can also leave an empty file. These outcomes are disclosed
+and never retrospectively deleted, because another writer may now own the path.
+Editing/saving the resulting session uses the existing P0 guarded save path. Opening existing targets uses `index.read()` directly,
+without an ordinary file-read fallback that could download or follow a symlink.
+
+Limitations are explicit in the picker and failure notices: frontmatter YAML
+aliases are not indexed; the truncated property-card UI model is never treated
+as a complete alias database. Wiki heading/block navigation, non-`.md` note
+matching, cross-vault navigation, link-aware rename transactions and graphs are
+not implemented in this phase. Display aliases (`[[Note|label]]`) still render
+and route normally. These conservative duplicate-name rules are not a claim to
+reproduce undocumented Obsidian priority rules. Reference behavior was checked
+against the official [Internal links](https://help.obsidian.md/links) and
+[Settings](https://help.obsidian.md/settings) documentation.
+
+Synthetic Dart/widget tests cover source fidelity, UTF-16, IME, dirty sessions,
+case/NFC ambiguity, raw Wiki paths, partial catalogs, creation cancellation,
+collisions, failure and stale tab/scope results. Native acceptance scenarios live
+in `native_attachment_test.swift`; Linux source-contract tests do not establish
+Swift compilation, real sandbox/iCloud behavior or Apple UI/device acceptance.

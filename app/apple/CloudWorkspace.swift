@@ -15,6 +15,7 @@ final class CloudWorkspace {
   static let extensions: Set<String> = ["md", "markdown", "mdown", "mkd", "txt"]
   private let queue = DispatchQueue(label: "work.ianvs.linefold.workspace", qos: .userInitiated)
   private let attachmentQueue = DispatchQueue(label: "work.ianvs.linefold.attachments", qos: .userInitiated)
+  private let noteWriteQueue = DispatchQueue(label: "work.ianvs.linefold.note-create", qos: .userInitiated)
   private let searchQueue = DispatchQueue(label: "work.ianvs.linefold.search", qos: .utility)
   private var channel: FlutterMethodChannel?
   private var query: NSMetadataQuery?
@@ -43,13 +44,13 @@ final class CloudWorkspace {
       let method = call.method
       guard ["defaultDirectory", "listDirectory", "readDocument", "readDocumentBytes", "writeDocument", "writeDocumentGuarded",
              "listAttachments", "readAttachmentBytes", "normalizeAttachmentPaths",
-             "listWorkspaceDirectory", "readWorkspaceTextBytes"].contains(method) else {
+             "listWorkspaceDirectory", "readWorkspaceTextBytes", "createWorkspaceNote", "resolveWorkspacePath"].contains(method) else {
         result(FlutterMethodNotImplemented)
         return
       }
-      let isSearch = method == "listWorkspaceDirectory" || method == "readWorkspaceTextBytes"
+      let isSearch = method == "listWorkspaceDirectory" || method == "readWorkspaceTextBytes" || method == "createWorkspaceNote" || method == "resolveWorkspacePath"
       let isAttachment = method == "listAttachments" || method == "readAttachmentBytes"
-      let workQueue = isSearch ? self.searchQueue : (isAttachment ? self.attachmentQueue : self.queue)
+      let workQueue = method == "createWorkspaceNote" ? self.noteWriteQueue : (isSearch ? self.searchQueue : (isAttachment ? self.attachmentQueue : self.queue))
       workQueue.async {
         do {
           let value: Any
@@ -69,6 +70,13 @@ final class CloudWorkspace {
             }
             let url = URL(fileURLWithPath: path)
             switch method {
+            case "resolveWorkspacePath":
+              guard let relativePath = arguments["relativePath"] as? String else { throw AttachmentError.invalid }
+              value = try Self.resolveWorkspacePath(url, relativePath: relativePath)
+            case "createWorkspaceNote":
+              guard let relativePath = arguments["relativePath"] as? String else { throw AttachmentError.invalid }
+              try Self.createWorkspaceNote(url, relativePath: relativePath)
+              value = true
             case "listWorkspaceDirectory":
               guard let relativePath = arguments["relativePath"] as? String else { throw AttachmentError.invalid }
               value = try Self.listWorkspaceDirectory(url, relativePath: relativePath)
@@ -351,6 +359,42 @@ enum WorkspaceError: LocalizedError {
 // reader. The explicit root is the authority, not a concatenated absolute file
 // URL; every descendant is opened relative to a pinned descriptor without links.
 extension CloudWorkspace {
+  static func resolveWorkspacePath(_ root: URL, relativePath: String) throws -> [String: String] {
+    do {
+      return try WorkspaceFileScope.withoutMaterialization {
+        try WorkspaceTextScope(root).resolvePath(relativePath: relativePath)
+      }
+    } catch { throw AttachmentError.classify(error) }
+  }
+
+  static func createWorkspaceNote(_ root: URL, relativePath: String) throws {
+    do {
+      try WorkspaceFileScope.withoutMaterialization {
+        let scope = try WorkspaceTextScope(root)
+        _ = try WorkspaceTextScope.textComponents(relativePath, directory: false)
+        let target = scope.rootURL.appendingPathComponent(relativePath)
+        var coordinationError: NSError?
+        var outcome: Result<Void, Error> = .failure(AttachmentError.unavailable)
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        let deadline = DispatchTime.now() + WorkspaceTextScope.coordinationTimeout
+        let timeout = DispatchWorkItem { coordinator.cancel() }
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: deadline, execute: timeout)
+        defer { timeout.cancel() }
+        coordinator.coordinate(writingItemAt: target, options: [], error: &coordinationError) { coordinated in
+          outcome = Result {
+            guard DispatchTime.now().uptimeNanoseconds < deadline.uptimeNanoseconds,
+                  coordinated.standardizedFileURL.path == target.standardizedFileURL.path else {
+              throw AttachmentError.unavailable
+            }
+            try scope.createNote(relativePath: relativePath)
+          }
+        }
+        if let error = coordinationError { throw error }
+        try outcome.get()
+      }
+    } catch { throw AttachmentError.classify(error) }
+  }
+
   static func listWorkspaceDirectory(_ root: URL, relativePath: String) throws -> [String: Any] {
     do {
       return try WorkspaceFileScope.withoutMaterialization {
@@ -511,7 +555,7 @@ class WorkspaceFileScope {
 
   static func relativeComponents(_ path: String) throws -> [String] {
     guard !path.isEmpty, path.utf16.count <= 4096, !path.hasPrefix("/"),
-          !path.contains("\\"), !path.unicodeScalars.contains(where: { $0.value < 32 }), !path.contains(":") else {
+          !path.contains("\\"), !path.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 }), !path.contains(":") else {
       throw AttachmentError.invalid
     }
     let components = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
@@ -699,7 +743,7 @@ final class AttachmentScope: WorkspaceFileScope {
         if name.hasPrefix(".") && !placeholder { continue }
         // Unsupported names must not poison the complete Dart index or cause
         // traversal of directories the resolver cannot address.
-        if name.unicodeScalars.contains(where: { $0.value < 32 }) ||
+        if name.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 }) ||
            name.contains("\\") || name.contains(":") { continue }
         var attributes = stat()
         guard fstatat(descriptor, name, &attributes, AT_SYMLINK_NOFOLLOW) == 0 else {
@@ -810,6 +854,7 @@ final class AttachmentScope: WorkspaceFileScope {
 /// Search has a separate allow-list and never requests iCloud materialization.
 /// It shares authority and byte IO with images, not their download/config policy.
 final class WorkspaceTextScope: WorkspaceFileScope {
+  static let coordinationTimeout: TimeInterval = 5
   static let maximumTextBytes = 5 * 1024 * 1024
   static let maximumDirectoryEntries = 50_000
   static let maximumVisitedDirectoryEntries = 100_000
@@ -884,7 +929,7 @@ final class WorkspaceTextScope: WorkspaceFileScope {
       guard visited <= visitedLimit else { reason = .indexLimit; break }
       let placeholder = name.hasPrefix(".") && name.hasSuffix(".icloud")
       if name.hasPrefix(".") && !placeholder { continue }
-      if name.unicodeScalars.contains(where: { $0.value < 32 }) ||
+      if name.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 }) ||
          name.contains("\\") || name.contains(":") { continue }
       var attributes = stat()
       guard fstatat(descriptor, name, &attributes, AT_SYMLINK_NOFOLLOW) == 0 else {
@@ -925,6 +970,7 @@ final class WorkspaceTextScope: WorkspaceFileScope {
       let attributes = entry.attributes
       return [
         "relativePath": entry.relativePath,
+        "comparisonPath": entry.relativePath.precomposedStringWithCanonicalMapping.lowercased(),
         "name": entry.name,
         "isDirectory": entry.directory,
         "size": entry.placeholder ? Int64(0) : Int64(attributes.st_size),
@@ -936,6 +982,104 @@ final class WorkspaceTextScope: WorkspaceFileScope {
     var result: [String: Any] = ["entries": rows, "complete": reason == nil]
     if let reason { result["reason"] = reason.code }
     return result
+  }
+
+  /// Ask the filesystem, not a lowercase/NFC guess. Two distinct files on a
+  /// case-sensitive volume keep distinct identities and stored spellings.
+  func resolvePath(relativePath: String) throws -> [String: String] {
+    let components = try Self.textComponents(relativePath, directory: false)
+    try verifyRootLocation()
+    let parent = try parentDescriptor(components)
+    defer { close(parent) }
+    let descriptor = openat(parent, components.last!, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
+    guard descriptor >= 0 else { throw AttachmentError.posix() }
+    defer { close(descriptor) }
+    var attributes = stat()
+    guard fstat(descriptor, &attributes) == 0 else { throw AttachmentError.posix() }
+    guard attributes.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG) else { throw AttachmentError.invalid }
+    var path = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+    guard path.withUnsafeMutableBufferPointer({ fcntl(descriptor, F_GETPATH, $0.baseAddress!) }) == 0 else {
+      throw AttachmentError.posix()
+    }
+    let actual = String(cString: path)
+    let prefix = rootURL.path.hasSuffix("/") ? rootURL.path : rootURL.path + "/"
+    guard actual.utf8.starts(with: prefix.utf8) else { throw AttachmentError.invalid }
+    let relative = String(decoding: actual.utf8.dropFirst(prefix.utf8.count), as: UTF8.self)
+    _ = try Self.textComponents(relative, directory: false)
+    try verifyRootLocation()
+    let currentParent = try parentDescriptor(components)
+    defer { close(currentParent) }
+    var current = stat()
+    guard fstatat(currentParent, components.last!, &current, AT_SYMLINK_NOFOLLOW) == 0 else { throw AttachmentError.posix() }
+    guard current.st_dev == attributes.st_dev && current.st_ino == attributes.st_ino else {
+      throw AttachmentError.unavailable
+    }
+    return ["relativePath": relative, "identity": "\(attributes.st_dev):\(attributes.st_ino)"]
+  }
+
+  /// Explicit create only. No recursive mkdir, absolute-path fallback, provider
+  /// download, or replacing rename. Subsequent edits use guarded document saves.
+  func createNote(
+    relativePath: String,
+    beforeExclusiveCreate: (() throws -> Void)? = nil,
+    afterExclusiveCreate: (() throws -> Void)? = nil
+  ) throws {
+    let components = try Self.textComponents(relativePath, directory: false)
+    guard relativePath.lowercased().hasSuffix(".md"), let name = components.last else {
+      throw AttachmentError.invalid
+    }
+    try verifyRootLocation()
+    let parent = try parentDescriptor(components)
+    defer { close(parent) }
+    var attributes = stat()
+    guard fstat(parent, &attributes) == 0 else { throw AttachmentError.posix() }
+    guard attributes.st_flags & UInt32(SF_DATALESS) == 0 else { throw AttachmentError.offline }
+    // Reject known case/NFC collisions and provider placeholders before the
+    // exclusive final open. A partial listing is not evidence of absence.
+    let parentPath = components.dropLast().joined(separator: "/")
+    let listing = try listDirectory(relativePath: parentPath)
+    guard listing["complete"] as? Bool == true,
+          let rows = listing["entries"] as? [[String: Any]] else { throw AttachmentError.unavailable }
+    let comparison = relativePath.precomposedStringWithCanonicalMapping.lowercased()
+    guard !rows.contains(where: { $0["comparisonPath"] as? String == comparison }) else {
+      throw AttachmentError.unavailable
+    }
+    let currentParent = try parentDescriptor(components)
+    defer { close(currentParent) }
+    var current = stat()
+    guard fstat(currentParent, &current) == 0 else { throw AttachmentError.posix() }
+    guard current.st_dev == attributes.st_dev && current.st_ino == attributes.st_ino else {
+      throw AttachmentError.unavailable
+    }
+    try verifyRootLocation()
+    // Test hooks exercise deterministic uncoordinated writers. They are never
+    // exposed through the channel or invoked by production callers.
+    try beforeExclusiveCreate?()
+    let descriptor = openat(parent, name, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
+    guard descriptor >= 0 else { throw AttachmentError.posix() }
+    defer { close(descriptor) }
+    var created = stat()
+    guard fstat(descriptor, &created) == 0 else { throw AttachmentError.posix() }
+    // After a failed flush the exclusive empty file can exist. Never retry or
+    // delete it automatically: a later user retry sees the occupied path.
+    guard fsync(descriptor) == 0 else { throw AttachmentError.posix() }
+    try afterExclusiveCreate?()
+    try verifyRootLocation()
+    let finalParent = try parentDescriptor(components)
+    defer { close(finalParent) }
+    var finalDirectory = stat()
+    var finalTarget = stat()
+    guard fstat(finalParent, &finalDirectory) == 0,
+          fstatat(finalParent, name, &finalTarget, AT_SYMLINK_NOFOLLOW) == 0 else { throw AttachmentError.posix() }
+    guard finalDirectory.st_dev == attributes.st_dev && finalDirectory.st_ino == attributes.st_ino,
+          finalTarget.st_dev == created.st_dev && finalTarget.st_ino == created.st_ino,
+          finalTarget.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+          Self.revision(finalTarget) == Self.revision(created), created.st_size == 0 else {
+      // Do not unlink: an uncoordinated writer may now own the pathname. A
+      // renamed authorized parent can retain our empty file outside the vault;
+      // this is a reported failure, never a successful navigation or retry.
+      throw AttachmentError.unavailable
+    }
   }
 
   func readText(relativePath: String, maximumBytes: Int = WorkspaceTextScope.maximumTextBytes) throws -> WorkspaceTextBytes {

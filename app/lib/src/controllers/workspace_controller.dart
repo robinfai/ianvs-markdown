@@ -310,6 +310,136 @@ class WorkspaceController extends ChangeNotifier {
     return document;
   }
 
+  /// Wiki navigation uses the scoped/local-only catalog read, never a second
+  /// ordinary file read that could materialize a provider file or follow links.
+  Future<DocumentSession?> openIndexedNote(
+    String relativePath, {
+    required int epoch,
+    required bool Function() isCurrent,
+  }) => _serializeFileOperation(() async {
+    if (!isCurrent() ||
+        epoch != index.epoch ||
+        _workspaceRoot == null ||
+        !safeWorkspaceRelativePath(relativePath)) {
+      return null;
+    }
+    final path = p.posix.join(_workspaceRoot!, relativePath);
+    DocumentSession? existing() {
+      final position = _documents.indexWhere((d) => d.path == path);
+      if (position < 0) return null;
+      selectDocument(position);
+      return _documents[position];
+    }
+
+    final opened = existing();
+    if (opened != null) return opened;
+    final identitySource = index.source;
+    if (identitySource is WorkspacePathIdentitySource) {
+      final targetIdentity =
+          await (identitySource as WorkspacePathIdentitySource)
+              .resolveWorkspacePath(_workspaceRoot!, relativePath);
+      if (!isCurrent() || epoch != index.epoch) return null;
+      for (final document in _documents.toList()) {
+        if (!isCurrent() || epoch != index.epoch) return null;
+        final documentPath = document.path;
+        if (documentPath == null ||
+            !p.posix.isWithin(_workspaceRoot!, documentPath)) {
+          continue;
+        }
+        WorkspacePathIdentity identity;
+        try {
+          identity = await (identitySource as WorkspacePathIdentitySource)
+              .resolveWorkspacePath(
+                _workspaceRoot!,
+                p.posix.relative(documentPath, from: _workspaceRoot!),
+              );
+        } on Object {
+          continue;
+        }
+        if (!isCurrent() || epoch != index.epoch) return null;
+        if (identity.identity == targetIdentity.identity &&
+            identity.relativePath == targetIdentity.relativePath) {
+          final position = _documents.indexOf(document);
+          if (position < 0) return null;
+          selectDocument(position);
+          return document;
+        }
+      }
+    }
+    final parent = p.posix.dirname(relativePath);
+    final directory = await index.directory(
+      parent == '.' ? '' : parent,
+      reconcile: true,
+    );
+    if (!isCurrent() || epoch != index.epoch) return null;
+    final entry = directory.entries
+        .where((e) => e.relativePath == relativePath && !e.isDirectory)
+        .firstOrNull;
+    if (entry == null) {
+      throw StateError(
+        'The note is no longer available. Follow the link again.',
+      );
+    }
+    final snapshot = await index.read(entry);
+    if (!isCurrent() || epoch != index.epoch) return null;
+    final openedWhileReading = existing();
+    if (openedWhileReading != null) return openedWhileReading;
+    // The selected root may change before the next launch. Preserve only this
+    // already-authorized file's access, as ordinary file opens do.
+    final accessToken = await fileService.createPersistentAccessToken(path);
+    if (!isCurrent() || epoch != index.epoch) return null;
+    final document = _createDocument(
+      name: p.posix.basename(path),
+      path: path,
+      accessToken: accessToken,
+      text: snapshot.text,
+      persistedText: snapshot.text,
+      lineEnding: _lineEndingOf(snapshot.text),
+    );
+    _documents.add(document);
+    _activeIndex = _documents.length - 1;
+    _watch(document);
+    notifyListeners();
+    _schedulePersist();
+    return document;
+  });
+
+  /// Only the explicit missing-note Create action reaches this capability.
+  /// It cannot borrow operation-folder grants or create parent directories.
+  Future<bool> createWikiNote(
+    String relativePath, {
+    required int epoch,
+    required bool Function() isCurrent,
+  }) => _serializeFileOperation(() async {
+    final root = _workspaceRoot;
+    if (!isCurrent() || epoch != index.epoch || root == null) return false;
+    if (!safeWorkspaceRelativePath(relativePath) ||
+        !relativePath.toLowerCase().endsWith('.md')) {
+      throw const FormatException(
+        'Use a visible .md note inside the workspace.',
+      );
+    }
+    for (final component in relativePath.split('/')) {
+      validateEntryName(component);
+    }
+    final source = index.source;
+    if (source is! WorkspaceNoteCreator) {
+      throw StateError('Safe note creation is unavailable on this host.');
+    }
+    final absolute = p.posix.join(root, relativePath);
+    if (_documents.any((d) => d.path == absolute)) {
+      throw StateError('This note is already open. Follow the link again.');
+    }
+    await (source as WorkspaceNoteCreator).createWorkspaceNote(
+      root,
+      relativePath,
+    );
+    if (epoch == index.epoch) {
+      await _afterFileOperation([p.posix.dirname(absolute)]);
+    }
+    return true;
+  });
+
   Future<void> chooseWorkspaceFolder() async {
     final root = await fileService.chooseWorkspaceFolder();
     if (root == null) return;

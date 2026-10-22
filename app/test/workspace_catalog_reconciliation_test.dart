@@ -54,6 +54,74 @@ const newNote = WorkspaceMetadata(
 );
 
 void main() {
+  test(
+    'catalog failure publishes only its changed directory and clears after recovery',
+    () async {
+      final source = CatalogSource()
+        ..directories[''] = const WorkspaceDirectorySnapshot([folder])
+        ..directories['folder'] = const WorkspaceDirectorySnapshot([oldNote]);
+      final index = WorkspaceIndex(source: source)..configure('/vault');
+      addTearDown(index.dispose);
+      await index.catalog();
+      expect(index.catalogSnapshot.complete, isTrue);
+      await index.directory('', refresh: true);
+      expect(index.changedDirectories, {''});
+      source.onList = (path) async =>
+          throw const WorkspaceIndexFailure(WorkspaceReadIssue.denied);
+      await expectLater(
+        index.directory('folder', refresh: true),
+        throwsA(isA<WorkspaceIndexFailure>()),
+      );
+      expect(index.changedDirectories, {'folder'});
+      expect(index.catalogSnapshot.complete, isFalse);
+      expect(index.catalogSnapshot.issues, contains(WorkspaceReadIssue.denied));
+      source.onList = null;
+      await index.directory('folder', refresh: true);
+      expect(index.catalogSnapshot.complete, isTrue);
+      expect(index.changedDirectories, {'folder'});
+    },
+  );
+
+  test(
+    'late evicted directory failure cannot poison successfully rebuilt catalog',
+    () async {
+      final source = CatalogSource()
+        ..directories[''] = const WorkspaceDirectorySnapshot([folder]);
+      final index = WorkspaceIndex(source: source)..configure('/vault');
+      addTearDown(index.dispose);
+      await index.directory('');
+      final pending = Completer<WorkspaceDirectorySnapshot>();
+      final started = Completer<void>();
+      source.onList = (_) {
+        started.complete();
+        return pending.future;
+      };
+      final old = index.directory('folder');
+      final checked = expectLater(old, throwsA(isA<WorkspaceIndexFailure>()));
+      await started.future;
+      source.onList = null;
+      source.directories[''] = const WorkspaceDirectorySnapshot([]);
+      await index.directory('', refresh: true);
+      source.directories[''] = const WorkspaceDirectorySnapshot([folder]);
+      source.directories['folder'] = const WorkspaceDirectorySnapshot([
+        newNote,
+      ]);
+      await index.catalog(refresh: true);
+      final revision = index.catalogRevision;
+      expect(index.catalogSnapshot.complete, isTrue);
+      pending.completeError(
+        const WorkspaceIndexFailure(WorkspaceReadIssue.denied),
+      );
+      await checked;
+      expect(index.catalogRevision, revision);
+      expect(index.catalogSnapshot.complete, isTrue);
+      expect(
+        index.catalogSnapshot.entries.map((e) => e.relativePath),
+        contains('folder/new.md'),
+      );
+    },
+  );
+
   test('deleted parent must reject in-flight descendant body', () async {
     final source = CatalogSource()
       ..directories[''] = const WorkspaceDirectorySnapshot([folder])

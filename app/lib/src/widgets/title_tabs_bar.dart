@@ -23,11 +23,16 @@ class TitleTabsBar extends StatelessWidget {
     required this.workspace,
     required this.onSave,
     required this.onClose,
+    this.documentActions = const [],
   });
 
   final WorkspaceController workspace;
   final Future<bool> Function(DocumentSession, {bool saveAs}) onSave;
   final FutureOr<void> Function(DocumentSession) onClose;
+
+  /// Compact, keyboard-accessible actions sharing the existing context row.
+  /// Do not add a separate toolbar row that reduces the editor's height.
+  final List<Widget> documentActions;
 
   @override
   Widget build(BuildContext context) {
@@ -111,6 +116,8 @@ class TitleTabsBar extends StatelessWidget {
               children: [
                 Expanded(child: _DocumentLocation(workspace: workspace)),
                 const SizedBox(width: 16),
+                ...documentActions,
+                if (documentActions.isNotEmpty) const SizedBox(width: 8),
                 _EditorModePicker(workspace: workspace),
               ],
             ),

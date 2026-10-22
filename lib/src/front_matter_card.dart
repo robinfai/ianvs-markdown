@@ -1,3 +1,4 @@
+import 'link_target.dart';
 import 'localization.dart';
 import 'keyboard.dart';
 import 'package:flutter/foundation.dart';
@@ -189,6 +190,7 @@ class IanvsMarkdownFrontMatterCard extends StatefulWidget {
     this.initiallyExpanded = true,
     this.showDocumentTitle = false,
     this.onTapLink,
+    this.onTapLinkTarget,
     this.onTextChanged,
     this.onBooleanChanged,
     this.onNumberChanged,
@@ -211,6 +213,9 @@ class IanvsMarkdownFrontMatterCard extends StatefulWidget {
   final bool initiallyExpanded;
   final bool showDocumentTitle;
   final MarkdownTapLinkCallback? onTapLink;
+
+  /// Receives parsed link origins. When set, takes precedence over [onTapLink].
+  final IanvsMarkdownTapLinkTargetCallback? onTapLinkTarget;
   final IanvsMarkdownMetadataTextChanged? onTextChanged;
   final IanvsMarkdownMetadataBooleanChanged? onBooleanChanged;
   final IanvsMarkdownMetadataNumberChanged? onNumberChanged;
@@ -444,6 +449,7 @@ class _IanvsMarkdownFrontMatterCardState
                           entry: entry,
                           colors: colors,
                           onTapLink: widget.onTapLink,
+                          onTapLinkTarget: widget.onTapLinkTarget,
                           onTextChanged: widget.onTextChanged,
                           onBooleanChanged: widget.onBooleanChanged,
                           onNumberChanged: widget.onNumberChanged,
@@ -491,6 +497,7 @@ class _ObsidianMetadataRow extends StatelessWidget {
     required this.entry,
     required this.colors,
     required this.onTapLink,
+    this.onTapLinkTarget,
     required this.onTextChanged,
     required this.onBooleanChanged,
     required this.onNumberChanged,
@@ -503,6 +510,9 @@ class _ObsidianMetadataRow extends StatelessWidget {
   final MarkdownMetadataEntry entry;
   final IanvsMarkdownThemeData colors;
   final MarkdownTapLinkCallback? onTapLink;
+
+  /// Receives parsed link origins. When set, takes precedence over [onTapLink].
+  final IanvsMarkdownTapLinkTargetCallback? onTapLinkTarget;
   final IanvsMarkdownMetadataTextChanged? onTextChanged;
   final IanvsMarkdownMetadataBooleanChanged? onBooleanChanged;
   final IanvsMarkdownMetadataNumberChanged? onNumberChanged;
@@ -569,6 +579,7 @@ class _ObsidianMetadataRow extends StatelessWidget {
               items: items,
               colors: colors,
               onTapLink: onTapLink,
+              onTapLinkTarget: onTapLinkTarget,
               onTextChanged: onTextChanged,
               onBooleanChanged: onBooleanChanged,
               onNumberChanged: onNumberChanged,
@@ -798,6 +809,7 @@ class _ObsidianMetadataValue extends StatelessWidget {
     required this.items,
     required this.colors,
     required this.onTapLink,
+    this.onTapLinkTarget,
     required this.onTextChanged,
     required this.onBooleanChanged,
     required this.onNumberChanged,
@@ -810,6 +822,9 @@ class _ObsidianMetadataValue extends StatelessWidget {
   final List<String> items;
   final IanvsMarkdownThemeData colors;
   final MarkdownTapLinkCallback? onTapLink;
+
+  /// Receives parsed link origins. When set, takes precedence over [onTapLink].
+  final IanvsMarkdownTapLinkTargetCallback? onTapLinkTarget;
   final IanvsMarkdownMetadataTextChanged? onTextChanged;
   final IanvsMarkdownMetadataBooleanChanged? onBooleanChanged;
   final IanvsMarkdownMetadataNumberChanged? onNumberChanged;
@@ -908,6 +923,7 @@ class _ObsidianMetadataValue extends StatelessWidget {
         link: propertyLink,
         colors: colors,
         onTapLink: onTapLink,
+        onTapLinkTarget: onTapLinkTarget,
       );
     }
     final tags = normalizedKey == 'tags' || normalizedKey == 'tag';
@@ -955,6 +971,7 @@ class _ObsidianMetadataValue extends StatelessWidget {
               linksEnabled: !tags && !aliases,
               colors: colors,
               onTapLink: onTapLink,
+              onTapLinkTarget: onTapLinkTarget,
             ),
         ],
       );
@@ -1117,6 +1134,7 @@ class _ObsidianEditableListValueState
             linksEnabled: false,
             colors: widget.colors,
             onTapLink: null,
+            onTapLinkTarget: null,
             removeKey: ValueKey(
               'ianvs-markdown-front-matter-chip-remove-${widget.entry.key}-$index',
             ),
@@ -1820,6 +1838,7 @@ class _ObsidianMetadataChip extends StatelessWidget {
     required this.linksEnabled,
     required this.colors,
     required this.onTapLink,
+    this.onTapLinkTarget,
     this.removeKey,
     this.onRemove,
   });
@@ -1829,6 +1848,9 @@ class _ObsidianMetadataChip extends StatelessWidget {
   final bool linksEnabled;
   final IanvsMarkdownThemeData colors;
   final MarkdownTapLinkCallback? onTapLink;
+
+  /// Receives parsed link origins. When set, takes precedence over [onTapLink].
+  final IanvsMarkdownTapLinkTargetCallback? onTapLinkTarget;
   final Key? removeKey;
   final VoidCallback? onRemove;
 
@@ -1839,11 +1861,19 @@ class _ObsidianMetadataChip extends StatelessWidget {
     final linked = link != null;
     return Semantics(
       link: linked,
-      enabled: linked ? onTapLink != null : null,
+      enabled: linked ? onTapLinkTarget != null || onTapLink != null : null,
       label: label,
       child: InkWell(
-        onTap: linked && onTapLink != null
-            ? () => onTapLink!(link.label, link.href, '')
+        onTap: linked && (onTapLinkTarget != null || onTapLink != null)
+            ? () => dispatchIanvsMarkdownLinkTap(
+                IanvsMarkdownLinkTarget(
+                  text: link.label,
+                  href: link.href,
+                  kind: link.kind,
+                ),
+                onTapLinkTarget: onTapLinkTarget,
+                onTapLink: onTapLink,
+              )
             : null,
         borderRadius: BorderRadius.circular(5),
         child: Container(
@@ -1915,11 +1945,15 @@ class _ObsidianMetadataLink extends StatelessWidget {
     required this.link,
     required this.colors,
     required this.onTapLink,
+    this.onTapLinkTarget,
   });
 
   final _PropertyLink link;
   final IanvsMarkdownThemeData colors;
   final MarkdownTapLinkCallback? onTapLink;
+
+  /// Receives parsed link origins. When set, takes precedence over [onTapLink].
+  final IanvsMarkdownTapLinkTargetCallback? onTapLinkTarget;
 
   @override
   Widget build(BuildContext context) {
@@ -1927,12 +1961,20 @@ class _ObsidianMetadataLink extends StatelessWidget {
       alignment: Alignment.centerLeft,
       child: Semantics(
         link: true,
-        enabled: onTapLink != null,
+        enabled: onTapLinkTarget != null || onTapLink != null,
         label: link.label,
         child: InkWell(
-          onTap: onTapLink == null
+          onTap: onTapLinkTarget == null && onTapLink == null
               ? null
-              : () => onTapLink!(link.label, link.href, ''),
+              : () => dispatchIanvsMarkdownLinkTap(
+                  IanvsMarkdownLinkTarget(
+                    text: link.label,
+                    href: link.href,
+                    kind: link.kind,
+                  ),
+                  onTapLinkTarget: onTapLinkTarget,
+                  onTapLink: onTapLink,
+                ),
           borderRadius: BorderRadius.circular(3),
           child: Text(
             link.label,
@@ -1971,10 +2013,15 @@ String _displayMetadataDate(String value) {
 }
 
 final class _PropertyLink {
-  const _PropertyLink({required this.label, required this.href});
+  const _PropertyLink({
+    required this.label,
+    required this.href,
+    this.kind = IanvsMarkdownLinkKind.markdown,
+  });
 
   final String label;
   final String href;
+  final IanvsMarkdownLinkKind kind;
 }
 
 _PropertyLink? _propertyLink(String value) {
@@ -1999,17 +2046,29 @@ _PropertyLink? _propertyWikiLink(String value) {
     final alias = source.substring(separator + 1).trim();
     if (alias.isNotEmpty) {
       label = alias;
-      return _PropertyLink(label: label, href: target);
+      return _PropertyLink(
+        label: label,
+        href: target,
+        kind: IanvsMarkdownLinkKind.wiki,
+      );
     }
   }
   final hash = target.indexOf('#');
   if (hash < 0 || hash == target.length - 1) {
-    return _PropertyLink(label: target, href: target);
+    return _PropertyLink(
+      label: target,
+      href: target,
+      kind: IanvsMarkdownLinkKind.wiki,
+    );
   }
   final note = target.substring(0, hash).trim();
   final subpath = target.substring(hash + 1).trim();
   label = note.isEmpty ? subpath : '$note > $subpath';
-  return _PropertyLink(label: label, href: target);
+  return _PropertyLink(
+    label: label,
+    href: target,
+    kind: IanvsMarkdownLinkKind.wiki,
+  );
 }
 
 class _MetadataEntryTile extends StatelessWidget {

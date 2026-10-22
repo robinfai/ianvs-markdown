@@ -49,7 +49,9 @@ bool safeWorkspaceRelativePath(String path, {bool directory = false}) =>
     (path.isNotEmpty &&
         !p.posix.isAbsolute(path) &&
         !path.contains('\\') &&
-        !path.contains('\u0000') &&
+        path.length <= 4096 &&
+        !path.contains(RegExp(r'[:\x00-\x1f\x7f]')) &&
+        path.split('/').length <= (directory ? 64 : 65) &&
         path
             .split('/')
             .every(
@@ -68,6 +70,7 @@ class WorkspaceMetadata {
     this.modified = 0,
     required this.revision,
     this.local = true,
+    this.comparisonPath,
   });
   final String relativePath;
   final bool isDirectory;
@@ -75,6 +78,9 @@ class WorkspaceMetadata {
   final int modified;
   final String revision;
   final bool local;
+
+  /// Native NFC + lowercase key. Never used as a filesystem identity.
+  final String? comparisonPath;
   WorkspaceEntry entry(String root) => WorkspaceEntry(
     path: p.posix.join(root, relativePath),
     name: p.posix.basename(relativePath),
@@ -114,8 +120,65 @@ abstract class WorkspaceIndexSource {
   );
 }
 
-class AppleWorkspaceIndexSource implements WorkspaceIndexSource {
+class WorkspacePathIdentity {
+  const WorkspacePathIdentity({
+    required this.relativePath,
+    required this.identity,
+  });
+  final String relativePath;
+  final String identity;
+}
+
+/// Resolve the actual stored spelling through the selected root capability.
+/// Comparison keys alone cannot distinguish aliases from two real files.
+abstract class WorkspacePathIdentitySource {
+  Future<WorkspacePathIdentity> resolveWorkspacePath(
+    String root,
+    String relativePath,
+  );
+}
+
+abstract class WorkspaceNoteCreator {
+  /// Creates an empty file exclusively under the selected root. Never creates
+  /// parents, follows symlinks, downloads provider files or replaces a target.
+  Future<void> createWorkspaceNote(String root, String relativePath);
+}
+
+class AppleWorkspaceIndexSource
+    implements
+        WorkspaceIndexSource,
+        WorkspaceNoteCreator,
+        WorkspacePathIdentitySource {
   const AppleWorkspaceIndexSource();
+  @override
+  Future<WorkspacePathIdentity> resolveWorkspacePath(
+    String root,
+    String relativePath,
+  ) async {
+    final result = await AppleWorkspaceService.channel
+        .invokeMapMethod<String, dynamic>('resolveWorkspacePath', {
+          'path': root,
+          'relativePath': relativePath,
+        });
+    if (result?['relativePath'] is! String ||
+        result?['identity'] is! String ||
+        !safeWorkspaceRelativePath(result!['relativePath'] as String)) {
+      throw const WorkspaceIndexFailure(WorkspaceReadIssue.unavailable);
+    }
+    return WorkspacePathIdentity(
+      relativePath: result['relativePath'] as String,
+      identity: result['identity'] as String,
+    );
+  }
+
+  @override
+  Future<void> createWorkspaceNote(String root, String relativePath) async {
+    await AppleWorkspaceService.channel.invokeMethod<void>(
+      'createWorkspaceNote',
+      {'path': root, 'relativePath': relativePath},
+    );
+  }
+
   @override
   Future<WorkspaceDirectorySnapshot> listWorkspaceDirectory(
     String root,
@@ -139,6 +202,7 @@ class AppleWorkspaceIndexSource implements WorkspaceIndexSource {
             modified: (item['modified'] as num?)?.toInt() ?? 0,
             revision: item['revision'] as String,
             local: item['local'] != false,
+            comparisonPath: item['comparisonPath'] as String?,
           ),
       ],
       complete: data['complete'] as bool,

@@ -188,3 +188,13 @@ IanvsMarkdownEditor(
 [源码仓库](https://github.com/robinfai/ianvs-markdown/blob/main/tool/package_smoke_test.dart)
 提供，不进入核心包依赖。API 基线检测新增、删除和声明变化，不能证明行为兼容；后续每次
 改动仍需同步本指南、[API 契约](API_CONTRACTS.md) 和 [CHANGELOG](../CHANGELOG.md)。
+
+## Typed 链接回调（P1d）
+
+旧 `onTapLink` 可原样保留。需要区分 Wiki、普通 Markdown 和 tag 的宿主可以改用
+`onTapLinkTarget: (target) { ... }`，按 `target.kind` 分发。不要根据 `.md` 扩展名、
+标签或同段其他 Wiki 链接猜来源。`target.href` 可空；Wiki 目标保留 fragment，路径解析、
+当前笔记内定位和打开/创建策略由宿主负责。两个回调同时设置时 typed 优先且仅调用一次。
+
+Wiki embed、front matter Wiki 属性和嵌套渲染面也保留来源；Live 的普通 Markdown/tag
+编辑交互不变，Reading 则交付完整 typed 导航事件。该接口为可选新增，无需迁移已有回调。

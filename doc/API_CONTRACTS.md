@@ -5,11 +5,27 @@
 ## API 漂移校验
 
 仓库的 `make check-api`（同时包含在 `make check-core` 和双 SDK Core CI 中）解析公共入口，
-比较 173 个项目导出、11 个第三方重导出，以及它们声明的公开成员、类型、默认值和常量。
+比较 176 个项目导出、11 个第三方重导出，以及它们声明的公开成员、类型、默认值和常量。
 新增、删除和修改都要求审查；检查不会自动重写基线。修改 API 时先更新本契约、迁移说明和
 行为测试，再显式生成并审查基线差异。工具不比较继承成员的实现或任意行为，不能证明
 语义版本兼容，也不表示 1.0 API 已冻结。维护工具与基线不进入发布包，操作说明见
 [源码仓库中的 API 校验说明](https://github.com/robinfai/ianvs-markdown/blob/main/tool/api_check/README.md)。
+
+## 链接交互类型
+
+`IanvsMarkdown`、`IanvsMarkdownView`、`IanvsMarkdownLiveEditor`、front matter 卡片和
+内置 link/embed/footnote builder 提供可选 `onTapLinkTarget`。
+`IanvsMarkdownLinkTarget` 是不可变值，包含 `text`、可空 `href`、`title`（默认空串）和
+`kind`（`IanvsMarkdownLinkKind.markdown` / `wiki` / `tag`）。`kind` 来自解析结构，
+不根据扩展名或同文档中其他链接的 href/显示文本猜测。Wiki 的 `href` 保留原解析目标，
+包括 `#Heading` / `#^block`，不追加 `.md`、做 URL 编码或文件路径解析；`text` 是实际显示
+的 alias 或格式化标签。普通 Markdown href 保持已有空目标/链接解析规则。
+
+同时传两个回调时只调用 `onTapLinkTarget`；未传它时仍调用原 `onTapLink(text, href, title)`。
+嵌套 callout/HTML、Reading View、front matter Wiki 属性及 Wiki embed 打开按钮沿用同一契约。
+普通 Markdown、HTML 和脚注链接为 `markdown`；Wiki 属性和 embed 为 `wiki`。
+Live 仅 Wiki 导航直接交给宿主；普通链接仍保留原有渲染控制/编辑行为，tag 点击仍进入编辑。
+Reading 的 inline tag 回调带 `tag`。任何点击都不会改写 Markdown 原文。
 
 ## 四种入口
 
@@ -277,6 +293,10 @@ final legacy = IanvsMarkdownController(text: initialMarkdown, historyPolicy: nul
 ### [lib/src/inline_link.dart](../lib/src/inline_link.dart)
 
 `IanvsMarkdownAutolinkScope`、`IanvsMarkdownInlineLinkBuilder`、`IanvsMarkdownWikiLinkExists`、`looksLikeMarkdownFileReference`
+
+### [lib/src/link_target.dart](../lib/src/link_target.dart)
+
+`IanvsMarkdownLinkKind`、`IanvsMarkdownLinkTarget`、`IanvsMarkdownTapLinkTargetCallback`
 
 ### [lib/src/markdown_document.dart](../lib/src/markdown_document.dart)
 

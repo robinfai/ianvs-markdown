@@ -9,6 +9,7 @@ import 'package:markdown/markdown.dart' as md;
 
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
+import '../link_target.dart';
 import 'inline_control_height_scope.dart';
 
 const Set<String> _standardBlockTags = <String>{
@@ -82,8 +83,8 @@ abstract class ScopedMarkdownBuilderDelegate {
   BuildContext get context;
 
   /// Returns a gesture recognizer to use for an `a` element with the given
-  /// text, `href` attribute, and title.
-  GestureRecognizer createLink(String text, String? href, String title);
+  /// display text, destination, title, and parsed syntax origin.
+  GestureRecognizer createLink(IanvsMarkdownLinkTarget target);
 
   /// Returns formatted text to use to display the given contents of a `pre`
   /// element.
@@ -291,7 +292,20 @@ class ScopedMarkdownBuilder implements md.NodeVisitor {
         final String? destination = element.attributes['href'];
         final String title = element.attributes['title'] ?? '';
 
-        _linkHandlers.add(delegate.createLink(text, destination, title));
+        _linkHandlers.add(
+          delegate.createLink(
+            IanvsMarkdownLinkTarget(
+              text: text,
+              href: destination,
+              title: title,
+              kind: element.attributes['data-ianvs-wiki-link'] == 'true'
+                  ? IanvsMarkdownLinkKind.wiki
+                  : element.attributes['data-ianvs-tag'] == 'true'
+                  ? IanvsMarkdownLinkKind.tag
+                  : IanvsMarkdownLinkKind.markdown,
+            ),
+          ),
+        );
       }
 
       _addParentInlineIfNeeded(_blocks.last.tag);

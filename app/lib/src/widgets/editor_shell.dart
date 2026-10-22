@@ -14,9 +14,13 @@ import '../controllers/document_find_controller.dart';
 import '../controllers/workspace_search_controller.dart';
 import 'workspace_search_dialog.dart';
 import '../editor_commands.dart';
+import '../editor_input_target.dart';
 import '../models/document_session.dart';
 import '../models/workspace_layout.dart';
 import '../services/document_link_service.dart';
+import '../services/wiki_note_resolver.dart';
+import '../services/wiki_link_insertion.dart';
+import 'wiki_note_picker.dart';
 import '../services/attachment_repository.dart';
 import 'document_attachment_scope.dart';
 import '../services/markdown_file_service.dart';
@@ -65,6 +69,7 @@ class _EditorShellState extends State<EditorShell> {
   final _editorFocus = FocusNode();
   final _findFocus = FocusNode();
   final _shellFocus = FocusNode();
+  late final DocumentInputTarget _documentInputTarget;
   DocumentFindController? _find;
   String _lastFindQuery = '';
   String _lastReplacement = '';
@@ -74,10 +79,18 @@ class _EditorShellState extends State<EditorShell> {
   bool _beforeFindFocused = false;
   IanvsMarkdownController? _resumeLiveController;
   int _findSurfaceEpoch = 0;
+  int _wikiGeneration = 0;
+  String? _wikiActiveDocumentId;
 
   @override
   void initState() {
     super.initState();
+    _documentInputTarget = DocumentInputTarget(
+      mainFocus: _editorFocus,
+      document: () => widget.workspace.activeDocument?.controller,
+      onLocalTarget: () => ++_wikiGeneration,
+    );
+    _wikiActiveDocumentId = widget.workspace.activeDocument?.id;
     widget.workspace.addListener(_workspaceChanged);
   }
 
@@ -86,12 +99,20 @@ class _EditorShellState extends State<EditorShell> {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.workspace, widget.workspace)) {
       oldWidget.workspace.removeListener(_workspaceChanged);
+      _documentInputTarget.reset();
+      ++_wikiGeneration;
+      _wikiActiveDocumentId = widget.workspace.activeDocument?.id;
       widget.workspace.addListener(_workspaceChanged);
       _closeFind(restoreFocus: false, restoreScroll: false);
     }
   }
 
   void _workspaceChanged() {
+    if (_wikiActiveDocumentId != widget.workspace.activeDocument?.id) {
+      _wikiActiveDocumentId = widget.workspace.activeDocument?.id;
+      ++_wikiGeneration;
+      _documentInputTarget.reset();
+    }
     if (!identical(
       _resumeLiveController,
       widget.workspace.activeDocument?.controller,
@@ -180,6 +201,182 @@ class _EditorShellState extends State<EditorShell> {
       );
       _findFocus.requestFocus();
     });
+  }
+
+  Future<void> _insertWikiLink() async {
+    if (!(ModalRoute.of(context)?.isCurrent ?? true) ||
+        hasEditorComposition(widget.workspace)) {
+      return;
+    }
+    final document = widget.workspace.activeDocument;
+    if (document == null) return;
+    if (document.controller.mode == IanvsMarkdownEditorMode.livePreview &&
+        _documentInputTarget.isLocal) {
+      _showError(
+        'Place the cursor in the document body or use Source mode to insert a note link.',
+      );
+      return;
+    }
+    final edit = WikiLinkInsertion.capture(document.controller);
+    if (edit == null) {
+      _showError(
+        'Enter Live or Source mode and finish composition before inserting a note link.',
+      );
+      return;
+    }
+    final epoch = widget.workspace.index.epoch;
+    final generation = ++_wikiGeneration;
+    bool current() =>
+        mounted &&
+        generation == _wikiGeneration &&
+        epoch == widget.workspace.index.epoch &&
+        identical(document, widget.workspace.activeDocument);
+    final root = widget.workspace.workspaceRoot;
+    if (root == null ||
+        document.path == null ||
+        !p.posix.isWithin(root, document.path!)) {
+      _showError(
+        'Open a workspace folder and a note inside it to insert Wiki links.',
+      );
+      return;
+    }
+    try {
+      final resolver = WikiNoteResolver(widget.workspace.index);
+      final catalog = await widget.workspace.index.catalog();
+      final notes = await resolver.candidates(catalog);
+      if (!mounted || !current()) return;
+      final selected = await showDialog<WikiNoteCandidate>(
+        context: context,
+        builder: (_) => WikiNotePicker(
+          notes: notes,
+          title: 'Insert note link',
+          initialQuery: edit.query,
+          notice: catalog.complete
+              ? null
+              : 'The catalog is incomplete. Only known notes are shown; no missing note is inferred.',
+        ),
+      );
+      if (!current() || selected == null) return;
+      if (!WikiLinkInsertion.canRepresent(selected.relativePath)) {
+        _showError(
+          'This filename cannot be represented safely as a Wiki link.',
+        );
+        return;
+      }
+      if (!edit.apply(document.controller, selected.relativePath)) {
+        _showError('The source or selection changed. Insert the link again.');
+      } else {
+        _editorFocus.requestFocus();
+      }
+    } on Object catch (error) {
+      if (current()) _showError('Unable to list note links: $error');
+    }
+  }
+
+  Future<void> _openWikiLink(DocumentSession origin, String target) async {
+    if (!(ModalRoute.of(context)?.isCurrent ?? true) ||
+        hasEditorComposition(widget.workspace)) {
+      return;
+    }
+    final generation = ++_wikiGeneration;
+    final epoch = widget.workspace.index.epoch;
+    bool current() =>
+        mounted &&
+        generation == _wikiGeneration &&
+        epoch == widget.workspace.index.epoch &&
+        identical(origin, widget.workspace.activeDocument);
+    final resolver = WikiNoteResolver(widget.workspace.index);
+    final resolution = await resolver.resolve(target, originPath: origin.path);
+    if (!mounted || !current()) return;
+    WikiNoteCandidate? selected;
+    switch (resolution.status) {
+      case WikiNoteStatus.resolved:
+        selected = resolution.candidates.single;
+      case WikiNoteStatus.ambiguous:
+        selected = await showDialog<WikiNoteCandidate>(
+          context: context,
+          builder: (_) => WikiNotePicker(
+            notes: resolution.candidates,
+            title: 'Choose linked note',
+            notice: resolution.message,
+          ),
+        );
+      case WikiNoteStatus.missing:
+        final create = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Note not found'),
+            content: Text(resolution.message!),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              if (resolution.createPath != null)
+                TextButton(
+                  key: const ValueKey('wiki-create-note'),
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Create note'),
+                ),
+            ],
+          ),
+        );
+        if (!current() || create != true) return;
+        // Reconcile after the user's decision; never overwrite a racing note or
+        // silently turn approval for one path into creation of another.
+        final latest = await resolver.resolve(
+          target,
+          originPath: origin.path,
+          refresh: true,
+        );
+        if (!mounted || !current()) return;
+        if (latest.status != WikiNoteStatus.missing ||
+            latest.createPath != resolution.createPath) {
+          _showError(
+            'The target changed. Follow the link again before creating a note.',
+          );
+          return;
+        }
+        try {
+          final created = await widget.workspace.createWikiNote(
+            resolution.createPath!,
+            epoch: epoch,
+            isCurrent: current,
+          );
+          if (!created || !current()) return;
+          selected = WikiNoteCandidate(
+            relativePath: resolution.createPath!,
+            comparisonPath: '',
+          );
+        } on Object catch (error) {
+          if (current()) {
+            _showError(
+              'Unable to create the note: $error. A failed operation may have left an empty file; retry the link to check.',
+            );
+          }
+          return;
+        }
+      case WikiNoteStatus.unavailable:
+      case WikiNoteStatus.unsupported:
+        _showError(resolution.message!);
+        return;
+    }
+    if (!current() || selected == null) return;
+    final existingSessionIds = widget.workspace.documents
+        .map((d) => d.id)
+        .toSet();
+    final mode = origin.controller.mode;
+    final opened = await widget.workspace.openIndexedNote(
+      selected.relativePath,
+      epoch: epoch,
+      isCurrent: current,
+    );
+    if (mounted &&
+        opened != null &&
+        !existingSessionIds.contains(opened.id) &&
+        identical(widget.workspace.activeDocument, opened)) {
+      opened.controller.mode = mode;
+    }
   }
 
   Future<void> _openWorkspaceSearch() async {
@@ -344,6 +541,7 @@ class _EditorShellState extends State<EditorShell> {
     _find?.document.modeListenable.removeListener(_findModeChanged);
     _find?.removeListener(_findChanged);
     _find?.dispose();
+    _documentInputTarget.dispose();
     _editorFocus.dispose();
     _findFocus.dispose();
     _shellFocus.dispose();
@@ -439,6 +637,8 @@ class _EditorShellState extends State<EditorShell> {
           onFindPrevious: () => _findNext(backwards: true),
           child: CallbackShortcuts(
             bindings: <ShortcutActivator, VoidCallback>{
+              _WikiLinkActivator(workspace, meta: true): _insertWikiLink,
+              _WikiLinkActivator(workspace, control: true): _insertWikiLink,
               const SingleActivator(
                 LogicalKeyboardKey.keyF,
                 meta: true,
@@ -593,6 +793,31 @@ class _EditorShellState extends State<EditorShell> {
                               workspace: workspace,
                               onSave: _saveDocument,
                               onClose: _closeDocument,
+                              documentActions: [
+                                IconButton(
+                                  key: const ValueKey(
+                                    'insert-wiki-link-button',
+                                  ),
+                                  tooltip:
+                                      'Insert note link (⌘⇧K / Ctrl+Shift+K)',
+                                  onPressed: _insertWikiLink,
+                                  icon: const Icon(
+                                    Icons.add_link,
+                                    size: 16,
+                                    semanticLabel: 'Insert note link',
+                                  ),
+                                  style: const ButtonStyle(
+                                    minimumSize: WidgetStatePropertyAll(
+                                      Size(32, 32),
+                                    ),
+                                    padding: WidgetStatePropertyAll(
+                                      EdgeInsets.all(6),
+                                    ),
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                ),
+                              ],
                             ),
                             if (_find case final find?)
                               DocumentFindBar(
@@ -722,19 +947,25 @@ class _EditorShellState extends State<EditorShell> {
                                                                 data.markdown,
                                                             html: data.html,
                                                           ),
-                                                      onTapLink: (_, href, _) =>
-                                                          _guard(
-                                                            () =>
-                                                                DocumentLinkService(
-                                                                  workspace:
-                                                                      workspace,
-                                                                  openImage:
-                                                                      _openImage,
-                                                                ).open(
-                                                                  document,
-                                                                  href,
-                                                                ),
-                                                          ),
+                                                      onTapLinkTarget: (link) => _guard(
+                                                        () =>
+                                                            link.kind ==
+                                                                IanvsMarkdownLinkKind
+                                                                    .wiki
+                                                            ? _openWikiLink(
+                                                                document,
+                                                                link.href ?? '',
+                                                              )
+                                                            : DocumentLinkService(
+                                                                workspace:
+                                                                    workspace,
+                                                                openImage:
+                                                                    _openImage,
+                                                              ).open(
+                                                                document,
+                                                                link.href,
+                                                              ),
+                                                      ),
                                                       diagramBuilder:
                                                           (
                                                             context,
@@ -1083,4 +1314,23 @@ class _DocumentStatusBar extends StatelessWidget {
       },
     );
   }
+}
+
+/// Match at event time, not build time: source/table IME may change without a
+/// shell rebuild. Unavailable commands return false so other input handlers can
+/// see the keystroke instead of having CallbackShortcuts swallow it.
+class _WikiLinkActivator extends SingleActivator {
+  _WikiLinkActivator(
+    this.workspace, {
+    super.meta = false,
+    super.control = false,
+  }) : super(LogicalKeyboardKey.keyK, shift: true, includeRepeats: false);
+  final WorkspaceController workspace;
+  @override
+  bool accepts(KeyEvent event, HardwareKeyboard state) =>
+      super.accepts(event, state) &&
+      workspace.activeDocument?.controller.mode !=
+          IanvsMarkdownEditorMode.preview &&
+      workspace.activeDocument != null &&
+      !hasEditorComposition(workspace);
 }

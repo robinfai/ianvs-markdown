@@ -1,3 +1,4 @@
+import 'link_target.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -43,6 +44,7 @@ class _IanvsMarkdownAutolinkScopeState
 class IanvsMarkdownInlineLinkBuilder extends MarkdownElementBuilder {
   IanvsMarkdownInlineLinkBuilder({
     required this.onTapLink,
+    this.onTapLinkTarget,
     required this.enableFileLinkChips,
     this.editing = false,
     this.wikiLinkExists,
@@ -50,6 +52,9 @@ class IanvsMarkdownInlineLinkBuilder extends MarkdownElementBuilder {
   });
 
   final MarkdownTapLinkCallback? onTapLink;
+
+  /// Receives parsed link origins. When set, takes precedence over [onTapLink].
+  final IanvsMarkdownTapLinkTargetCallback? onTapLinkTarget;
   final bool enableFileLinkChips;
   final bool editing;
   final IanvsMarkdownWikiLinkExists? wikiLinkExists;
@@ -131,6 +136,7 @@ class IanvsMarkdownInlineLinkBuilder extends MarkdownElementBuilder {
       tagLink: tagLink,
       preferredStyle: effectivePreferredStyle,
       onTapLink: keepsRenderedControl ? _consumeMarkdownLinkTap : onTapLink,
+      onTapLinkTarget: keepsRenderedControl ? null : onTapLinkTarget,
       enableFileLinkChips: enableFileLinkChips,
       theme: theme,
     );
@@ -168,6 +174,7 @@ class _MarkdownInlineLink extends StatefulWidget {
     required this.tagLink,
     required this.preferredStyle,
     required this.onTapLink,
+    this.onTapLinkTarget,
     required this.enableFileLinkChips,
     required this.theme,
   });
@@ -181,6 +188,9 @@ class _MarkdownInlineLink extends StatefulWidget {
   final bool tagLink;
   final TextStyle? preferredStyle;
   final MarkdownTapLinkCallback? onTapLink;
+
+  /// Receives parsed link origins. When set, takes precedence over [onTapLink].
+  final IanvsMarkdownTapLinkTargetCallback? onTapLinkTarget;
   final bool enableFileLinkChips;
   final IanvsMarkdownThemeData? theme;
 
@@ -191,7 +201,8 @@ class _MarkdownInlineLink extends StatefulWidget {
 class _MarkdownInlineLinkState extends State<_MarkdownInlineLink> {
   var _hovered = false;
 
-  bool get _enabled => widget.onTapLink != null;
+  bool get _enabled =>
+      widget.onTapLinkTarget != null || widget.onTapLink != null;
 
   @override
   Widget build(BuildContext context) {
@@ -239,10 +250,19 @@ class _MarkdownInlineLinkState extends State<_MarkdownInlineLink> {
                       : 3,
                 ),
                 onTap: _enabled
-                    ? () => widget.onTapLink!(
-                        widget.label,
-                        widget.href,
-                        widget.title,
+                    ? () => dispatchIanvsMarkdownLinkTap(
+                        IanvsMarkdownLinkTarget(
+                          text: widget.label,
+                          href: widget.href,
+                          title: widget.title,
+                          kind: widget.wikiLink
+                              ? IanvsMarkdownLinkKind.wiki
+                              : widget.tagLink
+                              ? IanvsMarkdownLinkKind.tag
+                              : IanvsMarkdownLinkKind.markdown,
+                        ),
+                        onTapLinkTarget: widget.onTapLinkTarget,
+                        onTapLink: widget.onTapLink,
                       )
                     : null,
                 child: link,

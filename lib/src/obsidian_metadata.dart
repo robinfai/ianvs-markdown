@@ -1,3 +1,4 @@
+import 'link_target.dart';
 import 'localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -891,11 +892,15 @@ final class IanvsMarkdownFootnoteSuperscriptBuilder
     extends MarkdownElementBuilder {
   IanvsMarkdownFootnoteSuperscriptBuilder({
     required this.onTapLink,
+    this.onTapLinkTarget,
     this.superscriptFontFeatureTag,
     this.theme,
   });
 
   final MarkdownTapLinkCallback? onTapLink;
+
+  /// Receives parsed link origins. When set, takes precedence over [onTapLink].
+  final IanvsMarkdownTapLinkTargetCallback? onTapLinkTarget;
   final String? superscriptFontFeatureTag;
   final IanvsMarkdownThemeData? theme;
 
@@ -923,7 +928,7 @@ final class IanvsMarkdownFootnoteSuperscriptBuilder
       );
     }
 
-    final enabled = onTapLink != null;
+    final enabled = onTapLinkTarget != null || onTapLink != null;
     final link = Semantics(
       key: const ValueKey('ianvs-markdown-footnote-reference'),
       link: true,
@@ -934,8 +939,16 @@ final class IanvsMarkdownFootnoteSuperscriptBuilder
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: enabled
-              ? () =>
-                    onTapLink!(reference.label, reference.href, reference.title)
+              ? () => dispatchIanvsMarkdownLinkTap(
+                  IanvsMarkdownLinkTarget(
+                    text: reference.label,
+                    href: reference.href,
+                    title: reference.title,
+                    kind: IanvsMarkdownLinkKind.markdown,
+                  ),
+                  onTapLinkTarget: onTapLinkTarget,
+                  onTapLink: onTapLink,
+                )
               : null,
           child: Text(
             reference.label,

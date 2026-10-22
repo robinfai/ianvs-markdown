@@ -1,3 +1,4 @@
+import 'link_target.dart';
 import 'localization.dart';
 import 'keyboard.dart';
 import 'dart:async';
@@ -96,6 +97,7 @@ class IanvsMarkdown extends StatelessWidget {
     this.styleSheetTheme = MarkdownStyleSheetBaseTheme.material,
     this.onSelectionChanged,
     this.onTapLink,
+    this.onTapLinkTarget,
     this.onTapText,
     this.onCalloutToggle,
     this.blockSyntaxes,
@@ -149,6 +151,9 @@ class IanvsMarkdown extends StatelessWidget {
   final MarkdownStyleSheetBaseTheme styleSheetTheme;
   final MarkdownOnSelectionChangedCallback? onSelectionChanged;
   final MarkdownTapLinkCallback? onTapLink;
+
+  /// Receives parsed link origins. When set, takes precedence over [onTapLink].
+  final IanvsMarkdownTapLinkTargetCallback? onTapLinkTarget;
   final VoidCallback? onTapText;
 
   /// Called when a foldable callout's arrow is pressed.
@@ -341,12 +346,14 @@ class IanvsMarkdown extends StatelessWidget {
       ),
       'sup': IanvsMarkdownFootnoteSuperscriptBuilder(
         onTapLink: onTapLink,
+        onTapLinkTarget: onTapLinkTarget,
         superscriptFontFeatureTag:
             effectiveStyleSheet.superscriptFontFeatureTag,
         theme: colors,
       ),
       'a': IanvsMarkdownInlineLinkBuilder(
         onTapLink: onTapLink,
+        onTapLinkTarget: onTapLinkTarget,
         enableFileLinkChips: enableFileLinkChips,
         editing:
             obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing,
@@ -532,6 +539,7 @@ class IanvsMarkdown extends StatelessWidget {
       ),
       'ianvs-wiki-embed': IanvsMarkdownWikiEmbedElementBuilder(
         onTapLink: onTapLink,
+        onTapLinkTarget: onTapLinkTarget,
         onTapText: onTapText,
         contentBuilder: wikiEmbedBuilder,
         onResizeImage: onImageResize == null
@@ -690,6 +698,7 @@ class IanvsMarkdown extends StatelessWidget {
       styleSheetTheme: styleSheetTheme,
       onSelectionChanged: blockSelectable ? onSelectionChanged : null,
       onTapLink: onTapLink,
+      onTapLinkTarget: onTapLinkTarget,
       onTapText: onTapText,
       blockSyntaxes: effectiveBlockSyntaxes,
       inlineSyntaxes: effectiveInlineSyntaxes,
@@ -831,6 +840,7 @@ class IanvsMarkdown extends StatelessWidget {
       styleSheetTheme: styleSheetTheme,
       onSelectionChanged: onSelectionChanged,
       onTapLink: onTapLink,
+      onTapLinkTarget: onTapLinkTarget,
       onTapText: onTapText,
       blockSyntaxes: blockSyntaxes,
       inlineSyntaxes: inlineSyntaxes,
@@ -875,6 +885,7 @@ class IanvsMarkdown extends StatelessWidget {
       styleSheetTheme: styleSheetTheme,
       onSelectionChanged: blockSelectable ? onSelectionChanged : null,
       onTapLink: onTapLink,
+      onTapLinkTarget: onTapLinkTarget,
       onTapText: onTapText,
       blockSyntaxes: blockSyntaxes,
       inlineSyntaxes: inlineSyntaxes,
@@ -900,6 +911,7 @@ class IanvsMarkdown extends StatelessWidget {
         if (enableFileLinkChips)
           'a': IanvsMarkdownInlineLinkBuilder(
             onTapLink: onTapLink,
+            onTapLinkTarget: onTapLinkTarget,
             enableFileLinkChips: true,
             theme: colors,
           ),
@@ -929,6 +941,7 @@ class IanvsMarkdown extends StatelessWidget {
       styleSheetTheme: styleSheetTheme,
       onSelectionChanged: onSelectionChanged,
       onTapLink: onTapLink,
+      onTapLinkTarget: onTapLinkTarget,
       onTapText: onTapText,
       blockSyntaxes: blockSyntaxes,
       inlineSyntaxes: inlineSyntaxes,
@@ -975,6 +988,7 @@ class IanvsMarkdown extends StatelessWidget {
       styleSheetTheme: styleSheetTheme,
       onSelectionChanged: onSelectionChanged,
       onTapLink: onTapLink,
+      onTapLinkTarget: onTapLinkTarget,
       onTapText: onTapText,
       blockSyntaxes: blockSyntaxes,
       inlineSyntaxes: inlineSyntaxes,
@@ -1021,6 +1035,7 @@ class IanvsMarkdown extends StatelessWidget {
       styleSheetTheme: styleSheetTheme,
       onSelectionChanged: onSelectionChanged,
       onTapLink: onTapLink,
+      onTapLinkTarget: onTapLinkTarget,
       onTapText: onTapText,
       blockSyntaxes: blockSyntaxes,
       inlineSyntaxes: inlineSyntaxes,
@@ -1067,6 +1082,7 @@ class IanvsMarkdown extends StatelessWidget {
       styleSheetTheme: styleSheetTheme,
       onSelectionChanged: onSelectionChanged,
       onTapLink: onTapLink,
+      onTapLinkTarget: onTapLinkTarget,
       onTapText: onTapText,
       blockSyntaxes: blockSyntaxes,
       inlineSyntaxes: inlineSyntaxes,
@@ -1113,6 +1129,7 @@ class IanvsMarkdown extends StatelessWidget {
       styleSheetTheme: styleSheetTheme,
       onSelectionChanged: onSelectionChanged,
       onTapLink: onTapLink,
+      onTapLinkTarget: onTapLinkTarget,
       onTapText: onTapText,
       blockSyntaxes: blockSyntaxes,
       inlineSyntaxes: inlineSyntaxes,
@@ -1170,6 +1187,7 @@ class IanvsMarkdown extends StatelessWidget {
       ),
       styleSheetTheme: styleSheetTheme,
       onTapLink: onTapLink,
+      onTapLinkTarget: onTapLinkTarget,
       blockSyntaxes: blockSyntaxes,
       inlineSyntaxes: inlineSyntaxes,
       extensionSet: extensionSet,
@@ -1327,6 +1345,7 @@ class IanvsMarkdownView extends StatefulWidget {
     this.styleSheet,
     this.onSelectionChanged,
     this.onTapLink,
+    this.onTapLinkTarget,
     this.imageBuilder,
     this.builders = const <String, MarkdownElementBuilder>{},
     this.renderBudget = const IanvsMarkdownRenderBudget(),
@@ -1381,6 +1400,9 @@ class IanvsMarkdownView extends StatefulWidget {
   final MarkdownStyleSheet? styleSheet;
   final MarkdownOnSelectionChangedCallback? onSelectionChanged;
   final MarkdownTapLinkCallback? onTapLink;
+
+  /// Receives parsed link origins. When set, takes precedence over [onTapLink].
+  final IanvsMarkdownTapLinkTargetCallback? onTapLinkTarget;
   final MarkdownImageBuilder? imageBuilder;
   final Map<String, MarkdownElementBuilder> builders;
   final IanvsMarkdownRenderBudget? renderBudget;
@@ -1622,6 +1644,7 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
                               initiallyExpanded: true,
                               showDocumentTitle: widget.showDocumentTitle,
                               onTapLink: widget.onTapLink,
+                              onTapLinkTarget: widget.onTapLinkTarget,
                             ),
                             const SizedBox(height: 18),
                           ],
@@ -1632,6 +1655,7 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
                             softLineBreak: widget.softLineBreak,
                             styleSheet: widget.styleSheet,
                             onTapLink: widget.onTapLink,
+                            onTapLinkTarget: widget.onTapLinkTarget,
                             imageBuilder: widget.imageBuilder,
                             builders: headingBuilders,
                             renderBudget: widget.renderBudget,
