@@ -23,6 +23,7 @@ final class CloudWorkspace {
   private let attachmentQueue = DispatchQueue(label: "work.ianvs.linefold.attachments", qos: .userInitiated)
   private let noteWriteQueue = DispatchQueue(label: "work.ianvs.linefold.note-create", qos: .userInitiated)
   private let readScheduler = WorkspaceReadScheduler()
+  private let transactionQueue = DispatchQueue(label: "work.ianvs.linefold.note-move", qos: .userInitiated)
   private let searchQueue = DispatchQueue(label: "work.ianvs.linefold.search", qos: .utility)
   private var channel: FlutterMethodChannel?
   private var query: NSMetadataQuery?
@@ -49,6 +50,13 @@ final class CloudWorkspace {
       guard let self else { return }
       let arguments = call.arguments as? [String: Any] ?? [:]
       let method = call.method
+      if WorkspaceNoteTransaction.methods.contains(method) {
+        self.transactionQueue.async {
+          let value = WorkspaceNoteTransaction.shared.perform(method, arguments: arguments)
+          DispatchQueue.main.async { result(value) }
+        }
+        return
+      }
       #if os(macOS)
       // No clipboard observation/polling. These two entry points are called only
       // from the editor's explicit Insert Image and Paste actions.

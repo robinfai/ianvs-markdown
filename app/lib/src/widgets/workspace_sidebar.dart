@@ -17,6 +17,7 @@ import 'file_context_menu.dart';
 import 'middle_ellipsis_text.dart';
 import 'window_app_title.dart';
 import 'workspace_note_move_preview.dart';
+import 'workspace_note_move_recovery.dart';
 
 const _background = Color(0xff17191a);
 final _secondary = IanvsTokens.dark.muted;
@@ -347,6 +348,11 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                               value: 'refresh',
                               child: Text('Refresh'),
                             ),
+                            const PopupMenuItem(
+                              height: 32,
+                              value: 'note-move-recovery',
+                              child: Text('Note Move Recovery'),
+                            ),
                             const PopupMenuDivider(),
                             CheckedPopupMenuItem(
                               height: 32,
@@ -369,6 +375,17 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                   ),
                 ),
               ),
+              if (widget.workspace.noteMoveRecoveryNotice case final notice?)
+                TextButton(
+                  key: const ValueKey('note-move-recovery-notice'),
+                  onPressed: () => _run(
+                    () => showWorkspaceNoteMoveRecovery(
+                      context,
+                      widget.workspace,
+                    ),
+                  ),
+                  child: Text(notice),
+                ),
               if (widget.workspace.workspaceNotice case final notice?)
                 Padding(
                   padding: const EdgeInsets.all(12),
@@ -1133,6 +1150,8 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
         browser.collapseAll();
       case 'refresh':
         _run(() => browser.refresh());
+      case 'note-move-recovery':
+        _run(() => showWorkspaceNoteMoveRecovery(context, widget.workspace));
       case 'name':
         browser.setSort(FileSort.name);
       case 'modified':
@@ -1406,9 +1425,20 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
           if (row?.entry?.isDirectory == false && !isMarkdownFileName(name)) {
             throw const FormatException('Use a Markdown or text extension.');
           }
-          if (!await _confirmUnmaintainedMove([old], [result])) return;
-          await widget.workspace.moveFileEntry(old, result);
-          _message('Renamed. Relative Markdown links were not updated.');
+          final decision = await _confirmNoteMove([old], [result]);
+          if (decision.cancelled) return;
+          if (decision.manual) {
+            await widget.workspace.moveFileEntry(old, result);
+            _message('Renamed. Relative Markdown links were not updated.');
+          } else {
+            final completed = decision.automatic!.completed;
+            _message(
+              completed
+                  ? 'Renamed and reference updates verified.'
+                  : 'The move is partial or unverified. Review recovery before retrying.',
+            );
+            if (!completed) result = null;
+          }
         }
       }
       if (!mounted) return;
@@ -1475,9 +1505,16 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
     for (final source in paths) {
       if (!await _authorize(p.dirname(source))) return;
     }
-    if (!await _confirmUnmaintainedMove(paths, [
+    final decision = await _confirmNoteMove(paths, [
       for (final path in paths) p.join(target, p.basename(path)),
-    ])) {
+    ]);
+    if (decision.cancelled) return;
+    if (!decision.manual) {
+      _message(
+        decision.automatic!.completed
+            ? 'Moved and reference updates verified.'
+            : 'The move is partial or unverified. Review recovery before retrying.',
+      );
       return;
     }
     await _batch(paths, (path) async {
@@ -1489,11 +1526,11 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
     }, 'moved');
   }
 
-  Future<bool> _confirmUnmaintainedMove(
+  Future<WorkspaceNoteMoveDecision> _confirmNoteMove(
     List<String> sources,
     List<String> destinations,
   ) async {
-    if (_previewingMove) return false;
+    if (_previewingMove) return const WorkspaceNoteMoveDecision();
     _previewingMove = true;
     try {
       Future<WorkspaceNoteMovePlan>? preview;
@@ -1512,18 +1549,30 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
         unavailable =
             'This item is outside the selected workspace. Complete incoming reference coverage is unavailable.';
       }
-      if (!mounted) return false;
+      if (!mounted) return const WorkspaceNoteMoveDecision();
       final accepted = await showWorkspaceNoteMovePreview(
         context: context,
         sources: sources,
         destinations: destinations,
         preview: preview,
         unavailable: unavailable,
+        onMaintain: widget.workspace.executeNoteMove,
+        onRecoverCopies: (id) {
+          if (!mounted ||
+              root != widget.workspace.workspaceRoot ||
+              epoch != widget.workspace.index.epoch) {
+            throw StateError(
+              'The workspace changed. Confirm recovery again in the original workspace.',
+            );
+          }
+          return widget.workspace.recoverNoteMoveCopies(id);
+        },
       );
-      return accepted &&
-          mounted &&
-          root == widget.workspace.workspaceRoot &&
-          epoch == widget.workspace.index.epoch;
+      return mounted &&
+              root == widget.workspace.workspaceRoot &&
+              epoch == widget.workspace.index.epoch
+          ? accepted
+          : const WorkspaceNoteMoveDecision();
     } finally {
       _previewingMove = false;
     }

@@ -663,6 +663,11 @@ class FileBrowserController extends ChangeNotifier {
     _emit();
   }
 
+  /// Favorites retain their file access across workspace switches.
+  bool hasFavorite(String path) => _preferences.values.any(
+    (preferences) => preferences.favorites.containsKey(path),
+  );
+
   void remap(String source, String? destination) {
     String mapped(String path) => p.equals(path, source)
         ? destination!
