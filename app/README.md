@@ -1,6 +1,6 @@
 # Linefold
 
-`app/` includes the macOS editor and an iOS reading preview. The normal
+`app/` includes the macOS editor and an iOS reader with explicit Source quick editing. The normal
 `lib/main.dart` entry point selects the iOS reader on iPhone/iPad and keeps the
 existing desktop shell on macOS.
 
@@ -53,15 +53,15 @@ Undo removes only the link. If the note, selection, tab or workspace changes
 while the image is being written, the file is kept and **Show link** provides
 its path for recovery. In Live table cells/properties, switch to Source to paste
 images. Dragging Markdown files still opens them. This is a desktop editing
-feature; iOS remains a reader. See [the complete boundaries and test gates](../doc/P1E_ATTACHMENT_IMPORT.md).
+feature; iOS quick editing does not collect photos or clipboard images. See [the complete boundaries and test gates](../doc/P1E_ATTACHMENT_IMPORT.md).
 
-## iOS reading preview
+## iOS reading and quick notes
 
 The iOS version supports iPhone and iPad on iOS 15 or later. In another app,
 share a **file attachment** and choose **Linefold** (sometimes under **More** or
 **Open in**). Alternatively, use **打开文件** in Linefold to select one or more
 documents from Files/iCloud Drive. Imported copies remain available under
-**最近文档**, including after a restart. Linefold never edits the source file.
+**最近文档**, including after a restart. Editing an imported copy never changes the original file in the sending app.
 
 With iCloud signing enabled and the container available, both apps default to the **iCloud · Linefold**
 workspace on every launch. They use the same `iCloud.work.ianvs.linefold`
@@ -112,8 +112,41 @@ The integration uses Apple's document **Open in** mechanism, not a text/URL
 Share Extension. The sending app must offer a file attachment. Remote images,
 adjacent image files, Wiki embeds, and links to other local files are not
 automatically imported; the existing renderer displays image/embed placeholders.
-This version is for reading; editing and saving back to the sending app are not
-exposed.
+Source editing saves the imported copy only; writing back to the sending app is not exposed.
+
+Choose **编辑源码** to enter the lightweight Source editor. **保存** explicitly
+writes the selected note; **取消编辑** confirms before discarding dirty text.
+Task checkboxes can be edited as `[ ]` / `[x]` source. New notes use the **+**
+button in the library, a safe basename and exclusive creation in the current
+folder. No parent directories or existing notes are overwritten by New.
+
+Original-file saves compare exact observed source bytes inside native file
+coordination. A conflict offers **取消保存**, **保留两份**, or **覆盖此版本**.
+Overwrite approval covers only the displayed observed version; another external
+change prompts again. Pending native writes cannot be cancelled by changing
+folders or dismissing a Dart timeout. Permission/offline errors retain the draft.
+
+Mobile recovery uses its own local primary/backup store, not desktop sessions.
+Edits are debounced and flushed on lifecycle inactivity, but are not saved to
+Markdown until Save. On relaunch, **恢复草稿** requires an explicit action in the
+same selected workspace; external folders must be manually selected again.
+Recovery never restores file grants or silently overwrites an externally edited
+note. Failed persistence is reported, and recovery files are not discarded.
+
+If the original folder cannot be reauthorized (including an old app container
+path), **恢复为新笔记** explicitly copies recovered source into a fresh exclusive
+file in the current granted root. It does not copy attachments or change the old
+file. The new Source still requires Save. Lifecycle events before recovery load
+finishes cannot clear an unseen draft.
+
+Library search filters filenames and relative paths only, not note bodies.
+Ordinary relative Markdown links and Wiki note names navigate within the already
+selected folder. Duplicate Wiki names require a choice; missing notes are not
+created by following a link. Wiki YAML aliases and block references are not yet
+supported in this lightweight reader. A single imported file never grants access
+to its old parent or adjacent attachments.
+
+See [mobile quick-note boundaries and verification](../doc/P2C_IOS_QUICK_NOTES.md).
 
 The native importer coordinates access to file-provider URLs, reads while their
 security scope is active, then writes into the default workspace's
