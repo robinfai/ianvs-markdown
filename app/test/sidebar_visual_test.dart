@@ -85,6 +85,7 @@ void main() {
                 key: boundary,
                 child: WorkspaceSidebar(
                   workspace: workspace,
+                  onSave: workspace.saveDocument,
                   width: width,
                   onError: (error) => fail(error),
                 ),

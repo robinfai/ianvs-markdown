@@ -12,7 +12,7 @@ INTEGRATION_DART = app/lib app/test packages/ianvs_mermaid/lib packages/ianvs_me
 # Flutter resolves dependencies and writes generated files in each package.
 .NOTPARALLEL:
 
-.PHONY: help deps deps-core deps-integrations format format-check format-check-core format-check-integrations analyze analyze-core analyze-integrations test test-example test-app test-mermaid test-mermaid-example test-quicklook test-native-import test-ios-preview build-ios-preview build-examples run-ios check check-local build-local build-local-release run-example check-core check-integrations check-package check-api check-processing-budget test-clipboard benchmark run example run-app install clean publish-dry-run
+.PHONY: help deps deps-core deps-integrations format format-check format-check-core format-check-integrations analyze analyze-core analyze-integrations test test-example test-app test-mermaid test-mermaid-example test-quicklook test-native-import test-native-guarded-save test-ios-preview build-ios-preview build-examples run-ios check check-local build-local build-local-release run-example check-core check-integrations check-package check-api check-processing-budget test-clipboard benchmark run example run-app install clean publish-dry-run
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -66,6 +66,9 @@ test-app: ## Run desktop application tests
 test-native-import: ## Verify native Markdown file import handling
 	bash app/tool/test_native_markdown_import.sh
 
+test-native-guarded-save: ## Verify coordinated native conflict-safe saves
+	FLUTTER="$(FLUTTER)" PYTHON="$(PYTHON)" bash app/tool/test_native_guarded_save.sh
+
 test-ios-preview: test-native-import ## Check iOS reading, import handling, and native file copying
 	cd app && $(FLUTTER) test test/preview_app_test.dart test/preview_library_test.dart test/preview_platform_test.dart
 
@@ -117,7 +120,7 @@ check-api: deps-core ## Validate the public API baseline and its checker
 
 check-core: check-api format-check-core analyze-core test test-example test-tools check-processing-budget ## Validate core without Apple or Mermaid integration checks
 
-check-integrations: deps-integrations format-check-integrations analyze-integrations test-app test-mermaid test-mermaid-example test-clipboard test-quicklook test-native-import ## Validate the app and native integrations (macOS)
+check-integrations: test-native-guarded-save deps-integrations format-check-integrations analyze-integrations test-app test-mermaid test-mermaid-example test-clipboard test-quicklook test-native-import ## Validate the app and native integrations (macOS)
 
 check-package: ## Test the actual Pub snapshot in an external Flutter host
 	$(PYTHON) tool/check_package.py --flutter "$(FLUTTER)" --dart "$(DART)"

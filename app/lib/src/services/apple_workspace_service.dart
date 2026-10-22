@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/services.dart';
+
+import 'markdown_text_codec.dart';
 
 /// Shared native iCloud access for macOS and iOS. Native file coordination also
 /// materializes an evicted document before exposing its contents to Dart.
@@ -43,16 +46,35 @@ class AppleWorkspaceService {
     ];
   }
 
-  Future<String> read(String path, {int? maximumBytes}) async =>
-      (await channel.invokeMethod<String>('readDocument', {
-        'path': path,
-        'maximumBytes': maximumBytes,
-      }))!;
+  Future<String> read(String path, {int? maximumBytes}) async {
+    // StandardMethodCodec decodes Strings with Utf8Decoder, which drops a BOM.
+    // Transfer source bytes instead so the read baseline remains exact.
+    final bytes = await channel.invokeMethod<Uint8List>('readDocumentBytes', {
+      'path': path,
+      'maximumBytes': maximumBytes,
+    });
+    if (bytes == null) throw StateError('The document bytes are unavailable.');
+    return decodeMarkdownUtf8(bytes);
+  }
 
   Future<void> write(String path, String contents) async {
     await channel.invokeMethod<bool>('writeDocument', {
       'path': path,
       'contents': contents,
+    });
+  }
+
+  Future<void> writeGuarded(
+    String path,
+    String contents, {
+    required String? expectedContents,
+  }) async {
+    await channel.invokeMethod<bool>('writeDocumentGuarded', {
+      'path': path,
+      'contentsBytes': Uint8List.fromList(utf8.encode(contents)),
+      'expectedContentsBytes': expectedContents == null
+          ? null
+          : Uint8List.fromList(utf8.encode(expectedContents)),
     });
   }
 }

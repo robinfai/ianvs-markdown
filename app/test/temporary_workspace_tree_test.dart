@@ -482,6 +482,7 @@ Future<void> _pumpSidebar(
           alignment: Alignment.topLeft,
           child: WorkspaceSidebar(
             workspace: workspace,
+            onSave: workspace.saveDocument,
             onError: (error) => fail(error),
           ),
         ),

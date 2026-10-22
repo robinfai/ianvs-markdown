@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import '../app_icons.dart';
 import '../controllers/file_browser_controller.dart';
 import '../controllers/workspace_controller.dart';
+import '../models/document_session.dart';
 import '../desktop_theme.dart';
 import '../desktop_typography.dart';
 import '../services/markdown_file_service.dart';
@@ -24,10 +25,12 @@ class WorkspaceSidebar extends StatefulWidget {
   const WorkspaceSidebar({
     super.key,
     required this.workspace,
+    required this.onSave,
     required this.onError,
     this.width,
   });
   final WorkspaceController workspace;
+  final Future<bool> Function(DocumentSession) onSave;
   final ValueChanged<String> onError;
   final double? width;
   @override
@@ -1501,8 +1504,13 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
     if (choice == null) return;
     if (choice == 'save') {
       for (final document in dirty) {
-        if (!await widget.workspace.saveDocument(document)) return;
+        if (!await widget.onSave(document) || document.controller.isDirty) {
+          return;
+        }
       }
+      // A previous document can receive newer edits while another save waits
+      // for a conflict decision. Do not begin a partially destructive batch.
+      if (dirty.any((document) => document.controller.isDirty)) return;
     }
     await _batch(paths, (path) async {
       await widget.workspace.trashFileEntry(

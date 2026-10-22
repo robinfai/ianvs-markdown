@@ -160,6 +160,7 @@ Future<void> _pumpSidebar(
             animation: workspace,
             builder: (context, _) => WorkspaceSidebar(
               workspace: workspace,
+              onSave: workspace.saveDocument,
               onError: (error) => fail(error),
             ),
           ),

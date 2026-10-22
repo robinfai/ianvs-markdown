@@ -73,7 +73,7 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
 
   Future<void> _initialize() async {
     await _workspace.initialize();
-    if (!mounted || localPerformanceEnabled) return;
+    if (!mounted || localPerformanceEnabled || !_workspace.initialized) return;
     try {
       await _incomingFiles.start(_openIncomingFiles);
     } on Object catch (error) {
@@ -186,6 +186,7 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
           child: _withPerformance(
             EditorShell(
               workspace: _workspace,
+              onRetryInitialization: _initialize,
               dark: Theme.of(context).brightness == Brightness.dark,
               onToggleTheme: () => setState(
                 () =>

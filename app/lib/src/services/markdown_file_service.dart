@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 
 import 'apple_workspace_service.dart';
+import 'markdown_text_codec.dart';
 
 const markdownTypeGroup = XTypeGroup(
   label: 'Markdown',
@@ -76,7 +77,35 @@ abstract class MarkdownFileService {
   Future<DateTime?> readModifiedTime(String path);
 }
 
-class DesktopMarkdownFileService implements MarkdownFileService {
+/// Optional save capability for services that can check the destination at the
+/// write boundary. A null baseline means that the destination must not exist.
+abstract class GuardedMarkdownFileService {
+  Future<void> writeMarkdownFileGuarded(
+    String path,
+    String contents, {
+    required String? expectedContents,
+  });
+}
+
+/// A verified change to the destination, not a read or permission failure.
+/// A null [currentContents] means that the destination has been removed.
+class MarkdownSaveConflict implements Exception {
+  const MarkdownSaveConflict({
+    required this.path,
+    required this.expectedContents,
+    required this.currentContents,
+  });
+
+  final String path;
+  final String? expectedContents;
+  final String? currentContents;
+
+  @override
+  String toString() => 'The file changed on disk: $path';
+}
+
+class DesktopMarkdownFileService
+    implements MarkdownFileService, GuardedMarkdownFileService {
   const DesktopMarkdownFileService({this.workspace});
 
   final AppleWorkspaceService? workspace;
@@ -113,7 +142,7 @@ class DesktopMarkdownFileService implements MarkdownFileService {
   @override
   Future<MarkdownFileData> readMarkdownFile(String path) async {
     final contents = workspace == null
-        ? utf8.decode(await File(path).readAsBytes(), allowMalformed: false)
+        ? decodeMarkdownUtf8(await File(path).readAsBytes())
         : await workspace!.read(path);
     return MarkdownFileData(
       path: path,
@@ -129,22 +158,111 @@ class DesktopMarkdownFileService implements MarkdownFileService {
       await workspace!.write(path, contents);
       return;
     }
+    await _writeLocalAtomic(path, contents);
+  }
+
+  @override
+  Future<void> writeMarkdownFileGuarded(
+    String path,
+    String contents, {
+    required String? expectedContents,
+  }) async {
+    if (workspace != null) {
+      try {
+        await workspace!.writeGuarded(
+          path,
+          contents,
+          expectedContents: expectedContents,
+        );
+      } on PlatformException catch (error) {
+        final details = error.details;
+        // A malformed native response must fail closed, not authorize replacing
+        // a destination whose current contents are unknown.
+        if (error.code == 'workspace_save_conflict' &&
+            details is Map &&
+            details['path'] == path &&
+            details.containsKey('currentContentsBytes') &&
+            (details['currentContentsBytes'] == null ||
+                details['currentContentsBytes'] is Uint8List)) {
+          final bytes = details['currentContentsBytes'] as Uint8List?;
+          throw MarkdownSaveConflict(
+            path: path,
+            expectedContents: expectedContents,
+            currentContents: bytes == null ? null : decodeMarkdownUtf8(bytes),
+          );
+        }
+        rethrow;
+      }
+      return;
+    }
+    await _writeLocalAtomic(
+      path,
+      contents,
+      checkDestination: () async {
+        final currentContents = await _readCurrentContents(path);
+        if (currentContents != expectedContents) {
+          throw MarkdownSaveConflict(
+            path: path,
+            expectedContents: expectedContents,
+            currentContents: currentContents,
+          );
+        }
+      },
+    );
+  }
+
+  Future<void> _writeLocalAtomic(
+    String path,
+    String contents, {
+    Future<void> Function()? checkDestination,
+  }) async {
     final target = File(path);
     await target.parent.create(recursive: true);
-    final temporary = File(
-      p.join(
-        target.parent.path,
-        '.${p.basename(path)}.ianvs-${DateTime.now().microsecondsSinceEpoch}.tmp',
-      ),
+    // A unique sibling staging directory keeps concurrent saves separate while
+    // ensuring the final rename stays on the destination's filesystem.
+    final staging = await target.parent.createTemp(
+      '.${p.basename(path)}.ianvs-',
     );
-    await temporary.writeAsBytes(utf8.encode(contents), flush: true);
+    final temporary = File(p.join(staging.path, 'document.tmp'));
     try {
+      await temporary.writeAsBytes(utf8.encode(contents), flush: true);
+      await checkDestination?.call();
+      // Portable Dart has no atomic compare-and-replace primitive. An
+      // uncoordinated external writer can still change the destination between
+      // this final comparison and rename. Apple workspace saves coordinate both
+      // operations together; this fallback deliberately never truncates a file.
       await temporary.rename(path);
-    } on FileSystemException {
-      // Some filesystems do not allow rename-over-existing. Keep a flushed
-      // fallback instead of leaving the user's document unsaved.
-      await target.writeAsBytes(utf8.encode(contents), flush: true);
-      if (await temporary.exists()) await temporary.delete();
+    } finally {
+      // Preserve the original failure (or successful save) if cleanup fails.
+      try {
+        await staging.delete(recursive: true);
+      } on FileSystemException {
+        // Best-effort removal of only this save's private staging directory.
+      }
+    }
+  }
+
+  Future<String?> _readCurrentContents(String path) async {
+    try {
+      final type = await FileSystemEntity.type(path, followLinks: false);
+      if (type != FileSystemEntityType.file &&
+          type != FileSystemEntityType.notFound) {
+        throw FileSystemException(
+          'The save destination is not a regular file',
+          path,
+        );
+      }
+      return decodeMarkdownUtf8(await File(path).readAsBytes());
+    } on FileSystemException catch (error) {
+      final code = error.osError?.errorCode;
+      if ((code == 2 || (Platform.isWindows && code == 3)) &&
+          await FileSystemEntity.type(path, followLinks: false) ==
+              FileSystemEntityType.notFound) {
+        return null;
+      }
+      // Do not mistake permission failures, directories, or dangling symlinks
+      // for a deleted file, and do not convert decoding failures into conflicts.
+      rethrow;
     }
   }
 
