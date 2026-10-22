@@ -120,7 +120,7 @@ check-api: deps-core ## Validate the public API baseline and its checker
 
 check-core: check-api format-check-core analyze-core test test-example test-tools check-processing-budget ## Validate core without Apple or Mermaid integration checks
 
-check-integrations: deps-integrations format-check-integrations analyze-integrations test-app test-mermaid test-mermaid-example test-clipboard test-quicklook test-native-import test-native-guarded-save ## Validate the app and native integrations (macOS)
+check-integrations: test-native-guarded-save deps-integrations format-check-integrations analyze-integrations test-app test-mermaid test-mermaid-example test-clipboard test-quicklook test-native-import ## Validate the app and native integrations (macOS)
 
 check-package: ## Test the actual Pub snapshot in an external Flutter host
 	$(PYTHON) tool/check_package.py --flutter "$(FLUTTER)" --dart "$(DART)"

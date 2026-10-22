@@ -27,12 +27,13 @@ struct GuardedSaveTests {
       if let current { try expectContents(current) }
       else { precondition(!manager.fileExists(atPath: target.path)) }
     }
-    func expectReadFailure(expected: String?) {
+    func expectReadFailure(_ scenario: String, expected: String?) {
+      FileHandle.standardError.write(Data("Checking fail-closed case: \(scenario)\n".utf8))
       do {
         try CloudWorkspace.writeGuarded(target, contents: "mine", expectedContents: expected)
-        preconditionFailure("Expected an unreadable destination to fail closed")
+        preconditionFailure("Expected \(scenario) to fail closed")
       } catch is WorkspaceSaveConflict {
-        preconditionFailure("An unreadable destination must not become a save conflict")
+        preconditionFailure("\(scenario) must not become a save conflict")
       } catch {}
     }
 
@@ -97,25 +98,25 @@ struct GuardedSaveTests {
 
     for bytes in [Data([0xff, 0xfe]), Data([0x23, 0, 0x41])] {
       try bytes.write(to: target)
-      expectReadFailure(expected: nil)
+      expectReadFailure("invalid UTF-8 or NUL \(bytes as NSData)", expected: nil)
       let after = try Data(contentsOf: target)
       precondition(after == bytes)
     }
     try manager.removeItem(at: target)
     try manager.createDirectory(at: target, withIntermediateDirectories: false)
-    expectReadFailure(expected: nil)
+    expectReadFailure("directory", expected: nil)
     var isDirectory: ObjCBool = false
     precondition(manager.fileExists(atPath: target.path, isDirectory: &isDirectory) && isDirectory.boolValue)
     try manager.removeItem(at: target)
     try manager.createSymbolicLink(at: target, withDestinationURL: root.appendingPathComponent("missing.md"))
-    expectReadFailure(expected: nil)
+    expectReadFailure("dangling symlink", expected: nil)
     _ = try manager.destinationOfSymbolicLink(atPath: target.path)
     try manager.removeItem(at: target)
 
     let linked = root.appendingPathComponent("linked.md")
     try Data("linked baseline".utf8).write(to: linked)
     try manager.createSymbolicLink(at: target, withDestinationURL: linked)
-    expectReadFailure(expected: "linked baseline")
+    expectReadFailure("valid symlink", expected: "linked baseline")
     _ = try manager.destinationOfSymbolicLink(atPath: target.path)
     let linkedBytes = try Data(contentsOf: linked)
     precondition(linkedBytes == Data("linked baseline".utf8))
@@ -124,7 +125,7 @@ struct GuardedSaveTests {
 
     let placeholder = root.appendingPathComponent(".\(target.lastPathComponent).icloud")
     try Data("evicted placeholder".utf8).write(to: placeholder)
-    expectReadFailure(expected: nil)
+    expectReadFailure("iCloud placeholder", expected: nil)
     precondition(!manager.fileExists(atPath: target.path))
     precondition(manager.fileExists(atPath: placeholder.path))
     try manager.removeItem(at: placeholder)
@@ -134,7 +135,7 @@ struct GuardedSaveTests {
     // still exercises unreadable destinations above but cannot prove this case.
     if getuid() != 0 {
       try manager.setAttributes([.posixPermissions: 0], ofItemAtPath: target.path)
-      expectReadFailure(expected: "read-protected")
+      expectReadFailure("mode-zero file", expected: "read-protected")
       try manager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: target.path)
       try expectContents("read-protected")
     }
