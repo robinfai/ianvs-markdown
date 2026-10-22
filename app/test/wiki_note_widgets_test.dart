@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:linefold/src/controllers/workspace_controller.dart';
 import 'package:linefold/src/desktop_theme.dart';
+import 'package:linefold/src/services/workspace_index_source.dart';
 import 'package:linefold/src/widgets/editor_shell.dart';
 import 'package:linefold/src/widgets/wiki_note_picker.dart';
 import 'wiki_note_navigation_test.dart'
@@ -293,4 +296,91 @@ void main() {
     expect(workspace.activeDocument!.controller.text, 'Target body');
     await finish(tester);
   });
+  for (final useShortcut in [false, true]) {
+    testWidgets(
+      '${useShortcut ? 'shortcut' : 'toolbar'} refuses a local table target with an unmapped caret',
+      (tester) async {
+        const source = '| H | I |\n| --- | --- |\n| Alpha |\n\nBody';
+        await open(tester, source: source);
+        workspace.setMode(IanvsMarkdownEditorMode.livePreview);
+        final c = workspace.activeDocument!.controller;
+        c.selection = TextSelection.collapsed(offset: source.length);
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('ianvs-markdown-table-1-1')),
+        );
+        await tester.pumpAndSettle();
+        final before = c.value;
+        if (useShortcut) {
+          await shortcut(tester);
+        } else {
+          await tester.tap(
+            find.byKey(const ValueKey('insert-wiki-link-button')),
+          );
+          await tester.pumpAndSettle();
+        }
+        expect(find.byType(WikiNotePicker), findsNothing);
+        expect(
+          find.textContaining('Place the cursor in the document body'),
+          findsOneWidget,
+        );
+        expect(c.value, before);
+
+        workspace.setMode(IanvsMarkdownEditorMode.source);
+        c.selection = TextSelection.collapsed(offset: source.length);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('insert-wiki-link-button')));
+        await tester.pumpAndSettle();
+        expect(find.byType(WikiNotePicker), findsOneWidget);
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+        expect(c.text, source);
+        await finish(tester);
+      },
+    );
+  }
+  testWidgets('moving into a local cell invalidates a pending picker request', (
+    tester,
+  ) async {
+    const source = '| H | I |\n| --- | --- |\n| Alpha |\n\nBody';
+    final delayed = _DelayedWikiFiles();
+    await open(tester, source: source, filesystem: delayed);
+    workspace.setMode(IanvsMarkdownEditorMode.livePreview);
+    final c = workspace.activeDocument!.controller;
+    c.selection = TextSelection.collapsed(offset: source.length);
+    await tester.pumpAndSettle();
+    delayed.gate = Completer<void>();
+    workspace.index.invalidateDirectory('');
+    await tester.tap(find.byKey(const ValueKey('insert-wiki-link-button')));
+    await tester.pump();
+    expect(delayed.waiting, isTrue);
+    await tester.tap(find.byKey(const ValueKey('ianvs-markdown-table-1-1')));
+    await tester.pump();
+    tester
+        .widget<IanvsMarkdownLiveEditor>(find.byType(IanvsMarkdownLiveEditor))
+        .focusNode!
+        .requestFocus();
+    await tester.pump();
+    delayed.gate!.complete();
+    await tester.pumpAndSettle();
+    expect(find.byType(WikiNotePicker), findsNothing);
+    expect(c.text, source);
+    await finish(tester);
+  });
+}
+
+class _DelayedWikiFiles extends WikiFiles {
+  Completer<void>? gate;
+  bool waiting = false;
+  @override
+  Future<WorkspaceDirectorySnapshot> listWorkspaceDirectory(
+    String root,
+    String relativePath,
+  ) async {
+    if (gate case final pending?) {
+      waiting = true;
+      await pending.future;
+    }
+    return super.listWorkspaceDirectory(root, relativePath);
+  }
 }

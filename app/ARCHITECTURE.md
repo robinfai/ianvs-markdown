@@ -335,6 +335,13 @@ completes that target without consuming following prose. Existing `#fragment`,
 are preserved. The edit is one undo unit and is rejected after source, selection,
 mode, composition, tab or workspace changes. This is an explicit picker, not an
 automatically opening suggestion menu on every `[[` keystroke.
+The compact action shares the existing document-context row; it does not consume
+an extra toolbar row. Its tooltip, semantic label and keyboard shortcut remain
+available at larger text scales. Empty outline guidance and the picker body can
+scroll rather than clipping when vertical space is limited. In Live mode, a
+focused local table/property editor is not assumed to map to the source caret:
+use the document body or Source mode instead. That local target remains remembered
+across toolbar focus changes and invalidates an already pending insertion.
 
 Clicking a missing note offers **Create note**, with the exact root-relative
 filename. Cancel writes nothing. Confirmation is followed by fresh catalog

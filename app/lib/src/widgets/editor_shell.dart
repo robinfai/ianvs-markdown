@@ -14,6 +14,7 @@ import '../controllers/document_find_controller.dart';
 import '../controllers/workspace_search_controller.dart';
 import 'workspace_search_dialog.dart';
 import '../editor_commands.dart';
+import '../editor_input_target.dart';
 import '../models/document_session.dart';
 import '../models/workspace_layout.dart';
 import '../services/document_link_service.dart';
@@ -68,6 +69,7 @@ class _EditorShellState extends State<EditorShell> {
   final _editorFocus = FocusNode();
   final _findFocus = FocusNode();
   final _shellFocus = FocusNode();
+  late final DocumentInputTarget _documentInputTarget;
   DocumentFindController? _find;
   String _lastFindQuery = '';
   String _lastReplacement = '';
@@ -83,6 +85,11 @@ class _EditorShellState extends State<EditorShell> {
   @override
   void initState() {
     super.initState();
+    _documentInputTarget = DocumentInputTarget(
+      mainFocus: _editorFocus,
+      document: () => widget.workspace.activeDocument?.controller,
+      onLocalTarget: () => ++_wikiGeneration,
+    );
     _wikiActiveDocumentId = widget.workspace.activeDocument?.id;
     widget.workspace.addListener(_workspaceChanged);
   }
@@ -92,6 +99,8 @@ class _EditorShellState extends State<EditorShell> {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.workspace, widget.workspace)) {
       oldWidget.workspace.removeListener(_workspaceChanged);
+      _documentInputTarget.reset();
+      ++_wikiGeneration;
       _wikiActiveDocumentId = widget.workspace.activeDocument?.id;
       widget.workspace.addListener(_workspaceChanged);
       _closeFind(restoreFocus: false, restoreScroll: false);
@@ -102,6 +111,7 @@ class _EditorShellState extends State<EditorShell> {
     if (_wikiActiveDocumentId != widget.workspace.activeDocument?.id) {
       _wikiActiveDocumentId = widget.workspace.activeDocument?.id;
       ++_wikiGeneration;
+      _documentInputTarget.reset();
     }
     if (!identical(
       _resumeLiveController,
@@ -200,6 +210,13 @@ class _EditorShellState extends State<EditorShell> {
     }
     final document = widget.workspace.activeDocument;
     if (document == null) return;
+    if (document.controller.mode == IanvsMarkdownEditorMode.livePreview &&
+        _documentInputTarget.isLocal) {
+      _showError(
+        'Place the cursor in the document body or use Source mode to insert a note link.',
+      );
+      return;
+    }
     final edit = WikiLinkInsertion.capture(document.controller);
     if (edit == null) {
       _showError(
@@ -524,6 +541,7 @@ class _EditorShellState extends State<EditorShell> {
     _find?.document.modeListenable.removeListener(_findModeChanged);
     _find?.removeListener(_findChanged);
     _find?.dispose();
+    _documentInputTarget.dispose();
     _editorFocus.dispose();
     _findFocus.dispose();
     _shellFocus.dispose();
@@ -775,15 +793,31 @@ class _EditorShellState extends State<EditorShell> {
                               workspace: workspace,
                               onSave: _saveDocument,
                               onClose: _closeDocument,
-                            ),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton.icon(
-                                key: const ValueKey('insert-wiki-link-button'),
-                                onPressed: _insertWikiLink,
-                                icon: const Icon(Icons.add_link, size: 16),
-                                label: const Text('Insert note link'),
-                              ),
+                              documentActions: [
+                                IconButton(
+                                  key: const ValueKey(
+                                    'insert-wiki-link-button',
+                                  ),
+                                  tooltip:
+                                      'Insert note link (⌘⇧K / Ctrl+Shift+K)',
+                                  onPressed: _insertWikiLink,
+                                  icon: const Icon(
+                                    Icons.add_link,
+                                    size: 16,
+                                    semanticLabel: 'Insert note link',
+                                  ),
+                                  style: const ButtonStyle(
+                                    minimumSize: WidgetStatePropertyAll(
+                                      Size(32, 32),
+                                    ),
+                                    padding: WidgetStatePropertyAll(
+                                      EdgeInsets.all(6),
+                                    ),
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                ),
+                              ],
                             ),
                             if (_find case final find?)
                               DocumentFindBar(

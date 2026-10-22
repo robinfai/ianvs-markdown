@@ -5,8 +5,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:linefold/src/controllers/workspace_controller.dart';
 import 'package:linefold/src/desktop_theme.dart';
+import 'package:linefold/src/services/apple_workspace_service.dart';
 import 'package:linefold/src/widgets/editor_shell.dart';
 import 'package:linefold/src/widgets/middle_ellipsis_text.dart';
+import 'package:linefold/src/widgets/wiki_note_picker.dart';
 
 import 'support/fakes.dart';
 import '../../test/fixtures/live_block_finder.dart';
@@ -275,4 +277,92 @@ void main() {
       }
     },
   );
+
+  for (final (size, textScale) in [
+    (const Size(840, 560), 2.0),
+    (const Size(840, 480), 2.0),
+    (const Size(840, 480), 3.0),
+    (const Size(1200, 780), 3.0),
+  ]) {
+    testWidgets(
+      'context action stays reachable at $size and ${textScale}x text',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          AppleWorkspaceService.channel,
+          (call) async => call.method == 'normalizeAttachmentPaths'
+              ? (call.arguments['values'] as List)
+                    .cast<String>()
+                    .map((path) => path.toLowerCase())
+                    .toList()
+              : null,
+        );
+        addTearDown(
+          () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            AppleWorkspaceService.channel,
+            null,
+          ),
+        );
+        const path =
+            '/Projects/Project/notes/A very long document title 中文 with spaces and more words.md';
+        files.files[path] = '';
+        await workspace.openPath(path);
+        workspace.setMode(IanvsMarkdownEditorMode.source);
+        workspace.activeDocument!.controller.selection =
+            const TextSelection.collapsed(offset: 0);
+        await pumpShell(tester, textScale: textScale);
+        expect(tester.takeException(), isNull);
+
+        final action = find.byKey(const ValueKey('insert-wiki-link-button'));
+        final row = tester.getRect(
+          find.byKey(const ValueKey('document-context-row')),
+        );
+        final bounds = tester.getRect(action);
+        final mode = tester.getRect(
+          find.byKey(const ValueKey('editor-mode-button')),
+        );
+        debugPrint(
+          'Layout $size @ $textScale: row $row; action $bounds; mode $mode',
+        );
+        expect(bounds.width, greaterThanOrEqualTo(32));
+        expect(bounds.height, greaterThanOrEqualTo(32));
+        expect(row.contains(bounds.topLeft), isTrue);
+        expect(row.contains(bounds.bottomRight), isTrue);
+        expect(bounds.right, lessThan(mode.left));
+        expect(bounds.center.dy, closeTo(row.center.dy, 0.5));
+        expect(
+          tester.getRect(find.byType(IanvsMarkdownLiveEditor)).top,
+          closeTo(row.bottom, 0.5),
+          reason: 'The action must not add a toolbar row or cover the editor.',
+        );
+        final semantics = tester.ensureSemantics();
+        await tester.pump();
+        expect(find.bySemanticsLabel('Insert note link'), findsOneWidget);
+        semantics.dispose();
+
+        final outlineScroll = find.descendant(
+          of: find.byKey(const ValueKey('empty-outline-scroll')),
+          matching: find.byType(Scrollable),
+        );
+        final position = tester.state<ScrollableState>(outlineScroll).position;
+        await tester.drag(
+          outlineScroll,
+          Offset(0, -position.maxScrollExtent - 100),
+        );
+        await tester.pumpAndSettle();
+        expect(position.pixels, closeTo(position.maxScrollExtent, 0.5));
+        expect(tester.takeException(), isNull);
+
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+        expect(find.byType(WikiNotePicker), findsOneWidget);
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+        expect(workspace.activeDocument!.controller.text, '');
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump(const Duration(milliseconds: 400));
+      },
+    );
+  }
 }
