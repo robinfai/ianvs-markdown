@@ -247,7 +247,9 @@ and `WorkspaceSearchController` share its root-relative metadata snapshots and
 per-directory singleflight requests. The browser owns view preferences and
 watcher hints, not another filesystem database. Simultaneous refreshes coalesce
 and a refresh arriving during enumeration is replayed; incomplete/error listings
-are never evidence that an old subtree was deleted.
+are never evidence that an old subtree was deleted. Each catalog revision carries
+its affected directory paths; the tree applies only changed snapshots, rather
+than rebuilding unrelated visible entries for every scanned sibling.
 
 Search has a separate sidebar action and Command-Shift-F / Control-Shift-F. It
 matches literal Markdown source (including front matter, code and destinations),
@@ -291,7 +293,8 @@ iOS providers are not claimed to have real-time or complete watchers. The shared
 source implementation is included in the iOS host, but P1c exposes its search UI only in
 the desktop editor; the iOS reading library is not yet a full-workspace search UI.
 
-Synthetic Dart tests cover 1k/10k catalogs, exact IO counts, bounded cache and
+Synthetic Dart tests cover 1k/10k flat catalogs and sibling directories, exact IO
+and consumer snapshot-application counts, partial deep trees, bounded cache and
 concurrency, live buffer/save conflicts, stale epochs/revisions, partial coverage,
 Unicode windows, and navigation. They are not measured end-user latency, memory
 or Apple provider performance. Native synthetic filesystem tests, macOS build,

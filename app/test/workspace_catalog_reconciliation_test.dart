@@ -27,6 +27,16 @@ class CatalogSource implements WorkspaceIndexSource {
   ) async => onRead == null ? reads[path]! : await onRead!(path);
 }
 
+class CountingIndex extends WorkspaceIndex {
+  CountingIndex({required super.source});
+  int snapshotLookups = 0;
+  @override
+  WorkspaceDirectorySnapshot? cachedDirectory(String relativePath) {
+    snapshotLookups++;
+    return super.cachedDirectory(relativePath);
+  }
+}
+
 const folder = WorkspaceMetadata(
   relativePath: 'folder',
   isDirectory: true,
@@ -271,6 +281,142 @@ void main() {
       expect(browser.matchCount, 0);
       expect(browser.searching, isFalse);
       expect(lists, 3);
+    },
+  );
+  for (final count in [1000, 10000]) {
+    test(
+      '$count collapsed sibling scans do not rebuild or notify unchanged browser snapshots',
+      () async {
+        final source = CatalogSource();
+        source.directories[''] = WorkspaceDirectorySnapshot([
+          for (var i = 0; i < count; i++)
+            WorkspaceMetadata(
+              relativePath: 'folder-$i',
+              isDirectory: true,
+              revision: 'v1',
+            ),
+        ]);
+        final index = CountingIndex(source: source)..configure('/vault');
+        final files = MemoryMarkdownFileService();
+        final browser = FileBrowserController(files, index: index)
+          ..configure('/vault', [], null);
+        addTearDown(browser.dispose);
+        addTearDown(index.dispose);
+        addTearDown(files.dispose);
+        await browser.load('/vault');
+        final rootEntry = browser.rows
+            .firstWhere((row) => row.entry?.path == '/vault/folder-0')
+            .entry;
+        index.snapshotLookups = 0;
+        var updates = 0;
+        browser.addListener(() => updates++);
+        for (var i = 0; i < count; i++) {
+          await index.directory('folder-$i');
+        }
+        expect(index.indexedDirectories, count + 1);
+        expect(index.snapshotLookups, 0);
+        expect(updates, 0);
+        expect(
+          identical(
+            browser.rows
+                .firstWhere((row) => row.entry?.path == '/vault/folder-0')
+                .entry,
+            rootEntry,
+          ),
+          isTrue,
+        );
+      },
+    );
+  }
+
+  test(
+    'expanded deep catalog changes only reconcile affected snapshot and preserve partial/error changes',
+    () async {
+      final source = CatalogSource();
+      var parent = '';
+      for (var i = 0; i < 48; i++) {
+        final child = parent.isEmpty ? 'level' : '$parent/level';
+        source.directories[parent] = WorkspaceDirectorySnapshot([
+          WorkspaceMetadata(
+            relativePath: child,
+            isDirectory: true,
+            revision: 'v1',
+          ),
+        ]);
+        parent = child;
+      }
+      source.directories[parent] = WorkspaceDirectorySnapshot([
+        WorkspaceMetadata(
+          relativePath: '$parent/note.md',
+          isDirectory: false,
+          revision: 'v1',
+        ),
+      ]);
+      final index = CountingIndex(source: source)..configure('/vault');
+      final files = MemoryMarkdownFileService();
+      final browser = FileBrowserController(files, index: index)
+        ..configure('/vault', [], null);
+      addTearDown(browser.dispose);
+      addTearDown(index.dispose);
+      addTearDown(files.dispose);
+      await browser.load('/vault');
+      for (final path in source.directories.keys.where(
+        (path) => path.isNotEmpty,
+      )) {
+        browser.preferences.expanded.add('/vault/$path');
+        await index.directory(path);
+      }
+      expect(
+        browser.rows.any((row) => row.entry?.path == '/vault/$parent/note.md'),
+        isTrue,
+      );
+      index.snapshotLookups = 0;
+      source.directories[parent] = const WorkspaceDirectorySnapshot(
+        [],
+        complete: false,
+        reason: 'provider unavailable',
+      );
+      await index.directory(parent, refresh: true);
+      expect(index.snapshotLookups, 1);
+      expect(
+        browser.errors['/vault/$parent'].toString(),
+        contains('provider unavailable'),
+      );
+      expect(
+        browser.rows.any((row) => row.entry?.path == '/vault/$parent/note.md'),
+        isTrue,
+      );
+      index.snapshotLookups = 0;
+      source.directories[parent] = const WorkspaceDirectorySnapshot([]);
+      await index.directory(parent, refresh: true);
+      expect(index.snapshotLookups, 1);
+      expect(browser.errors, isEmpty);
+      expect(
+        browser.rows.any((row) => row.entry?.path == '/vault/$parent/note.md'),
+        isFalse,
+      );
+    },
+  );
+  test(
+    'selected filesystem root does not evict itself while applying a snapshot',
+    () async {
+      final source = CatalogSource()
+        ..directories[''] = const WorkspaceDirectorySnapshot([
+          WorkspaceMetadata(
+            relativePath: 'note.md',
+            isDirectory: false,
+            revision: 'v1',
+          ),
+        ]);
+      final index = WorkspaceIndex(source: source)..configure('/');
+      final files = MemoryMarkdownFileService();
+      final browser = FileBrowserController(files, index: index)
+        ..configure('/', [], null);
+      addTearDown(browser.dispose);
+      addTearDown(index.dispose);
+      addTearDown(files.dispose);
+      await browser.load('/');
+      expect(browser.rows.any((row) => row.entry?.path == '/note.md'), isTrue);
     },
   );
 }

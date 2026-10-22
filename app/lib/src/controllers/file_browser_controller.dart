@@ -94,21 +94,31 @@ class FileBrowserController extends ChangeNotifier {
       return;
     }
     _catalogRevision = index.catalogRevision;
-    final paths = {
-      root!,
-      ..._children.keys,
-      ..._loading.keys,
-      ..._errors.keys,
-      ...preferences.expanded.where((path) => p.isWithin(root!, path)),
-    }.toList()..sort((a, b) => a.length.compareTo(b.length));
+    var changed = false;
+    final paths =
+        index.changedDirectories
+            .map(
+              (relative) => relative.isEmpty ? root! : p.join(root!, relative),
+            )
+            .where(
+              (path) =>
+                  path == root ||
+                  _children.containsKey(path) ||
+                  _loading.containsKey(path) ||
+                  _errors.containsKey(path) ||
+                  preferences.expanded.contains(path),
+            )
+            .toList()
+          ..sort((a, b) => a.length.compareTo(b.length));
     for (final path in paths) {
       final snapshot = index.cachedDirectory(index.relativeDirectory(path));
       if (snapshot != null) {
-        // Hydrate newly expanded/recreated paths from shared results without
-        // issuing another directory scan or waiting for a provider watcher.
-        _applySnapshot(path, snapshot);
+        // Hydrate only changed shared snapshots, not every cached directory on
+        // every completed search listing. Collapsed sibling scans stay linear.
+        changed = _applySnapshot(path, snapshot) || changed;
       } else if (_children.containsKey(path)) {
         _evict(path);
+        changed = true;
       }
     }
     if (query.isNotEmpty) {
@@ -118,10 +128,12 @@ class FileBrowserController extends ChangeNotifier {
         search(query);
       }
     }
-    _emit();
+    if (changed) _emit();
   }
 
-  void _applySnapshot(String path, WorkspaceDirectorySnapshot snapshot) {
+  bool _applySnapshot(String path, WorkspaceDirectorySnapshot snapshot) {
+    if (identical(_appliedSnapshots[path], snapshot)) return false;
+    _appliedSnapshots[path] = snapshot;
     final entries = snapshot.entries.map((e) => e.entry(root!)).toList();
     _children[path] = entries;
     if (snapshot.complete) {
@@ -131,19 +143,26 @@ class FileBrowserController extends ChangeNotifier {
         snapshot.reason ?? 'Partial directory listing',
       );
     }
-    if (!snapshot.complete) return;
+    if (!snapshot.complete) return true;
     final directories = entries
         .where((e) => e.isDirectory)
         .map((e) => e.path)
         .toSet();
     final obsolete = {..._children.keys, ..._loading.keys, ..._errors.keys}
-        .where((key) => p.dirname(key) == path && !directories.contains(key))
+        .where(
+          (key) =>
+              key != path &&
+              p.dirname(key) == path &&
+              !directories.contains(key),
+        )
         .toList();
     for (final removed in obsolete) {
       _evict(removed);
     }
+    return true;
   }
 
+  final _appliedSnapshots = <String, WorkspaceDirectorySnapshot>{};
   final _preferences = <String, BrowserPreferences>{};
   final _children = <String, List<WorkspaceEntry>>{};
   final _errors = <String, Object>{};
@@ -205,6 +224,7 @@ class FileBrowserController extends ChangeNotifier {
       }
       _refreshTimers.clear();
       _children.clear();
+      _appliedSnapshots.clear();
       _errors.clear();
       _loading.clear();
       _versions.clear();
@@ -327,6 +347,7 @@ class FileBrowserController extends ChangeNotifier {
       ..._refreshTimers.keys,
     }.where((key) => key == path || p.isWithin(path, key)).toList()) {
       _children.remove(key);
+      _appliedSnapshots.remove(key);
       _errors.remove(key);
       _loading.remove(key);
       _refreshTimers.remove(key)?.cancel();

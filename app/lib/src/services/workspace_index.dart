@@ -59,12 +59,16 @@ class WorkspaceIndex extends ChangeNotifier {
   int _cacheBytes = 0;
   int _contentRevision = 0;
   int _catalogRevision = 0;
+  final _changedDirectories = <String>{};
   int _reads = 0;
   final _readWaiters = Queue<Completer<void>>();
   String? get root => _root;
   int get epoch => _epoch;
   int get contentRevision => _contentRevision;
   int get catalogRevision => _catalogRevision;
+
+  /// Paths affected by the latest catalog revision, including evicted subtrees.
+  Set<String> get changedDirectories => Set.unmodifiable(_changedDirectories);
   int get cachedBytes => _cacheBytes;
   int get cachedDocuments => _bodies.length;
   int get indexedDirectories => _directories.length;
@@ -88,6 +92,7 @@ class WorkspaceIndex extends ChangeNotifier {
     _listedAt.clear();
     _directoryTasks.clear();
     _directoryVersions.clear();
+    _changedDirectories.clear();
     _metadataEntries = 0;
     _textTasks.clear();
     _bodies.clear();
@@ -173,6 +178,9 @@ class WorkspaceIndex extends ChangeNotifier {
             }
           }
           if (task.refreshAgain) continue;
+          _changedDirectories
+            ..clear()
+            ..add(relativePath);
           final old = _directories[relativePath];
           final entries = {
             if (!result.complete && old != null)
@@ -246,6 +254,7 @@ class WorkspaceIndex extends ChangeNotifier {
       ..._directories.keys,
       ..._directoryTasks.keys,
     }.where((key) => key == path || p.posix.isWithin(path, key)).toList()) {
+      _changedDirectories.add(key);
       _directoryVersions[key] = (_directoryVersions[key] ?? 0) + 1;
       _directoryTasks.remove(key);
       final old = _directories.remove(key);
