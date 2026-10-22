@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 
 import 'apple_workspace_service.dart';
 import 'markdown_text_codec.dart';
+import '../models/document_sync_status.dart';
 
 const markdownTypeGroup = XTypeGroup(
   label: 'Markdown',
@@ -105,10 +106,19 @@ class MarkdownSaveConflict implements Exception {
 }
 
 class DesktopMarkdownFileService
-    implements MarkdownFileService, GuardedMarkdownFileService {
+    implements
+        MarkdownFileService,
+        GuardedMarkdownFileService,
+        DocumentSyncSource {
   const DesktopMarkdownFileService({this.workspace});
 
   final AppleWorkspaceService? workspace;
+
+  @override
+  Future<DocumentSyncMetadata> readSyncMetadata(String path) async =>
+      workspace == null
+      ? const DocumentSyncMetadata()
+      : workspace!.readSyncMetadata(path);
 
   static const _fileAccessChannel = MethodChannel(
     'work.ianvs.linefold/file_access',

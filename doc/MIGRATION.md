@@ -31,6 +31,14 @@
 reference use 与有效 definition 共用目标范围，重命名计划必须去重并另行获得写入授权。
 完整限制和元数据 bounds 见 [笔记语义契约](NOTE_SEMANTICS.md)。
 
+### 可选同文档阅读刷新（P1h）
+
+`IanvsMarkdownView(preserveScrollOnUpdate: true, ...)` 可让同文档外部数据更新保留
+当前阅读像素位置。省略时保持原来的更新后回到文首，无需迁移；其他组件没有新增此参数。
+内容变短会裁剪到合法滚动范围，等待更新期间的用户滚动不会被旧请求位置覆盖。
+它不做语义锚点恢复。换文档或 workspace/session 时务必换 key；现有按 heading identity
+保留折叠状态的合同不变。详见 [同文档阅读刷新](API_CONTRACTS.md#同文档阅读刷新p1h)。
+
 ## 2. 复制：明确选择纯文本或原生双格式
 
 不传 `clipboardWriter` 的正文/View 及 Live 阅读面会使用核心纯文本 writer。

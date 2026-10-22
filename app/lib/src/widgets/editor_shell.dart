@@ -1,3 +1,4 @@
+import 'document_sync_indicator.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -1327,7 +1328,10 @@ class _EditorShellState extends State<EditorShell> {
                                 ),
                               ),
                             ),
-                            _DocumentStatusBar(document: document),
+                            _DocumentStatusBar(
+                              document: document,
+                              workspace: workspace,
+                            ),
                           ],
                         ),
                       ),
@@ -1575,8 +1579,9 @@ class _DropOverlay extends StatelessWidget {
 }
 
 class _DocumentStatusBar extends StatelessWidget {
-  const _DocumentStatusBar({required this.document});
+  const _DocumentStatusBar({required this.document, required this.workspace});
   final DocumentSession document;
+  final WorkspaceController workspace;
 
   @override
   Widget build(BuildContext context) {
@@ -1596,31 +1601,26 @@ class _DocumentStatusBar extends StatelessWidget {
             style: DesktopTypography.subheadline.copyWith(
               color: colors.textTertiary,
             ),
-            child: Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              spacing: 16,
-              runSpacing: 4,
-              children: [
-                Wrap(
-                  spacing: 14,
-                  children: [
-                    Text('${statistics.words} words'),
-                    Text('${statistics.characters} characters'),
-                  ],
-                ),
-                Wrap(
-                  spacing: 12,
-                  children: [
-                    ValueListenableBuilder<bool>(
-                      valueListenable: document.controller.dirtyListenable,
-                      builder: (context, dirty, _) =>
-                          Text(dirty ? 'Edited' : 'Saved'),
-                    ),
-                    Text(document.encoding),
-                    Text(document.lineEnding),
-                  ],
-                ),
-              ],
+            // A status footer must not consume the document's height at large
+            // text scales. Keep all details reachable by horizontal scrolling,
+            // with persistence and cloud state first rather than off-screen.
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  Text(workspace.persistenceStatus(document).label),
+                  const SizedBox(width: 12),
+                  DocumentSyncIndicator(controller: workspace.sync),
+                  const SizedBox(width: 16),
+                  Text('${statistics.words} words'),
+                  const SizedBox(width: 14),
+                  Text('${statistics.characters} characters'),
+                  const SizedBox(width: 12),
+                  Text(document.encoding),
+                  const SizedBox(width: 12),
+                  Text(document.lineEnding),
+                ],
+              ),
             ),
           ),
         );

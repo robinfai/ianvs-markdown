@@ -7,6 +7,7 @@ import 'package:ianvs_markdown_clipboard/ianvs_markdown_clipboard.dart';
 import 'package:ianvs_mermaid/ianvs_mermaid.dart';
 
 import '../widgets/document_diagram.dart';
+import '../widgets/document_sync_indicator.dart';
 import '../widgets/document_attachment_scope.dart';
 import '../services/attachment_repository.dart';
 import '../services/apple_workspace_service.dart';
@@ -47,11 +48,9 @@ class _LinefoldPreviewAppState extends State<LinefoldPreviewApp>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    if (widget.controller == null) {
-      _cloudChanges = const AppleWorkspaceService().changes.listen((_) {
-        if (_controller.initialized) unawaited(_controller.refresh());
-      });
-    }
+    _cloudChanges = _controller.library.workspaceService?.changes.listen((_) {
+      if (_controller.initialized) _controller.notifyCloudChange();
+    });
     unawaited(_initialize());
   }
 
@@ -70,6 +69,7 @@ class _LinefoldPreviewAppState extends State<LinefoldPreviewApp>
   }
 
   Future<void> _chooseFiles() async {
+    _controller.cancelPendingOperation();
     try {
       await _platform.chooseFiles();
     } on Object {
@@ -125,6 +125,18 @@ class _LinefoldPreviewAppState extends State<LinefoldPreviewApp>
                   PopupMenuItem(value: 'folder', child: Text('选择其他文件夹…')),
                 ],
               ),
+            if (_controller.busy)
+              IconButton(
+                tooltip: '取消等待',
+                onPressed: _controller.cancelPendingOperation,
+                icon: const Icon(CupertinoIcons.xmark),
+              )
+            else if (_controller.activePath != null)
+              IconButton(
+                tooltip: '刷新文档',
+                onPressed: _controller.refresh,
+                icon: const Icon(CupertinoIcons.refresh),
+              ),
             IconButton(
               tooltip: '打开文件',
               onPressed: _chooseFiles,
@@ -140,21 +152,46 @@ class _LinefoldPreviewAppState extends State<LinefoldPreviewApp>
               if (_controller.error case final error?)
                 Material(
                   color: Theme.of(context).colorScheme.errorContainer,
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 20, top: 8, bottom: 8),
-                    child: Row(
-                      children: [
-                        Expanded(child: Text(error)),
-                        IconButton(
-                          tooltip: '关闭提示',
-                          onPressed: _controller.clearError,
-                          icon: const Icon(CupertinoIcons.xmark),
-                        ),
-                      ],
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.sizeOf(context).height * .35,
+                    ),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 12, 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(error),
+                          Wrap(
+                            alignment: WrapAlignment.end,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              if (_controller.canRetry)
+                                TextButton(
+                                  onPressed: _controller.retry,
+                                  child: const Text('重试'),
+                                ),
+                              IconButton(
+                                tooltip: '关闭提示',
+                                onPressed: _controller.clearError,
+                                icon: const Icon(CupertinoIcons.xmark),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               if (_controller.busy) const LinearProgressIndicator(),
+              if (_controller.activePath != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 4,
+                  ),
+                  child: DocumentSyncIndicator(controller: _controller.sync),
+                ),
               Expanded(
                 child: !_controller.initialized
                     ? const Center(child: CircularProgressIndicator.adaptive())
@@ -164,10 +201,14 @@ class _LinefoldPreviewAppState extends State<LinefoldPreviewApp>
                         onOpen: _chooseFiles,
                       )
                     : _PreviewReader(
-                        key: ValueKey(_controller.activePath),
+                        key: ValueKey((
+                          _controller.activeRoot,
+                          _controller.activeWorkspaceGeneration,
+                          _controller.activePath,
+                        )),
                         contents: _controller.contents!,
                         documentPath: _controller.activePath,
-                        root: _controller.library.workspace?.path,
+                        root: _controller.activeRoot,
                         attachmentSource: widget.attachmentSource,
                         renderer: _renderer,
                         platform: _platform,
@@ -244,10 +285,9 @@ class _PreviewLibraryView extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           Center(
-            child: FilledButton.icon(
+            child: FilledButton(
               onPressed: onOpen,
-              icon: const Icon(CupertinoIcons.folder_open),
-              label: const Text('打开 Markdown 文件'),
+              child: const Text('打开 Markdown 文件', textAlign: TextAlign.center),
             ),
           ),
           const SizedBox(height: 12),
@@ -416,6 +456,7 @@ class _PreviewReaderState extends State<_PreviewReader> {
                   imageBuilder: images.image,
                   wikiEmbedBuilder: images.wiki,
                   data: widget.contents,
+                  preserveScrollOnUpdate: true,
                   clipboardWriter: (data) => writeIanvsMarkdownRichClipboard(
                     markdown: data.markdown,
                     html: data.html,
@@ -435,9 +476,12 @@ class _PreviewReaderState extends State<_PreviewReader> {
       const Divider(height: 1),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-        child: Row(
+        child: Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 12,
           children: [
-            const Expanded(child: Text('阅读预览', style: TextStyle(fontSize: 13))),
+            const Text('阅读预览', style: TextStyle(fontSize: 13)),
             TextButton.icon(
               onPressed: _showOutline,
               icon: const Icon(CupertinoIcons.list_bullet, size: 20),

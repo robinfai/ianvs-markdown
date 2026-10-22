@@ -63,8 +63,11 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     if (widget.workspaceController == null && !localPerformanceEnabled) {
       _cloudChanges = const AppleWorkspaceService().changes.listen((_) {
-        if (_workspace.initialized && _workspace.isCloudWorkspace) {
-          unawaited(_workspace.browser.refresh());
+        if (_workspace.initialized) {
+          _workspace.sync.scheduleRefresh();
+          if (_workspace.isCloudWorkspace) {
+            unawaited(_workspace.browser.refresh());
+          }
         }
       });
     }
@@ -147,6 +150,7 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _fileAssociation.initialized) {
       unawaited(_fileAssociation.refresh());
+      _workspace.sync.scheduleRefresh();
       if (_workspace.isCloudWorkspace) unawaited(_workspace.browser.refresh());
     }
   }

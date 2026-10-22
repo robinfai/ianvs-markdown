@@ -65,6 +65,19 @@ properties UI 的 40/16 展示截断。完整字段、支持范围与未知边�
 源码依据：[正文与 View](../lib/src/ianvs_markdown.dart)、[Source](../lib/src/editor/source_editor.dart)、[Live](../lib/src/editor/live_editor.dart)。
 行为证据：[标准 View](../test/standard_view_test.dart)、[标题范围](../test/heading_folding_test.dart)、[标准语法](../test/standard_syntax_test.dart)、[正文/View](../test/ianvs_markdown_test.dart)、[Live](../test/live_editor_test.dart)、[宿主契约](../test/host_contract_test.dart)。矩阵描述支持范围，不能把同名参数视为相同的处理路径。
 
+## 同文档阅读刷新（P1h）
+
+`IanvsMarkdownView.preserveScrollOnUpdate` 默认为 `false`，保留已有的 `data`、
+语法预设、front matter 或渲染预算变化后回到文首的行为。宿主仅在更新同一文档时
+显式设为 `true`：保留当前 `ScrollPosition` 的像素位置，内容变短时由滚动布局裁剪到
+合法范围，不恢复请求发起时的旧 offset，因此异步刷新期间用户后续滚动不会被抢回。
+这不是语义锚点重定位，前方内容增删仍可能改变该位置对应的段落。
+
+不同文档或同一路径的不同 workspace/session 必须更换 widget key；该参数本身不会判断
+文档身份。既有折叠控制器继续按 heading identity 保留仍存在的折叠项，消失的 identity
+会被移除；没有新建或全量清空折叠状态的副作用。仅 View 新增此参数，其他入口无需迁移。
+iOS preview 使用已成功打开的 scope generation、root 与 path 作为阅读器身份。
+
 ## 宿主 Paste 拦截（P1 图片附件）
 
 `IanvsMarkdownEditor`、`IanvsMarkdownLiveEditor` 与辅助 `IanvsMarkdownEditorShortcuts`
