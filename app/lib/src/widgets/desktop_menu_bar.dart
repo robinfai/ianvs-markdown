@@ -21,6 +21,9 @@ class DesktopMenuBar extends StatelessWidget {
     required this.onToggleTheme,
     this.onUseSystemTheme,
     this.onOpenSettings,
+    this.onFind,
+    this.onFindNext,
+    this.onFindPrevious,
     required this.child,
   });
 
@@ -33,6 +36,9 @@ class DesktopMenuBar extends StatelessWidget {
   final VoidCallback onToggleTheme;
   final VoidCallback? onUseSystemTheme;
   final VoidCallback? onOpenSettings;
+  final VoidCallback? onFind;
+  final VoidCallback? onFindNext;
+  final VoidCallback? onFindPrevious;
   final Widget child;
 
   void _edit(IanvsMarkdownCommand command, Intent fallback) {
@@ -192,6 +198,36 @@ class DesktopMenuBar extends StatelessWidget {
                 IanvsMarkdownCommand.selectAll,
                 const SelectAllTextIntent(SelectionChangedCause.keyboard),
               ),
+            ),
+            PlatformMenu(
+              label: 'Find',
+              menus: [
+                PlatformMenuItem(
+                  label: 'Find…',
+                  shortcut: const SingleActivator(
+                    LogicalKeyboardKey.keyF,
+                    meta: true,
+                  ),
+                  onSelected: onFind,
+                ),
+                PlatformMenuItem(
+                  label: 'Find Next',
+                  shortcut: const SingleActivator(
+                    LogicalKeyboardKey.keyG,
+                    meta: true,
+                  ),
+                  onSelected: onFindNext,
+                ),
+                PlatformMenuItem(
+                  label: 'Find Previous',
+                  shortcut: const SingleActivator(
+                    LogicalKeyboardKey.keyG,
+                    meta: true,
+                    shift: true,
+                  ),
+                  onSelected: onFindPrevious,
+                ),
+              ],
             ),
           ],
         ),

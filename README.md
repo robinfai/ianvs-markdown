@@ -284,6 +284,11 @@ flutter run -d macos
 打开/保存/另存为、文件拖放、外部变更提醒和崩溃恢复，并继续以原始 Markdown 作为
 唯一文档模型：
 
+桌面应用支持 `⌘F` 文内查找、`⌘G` / `⇧⌘G` 循环导航、大小写匹配和当前/全部替换。
+搜索使用当前未保存的 Markdown 源文，不是磁盘文件或全文索引；当前命中会高亮并跳转。
+Live / Read 查找期间临时显示源码，关闭查找或按 Escape 后返回原视图；Read 保持只读，
+点击 “Edit to replace” 才进入可编辑 Source。每次替换均可单步撤销，不会自动保存。
+
 ```sh
 cd app
 flutter pub get

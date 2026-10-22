@@ -10,6 +10,7 @@ import 'package:ianvs_mermaid/ianvs_mermaid.dart';
 import 'package:path/path.dart' as p;
 
 import '../controllers/workspace_controller.dart';
+import '../controllers/document_find_controller.dart';
 import '../editor_commands.dart';
 import '../models/document_session.dart';
 import '../models/workspace_layout.dart';
@@ -17,6 +18,7 @@ import '../services/document_link_service.dart';
 import '../services/markdown_file_service.dart';
 import 'local_document_image.dart';
 import 'document_diagram.dart';
+import 'document_find_bar.dart';
 import '../desktop_theme.dart';
 import '../desktop_typography.dart';
 import 'floating_outline.dart';
@@ -54,9 +56,225 @@ class EditorShell extends StatefulWidget {
 class _EditorShellState extends State<EditorShell> {
   var _draggingFiles = false;
   final _mermaidRenderer = NativeMermanRenderer();
+  final _editorFocus = FocusNode();
+  final _findFocus = FocusNode();
+  final _shellFocus = FocusNode();
+  DocumentFindController? _find;
+  String _lastFindQuery = '';
+  String _lastReplacement = '';
+  bool _lastMatchCase = false;
+  bool _enablingFindEditing = false;
+  double? _beforeFindScroll;
+  bool _beforeFindFocused = false;
+  IanvsMarkdownController? _resumeLiveController;
+  int _findSurfaceEpoch = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.workspace.addListener(_workspaceChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant EditorShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.workspace, widget.workspace)) {
+      oldWidget.workspace.removeListener(_workspaceChanged);
+      widget.workspace.addListener(_workspaceChanged);
+      _closeFind(restoreFocus: false, restoreScroll: false);
+    }
+  }
+
+  void _workspaceChanged() {
+    if (!identical(
+      _resumeLiveController,
+      widget.workspace.activeDocument?.controller,
+    )) {
+      _resumeLiveController = null;
+    }
+    final find = _find;
+    if (find != null &&
+        !identical(
+          find.document,
+          widget.workspace.activeDocument?.controller,
+        )) {
+      _closeFind(restoreFocus: false, restoreScroll: false);
+    }
+  }
+
+  void _findChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _findModeChanged() {
+    if (!_enablingFindEditing) _closeFind(restoreScroll: false);
+  }
+
+  void _openFind({bool seedSelection = true, bool? navigateBackwards}) {
+    if (!(ModalRoute.of(context)?.isCurrent ?? true)) return;
+    final document = widget.workspace.activeDocument;
+    if (document == null || hasEditorComposition(widget.workspace)) return;
+    if (_find != null) {
+      if (_find!.isComposing) return;
+      _findFocus.requestFocus();
+      _find!.query.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: _find!.query.text.length,
+      );
+      return;
+    }
+    final controller = document.controller;
+    _findSurfaceEpoch += 1;
+    final selection = controller.selection;
+    final selected = selection.isValid && !selection.isCollapsed
+        ? selection.textInside(controller.text)
+        : '';
+    _beforeFindScroll = document.scrollController.hasClients
+        ? document.scrollController.offset
+        : null;
+    _beforeFindFocused = _editorFocus.hasFocus;
+    _editorFocus.unfocus();
+    final find = DocumentFindController(
+      document: controller,
+      query:
+          seedSelection &&
+              selected.isNotEmpty &&
+              selected.length <= 2000 &&
+              !selected.contains('\n')
+          ? selected
+          : _lastFindQuery,
+      replacement: _lastReplacement,
+      matchCase: _lastMatchCase,
+      readOnly: controller.mode == IanvsMarkdownEditorMode.preview,
+      revealInitialMatch: false,
+    );
+    find.query.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: find.query.text.length,
+    );
+    find.addListener(_findChanged);
+    controller.modeListenable.addListener(_findModeChanged);
+    setState(() => _find = find);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !identical(_find, find)) return;
+      _restoreDocumentScroll(document, _beforeFindScroll);
+      // The old Live editor must be detached before moving the shared source
+      // selection: it otherwise redirects matches inside hidden front matter.
+      find.next(
+        backwards: navigateBackwards ?? false,
+        skipCurrentSelection: navigateBackwards == false,
+      );
+      _findFocus.requestFocus();
+    });
+  }
+
+  void _findNext({bool backwards = false}) {
+    if (!(ModalRoute.of(context)?.isCurrent ?? true)) return;
+    if (_find == null) {
+      _openFind(seedSelection: false, navigateBackwards: backwards);
+    } else {
+      _find!.next(backwards: backwards);
+    }
+  }
+
+  void _enableFindEditing() {
+    final find = _find;
+    if (find == null || find.isComposing) return;
+    _enablingFindEditing = true;
+    try {
+      find.readOnly = false;
+      widget.workspace.setMode(IanvsMarkdownEditorMode.source);
+    } finally {
+      _enablingFindEditing = false;
+    }
+    setState(() {});
+  }
+
+  void _closeFind({bool restoreFocus = true, bool restoreScroll = true}) {
+    final find = _find;
+    if (find == null) return;
+    final epoch = ++_findSurfaceEpoch;
+    final document = widget.workspace.activeDocument;
+    final restoreEditorFocus =
+        _beforeFindFocused || _editorFocus.hasFocus || find.highlight != null;
+    final scroll =
+        identical(find.document, document?.controller) &&
+            find.document.mode == IanvsMarkdownEditorMode.source &&
+            document!.scrollController.hasClients
+        ? document.scrollController.offset
+        : restoreScroll
+        ? _beforeFindScroll
+        : null;
+    _lastFindQuery = find.query.text;
+    _lastReplacement = find.replacement.text;
+    _lastMatchCase = find.matchCase;
+    find.document.modeListenable.removeListener(_findModeChanged);
+    find.removeListener(_findChanged);
+    setState(() {
+      _find = null;
+      _resumeLiveController =
+          restoreFocus &&
+              restoreEditorFocus &&
+              find.document.mode == IanvsMarkdownEditorMode.livePreview
+          ? find.document
+          : null;
+    });
+    find.dispose();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (epoch == _findSurfaceEpoch) _resumeLiveController = null;
+      if (!mounted ||
+          epoch != _findSurfaceEpoch ||
+          _find != null ||
+          !identical(document, widget.workspace.activeDocument)) {
+        return;
+      }
+      if (document != null) _restoreDocumentScroll(document, scroll);
+      if (restoreFocus) {
+        if (restoreEditorFocus && _editorFocus.parent != null) {
+          _editorFocus.requestFocus();
+        } else {
+          _shellFocus.requestFocus();
+        }
+      }
+      if (scroll != null &&
+          document?.controller.mode == IanvsMarkdownEditorMode.source) {
+        // Reconnecting input schedules a caret reveal. Restore the viewport
+        // after that one-shot reveal so an empty/no-match search does not undo
+        // the user's manual scrolling. Never run after another tab/surface won.
+        scheduleMicrotask(() {
+          if (!mounted) return;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted &&
+                epoch == _findSurfaceEpoch &&
+                _find == null &&
+                identical(document, widget.workspace.activeDocument) &&
+                document!.controller.mode == IanvsMarkdownEditorMode.source) {
+              _restoreDocumentScroll(document, scroll);
+            }
+          });
+          WidgetsBinding.instance.ensureVisualUpdate();
+        });
+      }
+    });
+  }
+
+  void _restoreDocumentScroll(DocumentSession document, double? offset) {
+    if (offset == null || !document.scrollController.hasClients) return;
+    final position = document.scrollController.position;
+    document.scrollController.jumpTo(
+      offset.clamp(position.minScrollExtent, position.maxScrollExtent),
+    );
+  }
 
   @override
   void dispose() {
+    widget.workspace.removeListener(_workspaceChanged);
+    _find?.document.modeListenable.removeListener(_findModeChanged);
+    _find?.removeListener(_findChanged);
+    _find?.dispose();
+    _editorFocus.dispose();
+    _findFocus.dispose();
+    _shellFocus.dispose();
     _mermaidRenderer.dispose();
     super.dispose();
   }
@@ -144,8 +362,35 @@ class _EditorShellState extends State<EditorShell> {
           onToggleTheme: widget.onToggleTheme,
           onUseSystemTheme: widget.onUseSystemTheme,
           onOpenSettings: widget.onOpenSettings,
+          onFind: _openFind,
+          onFindNext: _findNext,
+          onFindPrevious: () => _findNext(backwards: true),
           child: CallbackShortcuts(
             bindings: <ShortcutActivator, VoidCallback>{
+              const SingleActivator(LogicalKeyboardKey.keyF, meta: true):
+                  _openFind,
+              const SingleActivator(LogicalKeyboardKey.keyF, control: true):
+                  _openFind,
+              const SingleActivator(LogicalKeyboardKey.keyG, meta: true):
+                  _findNext,
+              const SingleActivator(LogicalKeyboardKey.keyG, control: true):
+                  _findNext,
+              const SingleActivator(
+                LogicalKeyboardKey.keyG,
+                meta: true,
+                shift: true,
+              ): () =>
+                  _findNext(backwards: true),
+              const SingleActivator(
+                LogicalKeyboardKey.keyG,
+                control: true,
+                shift: true,
+              ): () =>
+                  _findNext(backwards: true),
+              if (_find != null)
+                const SingleActivator(LogicalKeyboardKey.escape): () {
+                  if (!_find!.isComposing) _closeFind();
+                },
               const SingleActivator(LogicalKeyboardKey.comma, meta: true):
                   ?widget.onOpenSettings,
               const SingleActivator(LogicalKeyboardKey.keyN, meta: true):
@@ -227,7 +472,7 @@ class _EditorShellState extends State<EditorShell> {
                     WorkspaceLayout.minSidebarWidth,
                     maxSidebarWidth,
                   );
-                  return Row(
+                  final content = Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       if (workspace.sidebarVisible)
@@ -266,6 +511,13 @@ class _EditorShellState extends State<EditorShell> {
                               onSave: _saveDocument,
                               onClose: _closeDocument,
                             ),
+                            if (_find case final find?)
+                              DocumentFindBar(
+                                controller: find,
+                                queryFocus: _findFocus,
+                                onClose: _closeFind,
+                                onEnableEditing: _enableFindEditing,
+                              ),
                             if (workspace.recoveryError != null ||
                                 workspace.recoveryNotice != null)
                               MaterialBanner(
@@ -332,9 +584,41 @@ class _EditorShellState extends State<EditorShell> {
                                                             .documentMaxWidth) /
                                                     2,
                                               );
+                                              if (_find case final find?) {
+                                                return IanvsMarkdownEditor(
+                                                  key: ValueKey(
+                                                    'find-source-${document.id}',
+                                                  ),
+                                                  controller:
+                                                      document.controller,
+                                                  focusNode: _editorFocus,
+                                                  scrollController:
+                                                      document.scrollController,
+                                                  readOnly: find.readOnly,
+                                                  highlightedRange:
+                                                      find.highlight,
+                                                  showToolbar: false,
+                                                  enableModeShortcuts: false,
+                                                  placeholder:
+                                                      'Start writing Markdown…',
+                                                  padding: EdgeInsets.fromLTRB(
+                                                    inset,
+                                                    32,
+                                                    inset,
+                                                    56,
+                                                  ),
+                                                  onSaveRequested: (_) =>
+                                                      _saveFromEditor(document),
+                                                );
+                                              }
                                               return IanvsMarkdownLiveEditor(
                                                 key: ValueKey(document.id),
                                                 controller: document.controller,
+                                                focusNode: _editorFocus,
+                                                autofocus: identical(
+                                                  _resumeLiveController,
+                                                  document.controller,
+                                                ),
                                                 clipboardWriter: (data) =>
                                                     writeIanvsMarkdownRichClipboard(
                                                       markdown: data.markdown,
@@ -391,6 +675,11 @@ class _EditorShellState extends State<EditorShell> {
                         ),
                       ),
                     ],
+                  );
+                  return Focus(
+                    focusNode: _shellFocus,
+                    autofocus: true,
+                    child: content,
                   );
                 },
               ),

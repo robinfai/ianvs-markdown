@@ -121,6 +121,48 @@ Markdown rendering remains owned by the reusable root package. The app supplies
 theme overrides for neutral emphasis, code, and link colors without changing
 the library's defaults. See [DESIGN.md](DESIGN.md) for the full visual contract.
 
+## Current-document find and replace
+
+`DocumentFindController` searches the active controller's unsaved Markdown
+buffer, not the disk file or workspace. `Command-F` and Edit > Find open the
+compact find/replace bar; `Command-G` / `Shift-Command-G` and Enter / Shift-Enter
+in the Find field cycle through literal, non-overlapping matches. Case matching
+is optional, using Unicode-aware case-insensitive matching by default. There is
+no regular-expression query language, Unicode normalization, or full-text index.
+Markdown syntax, YAML, hidden text and link destinations remain searchable.
+
+Small buffers search immediately. Buffers of at least 64 Ki UTF-16 units use a
+150 ms debounce and 16 Ki source windows, yielding between windows with literal
+lookahead so boundary-spanning and non-overlapping matches remain exact. The
+bar shows **Searching…** and disables navigation/replacement until the complete
+current result is ready. Query, case, source, composition and disposal changes
+invalidate earlier generations; partial or stale counts never become editable
+results. Moving the source caret during a scan cancels its pending reveal.
+This stage wires the desktop app only, not the example host, and makes no
+device/Profile latency claim or rendered-text search claim.
+
+While the bar is open, the app temporarily presents the same controller through
+`IanvsMarkdownEditor`, with an exact current-match highlight independent of
+the query field's focus. Live/Read are not rewritten into a new document mode;
+closing the bar or pressing Escape returns to their original presentation.
+Live resumes editing at the current source selection, revealing that block;
+Read restores its previous viewport. An explicit mode change or tab change
+dismisses the bar. Closing the bar retains the query for subsequent
+Command-G / Shift-Command-G navigation.
+Read's temporary source surface remains read-only. Only the explicit
+**Edit to replace** action enters editable Source mode, which remains selected
+after closing the bar. This phase does not offer in-place rendered-text search.
+
+Each Replace or Replace All operation is one controller history group; Replace
+All applies a single snapshot, even when replacement text itself contains the
+query. Neither operation saves or normalizes the rest of the source. Typing or
+undo refreshes counts without moving the caret; the user navigates again before
+replacing an individual match whose prior highlight became stale. Replace All
+continues to act on the displayed query's full current set. Active editor,
+query, or replacement composition blocks search navigation and replacement.
+Find is not opened over an active editor composition or a modal dialog. Query
+and replacement text are transient window state and are not recovery content.
+
 ## Source-of-truth rules
 
 1. `DocumentSession.controller.text` is the current source shown by the editor.
