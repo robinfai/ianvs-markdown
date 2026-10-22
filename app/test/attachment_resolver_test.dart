@@ -77,6 +77,9 @@ void main() {
         '../outside',
         '/private',
         'file:assets',
+        String.fromCharCode(0xd800),
+        String.fromCharCode(0xdc00),
+        String.fromCharCode(0x7f),
         '.obsidian',
         r'a\b',
       ]) {
@@ -93,6 +96,7 @@ void main() {
         [255],
         List.filled(65537, 32),
         utf8.encode('{"attachmentFolderPath":42}'),
+        utf8.encode('{"attachmentFolderPath":null}'),
       ]) {
         expect(ObsidianAttachmentSettings.parse(bytes).malformed, isTrue);
       }

@@ -53,6 +53,31 @@ Reading 的 inline tag 回调带 `tag`。任何点击都不会改写 Markdown �
 源码依据：[正文与 View](../lib/src/ianvs_markdown.dart)、[Source](../lib/src/editor/source_editor.dart)、[Live](../lib/src/editor/live_editor.dart)。
 行为证据：[标准 View](../test/standard_view_test.dart)、[标题范围](../test/heading_folding_test.dart)、[标准语法](../test/standard_syntax_test.dart)、[正文/View](../test/ianvs_markdown_test.dart)、[Live](../test/live_editor_test.dart)、[宿主契约](../test/host_contract_test.dart)。矩阵描述支持范围，不能把同名参数视为相同的处理路径。
 
+## 宿主 Paste 拦截（P1 图片附件）
+
+`IanvsMarkdownEditor`、`IanvsMarkdownLiveEditor` 与辅助 `IanvsMarkdownEditorShortcuts`
+新增可空 `Future<bool> Function()? onPaste`。省略时不改变既有粘贴或原生菜单行为，无需迁移。
+回调只由用户发起的 Paste 命令触发，包括 Ctrl/Cmd+V、
+`IanvsMarkdownShortcuts.invoke(IanvsMarkdownCommand.paste)` 及组件文本菜单中的 Paste；
+普通输入、构建、切换标签和剪贴板状态查询不会调用它，也不自动读取图片。
+
+- `true` 表示宿主已经处理或主动消费请求，不执行核心文本粘贴；异常同样消费，避免宿主
+  已导入/插入但报错后再次粘贴。需要错误提示时由宿主负责。
+- `false` 表示没有处理，继续已有的纯文本/选中文本 URL 链接语义。安装回调后，核心只读取
+  一次纯文本，通过原输入面的格式器/源码映射写入，不重复获取可能已变化的剪贴板。
+- 空选区也调用回调。Reading、只读 Source、活跃 IME composing 不调用回调。
+  Live 主体、Source 及渲染预算超限后的完整源码降级均支持；Live 表格单元格和 front matter
+  属性仍使用原有局部文本粘贴，不调用宿主钩子。上述区域的附件粘贴需切到 Source。
+- 安装回调时，组件使用自适应文本菜单，并在没有文本的剪贴板上仍提供 Paste；没有回调
+  时保留既有原生菜单选择。平台直接提交的编辑更新不经过此钩子。
+- 核心只保证自己的异步文本回退：等待期间 controller、输入面、焦点、原文、选区、
+  composing、模式、只读状态变化或移除回调，就丢弃迟到回退，不粘贴到新文档或新选区。
+  宿主回调自己的副作用不由核心取消；宿主必须在异步工作前捕获文档/controller/源码选区，
+  写文件与插入前重新校验其身份、可写状态和焦点，并处理已写附件但未插入的结果。
+
+自动证据：[Paste 拦截回归](../test/paste_interception_test.dart)。此 API 不包含附件存储、
+授权、路径选择、Obsidian 附件配置解析或解码策略；这些属于宿主责任。
+
 ## 界面文案（R1-03 首批交付）
 
 `IanvsMarkdownLocalization` 是可嵌套的文案作用域，四种入口及独立辅助 Widget 从最近的作用域读取 `IanvsMarkdownStrings`。不提供作用域时使用 `.legacy()`，保留现有中英文混合标签；`.chinese()` / `.english()` 显式选择完整的内置界面文案。`overrides` 按 `IanvsMarkdownMessage` 覆盖单条消息，未覆盖项回退到所选语言；更新时替换配置对象，传入的 map 应保持不可变。

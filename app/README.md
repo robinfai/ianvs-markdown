@@ -40,6 +40,21 @@ or slow directory listings can also be incomplete and are explicitly labelled.
 The iOS reader shares the safe native source contract but does not yet expose the
 workspace search interface.
 
+## Import images and paste screenshots
+
+On Mac, choose **File → Import Image…** or **Import image** above the editor.
+Normal Paste (including Command-V/Control-V) imports an actual clipboard image;
+text and URL Paste continue to work. Save the note inside the opened workspace
+first. The app copies images to the vault's configured Obsidian attachment
+location, inserts an encoded relative Markdown link, and never changes the
+settings or the source image. With no setting, new images go to the vault root.
+
+Undo removes only the link. If the note, selection, tab or workspace changes
+while the image is being written, the file is kept and **Show link** provides
+its path for recovery. In Live table cells/properties, switch to Source to paste
+images. Dragging Markdown files still opens them. This is a desktop editing
+feature; iOS remains a reader. See [the complete boundaries and test gates](../doc/P1E_ATTACHMENT_IMPORT.md).
+
 ## iOS reading preview
 
 The iOS version supports iPhone and iPad on iOS 15 or later. In another app,

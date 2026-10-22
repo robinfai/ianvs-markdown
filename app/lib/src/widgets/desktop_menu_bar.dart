@@ -21,6 +21,7 @@ class DesktopMenuBar extends StatelessWidget {
     required this.onToggleTheme,
     this.onUseSystemTheme,
     this.onOpenSettings,
+    this.onImportImage,
     this.onFind,
     this.onFindNext,
     this.onFindPrevious,
@@ -36,6 +37,7 @@ class DesktopMenuBar extends StatelessWidget {
   final VoidCallback onToggleTheme;
   final VoidCallback? onUseSystemTheme;
   final VoidCallback? onOpenSettings;
+  final VoidCallback? onImportImage;
   final VoidCallback? onFind;
   final VoidCallback? onFindNext;
   final VoidCallback? onFindPrevious;
@@ -119,6 +121,7 @@ class DesktopMenuBar extends StatelessWidget {
               ),
               onSelected: onOpen,
             ),
+            PlatformMenuItem(label: 'Import Image…', onSelected: onImportImage),
             PlatformMenuItem(
               label: 'Open Folder…',
               shortcut: const SingleActivator(

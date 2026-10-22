@@ -44,6 +44,10 @@ class FakeAttachmentSource implements AttachmentSource {
     for (final path in paths) path.replaceAll('e\u0301', 'é').toLowerCase(),
   ];
   @override
+  Future<Uint8List> readImportSettings(String root) =>
+      read(root, '.obsidian/app.json', attachmentSettingsMaximumBytes);
+
+  @override
   Future<Uint8List> read(
     String root,
     String relativePath,

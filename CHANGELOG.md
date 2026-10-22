@@ -1,5 +1,14 @@
 ## Unreleased
 
+- Add explicit macOS image import and screenshot Paste using the opened vault's
+  read-only Obsidian attachment destination settings. Validate image bytes and
+  decode budgets before native exclusive/no-follow creation; preserve source
+  files and insert one undoable relative Markdown link. Late results retain the
+  file and offer its link instead of editing a changed note. The opt-in async
+  `onPaste` editor hook keeps ordinary text/URL paste unchanged by default.
+  Live table/property image paste requires Source; iOS remains a reader.
+  See [P1e boundaries and gates](doc/P1E_ATTACHMENT_IMPORT.md).
+
 - Add opt-in typed link callbacks (`IanvsMarkdownLinkTarget` and
   `onTapLinkTarget`) preserving raw Wiki targets/aliases while keeping the legacy
   callback as fallback. The desktop app now resolves current-vault `.md` Wiki
