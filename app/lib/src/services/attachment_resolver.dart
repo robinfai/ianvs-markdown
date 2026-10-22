@@ -250,6 +250,11 @@ class AttachmentIndex {
         final found = exact(candidate, canonical);
         if (found != null) return found;
       }
+      // A leading slash anchors the identity to the vault root. Only an
+      // unanchored Wiki target may fall back to a shortest unique suffix.
+      if (rooted) {
+        throw const AttachmentFailure(AttachmentFailureKind.missing);
+      }
       final matches = entries.where(
         (entry) =>
             entry.comparisonPath == canonical ||

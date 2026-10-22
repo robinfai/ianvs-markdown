@@ -166,6 +166,43 @@ void main() {
     },
   );
 
+  test('root-anchored Wiki paths never fall back to a suffix match', () {
+    const files = [
+      'archive/assets/chart.png',
+      'assets/exact.png',
+      'archive/assets/exact.png',
+      'Assets/CASE.PNG',
+      'archive/assets/case.png',
+      'Images/cafe\u0301.png',
+    ];
+    for (final target in [
+      '/assets/chart.png',
+      '/chart.png',
+      './assets/chart.png',
+      '../assets/chart.png',
+    ]) {
+      expect(
+        () => resolve(files, target),
+        throwsA(failure(AttachmentFailureKind.missing)),
+      );
+    }
+    expect(
+      resolve(files, '/assets/exact.png').relativePath,
+      'assets/exact.png',
+    );
+    expect(resolve(files, '/assets/case.png').relativePath, 'Assets/CASE.PNG');
+    expect(resolve(files, '/images/café.png').relativePath, files.last);
+    expect(
+      () => resolve(['Assets/x.png', 'ASSETS/X.PNG'], '/assets/x.png'),
+      throwsA(failure(AttachmentFailureKind.ambiguous)),
+    );
+    // Only an unanchored Wiki target may use the unique suffix fallback.
+    expect(
+      resolve(files, 'assets/chart.png').relativePath,
+      'archive/assets/chart.png',
+    );
+  });
+
   test(
     'Chinese, spaces, URL encoding, case and NFC/NFD preserve actual path',
     () {

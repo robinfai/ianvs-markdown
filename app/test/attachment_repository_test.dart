@@ -21,6 +21,37 @@ Future<AttachmentImageLease> load(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('anchored paths never read a different suffix-matching image', () async {
+    final source = FakeAttachmentSource()
+      ..files['archive/assets/chart.png'] = tinyPng
+      ..files['assets/exact.png'] = tinyPng
+      ..files['archive/assets/exact.png'] = await File(
+        'test/fixtures/attachments/raster.png',
+      ).readAsBytes();
+    final repository = AttachmentRepository(root: '/vault', source: source);
+    addTearDown(repository.dispose);
+    for (final target in [
+      '/assets/chart.png',
+      '/chart.png',
+      './assets/chart.png',
+      '../assets/chart.png',
+    ]) {
+      await expectLater(
+        load(repository, documentPath: '/vault/notes/note.md', target: target),
+        throwsA(failure(AttachmentFailureKind.missing)),
+      );
+    }
+    expect(source.reads.where((path) => path.endsWith('.png')), isEmpty);
+    for (final target in ['/assets/exact.png', 'assets/exact.png']) {
+      final lease = await load(repository, target: target);
+      // The root image is 1x1, while the suffix-matching archive image is 2x1.
+      expect(lease.image.width, 1);
+      expect(lease.image.height, 1);
+      expect(source.reads.last, 'assets/exact.png');
+      lease.dispose();
+    }
+  });
+
   for (final extension in ['png', 'jpg', 'gif', 'webp', 'bmp']) {
     test(
       'real $extension fixture decodes to a bounded still preview',
