@@ -52,9 +52,24 @@ struct ScopedNoteSaveTests {
         // stderr is flushed before a trapping assertion; stdout may be buffered.
         FileHandle.standardError.write(Data(evidence.utf8))
         precondition(observedBytesMatch)
-        // Keep the existing expectation until Apple evidence identifies the
-        // actual spelling/identity difference; do not relax production checks.
-        precondition(failure.path == foundationTarget)
+        precondition(Data(failure.path.utf8) == Data(selectedTarget.utf8),
+                     "Conflict path must exactly match the native-selected target")
+        if let current {
+          let originalAttributes = try manager.attributesOfItem(atPath: target.path)
+          let returnedAttributes = try manager.attributesOfItem(atPath: failure.path)
+          for key in [FileAttributeKey.systemNumber, .systemFileNumber] {
+            guard let original = originalAttributes[key] as? NSNumber,
+                  let returned = returnedAttributes[key] as? NSNumber else {
+              preconditionFailure("Expected filesystem identity for the synthetic conflict target")
+            }
+            precondition(original == returned, "Conflict must identify the original target inode")
+          }
+          check(try bytes(target) == Data(current.utf8))
+          check(try bytes(URL(fileURLWithPath: failure.path)) == Data(current.utf8))
+        } else {
+          precondition(!manager.fileExists(atPath: target.path))
+          precondition(!manager.fileExists(atPath: failure.path))
+        }
       }
     }
 
