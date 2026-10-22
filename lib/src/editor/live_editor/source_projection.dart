@@ -408,27 +408,29 @@ extension _LiveEditorSourceProjection on _IanvsMarkdownLiveEditorState {
   }) {
     final styleSheet =
         widget.styleSheet ?? ianvsMarkdownStyleSheet(context, colors);
-    return Column(
-      key: const ValueKey('ianvs-markdown-reference-definitions'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        for (final definition in definitions)
-          IanvsMarkdown(
-            data: _referenceDefinitionProjectionSource(definition),
-            selectable: true,
-            documentSelection: false,
-            styleSheet: styleSheet.copyWith(
-              blockSpacing: 0,
-              pPadding: EdgeInsets.zero,
+    return MarkdownInlineControlHeightScope(
+      child: Column(
+        key: const ValueKey('ianvs-markdown-reference-definitions'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          for (final definition in definitions)
+            IanvsMarkdown(
+              data: _referenceDefinitionProjectionSource(definition),
+              selectable: true,
+              documentSelection: false,
+              styleSheet: styleSheet.copyWith(
+                blockSpacing: 0,
+                pPadding: EdgeInsets.zero,
+              ),
+              fitContent: true,
+              onTapText: onTapText,
+              showListIndentationGuides: false,
+              softLineBreak: widget.softLineBreak,
+              obsidianMetadataMode: IanvsMarkdownObsidianMetadataMode.editing,
+              theme: colors,
             ),
-            fitContent: true,
-            onTapText: onTapText,
-            showListIndentationGuides: false,
-            softLineBreak: widget.softLineBreak,
-            obsidianMetadataMode: IanvsMarkdownObsidianMetadataMode.editing,
-            theme: colors,
-          ),
-      ],
+        ],
+      ),
     );
   }
 

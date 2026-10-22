@@ -32,6 +32,7 @@ import '../obsidian_metadata.dart';
 import '../render_budget.dart';
 import '../budget_notice.dart';
 import '../rich_clipboard.dart';
+import '../renderer/inline_control_height_scope.dart';
 import '../task_checkbox.dart';
 import '../task_syntax.dart';
 import '../theme.dart';
