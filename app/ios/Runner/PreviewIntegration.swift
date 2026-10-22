@@ -31,8 +31,15 @@ final class PreviewIntegration: NSObject, UIDocumentPickerDelegate {
       case "chooseFiles": self.chooseFiles(result: result)
       case "defaultWorkspace":
         self.queue.async {
-          let workspace = self.defaultWorkspace()
-          DispatchQueue.main.async { result(workspace) }
+          do {
+            let workspace = try self.defaultWorkspace()
+            DispatchQueue.main.async { result(workspace) }
+          } catch {
+            DispatchQueue.main.async {
+              result(FlutterError(code: error is WorkspaceWriteAuthorityError ? "workspace_busy" : "workspace_unavailable",
+                                  message: error.localizedDescription, details: nil))
+            }
+          }
         }
       case "chooseWorkspace": self.chooseFiles(result: result, folder: true)
       case "openExternal":
@@ -56,7 +63,7 @@ final class PreviewIntegration: NSObject, UIDocumentPickerDelegate {
       importing.insert(url)
       queue.async {
         let outcome = Result {
-          let workspace = self.defaultWorkspace()
+          let workspace = try self.defaultWorkspace(activate: false)
           let directory = URL(fileURLWithPath: workspace["path"] as! String)
           return try MarkdownImporter(documentsDirectory: directory).importFile(at: url)
         }
@@ -74,7 +81,20 @@ final class PreviewIntegration: NSObject, UIDocumentPickerDelegate {
     return !files.isEmpty
   }
 
-  private func defaultWorkspace() -> [String: Any] {
+  private func defaultWorkspace(activate: Bool = true) throws -> [String: Any] {
+    var workspace = defaultWorkspaceLocation()
+    if activate {
+      let root = URL(fileURLWithPath: workspace["path"] as! String)
+      for (key, value) in try CloudWorkspace.shared.previewWriteAuthority.activate(root) {
+        workspace[key] = value
+      }
+    }
+    return workspace
+  }
+
+  // Importing a shared copy does not switch the selected root or its write
+  // capability. Dart explicitly selects the default workspace before opening it.
+  private func defaultWorkspaceLocation() -> [String: Any] {
     do {
       let root = try CloudWorkspace.shared.defaultDirectory()
       // Preserve old imports in place. Copy stable UUID directories once so an
@@ -147,14 +167,34 @@ final class PreviewIntegration: NSObject, UIDocumentPickerDelegate {
   func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
     if let result = folderResult {
       folderResult = nil
-      guard let url = urls.first, url.startAccessingSecurityScopedResource() else {
+      guard let url = urls.first else {
         result(FlutterError(code: "folder_unavailable", message: "无法访问文件夹，请重新选择。", details: nil))
         return
       }
-      // Retain access for open reader routes during this session. On next launch
-      // the app always returns to its own iCloud folder, without auto-restoring grants.
-      scopedFolders.append(url)
-      result(["path": url.path, "isCloud": false, "name": url.lastPathComponent])
+      queue.async {
+        guard url.startAccessingSecurityScopedResource() else {
+          DispatchQueue.main.async {
+            result(FlutterError(code: "folder_unavailable", message: "无法访问文件夹，请重新选择。", details: nil))
+          }
+          return
+        }
+        do {
+          let access = try CloudWorkspace.shared.previewWriteAuthority.activate(url)
+          DispatchQueue.main.async {
+            // Retain old scopes for readers, never as write authorization. Each
+            // explicit selection gets a fresh nonpersistent native capability.
+            self.scopedFolders.append(url)
+            result(["path": access["path"]!, "workspaceToken": access["workspaceToken"]!,
+                    "isCloud": false, "name": url.lastPathComponent])
+          }
+        } catch {
+          url.stopAccessingSecurityScopedResource()
+          DispatchQueue.main.async {
+            result(FlutterError(code: error is WorkspaceWriteAuthorityError ? "workspace_busy" : "folder_unavailable",
+                                message: error.localizedDescription, details: nil))
+          }
+        }
+      }
     } else {
       receive(urls)
     }

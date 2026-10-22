@@ -7,6 +7,8 @@ import 'package:linefold/src/preview/preview_app.dart';
 import 'package:linefold/src/preview/preview_controller.dart';
 import 'package:linefold/src/preview/preview_library.dart';
 import 'package:linefold/src/preview/preview_platform.dart';
+
+import 'preview_test_support.dart';
 import 'package:linefold/src/services/apple_workspace_service.dart';
 import 'package:linefold/src/models/document_sync_status.dart';
 
@@ -18,7 +20,11 @@ void main() {
       final controller = PreviewController(library: _WorkspaceLibrary());
 
       await tester.pumpWidget(
-        LinefoldPreviewApp(controller: controller, platform: platform),
+        LinefoldPreviewApp(
+          draftStore: MemoryPreviewDraftStore(),
+          controller: controller,
+          platform: platform,
+        ),
       );
       await tester.pumpAndSettle();
       expect(find.text('iCloud · Linefold'), findsOneWidget);
@@ -49,7 +55,11 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(390, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(
-        LinefoldPreviewApp(controller: controller, platform: platform),
+        LinefoldPreviewApp(
+          draftStore: MemoryPreviewDraftStore(),
+          controller: controller,
+          platform: platform,
+        ),
       );
       await tester.pumpAndSettle();
       expect(find.text('共享文档.md'), findsOneWidget);
@@ -88,7 +98,11 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(320, 568));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
-      LinefoldPreviewApp(controller: controller, platform: platform),
+      LinefoldPreviewApp(
+        draftStore: MemoryPreviewDraftStore(),
+        controller: controller,
+        platform: platform,
+      ),
     );
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('打开文件'));
@@ -115,7 +129,11 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(320, 568));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(
-        LinefoldPreviewApp(controller: controller, platform: platform),
+        LinefoldPreviewApp(
+          draftStore: MemoryPreviewDraftStore(),
+          controller: controller,
+          platform: platform,
+        ),
       );
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
@@ -157,7 +175,11 @@ void main() {
     final controller = PreviewController(library: library);
 
     await tester.pumpWidget(
-      LinefoldPreviewApp(controller: controller, platform: platform),
+      LinefoldPreviewApp(
+        draftStore: MemoryPreviewDraftStore(),
+        controller: controller,
+        platform: platform,
+      ),
     );
     await tester.pumpAndSettle();
     library.text = '# Resume revision';
@@ -190,7 +212,11 @@ void main() {
     final controller = PreviewController(library: library);
     final platform = _Platform()..initial = ['/cloud/shared.md'];
     await tester.pumpWidget(
-      LinefoldPreviewApp(controller: controller, platform: platform),
+      LinefoldPreviewApp(
+        draftStore: MemoryPreviewDraftStore(),
+        controller: controller,
+        platform: platform,
+      ),
     );
     await tester.pumpAndSettle();
     expect(find.text('iCloud upload pending'), findsOneWidget);
@@ -226,7 +252,11 @@ void main() {
     final controller = PreviewController(library: library);
 
     await tester.pumpWidget(
-      LinefoldPreviewApp(controller: controller, platform: platform),
+      LinefoldPreviewApp(
+        draftStore: MemoryPreviewDraftStore(),
+        controller: controller,
+        platform: platform,
+      ),
     );
     await tester.pumpAndSettle();
     library.refreshText = '# Cloud revision';
