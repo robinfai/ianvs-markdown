@@ -54,66 +54,159 @@ The UI does not apply the displayed proposal in P1g1. The requested end-to-end
 rename/reference feature remains unfinished until P1g2 below is implemented,
 reviewed and independently verified.
 
-## P1g2: required executor and recovery contract
+## P1g2: recoverable single-note executor
 
-The next stage must replace the manual-only single-note path with an explicitly
-confirmed, recoverable executor. The preview's exact content/revisions, source,
-destination and affected set form the consent boundary. No new affected file may
-be added after confirmation. Rebuild and reconfirm when the plan materially changes.
+The same preview now offers **Move and update links** only for a complete plan.
+Every affected file can be expanded to inspect the exact old/new destination
+spelling. Explicit confirmation fixes the scope, source/destination, affected
+manifest and original/replacement bytes. There is no automatic execution when a
+preview opens and no automatic fallback to a manual move after any attempt.
+Folders, multi-selection, extension conversion and case/NFC-only moves still
+require the clearly warned, unmaintained legacy path; this is not the completed
+folder/batch reference-maintenance feature.
 
-Planned file boundaries:
+Implementation boundaries:
 
-- `workspace_note_transaction.dart`: bounded serialized request/result DTOs and
-  app/session reconciliation. Recheck dirty/conflicted buffers and scope before
-  invoking native operations; never advance a save baseline before disk evidence.
-- `app/apple/WorkspaceNoteTransaction.swift`: descriptor-rooted local preflight,
-  coordinated per-file compare-and-swap, exclusive destination and bounded journal.
-  Shared by macOS/iOS and compiled in both platform CI jobs.
-- A recovery UI in the existing preview flow: exact applied/pending/uncertain
-  file states, restore-original-as-copy and safe retry. No silent rollback.
+- `workspace_note_transaction.dart`: bounded platform DTOs, exact UTF-8 payloads
+  (including BOM/CRLF), native catalog revisions, receipts and recovery listing.
+- `WorkspaceController`: serialize mutations, reject stale/dirty/conflicted plans,
+  and freeze queued-save snapshots across move generations. A save captured before
+  a reference rewrite cannot silently write old links back afterward. Lost replies
+  trigger observation only, never replay `execute`. Open buffers advance only after
+  a verified receipt plus a fresh, non-materializing text/revision read. Keystrokes
+  during execution are retained and marked conflicted, not replaced. A failed fresh
+  read, revision mismatch or changed workspace downgrades the client result to
+  partial/current-state-unverified; native completion alone is not a UI success.
+  Before execution, obsolete inode-bound document/favorite bookmarks are removed
+  from the persisted session. A definitely unexecuted cancellation restores them;
+  verified resulting identities receive new bookmarks, including closed favorites
+  in other workspaces. A stale restored bookmark cannot redirect an old note tab
+  to a retained hidden artifact. Bookmark renewal failures preserve the verified
+  file result but explicitly report unavailable persistent access. Every asynchronous
+  renewal checks the original workspace, epoch, document membership and path.
+  An affected active document's previous cloud observation is invalidated before
+  execution and refreshed after the scoped result, including same-path backlinks.
+  This checks only the current active document and does not turn cloud metadata
+  into a receipt for the rewritten revision.
+- `app/apple/WorkspaceNoteTransaction.swift`: shared macOS/iOS descriptor-rooted
+  preflight, durable private journal, coordinated atomic swaps, exclusive final move.
+- The existing preview shows per-file and artifact states. **Workspace actions →
+  Note Move Recovery** remains available after restart, with a notice for unfinished,
+  unverifiable or storage-blocked journals. Original recovery is copy-only, explicitly
+  confirmed, and does not repair/finish a partial move by itself.
 
-The native scope must pin the authorized directory object, not merely reopen a
-path string under a later grant. Verify the root path still identifies that
-object before/after each coordinated action. Walk directory components with
-`openat`/`O_NOFOLLOW`, pin parent descriptors, reject symlinks, offline/dataless
-providers and unverified identities. Check stable file identity plus exact
-expected UTF-8 bytes/revision. Native coordination is advisory cooperation, not
-protection against arbitrary non-cooperating writers. A root/parent externally
-renamed after a check remains a residual race: never misreport successful scope
-or delete a concurrently created file when detecting it afterward.
+### Native authorization, read set and atomic replacement
 
-Durable states:
+The live prepared token retains the authorized root directory object and parent
+file descriptors. Root/path identities are checked before and after coordinated
+actions, with no-symlink `openat` walking. A restarted process cannot regain the
+old execution token by reopening the same path. Offline/dataless files, multiple
+hard links, unverifiable identities or provider materialization are rejected.
+Native revision, inode/device and exact expected bytes must agree. Unrelated
+catalog metadata and attachment requirements form a bounded dependency digest.
+The restart-reconstructible walk includes at most 50,000 relevant metadata entries
+(notes, assets and directories), including logical iCloud-placeholder notes rather
+than excluding every dot name; its deadline is bounded.
+New notes or changed link sources invalidate execution without retaining their
+bodies/paths in the journal. Metadata comparison remains a snapshot check, not a
+lock on arbitrary non-cooperating writers.
 
-1. `prepared`: complete bounded manifest and original/replacement bytes synced
-   before the first user-file mutation; all paths local and preflighted.
-2. `applying`: an intent receipt is synced before each individual CAS. A success
-   receipt records the resulting identity/revision after it. Files are independent,
-   not a cross-file ACID transaction.
-3. `moving`: after reference writes, move the one note exclusively, without
-   overwriting the destination. Source identity must still match its expected
-   current receipt; record identity at the destination. The source must not be
-   unlinked on evidence of an unrelated concurrent writer.
-4. `completed`: every write and final move is positively verified and receipted.
-5. `partial` / `uncertain`: record exact last known state after any failure.
-   Restart reconciliation compares identity and bytes to both baselines. Equality
-   alone is not permission to overwrite a changed identity. Do not automatically
-   roll back a file over another writer, nor infer unexecuted after a lost reply.
+Each changed file is fully written and synced to an exclusive hidden sibling
+`.linefold-note-move-<transaction UUID>-<index>.md`. It does not disclose the original
+filename. Ordinary permissions/uid/gid are preserved; unsupported ACLs, xattrs,
+special flags or metadata queries block replacement rather than silently dropping
+access semantics. A synced intent precedes `renameatx_np(RENAME_SWAP)`. The original
+(or concurrently displaced version) survives at the hidden sibling. The target is
+replaced atomically as a complete file, never an in-place truncated body. Durability
+claims cover process interruption with successful file/directory `fsync` calls;
+they do not guarantee OS-crash, power-loss or device-cache ordering. Unsupported
+swap/provider rejection fails closed, without an unbacked replace or in-place
+fallback. Final rename is exclusive and never overwrites a destination. Source and
+destination parents must be local, writable/searchable and on the same volume
+before any swap; those checks are not a reservation or a guarantee against races.
+The visible final move balances `NSFileCoordinator` will/did-move notifications
+when the namespace move actually succeeds, even if a later durability check fails.
 
-Recovery copies use exclusive new names in an authorized destination and retain
-original bytes; they never replace current files or permanently delete notes.
-Safe retry is allowed only for not-yet-applied entries still matching the original
-identity and contents, under the same confirmed scope/plan. Anything else is
-reported for a new preview/decision. Fault injection must exercise every boundary,
-including before/after a user-file write but before the durable success receipt.
+Coordination is advisory and this is not a cross-file ACID transaction or a stronger
+platform CAS guarantee than P0. Coordination covers individual changed files and
+the final move, not a transaction-wide lock or a globally consistent read-set
+snapshot. Even a cooperating writer can change an uncoordinated dependency between
+the final scan and receipt. A non-cooperating writer can race check → swap; its
+displaced inode is retained and the result becomes uncertain instead of being
+silently deleted or swapped back. External root/parent rename retains a residual
+check-to-system-call window; later detection must not claim successful authorized
+scope or delete a concurrently created file.
 
-Journal privacy and retention: app-private storage only, transaction-touched
-paths and before/after bytes only, no unrelated vault contents or global graph.
-Use bounded metadata and checksums, no credentials. Cap each transaction at the
-same 128 files / 32 MiB and cap total retained bytes/records. Never silently delete
-unrecovered records to make room; stop before mutation and offer export-as-copy or
-user-reviewed cleanup. A journal is not proof of power-loss durability until the
-file and directory fsync guarantees and fault tests are verified on supported
-filesystems. Do not claim provider-side rollback or cross-file atomicity.
+### Durable states and recovery
+
+1. `prepared`: bounded exact manifest, payloads and identities durably synced before
+   any vault mutation. A live token is required to execute.
+2. `applying`: durable staging/swap intents, then observed identity/revision receipts.
+   An artifact may be staged, retained or uncertain. Files change independently.
+3. `moving`: durable intent before the one exclusive final move. Reconciliation
+   checks both locations; a move whose receipt was lost must not be performed again.
+4. `completed`: every change and final location positively verified, with a durable
+   final dependency-verification proof written by the successful execution path.
+   A record missing that proof stays `partial` / `completion_unverified` even if
+   reconciliation verifies the final location and repairs its sync receipt. A live
+   token is not a completion proof, and reconciliation never creates one.
+5. `partial` / `uncertain` / `blocked`: observations for each exact entry. Restart
+   reconciliation checks real inode plus bytes and the dependency digest, not just
+   durable phase labels. Missing durability evidence requires real resynchronization
+   of the verified file and parent objects, followed by revalidation, before a
+   receipt can be accepted. An inode/bytes read is not proof of a successful sync.
+   Any failed final semantic verification, including an unavailable scan or new
+   offline placeholder, remains a sticky conflict rather than being replaced by a
+   weaker digest or the presence of an in-memory execution token.
+
+No failure automatically rolls back, reverses a swap, unlinks a file, retries an
+uncertain mutation or discards a concurrent version. Execution failure invalidates
+its live token; an in-memory invalidation remains effective even when a failed
+journal write prevents saving the latest conflict. UI recovery only creates new
+exclusive copies of the journal's originals in the explicitly selected original
+workspace. Its complete copy-name plan is durable first; each copy has its own
+intent/identity/bytes receipt. Existing or uncertain copies are never replaced or
+blindly duplicated. After another explicit recovery choice, a planned path still
+verified absent can continue using exclusive creation; no fresh duplicate name is
+allocated to hide an uncertain result. Missing old parents or an unverifiable
+original transaction do not prevent copying verified journal originals into a safe
+current destination under the same authorized root identity. Verified completed
+copies are listed. Copies may introduce aliases and affect link resolution; the
+confirmation discloses this rather than presenting them as a semantic rollback.
+The current UI does not offer
+execution retry after a restart: use recovery copies and a newly reviewed preview.
+Only its specifically planned, identity/bytes-verified recovery copies are excluded
+from that transaction's dependency digest, never arbitrary similarly named files.
+A historical completed record can conservatively show `partial` with
+`dependency_conflict` when later, unrelated visible metadata changes. This is a
+current-state verification limitation, not a claim that its previously verified
+move was undone: the per-file observed locations/states remain available.
+
+### Privacy, storage and remaining work
+
+Private journals live in app Application Support, excluded from backup, not in the
+vault or ubiquity container. They contain only touched paths, before/after bytes and
+required receipts/checksums, not unrelated note contents, graph or credentials.
+The transaction cap is 128 files / 32 MiB combined UTF-8 payload. Private retention
+is at most 32 records / 192 MiB, with a separate 192 MiB artifact reservation and
+pre-mutation free-space checks. Durable temporary journal remnants are accounted
+for, not silently pruned. Concurrent external growth of retained artifacts is not
+claimed to be bounded by the app. Capacity checks aggregate allocations sharing a
+volume: two generations of actual JSON/base64 journal bytes, 512 KiB receipt
+headroom, pending stages/copies and a 1 MiB per-volume margin. Capacity is rechecked
+before creation, not reserved; a provider quota or concurrent writer can still
+exhaust space. Recovery copies consume additional checked space. New private
+journal directories and their ancestors are synchronized, and unsupported inherited
+ACLs fail closed instead of silently broadening access.
+
+Successful and unsuccessful swaps retain originals. The confirmation discloses
+hidden files, space usage and possible vault synchronization; private journal data
+is not additionally synchronized. No automatic permanent delete is implemented.
+Explicit recoverable Trash cleanup is still a separate follow-on task; a full
+journal stops new operations rather than disposing of recovery data. Directory and
+multi-item maintained transactions, case-only rename and real-device/provider
+acceptance also remain open. This stage must not be described as completing all
+rename/move scope requested by the user.
 
 ## Validation
 

@@ -28,6 +28,7 @@ xcrun swiftc \
   -F "$framework_dir" -framework FlutterMacOS \
   -Xlinker -rpath -Xlinker "$framework_dir" \
   "$linefold_app_dir/apple/CloudWorkspace.swift" \
+  "$linefold_app_dir/apple/WorkspaceNoteTransaction.swift" \
   "$linefold_app_dir/test/native_guarded_save_test.swift" \
   -o "$linefold_test_dir/guarded_save_tests"
 "$linefold_test_dir/guarded_save_tests"
