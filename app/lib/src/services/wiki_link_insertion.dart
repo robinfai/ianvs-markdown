@@ -71,14 +71,22 @@ class WikiLinkInsertion {
   String get query =>
       partial ? value.text.substring(start, value.selection.extentOffset) : '';
 
+  static bool canRepresent(String relativePath) =>
+      !relativePath.contains(RegExp(r'[\r\n\[\]#|]')) &&
+      relativePath.toLowerCase().endsWith('.md');
+
   bool apply(IanvsMarkdownController controller, String relativePath) {
     if (controller.mode != mode ||
         controller.value != value ||
-        relativePath.contains(RegExp(r'[\r\n\[\]#|]')) ||
-        !relativePath.toLowerCase().endsWith('.md')) {
+        !canRepresent(relativePath)) {
       return false;
     }
-    final target = '/${relativePath.substring(0, relativePath.length - 3)}';
+    final stem = relativePath.substring(0, relativePath.length - 3);
+    // The resolver treats a trailing .md as a complete filename and trims the
+    // whole target. Keep the extension whenever omission would change identity.
+    final keepExtension =
+        stem.toLowerCase().endsWith('.md') || stem.trimRight() != stem;
+    final target = '/${keepExtension ? relativePath : stem}';
     final replacement = partial ? '$target${close ? ']]' : ''}' : '[[$target]]';
     controller.commitHistoryGroup();
     controller.value = TextEditingValue(

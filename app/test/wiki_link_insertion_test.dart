@@ -1,7 +1,11 @@
-import 'package:flutter/services.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:linefold/src/services/wiki_link_insertion.dart';
+import 'package:linefold/src/services/wiki_note_resolver.dart';
+import 'package:linefold/src/services/workspace_index.dart';
+import 'package:linefold/src/services/workspace_index_source.dart';
+import 'wiki_note_resolver_test.dart' show WikiCatalogSource, note;
 
 void main() {
   IanvsMarkdownController controller(String text, int offset) {
@@ -14,6 +18,69 @@ void main() {
     return result;
   }
 
+  for (final path in [
+    'Report.md.md',
+    'Report.MD.md',
+    'Report .md',
+    'Report\u00a0.md',
+    '中文 .md',
+    'Report%20.md',
+  ]) {
+    testWidgets(
+      'inserted source parses and resolves to the selected filename: $path',
+      (tester) async {
+        final c = controller('', 0);
+        expect(WikiLinkInsertion.capture(c)!.apply(c, path), isTrue);
+        final taps = <IanvsMarkdownLinkTarget>[];
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: IanvsMarkdown(data: c.text, onTapLinkTarget: taps.add),
+            ),
+          ),
+        );
+        await tester.tap(
+          find.textContaining(path.startsWith('中文') ? '中文' : 'Report').first,
+        );
+        expect(taps, hasLength(1));
+        expect(taps.single.kind, IanvsMarkdownLinkKind.wiki);
+        final source = WikiCatalogSource()
+          ..directories[''] = WorkspaceDirectorySnapshot([
+            for (final name in {path, 'Report.md', 'Report .md'}) note(name),
+          ]);
+        final index = WorkspaceIndex(source: source)..configure('/vault');
+        addTearDown(index.dispose);
+        final result = await tester.runAsync(
+          () => WikiNoteResolver(
+            index,
+            normalize: (values) async =>
+                values.map((s) => s.toLowerCase()).toList(),
+          ).resolve(taps.single.href!, originPath: '/vault/Origin.md'),
+        );
+        expect(result!.status, WikiNoteStatus.resolved);
+        expect(result.candidates.single.relativePath, path);
+        expect(
+          c.text,
+          path == 'Report%20.md' ? '[[/Report%20]]' : '[[/$path]]',
+        );
+        c.undo();
+        expect(c.text, '');
+      },
+    );
+  }
+  for (final path in ['Note#.md', 'Note|alias.md', 'Note[.md', 'Note].md']) {
+    test(
+      'unrepresentable literal Wiki delimiter refuses source mutation: $path',
+      () {
+        final c = controller('source', 6);
+        final before = c.value;
+        expect(WikiLinkInsertion.canRepresent(path), isFalse);
+        expect(WikiLinkInsertion.capture(c)!.apply(c, path), isFalse);
+        expect(c.value, before);
+        expect(c.canUndo, isFalse);
+      },
+    );
+  }
   test(
     'insert at UTF-16 offset preserves every unrelated source unit and undo',
     () {

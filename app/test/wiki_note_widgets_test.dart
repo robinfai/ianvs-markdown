@@ -256,6 +256,26 @@ void main() {
       await finish(tester);
     },
   );
+  testWidgets(
+    'picker explains unrepresentable literal filename without changing source',
+    (tester) async {
+      await open(tester, source: 'original');
+      await files.createEntry('/vault/Bad#Name.md', directory: false);
+      workspace.setMode(IanvsMarkdownEditorMode.source);
+      await tester.pumpAndSettle();
+      final before = workspace.activeDocument!.controller.value;
+      await tester.tap(find.byKey(const ValueKey('insert-wiki-link-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('wiki-note-Bad#Name.md')));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('cannot be represented safely as a Wiki link'),
+        findsOneWidget,
+      );
+      expect(workspace.activeDocument!.controller.value, before);
+      await finish(tester);
+    },
+  );
   testWidgets('stale modal result cannot insert into another tab', (
     tester,
   ) async {

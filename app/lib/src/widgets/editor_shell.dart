@@ -240,6 +240,12 @@ class _EditorShellState extends State<EditorShell> {
         ),
       );
       if (!current() || selected == null) return;
+      if (!WikiLinkInsertion.canRepresent(selected.relativePath)) {
+        _showError(
+          'This filename cannot be represented safely as a Wiki link.',
+        );
+        return;
+      }
       if (!edit.apply(document.controller, selected.relativePath)) {
         _showError('The source or selection changed. Insert the link again.');
       } else {
