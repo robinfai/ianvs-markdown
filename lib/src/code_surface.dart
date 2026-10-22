@@ -36,6 +36,9 @@ class IanvsMarkdownCodePatternPainter extends CustomPainter {
   }
 }
 
+final _codePatternPaths =
+    <(double, double, double, double, double, double), Path>{};
+
 void paintIanvsMarkdownCodePattern(
   Canvas canvas,
   Rect rect, {
@@ -50,24 +53,46 @@ void paintIanvsMarkdownCodePattern(
     ..color = color
     ..isAntiAlias = false
     ..style = PaintingStyle.fill;
-  final pattern = Path();
   final startX =
       rect.left +
       ((visibleRect.left - rect.left) / tileSize).floor() * tileSize;
   final startY =
       rect.top + ((visibleRect.top - rect.top) / tileSize).floor() * tileSize;
-  canvas.save();
-  canvas.clipRect(visibleRect);
-  for (var y = startY; y < visibleRect.bottom; y += tileSize) {
-    for (var x = startX; x < visibleRect.right; x += tileSize) {
-      pattern.addRect(
-        Rect.fromLTWH(x + dotSize, y + tileSize - dotSize, dotSize, dotSize),
-      );
-      pattern.addRect(
-        Rect.fromLTWH(x + tileSize - dotSize, y + dotSize, dotSize, dotSize),
-      );
+  final key = (
+    startX,
+    startY,
+    visibleRect.right,
+    visibleRect.bottom,
+    tileSize,
+    dotSize,
+  );
+  final cells =
+      ((visibleRect.right - startX) / tileSize).ceil() *
+      ((visibleRect.bottom - startY) / tileSize).ceil();
+  var pattern = _codePatternPaths.remove(key);
+  if (pattern == null) {
+    pattern = Path();
+    for (var y = startY; y < visibleRect.bottom; y += tileSize) {
+      for (var x = startX; x < visibleRect.right; x += tileSize) {
+        pattern.addRect(
+          Rect.fromLTWH(x + dotSize, y + tileSize - dotSize, dotSize, dotSize),
+        );
+        pattern.addRect(
+          Rect.fromLTWH(x + tileSize - dotSize, y + dotSize, dotSize, dotSize),
+        );
+      }
     }
   }
+  // Geometry only: no document text, style, raster image or scale is retained.
+  // Oversized paths are still painted in full but are not cached.
+  if (cells <= 32768) {
+    while (_codePatternPaths.length >= 8) {
+      _codePatternPaths.remove(_codePatternPaths.keys.first);
+    }
+    _codePatternPaths[key] = pattern;
+  }
+  canvas.save();
+  canvas.clipRect(visibleRect);
   canvas.drawPath(pattern, paint);
   canvas.restore();
 }
