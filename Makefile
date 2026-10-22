@@ -75,10 +75,10 @@ test-native-sync-metadata: ## Verify read-only native document sync metadata
 test-native-attachments: ## Verify scoped native attachment indexing and binary reads
 	FLUTTER="$(FLUTTER)" PYTHON="$(PYTHON)" bash app/tool/test_native_attachments.sh
 
-test-ios-preview: test-native-import ## Check iOS reading, import handling, and native file copying
-	cd app && $(FLUTTER) test test/preview_app_test.dart test/preview_library_test.dart test/preview_platform_test.dart
+test-ios-preview: test-native-import test-native-guarded-save ## Check iOS reading, quick notes, and native safety
+	cd app && $(FLUTTER) test test/preview_app_test.dart test/preview_library_test.dart test/preview_platform_test.dart test/preview_editor_controller_test.dart test/preview_write_bridge_test.dart test/preview_links_test.dart test/preview_quick_notes_widget_test.dart test/preview_recovery_races_test.dart test/preview_workspace_handoff_test.dart
 
-build-ios-preview: ## Build the iOS reading preview for the simulator
+build-ios-preview: ## Build the iOS reader and quick notes for the simulator
 	cd app && $(FLUTTER) build ios --simulator --debug --no-codesign
 
 build-local: deps ## Build the two local application entries for macOS Debug
@@ -129,12 +129,12 @@ check-core: check-api format-check-core analyze-core test test-example test-tool
 check-integrations: check-document-export check-integrations-rest ## Validate the app and native integrations (macOS)
 
 .PHONY: check-document-export test-document-export-fixture check-integrations-rest
-check-document-export: deps-integrations test-document-export-fixture test-native-document-export ## Diagnose export first with a bounded real-PDF process
+check-document-export: deps-integrations test-document-export-fixture test-native-document-export ## Validate HTML and Markdown copy export with bounded native destination tests
 
 test-document-export-fixture: ## Validate snapshot/export generation and create the production HTML fixture
 	cd app && $(FLUTTER) test test/document_export_service_test.dart test/document_export_flow_test.dart
 
-# CI invokes export and this remainder separately so a blocked native process
+# CI invokes export and this remainder separately so a failed native export
 # has a visible stage. check-integrations still includes every original gate.
 check-integrations-rest: test-native-note-transactions test-native-guarded-save test-native-sync-metadata test-native-attachments deps-integrations format-check-integrations analyze-integrations test-app test-mermaid test-mermaid-example test-clipboard test-quicklook test-native-import ## Validate all remaining host/native gates (after check-document-export)
 
@@ -180,7 +180,7 @@ publish-dry-run: check-core check-package ## Validate core and publication witho
 	$(DART) pub publish --dry-run
 
 .PHONY: test-native-document-export
-test-native-document-export: ## Verify real paged offline PDF and export destination safety (after test-document-export-fixture)
+test-native-document-export: ## Verify HTML/Markdown copies, cancellation and export destination safety (after test-document-export-fixture)
 	bash app/tool/test_native_document_export.sh
 
 .PHONY: test-native-note-transactions

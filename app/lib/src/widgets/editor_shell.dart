@@ -872,19 +872,11 @@ class _EditorShellState extends State<EditorShell> {
               attachmentSource: widget.attachmentSource,
             ),
           ),
-          onExportPdf: () => unawaited(
+          onExportMarkdown: () => unawaited(
             _documentExport.run(
               context,
               workspace,
-              DocumentExportAction.pdf,
-              attachmentSource: widget.attachmentSource,
-            ),
-          ),
-          onPrint: () => unawaited(
-            _documentExport.run(
-              context,
-              workspace,
-              DocumentExportAction.print,
+              DocumentExportAction.markdown,
               attachmentSource: widget.attachmentSource,
             ),
           ),

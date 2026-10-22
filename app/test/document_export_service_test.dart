@@ -22,6 +22,58 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
+    'Markdown copy preserves raw Unicode, CRLF, BOM and attachments without I/O',
+    () {
+      const source =
+          '\ufeff---\r\ntitle: 中文😀\r\n---\r\n'
+          '# 原稿\r\n![图](../attachments/image.png)\r\n'
+          '<script>alert(1)</script>\r\n\r\n';
+      final assets = FakeAttachmentSource();
+      final output = DocumentExportService(
+        attachmentSource: assets,
+      ).buildMarkdown(snapshot(source), isCurrent: () => true);
+      expect(output.content, source);
+      expect(utf8.encode(output.content), utf8.encode(source));
+      expect(output.notices, contains(documentExportMarkdownNotice));
+      expect(assets.reads, isEmpty);
+    },
+  );
+
+  test(
+    'Markdown copy allows empty and unparsed content, but enforces byte budget and scope',
+    () {
+      const service = DocumentExportService(maximumOutputBytes: 6);
+      expect(
+        service.buildMarkdown(snapshot(''), isCurrent: () => true).content,
+        '',
+      );
+      expect(
+        service.buildMarkdown(snapshot('中文'), isCurrent: () => true).content,
+        '中文',
+      );
+      expect(
+        () => service.buildMarkdown(snapshot('中文a'), isCurrent: () => true),
+        throwsA(isA<DocumentExportFailure>()),
+      );
+      expect(
+        () => service.buildMarkdown(snapshot('ok'), isCurrent: () => false),
+        throwsA(isA<DocumentExportFailure>()),
+      );
+      expect(
+        () => service.buildMarkdown(snapshot('\ud800'), isCurrent: () => true),
+        throwsA(isA<DocumentExportFailure>()),
+      );
+      final longLine = 'a' * 5000;
+      expect(
+        const DocumentExportService()
+            .buildMarkdown(snapshot(longLine), isCurrent: () => true)
+            .content,
+        longLine,
+      );
+    },
+  );
+
+  test(
     'complete CJK source, GFM, front matter and offline fidelity notices',
     () async {
       const source =
@@ -35,22 +87,22 @@ void main() {
       final output = await DocumentExportService(
         attachmentSource: sourceProvider,
       ).build(snapshot(source), isCurrent: () => true);
-      expect(output.html, startsWith('<!doctype html>'));
-      expect(output.html, contains('<meta charset="utf-8">'));
-      expect(output.html, contains('<h1>文档标题</h1>'));
-      expect(output.html, contains('<strong>加粗</strong>'));
-      expect(output.html, contains('<em>斜体</em>'));
-      expect(output.html, contains('<thead>'));
-      expect(output.html, contains('<td class="align-right">123</td>'));
-      expect(output.html, contains('☑'));
-      expect(output.html, contains('☐'));
-      expect(output.html, contains('title: 中文😀'));
-      expect(output.html, contains('graph LR; A--&gt;B'));
-      expect(output.html, contains('math-source'));
-      expect(output.html, contains(documentExportFidelityNotice));
-      expect(output.html, contains('table-layout: fixed'));
-      expect(output.html, contains('table-header-group'));
-      expect(output.html, contains('white-space: pre-wrap'));
+      expect(output.content, startsWith('<!doctype html>'));
+      expect(output.content, contains('<meta charset="utf-8">'));
+      expect(output.content, contains('<h1>文档标题</h1>'));
+      expect(output.content, contains('<strong>加粗</strong>'));
+      expect(output.content, contains('<em>斜体</em>'));
+      expect(output.content, contains('<thead>'));
+      expect(output.content, contains('<td class="align-right">123</td>'));
+      expect(output.content, contains('☑'));
+      expect(output.content, contains('☐'));
+      expect(output.content, contains('title: 中文😀'));
+      expect(output.content, contains('graph LR; A--&gt;B'));
+      expect(output.content, contains('math-source'));
+      expect(output.content, contains(documentExportFidelityNotice));
+      expect(output.content, contains('table-layout: fixed'));
+      expect(output.content, contains('table-header-group'));
+      expect(output.content, contains('white-space: pre-wrap'));
       expect(sourceProvider.reads, isEmpty);
       expect(source, contains('**加粗**'));
     },
@@ -79,7 +131,7 @@ void main() {
       );
       final html = (await DocumentExportService(
         attachmentSource: provider,
-      ).build(value, isCurrent: () => true)).html;
+      ).build(value, isCurrent: () => true)).content;
       expect(html, isNot(contains('<script')));
       expect(html, isNot(contains('<iframe')));
       expect(html, isNot(contains('<img src="file:')));
@@ -108,14 +160,14 @@ void main() {
       );
       final output = await service.build(source, isCurrent: () => true);
       expect(
-        RegExp('<img src="data:image/png;base64,').allMatches(output.html),
+        RegExp('<img src="data:image/png;base64,').allMatches(output.content),
         hasLength(3),
       );
-      expect(output.html, isNot(contains('/vault/')));
-      expect(output.html, isNot(contains('src="assets/')));
+      expect(output.content, isNot(contains('/vault/')));
+      expect(output.content, isNot(contains('src="assets/')));
       final data = RegExp(
         r'data:image/png;base64,([^\"]+)',
-      ).firstMatch(output.html)![1]!;
+      ).firstMatch(output.content)![1]!;
       expect(base64Decode(data).take(8), [137, 80, 78, 71, 13, 10, 26, 10]);
       expect(provider.reads.where((x) => x == 'assets/image.png').length, 1);
     },
@@ -134,9 +186,9 @@ void main() {
               ),
               isCurrent: () => true,
             );
-        expect(output.html, contains('image unavailable'));
+        expect(output.content, contains('image unavailable'));
         expect(output.notices.length, greaterThan(1));
-        expect(output.html, isNot(contains('<img')));
+        expect(output.content, isNot(contains('<img')));
         if (root == null) expect(provider.reads, isEmpty);
       }
       final provider = FakeAttachmentSource()
@@ -160,7 +212,7 @@ void main() {
             snapshot('![one](assets/image.png)\n\n![two](assets/image.png)'),
             isCurrent: () => true,
           );
-      expect(output.html, isNot(contains('<img')));
+      expect(output.content, isNot(contains('<img')));
       expect(output.notices.join(), contains('byte limit'));
       expect(output.notices.join(), contains('count limit'));
     },
@@ -194,7 +246,7 @@ void main() {
     await expectLater(
       DocumentExportService(
         attachmentSource: provider,
-        maximumOutputBytes: utf8.encode(baseline.html).length + 100,
+        maximumOutputBytes: utf8.encode(baseline.content).length + 100,
       ).build(source, isCurrent: () => true),
       throwsA(isA<DocumentExportFailure>()),
     );
@@ -213,7 +265,7 @@ void main() {
         snapshot(''),
         isCurrent: () => true,
       );
-      final fixedBytes = utf8.encode(empty.html).length;
+      final fixedBytes = utf8.encode(empty.content).length;
       // Headers/CSS/footer/fidelity notes alone exhaust this budget, before I/O.
       final envelopeProvider = FakeAttachmentSource();
       await expectLater(
@@ -246,12 +298,12 @@ void main() {
         unicode,
         isCurrent: () => true,
       );
-      final exactBytes = utf8.encode(rendered.html).length;
+      final exactBytes = utf8.encode(rendered.content).length;
       expect(
         (await DocumentExportService(
           maximumOutputBytes: exactBytes,
-        ).build(unicode, isCurrent: () => true)).html,
-        rendered.html,
+        ).build(unicode, isCurrent: () => true)).content,
+        rendered.content,
       );
       await expectLater(
         DocumentExportService(
@@ -271,7 +323,7 @@ void main() {
     await expectLater(
       DocumentExportService(
         attachmentSource: provider,
-        maximumOutputBytes: utf8.encode(empty.html).length + 20,
+        maximumOutputBytes: utf8.encode(empty.content).length + 20,
       ).build(
         snapshot(
           '![blocked](https://example.com/no.png)\n\n![later](assets/image.png)',
@@ -321,6 +373,67 @@ void main() {
   });
 
   test(
+    'native final approval checks active scope and cancelled operation identity',
+    () async {
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      const platform = AppleDocumentExportPlatform();
+      const codec = StandardMethodCodec();
+      final calls = <MethodCall>[];
+      final nativeResult = Completer<bool>();
+      final captured = snapshot('# dirty');
+      var current = true;
+      messenger.setMockMethodCallHandler(AppleDocumentExportPlatform.channel, (
+        call,
+      ) async {
+        calls.add(call);
+        return call.method == 'cancel' ? true : await nativeResult.future;
+      });
+      addTearDown(() {
+        if (!nativeResult.isCompleted) nativeResult.complete(false);
+        messenger.setMockMethodCallHandler(
+          AppleDocumentExportPlatform.channel,
+          null,
+        );
+      });
+      final pending = platform.output(
+        action: DocumentExportAction.markdown,
+        document: const ExportedDocument('# dirty', []),
+        snapshot: captured,
+        isCurrent: () => current,
+      );
+      await Future<void>.delayed(Duration.zero);
+      final id = (calls.single.arguments as Map)['operationId'] as String;
+      expect(base64Url.decode(id.split(':').first), hasLength(16));
+      Future<bool> approve(Object id) async {
+        final bytes = await messenger.handlePlatformMessage(
+          AppleDocumentExportPlatform.channel.name,
+          codec.encodeMethodCall(
+            MethodCall('approveCommit', {'operationId': id}),
+          ),
+          null,
+        );
+        return codec.decodeEnvelope(bytes!) == true;
+      }
+
+      expect(await approve(id), isTrue);
+      expect(await approve('unknown'), isFalse);
+      current = false;
+      expect(await approve(id), isFalse);
+      await platform.cancel(captured);
+      expect(calls.last.method, 'cancel');
+      expect((calls.last.arguments as Map)['operationId'], id);
+      nativeResult.complete(false);
+      expect(await pending, isFalse);
+      expect(
+        await approve(id),
+        isFalse,
+        reason: 'Late approval after completion must fail closed.',
+      );
+    },
+  );
+
+  test(
     'native command contains immutable source result and cancellation is false',
     () async {
       final messenger =
@@ -341,41 +454,49 @@ void main() {
       const value = ExportedDocument('<!doctype html>captured', []);
       expect(
         await const AppleDocumentExportPlatform().output(
-          action: DocumentExportAction.pdf,
+          action: DocumentExportAction.html,
           document: value,
           snapshot: snapshot('captured'),
+          isCurrent: () => true,
         ),
         isFalse,
       );
-      expect(received!.method, 'pdf');
-      expect((received!.arguments as Map)['html'], value.html);
+      expect(received!.method, 'html');
+      expect((received!.arguments as Map)['content'], value.content);
       expect((received!.arguments as Map).containsKey('source'), isFalse);
     },
   );
 
-  test('emit synthetic native PDF fixture from the actual generator', () async {
-    final source = StringBuffer('# 中文文档 CJK START 😀\n\n');
-    source.writeln(
-      '| 表格列一 HEADER_ONE | 表格列二 HEADER_TWO | 表格列三 HEADER_THREE | 表格列四 HEADER_FOUR |',
-    );
-    source.writeln('| --- | --- | --- | --- |');
-    for (var i = 0; i < 150; i++) {
+  test(
+    'emit complete synthetic HTML and Markdown fixtures from the actual generator',
+    () async {
+      final source = StringBuffer('# 中文文档 CJK START 😀\n\n');
       source.writeln(
-        '| 第$i行 CELL_${i}_A | 中文内容 CELL_${i}_B | 中间列 CELL_${i}_C | 末列 CELL_${i}_D |',
+        '| 表格列一 HEADER_ONE | 表格列二 HEADER_TWO | 表格列三 HEADER_THREE | 表格列四 HEADER_FOUR |',
       );
-    }
-    source.writeln(
-      '\n```text\n${'长代码 ABCDEFGHIJKLMNOPQRSTUVWXYZ ' * 35}\nCODE_END\n```\n\n文档结束 CJK END',
-    );
-    // Keep the same production input budgets; this corpus is synthetic only.
-    final output = await const DocumentExportService().build(
-      snapshot(source.toString()),
-      isCurrent: () => true,
-    );
-    final directory = Directory('build/export-qa')..createSync(recursive: true);
-    File('${directory.path}/pagination.html').writeAsStringSync(output.html);
-    expect(output.html, contains('CELL_149_D'));
-  });
+      source.writeln('| --- | --- | --- | --- |');
+      for (var i = 0; i < 150; i++) {
+        source.writeln(
+          '| 第$i行 CELL_${i}_A | 中文内容 CELL_${i}_B | 中间列 CELL_${i}_C | 末列 CELL_${i}_D |',
+        );
+      }
+      source.writeln(
+        '\n```text\n${'长代码 ABCDEFGHIJKLMNOPQRSTUVWXYZ ' * 35}\nCODE_END\n```\n\n文档结束 CJK END',
+      );
+      // Keep the same production input budgets; this corpus is synthetic only.
+      final output = await const DocumentExportService().build(
+        snapshot(source.toString()),
+        isCurrent: () => true,
+      );
+      final directory = Directory('build/export-qa')
+        ..createSync(recursive: true);
+      File('${directory.path}/document.html').writeAsStringSync(output.content);
+      File(
+        '${directory.path}/document.md',
+      ).writeAsStringSync(source.toString());
+      expect(output.content, contains('CELL_149_D'));
+    },
+  );
 }
 
 class _PhaseBlockedAttachmentSource extends FakeAttachmentSource {

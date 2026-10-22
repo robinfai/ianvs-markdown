@@ -1,8 +1,5 @@
 import AppKit
-import ApplicationServices
-import PDFKit
 import UniformTypeIdentifiers
-import WebKit
 
 struct DocumentExportError: LocalizedError {
   let message: String
@@ -41,11 +38,47 @@ struct ExportDestinationVersion: Equatable {
   }
 }
 
+/// The deadline bounds coordination wait, never a write already in progress.
+/// NSFileCoordinator.cancel() is explicitly safe from any thread; the locked
+/// transition prevents an expired accessor from writing after cancellation.
+final class ExportCoordinationDeadline: @unchecked Sendable {
+  private let lock = NSLock()
+  private var waiting = true
+  private var expired = false
+  private var finished = false
+  func beginAccessor() -> Bool {
+    lock.lock(); defer { lock.unlock() }
+    guard waiting, !expired else { return false }
+    waiting = false
+    return true
+  }
+  func expire() -> Bool {
+    lock.lock(); defer { lock.unlock() }
+    guard waiting, !expired else { return false }
+    expired = true
+    waiting = false
+    return true
+  }
+  var didExpire: Bool {
+    lock.lock(); defer { lock.unlock() }
+    return expired
+  }
+  var needsCancellation: Bool {
+    lock.lock(); defer { lock.unlock() }
+    return expired && !finished
+  }
+  func finish() {
+    lock.lock(); defer { lock.unlock() }
+    waiting = false
+    finished = true
+  }
+}
+
 enum DocumentExportFileWriter {
   static func validate(_ url: URL, format: String, sourcePath: String?, protectedPaths: [String] = []) throws {
     guard url.isFileURL, url.pathExtension.lowercased() == format,
-          ["html", "pdf"].contains(format) else {
-      throw DocumentExportError(message: "Use a .\(format) filename. Markdown files are never replaced by export.")
+          ["html", "md"].contains(format) else {
+      throw DocumentExportError(message: "Use a .\(format) filename. Open source documents cannot be replaced by export.")
     }
     _ = try ExportDestinationVersion.read(url)
     let protected = Set(protectedPaths + [sourcePath].compactMap { $0 })
@@ -63,357 +96,199 @@ enum DocumentExportFileWriter {
     }
   }
 
-  static func write(_ bytes: Data, to url: URL, format: String, sourcePath: String?, expected: ExportDestinationVersion?, protectedPaths: [String] = []) throws {
-    guard !bytes.isEmpty, bytes.count <= 64 * 1024 * 1024 else {
+  static func write(_ bytes: Data, to url: URL, format: String, sourcePath: String?, expected: ExportDestinationVersion?, protectedPaths: [String] = [], canCommit: @escaping () -> Bool = { true }, coordinationTimeout: TimeInterval = 15) throws {
+    guard (format == "md" || !bytes.isEmpty), bytes.count <= 32 * 1024 * 1024 else {
       throw DocumentExportError(message: "The output is empty or exceeds the export size limit.")
     }
     var coordinationError: NSError?
     var result: Result<Void, Error> = .failure(DocumentExportError(message: "The destination could not be coordinated."))
-    NSFileCoordinator().coordinate(writingItemAt: url, options: .forReplacing, error: &coordinationError) { target in
+    let coordinator = NSFileCoordinator()
+    let deadline = ExportCoordinationDeadline()
+    let timeout = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
+    // Repeat only while expired and still awaiting coordination. This also
+    // covers preemption between arming the timer and entering coordinate():
+    // cancel() must not be assumed to cancel a future, not-yet-active call.
+    timeout.schedule(deadline: .now() + coordinationTimeout, repeating: .milliseconds(100))
+    timeout.setEventHandler {
+      if deadline.expire() || deadline.needsCancellation { coordinator.cancel() }
+    }
+    timeout.resume()
+    defer { deadline.finish(); timeout.cancel() }
+    coordinator.coordinate(writingItemAt: url, options: .forReplacing, error: &coordinationError) { target in
+      guard deadline.beginAccessor() else { return }
+      timeout.cancel()
       result = Result {
+        guard canCommit() else { throw DocumentExportError(message: "Export was cancelled before writing.") }
         try validate(url, format: format, sourcePath: sourcePath, protectedPaths: protectedPaths)
         try validate(target, format: format, sourcePath: sourcePath, protectedPaths: protectedPaths)
         guard try ExportDestinationVersion.read(url) == expected,
               try ExportDestinationVersion.read(target) == expected else {
           throw DocumentExportError(message: "The destination changed while exporting. Nothing was replaced; export again.")
         }
+        guard canCommit() else { throw DocumentExportError(message: "Export was cancelled before writing.") }
         // A newly appeared name must fail rather than silently overwrite.
         try bytes.write(to: target, options: expected == nil ? .withoutOverwriting : .atomic)
       }
+    }
+    if deadline.didExpire {
+      throw DocumentExportError(message: "Timed out waiting for access to the destination. No file was written; export again.")
     }
     if let coordinationError { throw coordinationError }
     try result.get()
   }
 }
 
-/// A phase-aware, one-shot completion gate. Native callbacks after a timeout
-/// cannot publish a PDF or complete the Flutter result a second time.
+final class DocumentExportScope {
+  let url: URL
+  private let accessing: Bool
+  init(_ url: URL) { self.url = url; accessing = url.startAccessingSecurityScopedResource() }
+  deinit { if accessing { url.stopAccessingSecurityScopedResource() } }
+}
+
+/// Owns one selection and its scope through final approval. Late callbacks may
+/// not write, complete twice, or release a subsequent operation's busy state.
 @MainActor
-final class DocumentExportLifecycle {
-  enum Phase: Equatable { case loading, output, interactive, finished }
-  private(set) var phase = Phase.loading
+final class PendingDocumentExport {
+  let id: String
+  private(set) var finished = false
+  private(set) var committing = false
+  private var selectionHandled = false
+  private var awaitingApproval = false
+  var dismissSelection: (() -> Void)?
+  var scope: DocumentExportScope?
   private var timer: Timer?
-  private var completion: ((Result<Bool, Error>) -> Void)?
-  private let outputTimeout: TimeInterval
-  private let cancelOutput: () -> Void
-  var isActive: Bool { completion != nil }
-
-  init(loadingTimeout: TimeInterval = 30, outputTimeout: TimeInterval = 60,
-       cancelOutput: @escaping () -> Void, completion: @escaping (Result<Bool, Error>) -> Void) {
-    self.outputTimeout = outputTimeout
-    self.cancelOutput = cancelOutput
-    self.completion = completion
-    arm(seconds: loadingTimeout, phase: .loading)
+  private let completion: (Result<Bool, Error>) -> Void
+  init(id: String, completion: @escaping (Result<Bool, Error>) -> Void) {
+    self.id = id; self.completion = completion
   }
-
-  func beginPrinting(interactive: Bool) {
-    guard isActive, phase == .loading else { return }
-    timer?.invalidate()
-    timer = nil
-    phase = interactive ? .interactive : .output
-    // User-controlled print panels must never expire while choosing options.
-    if !interactive { arm(seconds: outputTimeout, phase: .output) }
+  func acceptSelection() -> Bool {
+    guard !finished, !selectionHandled else { return false }
+    selectionHandled = true
+    return true
   }
-
-  func finish(_ result: Result<Bool, Error>, cancelActiveOutput: Bool = false) {
-    guard let callback = completion else { return }
-    completion = nil
-    phase = .finished
-    timer?.invalidate()
-    timer = nil
-    if cancelActiveOutput { cancelOutput() }
-    callback(result)
-  }
-
-  private func arm(seconds: TimeInterval, phase expectedPhase: Phase) {
+  func awaitApproval(seconds: TimeInterval) {
+    awaitingApproval = true
     let timer = Timer(timeInterval: seconds, repeats: false) { [weak self] _ in
       Task { @MainActor [weak self] in
-        guard let self, self.isActive, self.phase == expectedPhase else { return }
-        let message = expectedPhase == .loading
-          ? "Offline document rendering timed out. No destination was written."
-          : "PDF output timed out and was cancelled. No destination was written."
-        self.finish(.failure(DocumentExportError(message: message)), cancelActiveOutput: expectedPhase == .output)
+        guard let self, self.awaitingApproval else { return }
+        self.finish(.failure(DocumentExportError(message: "Export approval timed out. No file was written; export again.")))
       }
     }
     self.timer = timer
     RunLoop.main.add(timer, forMode: .common)
   }
-}
-
-/// NSPrintOperation.current is thread-local. Once WebKit prints on its worker
-/// thread, keep a main-actor lease until the actual terminal callback, including
-/// after timeout. A stale callback must never release a newer operation's lease.
-@MainActor
-final class DocumentExportPrintLease {
-  static let shared = DocumentExportPrintLease()
-  private var owner: UUID?
-
-  func acquire(_ token: UUID) -> Bool {
-    guard owner == nil else { return false }
-    owner = token
+  func acceptApproval() -> Bool {
+    guard !finished, awaitingApproval else { return false }
+    awaitingApproval = false
+    timer?.invalidate(); timer = nil
     return true
   }
-
-  func release(_ token: UUID) {
-    if owner == token { owner = nil }
+  // Final Dart approval is the commit authorization point. Once granted,
+  // never report a later cancellation as if it had recalled an in-flight write.
+  func beginCommit() { committing = true }
+  @discardableResult
+  func cancelBeforeCommit() -> Bool {
+    guard !finished, !committing else { return false }
+    finish(.success(false), dismiss: true)
+    return true
+  }
+  func finish(_ result: Result<Bool, Error>, dismiss: Bool = false) {
+    guard !finished else { return }
+    finished = true
+    awaitingApproval = false
+    timer?.invalidate(); timer = nil
+    let closePanel = dismissSelection
+    dismissSelection = nil
+    if dismiss { closePanel?() }
+    scope = nil
+    completion(result)
   }
 }
 
-/// One transient, offline rendering job. No scripts, file URL load, browser
-/// profile, arbitrary URL navigation, or user-document read is permitted.
-@MainActor
-final class OfflineDocumentPrintJob: NSObject, WKNavigationDelegate {
-  typealias RuleCompiler = (String, @escaping (WKContentRuleList?, Error?) -> Void) -> Void
-  typealias PrintOperationFactory = @MainActor (WKWebView, NSPrintInfo) -> NSPrintOperation
-  private let loadingTimeout: TimeInterval
-  private let outputTimeout: TimeInterval
-  private let compileRules: RuleCompiler
-  private let makePrintOperation: PrintOperationFactory
-
-  init(loadingTimeout: TimeInterval = 30, outputTimeout: TimeInterval = 60,
-       compileRules: RuleCompiler? = nil, makePrintOperation: PrintOperationFactory? = nil) {
-    self.loadingTimeout = loadingTimeout
-    self.outputTimeout = outputTimeout
-    self.compileRules = compileRules ?? { rules, callback in
-      WKContentRuleListStore.default().compileContentRuleList(
-        forIdentifier: "linefold-offline-export-v1", encodedContentRuleList: rules, completionHandler: callback)
-    }
-    self.makePrintOperation = makePrintOperation ?? { view, info in view.printOperation(with: info) }
-    super.init()
-  }
-
-  private weak var window: NSWindow?
-  private var webView: WKWebView?
-  private var operation: NSPrintOperation?
-  private let printLeaseToken = UUID()
-  private var lifecycle: DocumentExportLifecycle?
-  // AppKit uses a delegate callback. Keep that delegate alive while cancellation
-  // unwinds; never destroy an in-flight print context or call private APIs.
-  private var retainedUntilPrintReturn: OfflineDocumentPrintJob?
-  private var terminalCleanup: (() -> Void)?
-  private var pdfDestination: URL?
-  private var didBeginPrint = false
-
-  func run(html: String, window: NSWindow, pdfDestination: URL?, terminalCleanup: @escaping () -> Void = {}, completion: @escaping (Result<Bool, Error>) -> Void) {
-    guard lifecycle == nil, html.utf8.count <= 32 * 1024 * 1024 else {
-      completion(.failure(DocumentExportError(message: "Export is busy or exceeds the size limit.")))
-      terminalCleanup()
-      return
-    }
-    self.window = window
-    self.pdfDestination = pdfDestination
-    self.terminalCleanup = terminalCleanup
-    lifecycle = DocumentExportLifecycle(loadingTimeout: loadingTimeout, outputTimeout: outputTimeout, cancelOutput: { [weak self] in
-      self?.cancelPrinting()
-    }, completion: { [weak self] result in
-      guard let self else { completion(result); return }
-      self.releaseResources()
-      completion(result)
-      self.cleanUpIfTerminal()
-    })
-    let rules = #"[{"trigger":{"url-filter":".*"},"action":{"type":"block"}},{"trigger":{"url-filter":"^data:image/png;base64,"},"action":{"type":"ignore-previous-rules"}},{"trigger":{"url-filter":"^about:blank$"},"action":{"type":"ignore-previous-rules"}}]"#
-    compileRules(rules) { [weak self] list, error in
-      guard let self, self.lifecycle?.isActive == true else { return }
-      guard let list, error == nil else {
-        self.finish(.failure(error ?? DocumentExportError(message: "Offline resource protection could not be installed.")))
-        return
-      }
-      let configuration = WKWebViewConfiguration()
-      configuration.websiteDataStore = .nonPersistent()
-      configuration.defaultWebpagePreferences.allowsContentJavaScript = false
-      configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
-      configuration.userContentController.add(list)
-      let view = WKWebView(frame: NSRect(x: 0, y: 0, width: 660, height: 900), configuration: configuration)
-      view.navigationDelegate = self
-      self.webView = view
-      view.loadHTMLString(html, baseURL: nil)
-    }
-  }
-
-  func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-    let url = navigationAction.request.url
-    let initial = !didBeginPrint && navigationAction.navigationType == .other &&
-      (url == nil || url?.absoluteString == "about:blank")
-    decisionHandler(initial ? .allow : .cancel)
-  }
-
-  func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-    guard !didBeginPrint, let window, lifecycle?.isActive == true else { return }
-    didBeginPrint = true
-    lifecycle?.beginPrinting(interactive: pdfDestination == nil)
-    guard NSPrintOperation.current == nil else {
-      finish(.failure(DocumentExportError(message: "A previous print operation is still stopping. Retry, or restart the app if it does not stop.")))
-      return
-    }
-    // NSPrintOperation's factory changes the current operation on this thread.
-    // Reject a held worker lease BEFORE invoking that stateful factory.
-    guard DocumentExportPrintLease.shared.acquire(printLeaseToken) else {
-      finish(.failure(DocumentExportError(message: "A previous print operation is still stopping. Retry, or restart the app if it does not stop.")))
-      return
-    }
-    let info = NSPrintInfo()
-    info.paperSize = NSSize(width: 595.276, height: 841.89)
-    info.topMargin = 51.024
-    info.bottomMargin = 51.024
-    info.leftMargin = 51.024
-    info.rightMargin = 51.024
-    info.horizontalPagination = .fit
-    info.verticalPagination = .automatic
-    info.isHorizontallyCentered = false
-    info.isVerticallyCentered = false
-    if let destination = pdfDestination {
-      info.jobDisposition = .save
-      info.dictionary()[NSPrintInfo.AttributeKey.jobSavingURL] = destination
-    }
-    // Unlike WKWebView.createPDF's rectangular snapshot, AppKit's print
-    // operation applies paged print CSS and produces actual paper-sized pages.
-    let operation = makePrintOperation(webView, info)
-    operation.view?.frame = NSRect(origin: .zero, size: info.paperSize)
-    operation.showsPrintPanel = pdfDestination == nil
-    operation.showsProgressPanel = pdfDestination == nil
-    // WebKit configures this true: its secondary-thread path prepares the full
-    // paginated PDF, while the main-thread path is asynchronous print preview.
-    // Do not force final output down the preview path.
-    operation.canSpawnSeparateThread = true
-    self.operation = operation
-    retainedUntilPrintReturn = self
-    operation.runModal(for: window, delegate: self,
-      didRun: #selector(printOperationDidRun(_:success:contextInfo:)), contextInfo: nil)
-  }
-
-  @objc nonisolated private func printOperationDidRun(_ operation: NSPrintOperation, success: Bool, contextInfo: UnsafeMutableRawPointer?) {
-    // AppKit may invoke this delegate on the spawned printing thread. Carry only
-    // the result across actors, not its non-Sendable operation/context pointer.
-    // The task strongly owns this delegate until terminal cleanup finishes.
-    Task { @MainActor [self] in completePrinting(success: success) }
-  }
-
-  private func completePrinting(success: Bool) {
-    DocumentExportPrintLease.shared.release(printLeaseToken)
-    retainedUntilPrintReturn = nil
-    self.operation = nil
-    defer { cleanUpIfTerminal() }
-    guard lifecycle?.isActive == true else { return }
-    if success, let destination = pdfDestination {
-      guard let document = PDFDocument(url: destination), document.pageCount > 0 else {
-        finish(.failure(DocumentExportError(message: "The print system did not produce a readable PDF.")))
-        return
-      }
-    }
-    finish(.success(success))
-  }
-
-  func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { finish(.failure(error)) }
-  func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { finish(.failure(error)) }
-  func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { finish(.failure(DocumentExportError(message: "Offline rendering stopped unexpectedly."))) }
-
-  private func cancelPrinting() {
-    if let operation {
-      let session = PMPrintSession(operation.printInfo.pmPrintSession())
-      _ = PMSessionSetError(session, OSStatus(kPMCancel))
-    }
-  }
-
-  private func finish(_ result: Result<Bool, Error>) {
-    if case .failure = result {
-      lifecycle?.finish(result, cancelActiveOutput: operation != nil)
-    } else {
-      lifecycle?.finish(result)
-    }
-  }
-
-  private func cleanUpIfTerminal() {
-    guard retainedUntilPrintReturn == nil else { return }
-    let cleanup = terminalCleanup
-    terminalCleanup = nil
-    cleanup?()
-  }
-
-  private func releaseResources() {
-    webView?.stopLoading()
-    webView?.navigationDelegate = nil
-    webView = nil
-    // A timed-out job cannot commit the user destination. AppKit may still be
-    // unwinding; retain its delegate until its late callback, which is ignored.
-    if retainedUntilPrintReturn == nil { operation = nil }
-  }
-}
-
+/// No WebView, JavaScript, PDF or printing API is present in this stage. The
+/// native SavePanel chooses a destination; Dart then approves the same operation
+/// against current tab/root state before native revalidates and commits it.
 @MainActor
 final class DocumentExportCoordinator {
+  typealias DestinationPicker = @MainActor (NSWindow, String, String, @escaping (URL?) -> Void) -> (() -> Void)
+  typealias CommitApproval = @MainActor (String, @escaping (Bool) -> Void) -> Void
   private weak var window: NSWindow?
-  private var job: OfflineDocumentPrintJob?
-  private var busy = false
+  private let pickDestination: DestinationPicker
+  private let approveCommit: CommitApproval
+  private let approvalTimeout: TimeInterval
+  private var pending: PendingDocumentExport?
 
-  init(window: NSWindow) { self.window = window }
+  init(window: NSWindow, approvalTimeout: TimeInterval = 5,
+       pickDestination: DestinationPicker? = nil, approveCommit: @escaping CommitApproval) {
+    self.window = window
+    self.approvalTimeout = approvalTimeout
+    self.approveCommit = approveCommit
+    self.pickDestination = pickDestination ?? { window, title, format, selected in
+      let panel = NSSavePanel()
+      panel.title = format == "md" ? "Export Markdown Copy" : "Export HTML"
+      panel.allowedContentTypes = format == "html" ? [.html] :
+        [UTType(filenameExtension: "md") ?? UTType(importedAs: "net.daringfireball.markdown", conformingTo: .plainText)]
+      panel.allowsOtherFileTypes = false
+      panel.canCreateDirectories = true
+      let basename = URL(fileURLWithPath: title).deletingPathExtension().lastPathComponent
+      panel.nameFieldStringValue = (basename.isEmpty ? "Document" : basename) + "." + format
+      // AppKit owns replacement confirmation. Never suppress it, or treat it
+      // as permission to overwrite any open source document.
+      panel.beginSheetModal(for: window) { response in
+        selected(response == .OK ? panel.url : nil)
+      }
+      return { panel.cancel(nil) }
+    }
+  }
 
   func perform(_ action: String, arguments: [String: Any], completion: @escaping (Result<Bool, Error>) -> Void) {
-    guard !busy, let window, ["html", "pdf", "print"].contains(action),
-          let html = arguments["html"] as? String, html.utf8.count <= 32 * 1024 * 1024,
+    guard let id = arguments["operationId"] as? String, !id.isEmpty, id.count <= 128 else {
+      completion(.failure(DocumentExportError(message: "Missing export operation identity.")))
+      return
+    }
+    if action == "cancel" {
+      let cancelled = pending?.id == id ? pending?.cancelBeforeCommit() ?? false : false
+      completion(.success(cancelled))
+      return
+    }
+    guard pending == nil, let window, ["html", "markdown"].contains(action),
+          let content = arguments["content"] as? String, content.utf8.count <= 32 * 1024 * 1024,
           let title = arguments["title"] as? String else {
       completion(.failure(DocumentExportError(message: "Export is unavailable or already in progress.")))
       return
     }
-    busy = true
-    let complete: (Result<Bool, Error>) -> Void = { [weak self] value in
-      self?.job = nil
-      self?.busy = false
+    let request = PendingDocumentExport(id: id) { [weak self] value in
+      if self?.pending?.id == id { self?.pending = nil }
       completion(value)
     }
-    if action == "print" {
-      let job = OfflineDocumentPrintJob()
-      self.job = job
-      job.run(html: html, window: window, pdfDestination: nil, completion: complete)
-      return
-    }
-    let panel = NSSavePanel()
-    panel.title = "Export \(action.uppercased())"
-    panel.allowedContentTypes = action == "html" ? [.html] : [.pdf]
-    panel.allowsOtherFileTypes = false
-    panel.canCreateDirectories = true
-    let basename = URL(fileURLWithPath: title).deletingPathExtension().lastPathComponent
-    panel.nameFieldStringValue = (basename.isEmpty ? "Document" : basename) + "." + action
-    // AppKit performs the existing-file replacement confirmation. Never pass
-    // an overwrite flag or suppress this native confirmation.
-    panel.beginSheetModal(for: window) { [weak self] response in
-      guard let self else { return }
-      guard response == .OK, let url = panel.url else { complete(.success(false)); return }
-      let scoped = url.startAccessingSecurityScopedResource()
-      let done: (Result<Bool, Error>) -> Void = { value in
-        if scoped { url.stopAccessingSecurityScopedResource() }
-        complete(value)
-      }
-      let sourcePath = arguments["sourcePath"] as? String
-      let protectedPaths = arguments["protectedPaths"] as? [String] ?? []
+    pending = request
+    let format = action == "markdown" ? "md" : "html"
+    let dismiss = pickDestination(window, title, format) { [weak self, weak request] url in
+      guard let self, let request, !request.finished, self.pending === request, request.acceptSelection() else { return }
+      guard let url else { request.finish(.success(false)); return }
+      // Keep the exact authorized URL and metadata across the approval await.
+      // Never rebuild a path or reopen the source to authorize an export.
+      request.scope = DocumentExportScope(url)
       do {
-        try DocumentExportFileWriter.validate(url, format: action, sourcePath: sourcePath, protectedPaths: protectedPaths)
+        let sourcePath = arguments["sourcePath"] as? String
+        let protectedPaths = arguments["protectedPaths"] as? [String] ?? []
+        // Only chosen-target metadata is inspected before the Dart approval;
+        // protected source identities are checked inside the eventual write.
         let expected = try ExportDestinationVersion.read(url)
-        if action == "html" {
-          try DocumentExportFileWriter.write(Data(html.utf8), to: url, format: action, sourcePath: sourcePath, expected: expected, protectedPaths: protectedPaths)
-          done(.success(true))
-        } else {
-          // No destination write until native printing and PDF parsing succeed.
-          let temporary = FileManager.default.temporaryDirectory.appendingPathComponent("linefold-export-\(UUID().uuidString)", isDirectory: true)
-          try FileManager.default.createDirectory(at: temporary, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
-          let output = temporary.appendingPathComponent("document.pdf")
-          let job = OfflineDocumentPrintJob()
-          self.job = job
-          job.run(html: html, window: window, pdfDestination: output, terminalCleanup: {
-            try? FileManager.default.removeItem(at: temporary)
-          }) { result in
-            do {
-              guard try result.get() else { done(.success(false)); return }
-              let attributes = try FileManager.default.attributesOfItem(atPath: output.path)
-              guard let size = attributes[.size] as? NSNumber, size.intValue <= 64 * 1024 * 1024 else {
-                throw DocumentExportError(message: "PDF exceeds the export size limit.")
-              }
-              let bytes = try Data(contentsOf: output)
-              try DocumentExportFileWriter.write(bytes, to: url, format: "pdf", sourcePath: sourcePath, expected: expected, protectedPaths: protectedPaths)
-              done(.success(true))
-            } catch { done(.failure(error)) }
-          }
+        request.awaitApproval(seconds: self.approvalTimeout)
+        self.approveCommit(id) { [weak self, weak request] approved in
+          guard let self, let request, !request.finished, self.pending === request, request.acceptApproval() else { return }
+          guard approved else { request.finish(.success(false)); return }
+          request.beginCommit()
+          do {
+            try DocumentExportFileWriter.write(Data(content.utf8), to: url, format: format,
+              sourcePath: sourcePath, expected: expected, protectedPaths: protectedPaths,
+              canCommit: { !request.finished && self.pending === request })
+            request.finish(.success(true))
+          } catch { request.finish(.failure(error)) }
         }
-      } catch { done(.failure(error)) }
+      } catch { request.finish(.failure(error)) }
     }
+    if !request.finished { request.dismissSelection = dismiss }
   }
 }

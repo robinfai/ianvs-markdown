@@ -29,6 +29,7 @@ final class CloudWorkspace {
   private var query: NSMetadataQuery?
   private var observers: [NSObjectProtocol] = []
   private var monitoredRoot: URL?
+  let previewWriteAuthority = WorkspaceWriteAuthority()
 
   func defaultDirectory() throws -> URL {
     if Bundle.main.object(forInfoDictionaryKey: "LinefoldCloudEnabled") as? String == "NO" {
@@ -71,10 +72,29 @@ final class CloudWorkspace {
       #endif
       guard ["defaultDirectory", "listDirectory", "readDocument", "readDocumentBytes", "writeDocument", "writeDocumentGuarded",
              "listAttachments", "readAttachmentBytes", "readAttachmentImportSettings", "normalizeAttachmentPaths", "createWorkspaceAttachment",
-             "listWorkspaceDirectory", "readWorkspaceTextBytes", "createWorkspaceNote", "resolveWorkspacePath", "readDocumentSyncMetadata"].contains(method) else {
+             "listWorkspaceDirectory", "readWorkspaceTextBytes", "createWorkspaceNote", "writeWorkspaceNoteGuarded", "resolveWorkspacePath", "readDocumentSyncMetadata"].contains(method) else {
         result(FlutterMethodNotImplemented)
         return
       }
+      // iOS edits must carry the current native-selected root capability. Do not
+      // let a previously retained picker grant authorize an absolute-path write.
+      var writeLease: WorkspaceWriteLease?
+      #if os(iOS)
+      if ["writeDocument", "writeDocumentGuarded", "createWorkspaceAttachment"].contains(method) {
+        result(FlutterError(code: "workspace_unavailable", message: WorkspaceError.invalidPath.localizedDescription, details: nil))
+        return
+      }
+      if method == "createWorkspaceNote" || method == "writeWorkspaceNoteGuarded" {
+        do {
+          guard let root = arguments["path"] as? String,
+                let token = arguments["workspaceToken"] as? String else { throw WorkspaceError.invalidPath }
+          writeLease = try self.previewWriteAuthority.admit(path: root, token: token)
+        } catch {
+          result(FlutterError(code: "workspace_unavailable", message: error.localizedDescription, details: nil))
+          return
+        }
+      }
+      #endif
       if let readKind = WorkspaceReadScheduler.Kind(method: method) {
         // The channel handler runs on the platform/main thread. Snapshot only
         // immutable request values here; readers never consult container,
@@ -118,11 +138,16 @@ final class CloudWorkspace {
         })
         return
       }
-      let isSearch = method == "listWorkspaceDirectory" || method == "readWorkspaceTextBytes" || method == "createWorkspaceNote" || method == "resolveWorkspacePath"
+      let isSearch = method == "listWorkspaceDirectory" || method == "readWorkspaceTextBytes" || method == "createWorkspaceNote" || method == "writeWorkspaceNoteGuarded" || method == "resolveWorkspacePath"
       let isAttachment = method == "listAttachments" || method == "readAttachmentBytes" || method == "readAttachmentImportSettings" || method == "createWorkspaceAttachment"
-      let workQueue = method == "createWorkspaceNote" ? self.noteWriteQueue : (isSearch ? self.searchQueue : (isAttachment ? self.attachmentQueue : self.queue))
+      let workQueue = (method == "createWorkspaceNote" || method == "writeWorkspaceNoteGuarded") ? self.noteWriteQueue : (isSearch ? self.searchQueue : (isAttachment ? self.attachmentQueue : self.queue))
+      let admittedWrite = writeLease
       workQueue.async {
+        // A Dart timeout does not cancel native IO. Keep the lease until this
+        // operation really settles, and reject root changes for its lifetime.
+        defer { admittedWrite?.finish() }
         do {
+          try admittedWrite?.validate()
           let value: Any
           if method == "normalizeAttachmentPaths" {
             value = try Self.normalizeAttachmentPaths(arguments["values"])
@@ -145,7 +170,12 @@ final class CloudWorkspace {
               value = try Self.resolveWorkspacePath(url, relativePath: relativePath)
             case "createWorkspaceNote":
               guard let relativePath = arguments["relativePath"] as? String else { throw AttachmentError.invalid }
-              try Self.createWorkspaceNote(url, relativePath: relativePath)
+              try Self.createWorkspaceNote(url, relativePath: relativePath, validateAuthority: { try admittedWrite?.validate() })
+              value = true
+            case "writeWorkspaceNoteGuarded":
+              guard let relativePath = arguments["relativePath"] as? String else { throw AttachmentError.invalid }
+              try Self.writeWorkspaceNoteGuarded(url, relativePath: relativePath, arguments: arguments,
+                                                 validateAuthority: { try admittedWrite?.validate() })
               value = true
             case "listWorkspaceDirectory":
               guard let relativePath = arguments["relativePath"] as? String else { throw AttachmentError.invalid }
@@ -190,17 +220,21 @@ final class CloudWorkspace {
               value = true
             }
           }
+          admittedWrite?.finish()
           DispatchQueue.main.async { result(value) }
         } catch let error as AttachmentImportWriteFailure {
+          admittedWrite?.finish()
           DispatchQueue.main.async {
             result(FlutterError(code: error.failure.code, message: error.localizedDescription,
                                 details: ["relativePath": error.relativePath, "fileMayRemain": true]))
           }
         } catch let error as AttachmentError {
+          admittedWrite?.finish()
           DispatchQueue.main.async {
             result(FlutterError(code: error.code, message: error.localizedDescription, details: nil))
           }
         } catch let conflict as WorkspaceSaveConflict {
+          admittedWrite?.finish()
           DispatchQueue.main.async {
             result(FlutterError(
               code: "workspace_save_conflict",
@@ -214,6 +248,7 @@ final class CloudWorkspace {
             ))
           }
         } catch {
+          admittedWrite?.finish()
           DispatchQueue.main.async {
             result(FlutterError(code: "workspace_unavailable", message: error.localizedDescription, details: nil))
           }
@@ -492,9 +527,12 @@ extension CloudWorkspace {
     } catch { throw AttachmentError.classify(error) }
   }
 
-  static func createWorkspaceNote(_ root: URL, relativePath: String) throws {
+  static func createWorkspaceNote(
+    _ root: URL, relativePath: String, validateAuthority: (() throws -> Void)? = nil
+  ) throws {
     do {
       try WorkspaceFileScope.withoutMaterialization {
+        try validateAuthority?()
         let scope = try WorkspaceTextScope(root)
         _ = try WorkspaceTextScope.textComponents(relativePath, directory: false)
         let target = scope.rootURL.appendingPathComponent(relativePath)
@@ -511,7 +549,9 @@ extension CloudWorkspace {
                   coordinated.standardizedFileURL.path == target.standardizedFileURL.path else {
               throw AttachmentError.unavailable
             }
+            try validateAuthority?()
             try scope.createNote(relativePath: relativePath)
+            try validateAuthority?()
           }
         }
         if let error = coordinationError { throw error }
@@ -827,6 +867,48 @@ class WorkspaceFileScope {
     }
     guard Self.revision(original) == Self.revision(after), Self.revision(original) == Self.revision(current),
           Int64(byteCount) == original.st_size else { throw AttachmentError.unavailable }
+  }
+
+  // Every creation path requires a complete bounded name scan, not
+  // fileExists. Include symlinks and nontext entries too: none may hide a
+  // case/NFC alias or logical provider placeholder. Never follow their paths.
+  func requireVacantName(parent: Int32, name: String) throws {
+    try verifyRootLocation()
+    var before = stat()
+    guard fstat(parent, &before) == 0 else { throw AttachmentError.posix() }
+    let duplicate = openat(parent, ".", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+    guard duplicate >= 0 else { throw AttachmentError.posix() }
+    guard let directory = fdopendir(duplicate) else {
+      let failure = AttachmentError.posix()
+      close(duplicate)
+      throw failure
+    }
+    defer { closedir(directory) }
+    let comparison = name.precomposedStringWithCanonicalMapping.lowercased()
+    let placeholder = "." + comparison + ".icloud"
+    let deadline = DispatchTime.now().uptimeNanoseconds + UInt64(WorkspaceTextScope.directoryTimeout * 1_000_000_000)
+    var count = 0
+    while true {
+      guard DispatchTime.now().uptimeNanoseconds < deadline else { throw AttachmentError.indexLimit }
+      errno = 0
+      guard let entry = readdir(directory) else {
+        if errno != 0 { throw AttachmentError.posix() }
+        break
+      }
+      count += 1
+      guard count <= WorkspaceTextScope.maximumVisitedDirectoryEntries else { throw AttachmentError.indexLimit }
+      let candidate = withUnsafePointer(to: &entry.pointee.d_name) {
+        $0.withMemoryRebound(to: CChar.self, capacity: Int(entry.pointee.d_namlen) + 1) { String(validatingUTF8: $0) }
+      }
+      guard let candidate else { throw AttachmentError.invalid }
+      let normalized = candidate.precomposedStringWithCanonicalMapping.lowercased()
+      if normalized == placeholder { throw AttachmentError.offline }
+      if normalized == comparison { throw AttachmentError.collision }
+    }
+    var after = stat()
+    guard fstat(parent, &after) == 0 else { throw AttachmentError.posix() }
+    guard Self.revision(before) == Self.revision(after) else { throw AttachmentError.unavailable }
+    try verifyRootLocation()
   }
 }
 
@@ -1183,16 +1265,9 @@ final class WorkspaceTextScope: WorkspaceFileScope {
     var attributes = stat()
     guard fstat(parent, &attributes) == 0 else { throw AttachmentError.posix() }
     guard attributes.st_flags & UInt32(SF_DATALESS) == 0 else { throw AttachmentError.offline }
-    // Reject known case/NFC collisions and provider placeholders before the
-    // exclusive final open. A partial listing is not evidence of absence.
-    let parentPath = components.dropLast().joined(separator: "/")
-    let listing = try listDirectory(relativePath: parentPath)
-    guard listing["complete"] as? Bool == true,
-          let rows = listing["entries"] as? [[String: Any]] else { throw AttachmentError.unavailable }
-    let comparison = relativePath.precomposedStringWithCanonicalMapping.lowercased()
-    guard !rows.contains(where: { $0["comparisonPath"] as? String == comparison }) else {
-      throw AttachmentError.unavailable
-    }
+    // Display indexes filter invisible/nontext entries; they cannot prove name
+    // vacancy. Use the same complete scan as missing-file guarded recovery.
+    try requireVacantName(parent: parent, name: name)
     let currentParent = try parentDescriptor(components)
     defer { close(currentParent) }
     var current = stat()
@@ -1241,6 +1316,377 @@ final class WorkspaceTextScope: WorkspaceFileScope {
     return try readLocalBytes(
       components: components, maximumBytes: min(maximumBytes, Self.maximumTextBytes), verifyRevision: true
     )
+  }
+}
+
+/// Session-only root capability. Retaining an OS picker scope is not permission
+/// to write after selection changes, and a timed-out Dart Future is not cancel.
+final class WorkspaceWriteAuthority {
+  private let lock = NSLock()
+  private var scope: WorkspaceFileScope?
+  private var token: String?
+  private var pending = 0
+
+  func activate(_ root: URL) throws -> [String: String] {
+    // Fail busy without touching a provider. Recheck after opening because an
+    // admission may occur while filesystem work runs outside the short lock.
+    lock.lock()
+    let available = pending == 0
+    lock.unlock()
+    guard available else { throw WorkspaceWriteAuthorityError.busy }
+    let candidate = try WorkspaceFileScope(root)
+    var previous: WorkspaceFileScope?
+    lock.lock()
+    defer {
+      lock.unlock()
+      // Closing an old provider descriptor must not hold up main-thread admit.
+      withExtendedLifetime(previous) {}
+    }
+    guard pending == 0 else { throw WorkspaceWriteAuthorityError.busy }
+    let token = UUID().uuidString
+    previous = scope
+    self.scope = candidate
+    self.token = token
+    return ["path": candidate.rootURL.path, "workspaceToken": token]
+  }
+
+  func admit(path: String, token: String) throws -> WorkspaceWriteLease {
+    lock.lock()
+    defer { lock.unlock() }
+    guard let scope, self.token == token,
+          Data(scope.rootURL.path.utf8) == Data(path.utf8) else { throw WorkspaceError.invalidPath }
+    pending += 1
+    return WorkspaceWriteLease(authority: self, scope: scope, token: token)
+  }
+
+  fileprivate func validate(_ lease: WorkspaceWriteLease) throws {
+    lock.lock()
+    let valid = token == lease.token && scope === lease.scope && !lease.finished
+    lock.unlock()
+    guard valid else { throw WorkspaceError.invalidPath }
+    try lease.scope.verifyRootLocation()
+  }
+
+  fileprivate func finish(_ lease: WorkspaceWriteLease) {
+    lock.lock()
+    defer { lock.unlock() }
+    guard !lease.finished else { return }
+    lease.finished = true
+    pending -= 1
+  }
+}
+
+final class WorkspaceWriteLease {
+  fileprivate let authority: WorkspaceWriteAuthority
+  fileprivate let scope: WorkspaceFileScope
+  fileprivate let token: String
+  fileprivate var finished = false
+  fileprivate init(authority: WorkspaceWriteAuthority, scope: WorkspaceFileScope, token: String) {
+    self.authority = authority
+    self.scope = scope
+    self.token = token
+  }
+  func validate() throws { try authority.validate(self) }
+  func finish() { authority.finish(self) }
+  deinit { finish() }
+}
+
+enum WorkspaceWriteAuthorityError: LocalizedError {
+  case busy
+  var errorDescription: String? { "A note write is still pending. Wait for it to finish before changing folders." }
+}
+
+extension CloudWorkspace {
+  static func writeWorkspaceNoteGuarded(
+    _ root: URL, relativePath: String, arguments: [String: Any],
+    validateAuthority: (() throws -> Void)? = nil
+  ) throws {
+    func text(_ value: Any) throws -> String {
+      guard let typed = value as? FlutterStandardTypedData, typed.elementSize == 1 else { throw WorkspaceError.invalidText }
+      guard typed.data.count <= WorkspaceTextScope.maximumTextBytes else { throw WorkspaceError.tooLarge }
+      return try decodeChannelBytes(typed)
+    }
+    guard let contents = arguments["contentsBytes"], let expected = arguments["expectedContentsBytes"] else {
+      throw WorkspaceError.invalidPath
+    }
+    try writeWorkspaceNoteGuarded(root, relativePath: relativePath, contents: text(contents),
+                                  expectedContents: expected is NSNull ? nil : text(expected),
+                                  validateAuthority: validateAuthority)
+  }
+
+  /// One modification claim covers compare and replace. No parent creation,
+  /// absolute-path fallback, provider download, or unbounded byte reads.
+  static func writeWorkspaceNoteGuarded(
+    _ root: URL, relativePath: String, contents: String, expectedContents: String?,
+    validateAuthority: (() throws -> Void)? = nil,
+    beforeCommit: (() throws -> Void)? = nil,
+    afterCommit: (() throws -> Void)? = nil
+  ) throws {
+    try WorkspaceNoteWriteScope.validate(contents: contents, expectedContents: expectedContents)
+    try WorkspaceFileScope.withoutMaterialization {
+      try validateAuthority?()
+      let scope = try WorkspaceNoteWriteScope(root)
+      let components = try WorkspaceTextScope.textComponents(relativePath, directory: false)
+      let parent = try scope.parentDescriptor(components)
+      defer { close(parent) }
+      let target = scope.rootURL.appendingPathComponent(relativePath)
+      var coordinationError: NSError?
+      var outcome: Result<Void, Error> = .failure(WorkspaceError.unavailable)
+      NSFileCoordinator().coordinate(writingItemAt: target, options: [], error: &coordinationError) { coordinated in
+        outcome = Result {
+          // The callback may run on another thread; the no-materialization
+          // policy must cover its validation and IO, not only the caller.
+          try WorkspaceFileScope.withoutMaterialization {
+            try scope.verifyCoordinatedURL(coordinated, relativePath: relativePath, parentDescriptor: parent)
+            try validateAuthority?()
+            try scope.writeNote(relativePath: relativePath, contents: contents, expectedContents: expectedContents,
+                                coordinatedParent: parent, validateAuthority: validateAuthority, beforeCommit: beforeCommit, afterCommit: afterCommit)
+          }
+        }
+      }
+      if let coordinationError { throw coordinationError }
+      try outcome.get()
+    }
+  }
+}
+
+/// Mobile explicit edits use a separate write policy from search's create-only
+/// policy. Every descendant and staging file is relative to a pinned directory.
+final class WorkspaceNoteWriteScope: WorkspaceFileScope {
+  /// Like note transactions, accept only a root-ancestor alias followed by
+  /// byte-identical planned components. Never resolve descendant/leaf links,
+  /// rebind the grant, or write through the coordinator's returned URL.
+  func verifyCoordinatedURL(_ observed: URL, relativePath: String, parentDescriptor: Int32) throws {
+    do {
+      try WorkspaceFileScope.withoutMaterialization {
+        guard observed.isFileURL, observed.host == nil || observed.host == "",
+              observed.user == nil, observed.password == nil, observed.port == nil,
+              observed.query == nil, observed.fragment == nil, !observed.hasDirectoryPath,
+              observed.path.hasPrefix("/"), observed.path.utf16.count <= 4096 else {
+          throw WorkspaceError.invalidPath
+        }
+        guard let encoded = URLComponents(url: observed, resolvingAgainstBaseURL: false)?.percentEncodedPath,
+              encoded.split(separator: "/", omittingEmptySubsequences: false).allSatisfy({
+                guard let component = String($0).removingPercentEncoding else { return false }
+                return component != "." && component != ".."
+              }) else { throw WorkspaceError.invalidPath }
+        let planned = try WorkspaceTextScope.textComponents(relativePath, directory: false)
+        let received = observed.pathComponents
+        guard received.count > planned.count, !received.contains("."), !received.contains(".."),
+              zip(received.suffix(planned.count), planned).allSatisfy({
+                $0.0.utf8.elementsEqual($0.1.utf8)
+              }) else { throw WorkspaceError.invalidPath }
+        var spelling = observed
+        for _ in planned { spelling.deleteLastPathComponent() }
+        let candidate = try WorkspaceFileScope(spelling)
+        var originalRoot = stat(), receivedRoot = stat()
+        guard fstat(rootDescriptor, &originalRoot) == 0,
+              fstat(candidate.rootDescriptor, &receivedRoot) == 0,
+              candidate.rootURL.path.utf8.elementsEqual(rootURL.path.utf8),
+              originalRoot.st_dev == receivedRoot.st_dev, originalRoot.st_ino == receivedRoot.st_ino,
+              originalRoot.st_flags & UInt32(SF_DATALESS) == 0,
+              receivedRoot.st_flags & UInt32(SF_DATALESS) == 0 else { throw WorkspaceError.invalidPath }
+        let receivedParent = try candidate.parentDescriptor(planned)
+        defer { close(receivedParent) }
+        var original = stat(), current = stat()
+        guard fstat(parentDescriptor, &original) == 0, fstat(receivedParent, &current) == 0,
+              original.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR),
+              current.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR),
+              original.st_dev == current.st_dev, original.st_ino == current.st_ino,
+              original.st_flags & UInt32(SF_DATALESS) == 0,
+              current.st_flags & UInt32(SF_DATALESS) == 0 else { throw WorkspaceError.invalidPath }
+        var leaf = stat()
+        if fstatat(receivedParent, planned.last!, &leaf, AT_SYMLINK_NOFOLLOW) == 0 {
+          guard leaf.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+                leaf.st_flags & UInt32(SF_DATALESS) == 0 else { throw WorkspaceError.invalidPath }
+        } else if errno != ENOENT { throw WorkspaceError.invalidPath }
+        try verifyRootLocation()
+        try candidate.verifyRootLocation()
+      }
+    } catch { throw WorkspaceError.invalidPath }
+  }
+
+  static func validate(contents: String, expectedContents: String?) throws {
+    for text in [contents, expectedContents].compactMap({ $0 }) {
+      guard text.utf8.count <= WorkspaceTextScope.maximumTextBytes else { throw WorkspaceError.tooLarge }
+      guard !text.utf8.contains(0) else { throw WorkspaceError.invalidText }
+    }
+  }
+
+  func writeNote(
+    relativePath: String, contents: String, expectedContents: String?,
+    coordinatedParent: Int32,
+    validateAuthority: (() throws -> Void)? = nil,
+    beforeCommit: (() throws -> Void)? = nil,
+    afterCommit: (() throws -> Void)? = nil
+  ) throws {
+    try Self.validate(contents: contents, expectedContents: expectedContents)
+    let components = try WorkspaceTextScope.textComponents(relativePath, directory: false)
+    let name = components.last!
+    let target = rootURL.appendingPathComponent(relativePath)
+    try verifyRootLocation()
+    // Keep the parent captured before coordination through commit. Reopening
+    // here would let a parent replacement after callback validation rebind IO.
+    let parent = dup(coordinatedParent)
+    guard parent >= 0 else { throw AttachmentError.posix() }
+    defer { close(parent) }
+    var originalParent = stat()
+    guard fstat(parent, &originalParent) == 0 else { throw AttachmentError.posix() }
+    guard originalParent.st_flags & UInt32(SF_DATALESS) == 0 else { throw AttachmentError.offline }
+
+    func verifyParent() throws {
+      try validateAuthority?()
+      try verifyRootLocation()
+      let currentParent = try parentDescriptor(components)
+      defer { close(currentParent) }
+      var current = stat()
+      guard fstat(currentParent, &current) == 0 else { throw AttachmentError.posix() }
+      guard current.st_dev == originalParent.st_dev, current.st_ino == originalParent.st_ino else {
+        throw AttachmentError.unavailable
+      }
+      guard current.st_flags & UInt32(SF_DATALESS) == 0 else { throw AttachmentError.offline }
+    }
+
+    func current() throws -> (Data?, stat?) {
+      try verifyParent()
+      var state = stat()
+      if fstatat(parent, name, &state, AT_SYMLINK_NOFOLLOW) != 0 {
+        guard errno == ENOENT else { throw AttachmentError.posix() }
+        var placeholder = stat()
+        if fstatat(parent, ".\(name).icloud", &placeholder, AT_SYMLINK_NOFOLLOW) == 0 { throw AttachmentError.offline }
+        guard errno == ENOENT else { throw AttachmentError.posix() }
+        return (nil, nil)
+      }
+      guard state.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG) else { throw AttachmentError.invalid }
+      guard state.st_flags & UInt32(SF_DATALESS) == 0 else { throw AttachmentError.offline }
+      let read = try readLocalBytes(components: components, maximumBytes: WorkspaceTextScope.maximumTextBytes, verifyRevision: true)
+      guard read.revision == Self.revision(state), String(data: read.bytes, encoding: .utf8) != nil,
+            !read.bytes.contains(0) else { throw WorkspaceError.invalidText }
+      try verifyParent()
+      return (read.bytes, state)
+    }
+
+    func conflict(_ data: Data?) -> WorkspaceSaveConflict {
+      WorkspaceSaveConflict(path: target.path, expectedContents: expectedContents,
+                            currentContents: data.map { String(decoding: $0, as: UTF8.self) })
+    }
+    let expected = expectedContents.map { Data($0.utf8) }
+    let observed = try current()
+    guard observed.0 == expected else { throw conflict(observed.0) }
+    let bytes = Data(contents.utf8)
+
+    func writeBytes(_ descriptor: Int32) throws {
+      var offset = 0
+      try bytes.withUnsafeBytes { buffer in
+        while offset < buffer.count {
+          let count = Darwin.write(descriptor, buffer.baseAddress!.advanced(by: offset), buffer.count - offset)
+          if count < 0 {
+            if errno == EINTR { continue }
+            throw AttachmentError.posix()
+          }
+          guard count > 0 else { throw AttachmentError.unavailable }
+          offset += count
+        }
+      }
+      guard fsync(descriptor) == 0 else { throw AttachmentError.posix() }
+    }
+    func writtenState(_ descriptor: Int32) throws -> stat {
+      var state = stat()
+      guard fstat(descriptor, &state) == 0 else { throw AttachmentError.posix() }
+      guard state.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG), state.st_size == Int64(bytes.count) else {
+        throw AttachmentError.unavailable
+      }
+      return state
+    }
+    func verifyExactBytes(_ descriptor: Int32) throws {
+      let before = try writtenState(descriptor)
+      var offset = 0
+      var chunk = [UInt8](repeating: 0, count: 64 * 1024)
+      let deadline = DispatchTime.now().uptimeNanoseconds + UInt64(Self.readTimeout * 1_000_000_000)
+      while offset < bytes.count {
+        guard DispatchTime.now().uptimeNanoseconds < deadline else { throw AttachmentError.unavailable }
+        let requested = min(chunk.count, bytes.count - offset)
+        let count = chunk.withUnsafeMutableBytes { Darwin.pread(descriptor, $0.baseAddress!, requested, off_t(offset)) }
+        if count < 0 {
+          if errno == EINTR { continue }
+          throw AttachmentError.posix()
+        }
+        guard count > 0, bytes[offset..<(offset + count)].elementsEqual(chunk.prefix(count)) else {
+          throw AttachmentError.unavailable
+        }
+        offset += count
+      }
+      let after = try writtenState(descriptor)
+      guard Self.revision(before) == Self.revision(after) else { throw AttachmentError.unavailable }
+    }
+    func verifySaved(_ descriptor: Int32) throws {
+      try verifyParent()
+      try verifyExactBytes(descriptor)
+      let opened = try writtenState(descriptor)
+      var installed = stat()
+      guard fstatat(parent, name, &installed, AT_SYMLINK_NOFOLLOW) == 0 else { throw AttachmentError.posix() }
+      guard opened.st_dev == installed.st_dev, opened.st_ino == installed.st_ino,
+            installed.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG), installed.st_size == Int64(bytes.count),
+            Self.revision(opened) == Self.revision(installed) else { throw AttachmentError.unavailable }
+      try verifyParent()
+    }
+
+    // A deletion explicitly approved by the user is a new exclusive creation,
+    // never a replacement rename that can clobber a concurrently appeared file.
+    if observed.1 == nil {
+      try beforeCommit?()
+      try verifyParent()
+      let latest = try current()
+      guard latest.0 == nil else { throw conflict(latest.0) }
+      try requireVacantName(parent: parent, name: name)
+      try verifyParent()
+      let descriptor = openat(parent, name, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
+      guard descriptor >= 0 else {
+        if errno == EEXIST { throw conflict(try current().0) }
+        throw AttachmentError.posix()
+      }
+      defer { close(descriptor) }
+      // On failure this file may remain. Never unlink or silently retry it.
+      try writeBytes(descriptor)
+      try afterCommit?()
+      try verifySaved(descriptor)
+      return
+    }
+
+    let stagingName = ".linefold-save-\(UUID().uuidString)"
+    let descriptor = openat(parent, stagingName, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
+    guard descriptor >= 0 else { throw AttachmentError.posix() }
+    defer { close(descriptor) }
+    var staged = stat()
+    guard fstat(descriptor, &staged) == 0 else { throw AttachmentError.posix() }
+    defer {
+      // Cleanup only our own inode. Never delete a path replaced by another actor.
+      var leftover = stat()
+      if fstatat(parent, stagingName, &leftover, AT_SYMLINK_NOFOLLOW) == 0,
+         leftover.st_dev == staged.st_dev, leftover.st_ino == staged.st_ino {
+        _ = unlinkat(parent, stagingName, 0)
+      }
+    }
+    try writeBytes(descriptor)
+    try verifyExactBytes(descriptor)
+    let written = try writtenState(descriptor)
+    try beforeCommit?()
+    try verifyParent()
+    let latest = try current()
+    guard latest.0 == expected else { throw conflict(latest.0) }
+    guard let state = latest.1, let original = observed.1,
+          Self.revision(state) == Self.revision(original) else { throw AttachmentError.unavailable }
+    var stagingPath = stat()
+    let opened = try writtenState(descriptor)
+    guard fstatat(parent, stagingName, &stagingPath, AT_SYMLINK_NOFOLLOW) == 0 else { throw AttachmentError.posix() }
+    guard stagingPath.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+          stagingPath.st_dev == staged.st_dev, stagingPath.st_ino == staged.st_ino,
+          Self.revision(stagingPath) == Self.revision(written),
+          Self.revision(opened) == Self.revision(written) else { throw AttachmentError.unavailable }
+    try verifyParent()
+    guard renameat(parent, stagingName, parent, name) == 0 else { throw AttachmentError.posix() }
+    try afterCommit?()
+    try verifySaved(descriptor)
   }
 }
 

@@ -11,12 +11,12 @@ mkdir -p "$app_dir/build/export-qa"
 # separately maintained native HTML sample. test-document-export-fixture runs first.
 python3 -m unittest discover -s "$app_dir/tool" -p test_native_test_watchdog.py
 python3 "$app_dir/tool/check_document_export_entitlements.py"
-test -s "$app_dir/build/export-qa/pagination.html"
+test -s "$app_dir/build/export-qa/document.html"
 echo "PHASE: compile native export acceptance"
 xcrun swiftc -target "$(uname -m)-apple-macos12.0" \
   "$app_dir/macos/Runner/DocumentExport.swift" \
   "$app_dir/test/native_document_export_test.swift" \
   -o "$test_dir/document_export_tests"
 python3 "$app_dir/tool/native_test_watchdog.py" --timeout-seconds 120 -- \
-  "$test_dir/document_export_tests" "$app_dir/build/export-qa/pagination.html" "$app_dir/build/export-qa/native"
+  "$test_dir/document_export_tests" "$app_dir/build/export-qa/document.html" "$app_dir/build/export-qa/document.md" "$app_dir/build/export-qa/native"
 } 2>&1 | tee "$app_dir/build/export-qa/native-acceptance.log"

@@ -12,7 +12,12 @@ class DocumentExportFlow {
   bool _pending = false;
   bool _disposed = false;
 
-  void dispose() => _disposed = true;
+  VoidCallback? _cancelNative;
+
+  void dispose() {
+    _disposed = true;
+    _cancelNative?.call();
+  }
 
   Future<void> run(
     BuildContext context,
@@ -37,6 +42,7 @@ class DocumentExportFlow {
     var stale = false;
     bool isCurrent() => !_disposed && !stale && context.mounted;
     void observe() {
+      final wasStale = stale;
       // Once invalidated, switching away and back never revives the operation.
       stale =
           stale ||
@@ -48,6 +54,7 @@ class DocumentExportFlow {
                 document.path != null &&
                 !snapshot.protectedPaths.contains(document.path),
           );
+      if (stale && !wasStale) _cancelNative?.call();
     }
 
     _pending = true;
@@ -57,14 +64,14 @@ class DocumentExportFlow {
         context: context,
         builder: (context) => AlertDialog(
           title: Text(
-            action == DocumentExportAction.print
-                ? 'Print document'
-                : 'Export ${action.name.toUpperCase()}',
+            'Export ${action == DocumentExportAction.markdown ? 'Markdown copy' : 'HTML'}',
           ),
-          content: const Text(
-            '$documentExportFidelityNotice\n\n'
+          content: Text(
+            '${action == DocumentExportAction.markdown ? documentExportMarkdownNotice : documentExportFidelityNotice}\n\n'
             'This exports the complete document, including unsaved changes, '
-            'as it was when you opened this dialog. Later edits are not included.',
+            'as it was when you opened this dialog. Later edits are not included.\n\n'
+            'Cancelling the Save dialog writes nothing. After Save is confirmed, '
+            'the copy may be committed even if you switch tabs.',
           ),
           actions: [
             TextButton(
@@ -79,23 +86,29 @@ class DocumentExportFlow {
         ),
       );
       if (proceed != true || !isCurrent()) return;
-      final document = await DocumentExportService(
-        attachmentSource: attachmentSource,
-      ).build(snapshot, isCurrent: isCurrent);
+      final service = DocumentExportService(attachmentSource: attachmentSource);
+      final document = action == DocumentExportAction.markdown
+          ? service.buildMarkdown(snapshot, isCurrent: isCurrent)
+          : await service.build(snapshot, isCurrent: isCurrent);
       if (!isCurrent()) return;
       // All values below are immutable. Native code never reads the source.
+      _cancelNative = () {
+        // Before final approval, invalidation also fails the native handshake.
+        // Once approved, a synchronous commit cannot be recalled by this
+        // later cross-bridge message. Never revive a stale snapshot.
+        unawaited(platform.cancel(snapshot).catchError((Object _) {}));
+      };
       final completed = await platform.output(
         action: action,
         document: document,
         snapshot: snapshot,
+        isCurrent: isCurrent,
       );
-      if (context.mounted && completed) {
+      if (context.mounted && !_disposed && completed) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              action == DocumentExportAction.print
-                  ? 'Print operation completed.'
-                  : '${action.name.toUpperCase()} exported. Markdown original unchanged.',
+              '${action == DocumentExportAction.markdown ? 'Markdown copy' : 'HTML'} exported. Original unchanged.',
             ),
           ),
         );
@@ -117,6 +130,7 @@ class DocumentExportFlow {
         );
       }
     } finally {
+      _cancelNative = null;
       workspace.removeListener(observe);
       _pending = false;
     }

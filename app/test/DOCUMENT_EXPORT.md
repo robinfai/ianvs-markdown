@@ -1,163 +1,139 @@
-# P2a basic offline export and print
+# P2a: HTML and Markdown copy export
 
-## Product boundary
+## Delivered scope
 
-macOS File has Export HTML, Export PDF, and Print (Command-P). Each command
-first captures the complete current buffer, including unsaved changes, then
-shows a confirmation explaining fidelity. Continuing exports that snapshot,
-not later edits and not a disk reread. Cancel performs no export or image reads.
-Switching the active tab/root/path before native handoff invalidates the job,
-even if the user switches back. After native handoff, the native sheet owns the
-explicitly requested immutable snapshot; no further document reads happen.
-The export does not save, mark saved, normalize or rewrite Markdown.
+macOS File exposes **Export HTML…** and **Export Markdown Copy…** only. Both
+capture the complete current editor buffer when the confirmation dialog opens,
+including unsaved changes. Later edits do not enter the snapshot. Export never
+saves the source, changes its dirty state, switches its file association, uploads
+content through an app service, shares it with another application, or reads a
+cloud vault in bulk. A destination chosen in a system file-provider folder may
+sync according to that provider and the user's existing settings.
 
-This is **basic export**, not pixel parity with Flutter or full Obsidian export:
+- HTML is one self-contained UTF-8 file. The visible confirmation and exported
+  notes explicitly explain basic fidelity: math and Mermaid are readable source,
+  not rendered diagrams; images use their first frame and at most 2048 pixels per
+  side; unavailable images get placeholders; local note links become text.
+- Markdown is an exact UTF-8 copy of the **current buffer**, not a reread or
+  byte-for-byte copy of an older disk version. It preserves buffer line endings,
+  BOM and valid Unicode, including empty content. It does not parse Markdown,
+  read images, copy attachments, rewrite relative links, or execute source HTML.
+  The confirmation explicitly warns that relative image/note links remain
+  unchanged and may not resolve at the new destination. Invalid Unicode and
+  over-budget output fail instead of silently replacing or truncating content.
+- This stage adds no mobile export interface. It preserves main's separately
+  delivered reader-first iOS quick notes and guarded source editing; this export
+  work does not expand them. The shared service compiles on iOS. Sharing and
+  high-fidelity rendering are not part of this stage.
 
-- GFM structure, code text, CJK/emoji and document properties are included.
-- Math/TeX and Mermaid are readable source rather than rendered diagrams.
-- Raster attachments are the preview's bounded first frame, at most 2048 pixels
-  on either side, re-encoded as PNG. Resizing metadata and animation are not
-  preserved. Embedded image output is limited to 32 image occurrences / 16 MiB.
-- Missing, offline, denied, unsafe and over-budget images are labeled
-  placeholders with a reason in Export notes. Remote images are never loaded.
-- Local/Wiki links are text, not portable vault links. Note embeds are not
-  expanded. Raw HTML is escaped source, not active markup.
-- Native share panel and higher-fidelity math/diagram export remain **P2b**.
-  This candidate does not upload or send content to another person or service.
-- iOS remains a reading-preview app. Shared Dart generation compiles there;
-  this candidate does not add mobile editing or mobile export UI.
+**PDF and Print are not delivered and have no menu, shortcut or native success
+route here.** Their complete implementation and original failing acceptance
+remain on `feat/p2-offline-pdf-print-wip` at
+`6a571f906d40a496ccb96c940b57d41831735068`. That branch actually produced six A4
+pages containing 600 cells, but failed acceptance: WebKit omitted later-page
+table headers and Quartz text extraction mapped some CJK characters to radical
+code points. NFKC fixes the title's compatibility form, not all code text. These
+are unresolved requirements, not tests waived to claim PDF completion. No PDF,
+WebKit print API or printing entitlement is needed by the copy-only stage.
 
-The fidelity summary appears before Continue and inside the output. Runtime
-absolute document paths are not inserted into HTML. User-authored text is not
-redacted: exporting a note intentionally includes the note's own contents.
+## Safety and resource boundaries
 
-## Safety and output
+HTML uses a Markdown AST allowlist, escaped text/attributes, a restricted link
+protocol set, generated CSS and CSP. No source HTML, script, external stylesheet,
+remote image fetch, file URL, source absolute path or user-supplied CSS is emitted
+as active content. Ordinary links require a user's later click in their browser.
+The generator does not promise to remove private text the author actually wrote.
 
-`DocumentExportService` uses existing core syntax classes plus the already
-locked `markdown` dependency, declared directly by the app. It serializes a
-small known AST tag set and escapes every text/attribute. No source HTML,
-styles, event handlers, custom classes or arbitrary URL protocols survive.
-Only HTTP(S), mailto and fragment hyperlinks remain; images are only generated
-PNG data URLs. The document has a restrictive CSP. Input uses core's existing
-1 MiB/4096-token/4096-character-line preflight; rejection creates no truncated
-file. HTML is incrementally capped at 32 MiB of actual UTF-8 output, including
-escaping expansion, each repeated image URI, document CSS/envelope and notices.
-Fixed envelope/notices are charged before I/O; body/notice overflow stops before
-later assets. PNG base64 size is checked before encoding. No completed unbounded
-HTML string or UTF-8 byte-array copy is built merely to discover overflow.
+The rendering preflight bounds source/tokens/line length. At most 32 local images
+and 16 MiB of normalized PNG payload are admitted. HTML's **32 MiB UTF-8** output
+budget is incremental: document headers, escaped Unicode, notices and every
+repeated data URI are charged before append; overflow prevents later asset I/O.
+Markdown copies bypass rendering limits but have the same incremental 32 MiB
+UTF-8 output ceiling. Native output independently enforces that ceiling.
 
-Image lookup reuses the P1b repository, native scope, file signatures, codec,
-pixel/working-memory limits and serialization. It never falls back to Dart
-File or a network request. A scope adapter checks before and after every index,
-settings, normalize and image await (also on failure). After invalidation, no new
-native read starts; already-issued native I/O cannot be recalled. Generated PNGs
-remove source image metadata.
+Image lookup reuses P1b's authorized root, Obsidian attachment settings, allowed
+formats/signatures, decoder and memory budgets. It never falls back to Dart File
+or network I/O. A scope adapter checks before and after every index, settings,
+normalization and image await, including failure. Invalidation prevents new I/O;
+an already-issued native read cannot be recalled. Generated PNGs remove original
+image metadata. Only synthetic documents and attachments are used in tests.
 
-macOS uses NSSavePanel with native existing-name confirmation. The output must
-be `.html` or `.pdf`; all open-source document paths, symlink and hard-link aliases are
-rejected. A metadata version captured after SavePanel approval is revalidated
-inside NSFileCoordinator before replacement; a new target uses exclusive create.
-Destination access errors and offline cloud placeholders fail closed. As with
-other NSFileCoordinator clients, this protects cooperating writers, not an
-adversarial process bypassing file coordination at precisely the commit point.
+NSSavePanel supplies the destination and its normal existing-file confirmation.
+The extension must be `.html` or `.md`. All open-source paths and their symlink
+and hard-link aliases are rejected independently of the replacement prompt.
+A newly appearing destination fails exclusive create. A previously approved
+file's metadata is rechecked inside NSFileCoordinator before atomic replacement.
+This protects cooperating writers, not an adversarial process bypassing file
+coordination at the exact commit point. Recognized legacy `.name.icloud`
+placeholder name collisions and permission errors fail closed without reading
+their data. This does not identify every provider placeholder representation.
 
-WKWebView is transient, nonpersistent, has JavaScript disabled, only accepts
-the initial about:blank navigation, and installs a fail-closed content rule list
-before loading generated HTML with no base URL. No document file URL or website
-is loaded. Rendering has a 30-second startup timeout; direct PDF output has a
-separate 60-second deadline with Core Printing cancellation. A one-shot gate
-ignores late callbacks and releases Flutter/native busy state without committing
-the user destination. The print delegate stays alive while AppKit unwinds; if
-the OS never returns, its private temporary output is retained until terminal
-cleanup (not deleted while still being written), and a subsequent PDF/Print
-fails clearly rather than starting
-a second active operation. HTML export remains available. These run-loop timers
-are not a hard process-kill guarantee if AppKit blocks the main thread entirely.
-WebKit's printing operation keeps its default secondary-thread output mode;
-its delegate callback is explicitly marshalled back to the main actor. Because
-NSPrintOperation.current is thread-local, an application-wide main-actor lease
-excludes another print until the terminal callback, including after timeout.
-An old callback cannot release a newer lease.
-Interactive print panels have no automatic timeout while the user is choosing.
-HTML does not require a WebView. Direct PDF uses WKWebView's NSPrintOperation with A4 pages, print CSS
-and a private temporary output, then checks it with PDFKit before committing the
-user destination. It does **not** call createPDF to make a single tall page or
-wrap a screenshot in PDF. Print uses the same document through the native print
-sheet; system PDF destination choices are user controlled.
+Tab/root/source-identity changes permanently invalidate a snapshot before its
+final approval. While the SavePanel is open, invalidation or flow disposal sends
+an operation-ID-bound cancel. IDs include a fresh per-isolate random prefix so a
+Dart restart cannot approve an old native panel with a reused counter.
+**Cancellation messaging alone is not the commit guard:** after selection,
+native retains the exact authorized URL and destination version, then asks Dart
+for final `isCurrent` approval for that same operation. Before that approval, a
+missing/false reply, cancellation or five-second approval timeout writes nothing
+and releases scope. The user choosing a SavePanel destination has no timeout.
 
-## Automated evidence
+**Final Dart approval is the commit authorization/linearization point.** The
+protected source set covers all documents open at that point, including paths
+and aliases; any newly opened path before approval makes the request stale.
+After approval, the native commit is synchronous. Subsequent cross-bridge
+cancellations or tab/root changes cannot be guaranteed to arrive before its
+write, and cannot undo it. Native no longer reports cancellation once committing.
+The confirmation UI states that after Save is confirmed, switching tabs may not
+prevent the copy. Source protection does not retroactively extend to documents
+opened after this authorization point. Native's identity rechecks guard already
+observed invalidation, not an imaginary continuously refreshed Dart state.
 
-Linux local checks (Flutter 3.44.0 / Dart 3.12.0):
+A 15-second deadline cancels a still-waiting NSFileCoordinator using Apple's
+thread-safe `cancel()` API. A locked waiting/accessor/expired transition prevents
+late accessors from writing; timeout is a failure, never success. Once the write
+accessor starts, the deadline cannot cancel it or report that no write occurred.
+Actual filesystem I/O remains synchronous and can stall the platform thread;
+there is no claimed hard timeout or safe cancellation of an in-flight atomic
+write. Duplicate/late selections, approvals and old cancellations cannot commit
+or unlock a newer operation. Scope is retained until the commit returns.
+See [Apple's cancellation contract](https://developer.apple.com/documentation/foundation/nsfilecoordinator/cancel()).
 
-- `flutter analyze --no-pub`: no issues.
-- `flutter test --no-pub test/document_export_service_test.dart test/document_export_flow_test.dart`:
-  21 tests cover escaping/protocols, CJK/GFM/front matter, attachment formats and
-  budgets, source/output rejection, cancellation, scope invalidation, dirty
-  snapshots, later edits, recoverable native failure, incremental Unicode/escape/
-  repeated-image budgets, and cancellation at all four native I/O boundaries.
-- Full app run after syncing main 5bcdf8e: 763 pass, 4 skipped, 17 fail on Linux. The 17 failure names exactly
-  match the established P1h Linux baseline; this is not a full green/native gate.
-- Tests use only synthetic source and fixtures. No real notes are enumerated.
+## Automated gates and evidence
 
-The following native gate is implemented but **not run on Linux**:
+- Focused Dart service/flow tests cover injection, link protocols, CJK/emoji/GFM,
+  front matter, attachments and all I/O invalidation boundaries, incremental
+  escape/Unicode/repeated-image budgets, raw Markdown bytes, empty content,
+  no attachment reads for Markdown, visible caveats, immutable dirty snapshots,
+  cancellation, final cross-bridge approval and recoverable native errors.
+- `test-document-export-fixture` writes synthetic `build/export-qa/document.html`
+  using the actual HTML builder, plus its Markdown source. The corpus contains
+  150 rows × 4 columns, CJK/emoji and long code. It is not a PDF assertion.
+- `test-native-document-export` compiles the production Swift adapter. It checks
+  exact output hashes, unchanged source SHA-256, empty Markdown, explicit
+  replacement, collisions, permission errors, aliases (including a source
+  symlink plus destination hard link), cancel/once-only completion, refused
+  PDF/Print commands, final approval, old cancellation identity, racing target
+  changes during approval, approval timeout and late callbacks.
+- A 120-second process watchdog fails closed and kills only its synthetic test
+  process group. Its three regressions cover normal result propagation and
+  cleanup even if the leader exits before a surviving child. No timeout is a pass.
+- Native CI keeps all pre-existing Host/native and transaction gates and all
+  four macOS example/app Debug/Release builds. It also checks the actual signed
+  app entitlements retain sandboxing without an unneeded print permission, and
+  compiles the unsigned iOS reader. Export fixtures/logs are retained as artifacts.
 
-1. `test-document-export-fixture` (also included in `test-app`) writes `build/export-qa/pagination.html` using the production
-   generator: CJK/emoji, 150 rows x 4 columns, repeated header and long code.
-2. `make test-native-document-export` compiles the actual native export source,
-   produces a real PDF and tests source SHA-256, overwrite/collision, aliases,
-   permission failure and offline placeholders. An independent Python watchdog
-   enforces a 120-second process deadline even if AppKit blocks the main thread.
-   A timeout is a failed gate (exit 124), prints the last flushed phase marker,
-   and kills only the isolated synthetic test process group. Portable regressions
-   cover success, failure and stopping a blocked test with its child process.
-3. Native lifecycle fixtures check loading/output timeouts, cancellation,
-   ignored late completion, loading-timeout owner release/terminal cleanup exactly
-   once, and an interactive print panel with no time limit.
-   Destination tests include a symlink source with a hard-link output alias.
-   Print lease fixtures reject concurrent and stale-owner release, and reject a
-   held-worker retry before invoking the stateful native factory; actual PDF
-   completion verifies main-thread delivery.
-4. PDFKit verifies at least three A4 pages, selectable Chinese, all 600 cells,
-   repeated header on each table page, complete long code and no horizontal
-   out-of-page character bounds. It retains PDF, extracted text and first/last
-   page PNGs in `build/export-qa/native` for visual review.
-5. Native integrations CI runs the focused fixture and bounded PDF first, then
-   all remaining original host/native gates without repeating the native PDF,
-   and uploads the evidence. `check-integrations` still aggregates every gate.
-   It also builds the actual macOS app and unsigned iOS reader. Passing Dart
-   mocks or source inspection is not evidence that native printing works.
-6. All four Debug/Release + Local entitlement files declare app sandbox and
-   com.apple.security.print. CI checks both these declarations and the built
-   Debug/Release app code-signature entitlements. The standalone Swift harness
-   is not sandbox app runtime evidence.
+Local Dart results are not evidence of Swift compilation or native UI behavior.
+The new narrowed commit must pass its own native CI; previous PDF-branch build
+success cannot stand in for it.
 
 ## Manual acceptance still required
 
-In the actual signed, sandboxed macOS Debug and Release app, use synthetic
-documents to check Export PDF and Print; compilation, entitlement inspection and
-the standalone harness cannot establish sandbox printing success. Any system
-permission prompts must be handled explicitly by the user, never auto-approved.
-Also check SavePanel Cancel, replacing an
-existing export after the native confirmation, changing filename/extension,
-Print preview paging, printer cancellation, PDF open/search and rendered CJK,
-emoji, dense tables and long code. Recheck sandbox destination access and
-placeholder behavior on a real file-provider folder without downloading a vault.
-Readability and printer/device behavior must not be claimed from compilation.
-
-Apple API references:
-
-- https://developer.apple.com/documentation/webkit/wkwebview/printoperation(with:)
-- https://developer.apple.com/documentation/appkit/nsprintoperation/runmodal(for:delegate:didrun:contextinfo:)
-- https://developer.apple.com/documentation/appkit/nsprintinfo/attributekey/jobsavingurl
-- https://developer.apple.com/documentation/pdfkit/pdfpage/characterbounds(at:)
-
-- https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.security.print
-- https://developer.apple.com/documentation/appkit/nsprintinfo/pmprintsession()
-- https://developer.apple.com/documentation/applicationservices/core_printing
-
-WebKit's upstream implementation sets `canSpawnSeparateThread = YES`; its
-printing view distinguishes final secondary-thread output from main-thread
-preview. These sources explain why the adapter must not override it to false:
-
-- https://github.com/WebKit/WebKit/blob/main/Source/WebKit/UIProcess/mac/WebViewImpl.mm
-- https://github.com/WebKit/WebKit/blob/main/Source/WebKit/UIProcess/mac/WKPrintingView.mm
+In the real signed sandboxed macOS app, use synthetic notes to check both SavePanel
+cancellation and native replacement confirmation, alternate directories and
+extensions, unsaved/empty Markdown copies, tab/root invalidation and actual
+file-provider permission behavior without downloading a vault. Open HTML in an
+offline browser and inspect CJK, emoji, tables, source math/Mermaid, normalized
+images and visible notices. Check that both exports leave the original and dirty
+buffer unchanged. Compilation and injected destination tests do not prove that
+these native UI/device interactions have been exercised.

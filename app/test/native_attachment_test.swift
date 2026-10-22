@@ -421,13 +421,13 @@ struct AttachmentTests {
     try CloudWorkspace.createWorkspaceNote(root, relativePath: "nested/新笔记😀.md")
     let emptyNote = try read("nested/新笔记😀.md")
     precondition(emptyNote.bytes.isEmpty)
-    rejects(.unavailable) { try CloudWorkspace.createWorkspaceNote(root, relativePath: "nested/新笔记😀.md") }
+    rejects(.collision) { try CloudWorkspace.createWorkspaceNote(root, relativePath: "nested/新笔记😀.md") }
     try write("CreateCollision.md", Data("preserve me".utf8))
-    rejects(.unavailable) { try CloudWorkspace.createWorkspaceNote(root, relativePath: "createcollision.md") }
+    rejects(.collision) { try CloudWorkspace.createWorkspaceNote(root, relativePath: "createcollision.md") }
     let originalCollision = try read("CreateCollision.md")
     precondition(originalCollision.bytes == Data("preserve me".utf8))
     try write("Cafe\u{0301}.md")
-    rejects(.unavailable) { try CloudWorkspace.createWorkspaceNote(root, relativePath: "Café.md") }
+    rejects(.collision) { try CloudWorkspace.createWorkspaceNote(root, relativePath: "Café.md") }
     for path in ["../outside.md", "/outside.md", ".private/new.md", "nested/../new.md", "linked-dir/new.md", "bad.txt"] {
       rejects(.invalid) { try CloudWorkspace.createWorkspaceNote(root, relativePath: path) }
     }

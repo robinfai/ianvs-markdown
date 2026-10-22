@@ -46,9 +46,9 @@ jobs:
           sw_vers
       - name: Export fixture and snapshot regressions
         run: make deps-integrations test-document-export-fixture
-      - name: Bounded offline PDF acceptance
+      - name: Bounded HTML and Markdown copy acceptance
         run: make test-native-document-export
-      # A failed PDF diagnostic must not hide the original host/build gates.
+      # A failed copy-export diagnostic must not hide the original host/build gates.
       # No step uses continue-on-error; every gate must pass for this job.
       - name: Host and remaining native regressions
         if: ${{ !cancelled() }}
@@ -56,7 +56,7 @@ jobs:
       - name: Build the example and app main entries
         if: ${{ !cancelled() }}
         run: make build-local build-local-release
-      - name: Check actual sandbox app printing declarations
+      - name: Check copy-only sandbox app declarations
         if: ${{ !cancelled() }}
         run: python3 app/tool/check_document_export_entitlements.py --built-apps
       - name: Save native rendering evidence

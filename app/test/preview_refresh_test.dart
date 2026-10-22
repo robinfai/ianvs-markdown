@@ -334,7 +334,7 @@ void main() {
   );
 
   test(
-    'late workspace selection cannot replace a newer navigation intent',
+    'pending workspace handoff cannot be superseded by navigation',
     () async {
       final pending = Completer<Map<String, Object>>();
       final messenger =
@@ -346,16 +346,17 @@ void main() {
       addTearDown(
         () => messenger.setMockMethodCallHandler(PreviewPlatform.channel, null),
       );
-      final library = PreviewLibrary(
-        workspaceService: const AppleWorkspaceService(),
-      )..workspace = _workspace('/a');
+      final library = _Library(workspaceService: const AppleWorkspaceService())
+        ..workspace = _workspace('/a');
       final controller = PreviewController(library: library);
       addTearDown(controller.dispose);
       final selection = controller.changeWorkspace();
       controller.showLibrary();
+      expect(controller.selectingWorkspace, isTrue);
       pending.complete({'path': '/b', 'name': 'B', 'isCloud': false});
       await selection;
-      expect(library.workspace!.path, '/a');
+      expect(library.workspace!.path, '/b');
+      expect(controller.selectingWorkspace, isFalse);
       expect(controller.contents, isNull);
       expect(controller.error, isNull);
     },
@@ -401,6 +402,7 @@ PreviewDocument _document(String path) =>
     PreviewDocument(path: path, name: path, openedAt: DateTime(2026));
 
 class _Library extends PreviewLibrary {
+  _Library({super.workspaceService});
   String text = '# Original';
   Object? refreshFailure;
   Object? listFailure;

@@ -1,7 +1,20 @@
 import AppKit
 import CryptoKit
-import PDFKit
-import WebKit
+
+/// Deliberately withholds the writer handoff on its own operation queue. This
+/// exercises real NSFileCoordinator waiting/cancel, not just a mocked gate.
+private final class WaitingExportPresenter: NSObject, NSFilePresenter {
+  let presentedItemURL: URL?
+  let presentedItemOperationQueue = OperationQueue()
+  let entered = DispatchSemaphore(value: 0)
+  let release = DispatchSemaphore(value: 0)
+  init(url: URL) { presentedItemURL = url.resolvingSymlinksInPath(); super.init() }
+  func relinquishPresentedItem(toWriter writer: @escaping ((() -> Void)?) -> Void) {
+    entered.signal()
+    release.wait()
+    writer(nil)
+  }
+}
 
 @main
 struct NativeDocumentExportAcceptance {
@@ -52,163 +65,183 @@ struct NativeDocumentExportAcceptance {
     let sourceHash = SHA256.hash(data: try Data(contentsOf: source))
     assert(sourceHash == originalHash)
 
-    guard CommandLine.arguments.count == 3 else { fatalError("Expected generated HTML fixture and evidence folder") }
-    let fixture = URL(fileURLWithPath: CommandLine.arguments[1])
-    let evidence = URL(fileURLWithPath: CommandLine.arguments[2], isDirectory: true)
-    try fm.createDirectory(at: evidence, withIntermediateDirectories: true)
-    let output = evidence.appendingPathComponent("pagination.pdf")
-    if fm.fileExists(atPath: output.path) { try fm.removeItem(at: output) }
-    phase("AppKit acceptance window startup")
+    phase("Markdown copy, empty copy and source aliases")
+    let copy = root.appendingPathComponent("副本.md")
+    try DocumentExportFileWriter.write(original, to: copy, format: "md", sourcePath: source.path, expected: nil)
+    assert((try? Data(contentsOf: copy)) == original)
+    rejects { try DocumentExportFileWriter.write(original, to: source, format: "md", sourcePath: source.path, expected: try ExportDestinationVersion.read(source)) }
+    rejects { try DocumentExportFileWriter.validate(copy, format: "md", sourcePath: source.path, protectedPaths: [copy.path]) }
+    let markdownAlias = root.appendingPathComponent("hardlink.md")
+    try fm.linkItem(at: source, to: markdownAlias)
+    rejects { try DocumentExportFileWriter.validate(markdownAlias, format: "md", sourcePath: sourceSymlink.path) }
+    let cancelledDestination = root.appendingPathComponent("cancelled-before-write.md")
+    rejects { try DocumentExportFileWriter.write(original, to: cancelledDestination, format: "md", sourcePath: source.path, expected: nil, canCommit: { false }) }
+    assert(!fm.fileExists(atPath: cancelledDestination.path))
+    let blank = root.appendingPathComponent("blank.md")
+    try DocumentExportFileWriter.write(Data(), to: blank, format: "md", sourcePath: source.path, expected: nil)
+    assert((try? Data(contentsOf: blank))?.isEmpty == true)
+    rejects { try DocumentExportFileWriter.validate(root.appendingPathComponent("not-delivered.pdf"), format: "pdf", sourcePath: source.path) }
+
+    phase("coordination deadline and non-cancellable commit authorization")
+    let expired = ExportCoordinationDeadline()
+    assert(expired.expire() && expired.didExpire)
+    assert(!expired.beginAccessor() && !expired.expire() && expired.needsCancellation)
+    expired.finish()
+    assert(!expired.needsCancellation && expired.didExpire)
+    let writing = ExportCoordinationDeadline()
+    assert(writing.beginAccessor())
+    assert(!writing.expire() && !writing.didExpire && !writing.beginAccessor())
+    let finished = ExportCoordinationDeadline()
+    finished.finish()
+    assert(!finished.expire() && !finished.beginAccessor())
+    var committedResults = [Result<Bool, Error>]()
+    let commitState = PendingDocumentExport(id: "commit-authorized") { committedResults.append($0) }
+    commitState.awaitApproval(seconds: 5)
+    assert(commitState.acceptApproval())
+    commitState.beginCommit()
+    assert(!commitState.cancelBeforeCommit() && committedResults.isEmpty)
+    commitState.finish(.success(true))
+    assert(committedResults.count == 1 && (try? committedResults[0].get()) == true)
+    assert(!commitState.cancelBeforeCommit() && committedResults.count == 1)
+
+    phase("real blocked file presenter coordination expires without a write")
+    let contested = root.appendingPathComponent("contested.md")
+    try original.write(to: contested)
+    let contestedVersion = try ExportDestinationVersion.read(contested)
+    let presenter = WaitingExportPresenter(url: contested)
+    NSFileCoordinator.addFilePresenter(presenter)
+    do {
+      defer {
+        presenter.release.signal()
+        NSFileCoordinator.removeFilePresenter(presenter)
+      }
+      do {
+        try DocumentExportFileWriter.write(Data("must not replace".utf8), to: contested,
+          format: "md", sourcePath: source.path, expected: contestedVersion, coordinationTimeout: 2)
+        fatalError("Blocked coordination must fail closed at its deadline")
+      } catch let error as DocumentExportError {
+        assert(error.message.contains("Timed out waiting for access"))
+      }
+      assert(presenter.entered.wait(timeout: .now()) == .success, "The actual presenter handoff must have blocked")
+      assert((try? Data(contentsOf: contested)) == original)
+    }
+    presenter.presentedItemOperationQueue.waitUntilAllOperationsAreFinished()
+    assert((try? Data(contentsOf: contested)) == original, "No late accessor may write after cancellation")
+
+    phase("native destination cancellation, single completion and unavailable commands")
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
     app.finishLaunching()
     let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 720, height: 900), styleMask: [.titled], backing: .buffered, defer: false)
-    window.makeKeyAndOrderFront(nil)
-    func spin(seconds: TimeInterval, until done: () -> Bool = { false }) {
-      let deadline = Date().addingTimeInterval(seconds)
-      while !done() && Date() < deadline {
-        RunLoop.main.run(until: Date().addingTimeInterval(0.005))
-      }
-    }
-    phase("lifecycle deadlines and once-only cleanup")
-    let printLease = DocumentExportPrintLease()
-    let firstPrint = UUID()
-    let secondPrint = UUID()
-    assert(printLease.acquire(firstPrint))
-    assert(!printLease.acquire(secondPrint), "An in-flight worker excludes a second print")
-    printLease.release(secondPrint)
-    assert(!printLease.acquire(secondPrint), "An unrelated callback cannot clear the lease")
-    printLease.release(firstPrint)
-    assert(printLease.acquire(secondPrint))
-    printLease.release(firstPrint)
-    assert(!printLease.acquire(firstPrint), "A late old callback cannot clear a new print")
-    printLease.release(secondPrint)
-    assert(printLease.acquire(firstPrint))
-    printLease.release(firstPrint)
-    var callbacks = 0
-    var cancellations = 0
+    var choices = 0
+    var selection: ((URL?) -> Void)?
+    let coordinator = DocumentExportCoordinator(window: window, pickDestination: { _, _, _, selected in
+      choices += 1
+      selection = selected
+      return {}
+    }, approveCommit: { _, approved in approved(true) })
+    let arguments: [String: Any] = ["operationId": "basic", "content": "# Unsaved 中文😀\r\n", "title": "原稿.md", "sourcePath": source.path, "protectedPaths": [source.path]]
     var results = [Result<Bool, Error>]()
-    let loading = DocumentExportLifecycle(loadingTimeout: 0.01, outputTimeout: 0.01,
-      cancelOutput: { cancellations += 1 }) { callbacks += 1; results.append($0) }
-    spin(seconds: 2, until: { !loading.isActive })
-    assert(!loading.isActive && callbacks == 1 && cancellations == 0)
-    assert((try? results.last!.get()) == nil)
-    loading.finish(.success(true))
-    assert(callbacks == 1, "Late load completion must be ignored")
-    let timedOutput = DocumentExportLifecycle(loadingTimeout: 2, outputTimeout: 0.01,
-      cancelOutput: { cancellations += 1 }) { callbacks += 1; results.append($0) }
-    timedOutput.beginPrinting(interactive: false)
-    spin(seconds: 2, until: { !timedOutput.isActive })
-    assert(!timedOutput.isActive && callbacks == 2 && cancellations == 1)
-    assert((try? results.last!.get()) == nil)
-    timedOutput.finish(.success(true))
-    assert(callbacks == 2, "Late PDF completion cannot publish or complete twice")
-    let interactive = DocumentExportLifecycle(loadingTimeout: 0.01, outputTimeout: 0.01,
-      cancelOutput: { cancellations += 1 }) { callbacks += 1; results.append($0) }
-    interactive.beginPrinting(interactive: true)
-    spin(seconds: 0.05)
-    assert(interactive.isActive && callbacks == 2 && cancellations == 1,
-      "A user's print-panel choice has no automatic timeout")
-    interactive.finish(.success(false))
-    assert(callbacks == 3 && (try? results.last!.get()) == false)
+    coordinator.perform("markdown", arguments: arguments) { results.append($0) }
+    assert(choices == 1 && results.isEmpty)
+    coordinator.perform("html", arguments: arguments) { results.append($0) }
+    assert(choices == 1 && results.count == 1 && (try? results[0].get()) == nil)
+    selection?(nil)
+    assert(results.count == 2 && (try? results[1].get()) == false)
+    selection?(copy) // A late duplicate selection cannot write or complete twice.
+    assert(results.count == 2 && (try? Data(contentsOf: copy)) == original)
+    for unsupported in ["pdf", "print"] {
+      coordinator.perform(unsupported, arguments: arguments) { results.append($0) }
+    }
+    assert(choices == 1 && results.count == 4)
+    assert((try? results[2].get()) == nil && (try? results[3].get()) == nil)
+    coordinator.perform("markdown", arguments: arguments) { results.append($0) }
+    selection?(source)
+    assert(results.count == 5 && (try? results[4].get()) == nil)
+    coordinator.perform("markdown", arguments: arguments) { results.append($0) }
+    let chosen = root.appendingPathComponent("chosen.md")
+    selection?(chosen)
+    assert(results.count == 6 && (try? results[5].get()) == true)
+    assert((try? String(contentsOf: chosen, encoding: .utf8)) == arguments["content"] as? String)
 
-    var loadingCleanups = 0
-    var loadingCallbacks = 0
-    var loadingJob: OfflineDocumentPrintJob? = OfflineDocumentPrintJob(
-      loadingTimeout: 0.01, compileRules: { _, _ in /* Deliberately no callback. */ })
-    weak var releasedLoadingJob = loadingJob
-    let loadingTemporary = root.appendingPathComponent("loading-timeout", isDirectory: true)
-    try fm.createDirectory(at: loadingTemporary, withIntermediateDirectories: false)
-    loadingJob!.run(html: "<p>synthetic</p>", window: window,
-      pdfDestination: loadingTemporary.appendingPathComponent("unused.pdf"), terminalCleanup: {
-        loadingCleanups += 1
-        try? fm.removeItem(at: loadingTemporary)
-      }) { result in
-        assert((try? result.get()) == nil)
-        loadingCallbacks += 1
-        loadingJob = nil // Same ownership release as DocumentExportCoordinator.
-      }
-    spin(seconds: 2, until: { loadingCallbacks == 1 })
-    assert(loadingCallbacks == 1 && loadingCleanups == 1 && releasedLoadingJob == nil,
-      "Loading timeout must hold the job through terminal cleanup exactly once")
-    assert(!fm.fileExists(atPath: loadingTemporary.path))
+    phase("scope approval, cancellation identity, timeout and late callbacks")
+    var approve: ((Bool) -> Void)?
+    var approvals = 0
+    var dismissals = 0
+    var guardedResults = [Result<Bool, Error>]()
+    let guarded = DocumentExportCoordinator(window: window, approvalTimeout: 0.02,
+      pickDestination: { _, _, _, selected in
+        selection = selected
+        return { dismissals += 1 }
+      }, approveCommit: { _, reply in approvals += 1; approve = reply })
+    func start(_ id: String) {
+      var payload = arguments
+      payload["operationId"] = id
+      guarded.perform("markdown", arguments: payload) { guardedResults.append($0) }
+    }
+    func cancel(_ id: String, expected: Bool = true) {
+      guarded.perform("cancel", arguments: ["operationId": id]) { value in assert((try? value.get()) == expected) }
+    }
+    let deferred = root.appendingPathComponent("deferred.md")
+    start("first")
+    selection?(deferred)
+    selection?(copy)
+    assert(approvals == 1 && !fm.fileExists(atPath: deferred.path), "Selection must not write before final approval")
+    let oldApproval = approve
+    cancel("first")
+    assert(dismissals == 1 && guardedResults.count == 1 && (try? guardedResults[0].get()) == false)
+    oldApproval?(true)
+    assert(!fm.fileExists(atPath: deferred.path))
+    start("second")
+    cancel("first", expected: false) // A delayed cancellation must not dismiss the new panel.
+    oldApproval?(true)
+    assert(dismissals == 1 && guardedResults.count == 1)
+    selection?(deferred)
+    let outsider = Data("new destination from another writer".utf8)
+    try outsider.write(to: deferred)
+    approve?(true)
+    assert(guardedResults.count == 2 && (try? guardedResults[1].get()) == nil)
+    assert((try? Data(contentsOf: deferred)) == outsider, "Approval await must preserve expected destination version")
+    let denied = root.appendingPathComponent("denied-approval.md")
+    start("denied")
+    selection?(denied)
+    approve?(false)
+    assert(guardedResults.count == 3 && (try? guardedResults[2].get()) == false)
+    assert(!fm.fileExists(atPath: denied.path))
+    start("timeout")
+    selection?(denied)
+    let lateTimeout = approve
+    let deadline = Date().addingTimeInterval(2)
+    while guardedResults.count < 4 && Date() < deadline {
+      RunLoop.main.run(until: Date().addingTimeInterval(0.005))
+    }
+    assert(guardedResults.count == 4 && (try? guardedResults[3].get()) == nil)
+    lateTimeout?(true)
+    assert(!fm.fileExists(atPath: denied.path) && guardedResults.count == 4)
+    start("after-timeout")
+    selection?(denied)
+    lateTimeout?(true)
+    assert(guardedResults.count == 4)
+    approve?(true)
+    assert(guardedResults.count == 5 && (try? guardedResults[4].get()) == true)
 
-    phase("held worker lease rejects before native operation factory")
-    let heldPrintToken = UUID()
-    assert(NSPrintOperation.current == nil)
-    assert(DocumentExportPrintLease.shared.acquire(heldPrintToken))
-    var rejectedFactoryCalls = 0
-    var rejectedPrint: Result<Bool, Error>?
-    let rejectedJob = OfflineDocumentPrintJob(compileRules: { _, _ in }, makePrintOperation: { view, info in
-      rejectedFactoryCalls += 1
-      return view.printOperation(with: info)
-    })
-    rejectedJob.run(html: "<p>synthetic</p>", window: window, pdfDestination: output) { rejectedPrint = $0 }
-    let rejectionConfiguration = WKWebViewConfiguration()
-    rejectionConfiguration.websiteDataStore = .nonPersistent()
-    let rejectionView = WKWebView(frame: .zero, configuration: rejectionConfiguration)
-    // Drive the didFinish boundary without loading another document or printing.
-    rejectedJob.webView(rejectionView, didFinish: nil)
-    guard case .some(.failure(_)) = rejectedPrint else { fatalError("Held print lease must reject retry") }
-    assert(rejectedFactoryCalls == 0 && NSPrintOperation.current == nil,
-      "A rejected retry cannot invoke the stateful factory or leave current occupied")
-    DocumentExportPrintLease.shared.release(heldPrintToken)
-
-    phase("offline WebKit rendering and native paged PDF")
-    let job = OfflineDocumentPrintJob()
-    var outcome: Result<Bool, Error>?
-    job.run(html: try String(contentsOf: fixture, encoding: .utf8), window: window, pdfDestination: output) {
-      assert(Thread.isMainThread, "Native print completion must return to the main actor")
-      outcome = $0
+    phase("production HTML and Markdown fixture round-trip")
+    guard CommandLine.arguments.count == 4 else { fatalError("Expected generated HTML, Markdown and evidence folder") }
+    let evidence = URL(fileURLWithPath: CommandLine.arguments[3], isDirectory: true)
+    try fm.createDirectory(at: evidence, withIntermediateDirectories: true)
+    for (argument, format) in [(1, "html"), (2, "md")] {
+      let fixture = URL(fileURLWithPath: CommandLine.arguments[argument])
+      let input = try Data(contentsOf: fixture)
+      let exported = evidence.appendingPathComponent("document.\(format)")
+      try DocumentExportFileWriter.write(input, to: exported, format: format, sourcePath: fixture.path,
+        expected: try ExportDestinationVersion.read(exported))
+      let actual = try Data(contentsOf: exported)
+      assert(SHA256.hash(data: actual) == SHA256.hash(data: input))
+      assert((try? String(contentsOf: exported, encoding: .utf8))?.contains("CELL_149_D") == true)
     }
-    let deadline = Date().addingTimeInterval(90)
-    while outcome == nil && Date() < deadline {
-      RunLoop.main.run(until: Date().addingTimeInterval(0.05))
-    }
-    guard let outcome else { fatalError("Native PDF generation exceeded 90 seconds") }
-    guard try outcome.get() else { fatalError("Native PDF generation was cancelled") }
-    phase("PDF page geometry, selectable Chinese and table-cell validation")
-    guard let pdf = PDFDocument(url: output), pdf.pageCount >= 3 else { fatalError("Expected real multi-page PDF") }
-    let text = pdf.string ?? ""
-    assert(text.contains("中文文档"), "Chinese must be selectable text, not a screenshot")
-    assert(text.contains("CJK START") && text.contains("CJK END"))
-    assert(text.contains("CODE_END"), "Long wrapped code must reach the end")
-    var tablePages = 0
-    for index in 0..<pdf.pageCount {
-      guard let page = pdf.page(at: index) else { fatalError("Missing PDF page") }
-      let bounds = page.bounds(for: .mediaBox)
-      assert(abs(bounds.width - 595.276) < 2 && abs(bounds.height - 841.89) < 2, "PDF must use A4 pages, not one tall capture")
-      let pageText = page.string ?? ""
-      if pageText.contains("CELL_") {
-        tablePages += 1
-        assert(pageText.contains("HEADER_ONE") && pageText.contains("HEADER_FOUR"), "Every table page repeats its header")
-      }
-      for character in 0..<page.numberOfCharacters {
-        let rectangle = page.characterBounds(at: character)
-        if rectangle.isEmpty || rectangle.isNull { continue }
-        assert(rectangle.minX >= -1 && rectangle.maxX <= bounds.width + 1, "Text must not clip horizontally")
-      }
-      if index == 0 || index == pdf.pageCount - 1 {
-        let image = page.thumbnail(of: NSSize(width: 840, height: 1188), for: .mediaBox)
-        if let tiff = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiff),
-           let png = bitmap.representation(using: .png, properties: [:]) {
-          try png.write(to: evidence.appendingPathComponent("page-\(index + 1).png"))
-        }
-      }
-    }
-    assert(tablePages >= 3)
-    // All columns of all rows survive pagination. Normalize whitespace only,
-    // because PDF extraction can introduce line breaks in narrow columns.
-    let compact = text.filter { !$0.isWhitespace }
-    for row in 0..<150 {
-      for column in ["A", "B", "C", "D"] {
-        assert(compact.contains("CELL_\(row)_\(column)"), "Missing table cell \(row) \(column)")
-      }
-    }
-    try text.write(to: evidence.appendingPathComponent("pagination.txt"), atomically: true, encoding: .utf8)
     let finalSourceHash = SHA256.hash(data: try Data(contentsOf: source))
     assert(finalSourceHash == originalHash)
-    print("PASS: source hash, explicit replacement, racing collision, hard-link/symlink, permissions, offline cloud; \(pdf.pageCount) A4 PDF pages, selectable Chinese, 600 table cells, repeated table headers and wrapped code.")
+    print("PASS: exact HTML/Markdown UTF-8 copies, source hash, empty Markdown, cancellation/once-only completion, unsupported PDF/Print, explicit replacement, racing collision, hard-link/symlink, permissions and offline placeholders.")
     window.orderOut(nil)
   }
 }

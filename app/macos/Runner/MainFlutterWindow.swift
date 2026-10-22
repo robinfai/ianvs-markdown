@@ -60,7 +60,12 @@ class MainFlutterWindow: NSWindow {
 
 
   private var exportChannel: FlutterMethodChannel?
-  private lazy var documentExport = DocumentExportCoordinator(window: self)
+  private lazy var documentExport = DocumentExportCoordinator(window: self, approveCommit: { [weak self] id, approved in
+    guard let channel = self?.exportChannel else { approved(false); return }
+    channel.invokeMethod("approveCommit", arguments: ["operationId": id]) { value in
+      approved(value as? Bool == true)
+    }
+  })
   private var fileAccessChannel: FlutterMethodChannel?
   private var fileAssociationChannel: FlutterMethodChannel?
   private var incomingFilesChannel: FlutterMethodChannel?

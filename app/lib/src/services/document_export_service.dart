@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:flutter/services.dart';
@@ -26,7 +27,7 @@ class DocumentExportSnapshot {
   final List<String> protectedPaths;
 }
 
-enum DocumentExportAction { html, pdf, print }
+enum DocumentExportAction { html, markdown }
 
 class DocumentExportFailure implements Exception {
   const DocumentExportFailure(this.message);
@@ -36,8 +37,8 @@ class DocumentExportFailure implements Exception {
 }
 
 class ExportedDocument {
-  const ExportedDocument(this.html, this.notices);
-  final String html;
+  const ExportedDocument(this.content, this.notices);
+  final String content;
   final List<String> notices;
 }
 
@@ -49,9 +50,15 @@ const documentExportFidelityNotice =
     'Local note links are text only; remote images are never downloaded. '
     'Your Markdown original and unsaved edits are not changed.';
 
+const documentExportMarkdownNotice =
+    'Exports the current Markdown text verbatim as a UTF-8 copy. '
+    'Attachments are not copied. Relative image and note links stay unchanged '
+    'and may not resolve in the destination folder. '
+    'Your original and unsaved edits are not changed.';
+
 /// No raw HTML is copied through. Only known AST elements and individually
 /// checked attributes are serialized; source HTML is visible escaped text.
-/// The same complete document is consumed by HTML, native PDF and Print.
+/// HTML is a complete offline document. Markdown copies skip parsing and assets.
 class DocumentExportService {
   const DocumentExportService({
     this.attachmentSource = const AppleAttachmentSource(),
@@ -63,6 +70,39 @@ class DocumentExportService {
   final int maximumImages;
   final int maximumImageBytes;
   final int maximumOutputBytes;
+
+  ExportedDocument buildMarkdown(
+    DocumentExportSnapshot snapshot, {
+    required bool Function() isCurrent,
+  }) {
+    if (!isCurrent()) {
+      throw const DocumentExportFailure(
+        'Export cancelled because the document or folder changed.',
+      );
+    }
+    // Verbatim copies need no parser, rendering budget, or attachment I/O.
+    // Charge UTF-8 incrementally before the platform codec allocates its copy.
+    _ExportByteBudget(
+      maximumOutputBytes,
+    ).chargeText(snapshot.source, 0, snapshot.source.length);
+    for (var index = 0; index < snapshot.source.length; index++) {
+      final unit = snapshot.source.codeUnitAt(index);
+      if (unit < 0xd800 || unit > 0xdfff) continue;
+      if (unit <= 0xdbff && index + 1 < snapshot.source.length) {
+        final next = snapshot.source.codeUnitAt(index + 1);
+        if (next >= 0xdc00 && next <= 0xdfff) {
+          index++;
+          continue;
+        }
+      }
+      throw const DocumentExportFailure(
+        'Markdown contains invalid Unicode and cannot be exported losslessly.',
+      );
+    }
+    return ExportedDocument(snapshot.source, const [
+      documentExportMarkdownNotice,
+    ]);
+  }
 
   Future<ExportedDocument> build(
     DocumentExportSnapshot snapshot, {
@@ -92,7 +132,7 @@ class DocumentExportService {
       source: _ScopedAttachmentSource(attachmentSource, check),
     );
     try {
-      final budget = _HtmlByteBudget(maximumOutputBytes);
+      final budget = _ExportByteBudget(maximumOutputBytes);
       final output = _BoundedHtmlBuffer(budget);
       // Reserve the fixed document and visible notices before any asset reads.
       final notesOutput = _BoundedHtmlBuffer(budget);
@@ -198,8 +238,8 @@ class _ScopedAttachmentSource implements AttachmentSource {
 /// Shares a single byte budget across body, fixed envelope and dynamic notices.
 /// Counts UTF-8 without allocating a second byte array. UTF-16 surrogate pairs
 /// use four bytes; lone surrogates use the encoder's three-byte replacement.
-class _HtmlByteBudget {
-  _HtmlByteBudget(this.maximum);
+class _ExportByteBudget {
+  _ExportByteBudget(this.maximum);
   final int maximum;
   int used = 0;
 
@@ -245,7 +285,7 @@ class _HtmlByteBudget {
 
 class _BoundedHtmlBuffer {
   _BoundedHtmlBuffer(this.budget);
-  final _HtmlByteBudget budget;
+  final _ExportByteBudget budget;
   final _buffer = StringBuffer();
 
   void write(String value) {
@@ -557,23 +597,72 @@ abstract class DocumentExportPlatform {
     required DocumentExportAction action,
     required ExportedDocument document,
     required DocumentExportSnapshot snapshot,
+    required bool Function() isCurrent,
   });
+  Future<void> cancel(DocumentExportSnapshot snapshot);
 }
 
 class AppleDocumentExportPlatform implements DocumentExportPlatform {
   const AppleDocumentExportPlatform();
   static const channel = MethodChannel('work.ianvs.linefold/document_export');
+  // A restarted Dart isolate must never approve an old native panel whose
+  // counter happens to match a new export. This nonce is not exported content.
+  static final _session = base64Url.encode(
+    List<int>.generate(16, (_) => _random.nextInt(256)),
+  );
+  static final _random = Random.secure();
+  static int _sequence = 0;
+  static final _pending =
+      <
+        String,
+        ({DocumentExportSnapshot snapshot, bool Function() isCurrent})
+      >{};
+
+  static void _installHandler() {
+    channel.setMethodCallHandler((call) async {
+      if (call.method != 'approveCommit' || call.arguments is! Map) {
+        return false;
+      }
+      final id = (call.arguments as Map)['operationId'];
+      // Native asks again AFTER the user's SavePanel choice. Cancellation alone
+      // is insufficient: its cross-bridge message could arrive after selection.
+      return _pending[id]?.isCurrent() ?? false;
+    });
+  }
+
+  @override
+  Future<void> cancel(DocumentExportSnapshot snapshot) async {
+    final ids = [
+      for (final entry in _pending.entries)
+        if (identical(entry.value.snapshot, snapshot)) entry.key,
+    ];
+    for (final id in ids) {
+      await channel.invokeMethod<bool>('cancel', {'operationId': id});
+    }
+  }
+
   @override
   Future<bool> output({
     required DocumentExportAction action,
     required ExportedDocument document,
     required DocumentExportSnapshot snapshot,
-  }) async =>
-      await channel.invokeMethod<bool>(action.name, {
-        'html': document.html,
-        'title': snapshot.title,
-        'sourcePath': snapshot.documentPath,
-        'protectedPaths': snapshot.protectedPaths,
-      }) ??
-      false;
+    required bool Function() isCurrent,
+  }) async {
+    if (!isCurrent()) return false;
+    _installHandler();
+    final id = '$_session:${++_sequence}';
+    _pending[id] = (snapshot: snapshot, isCurrent: isCurrent);
+    try {
+      return await channel.invokeMethod<bool>(action.name, {
+            'operationId': id,
+            'content': document.content,
+            'title': snapshot.title,
+            'sourcePath': snapshot.documentPath,
+            'protectedPaths': snapshot.protectedPaths,
+          }) ??
+          false;
+    } finally {
+      _pending.remove(id);
+    }
+  }
 }

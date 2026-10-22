@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check declared and (optionally) built app print permissions, not runtime UI."""
+"""Check sandboxed copy export adds no unnecessary printing permission."""
 import argparse
 from pathlib import Path
 import plistlib
@@ -8,9 +8,10 @@ import subprocess
 
 def validate(data: bytes, label: str) -> None:
     value = plistlib.loads(data)
-    for key in ("com.apple.security.app-sandbox", "com.apple.security.print"):
-        if value.get(key) is not True:
-            raise SystemExit(f"{label}: missing {key}=true")
+    if value.get("com.apple.security.app-sandbox") is not True:
+        raise SystemExit(f"{label}: missing app sandbox")
+    if "com.apple.security.print" in value:
+        raise SystemExit(f"{label}: copy-only export must not request printing")
 
 
 def main() -> None:
@@ -31,7 +32,7 @@ def main() -> None:
                 check=True, capture_output=True,
             )
             validate(result.stdout, str(bundle))
-    print("PASS: sandbox and printing declarations" +
+    print("PASS: sandbox declarations with no printing permission" +
           (" and actual Debug/Release code-signature entitlements" if args.built_apps else " (source only)"))
 
 
