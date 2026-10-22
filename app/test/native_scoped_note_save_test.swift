@@ -309,7 +309,31 @@ struct ScopedNoteSaveTests {
     precondition(early == .timedOut, "Scoped save escaped another writer's coordination claim")
     precondition(saverFinished.wait(timeout: .now() + 10) == .success)
     if let error = writer.load() { throw error }
-    guard let conflict = saver.load() as? WorkspaceSaveConflict else { preconditionFailure("Expected coordinated conflict") }
+    guard let conflict = saver.load() as? WorkspaceSaveConflict else {
+      let observed = saver.load()
+      FileHandle.standardError.write(Data("Concurrent save actual outcome=\(String(reflecting: observed))\n".utf8))
+      let selection = try WorkspaceWriteAuthority().activate(root)
+      let expected = URL(fileURLWithPath: selection["path"]!).appendingPathComponent("设计.md")
+      var evidence = "Concurrent save outcome=\(String(reflecting: observed)), original=\(target.path), nativeSelected=\(expected.path)\n"
+      var probeError: NSError?
+      let probe = NSFileCoordinator()
+      let cancelProbe = DispatchWorkItem { probe.cancel() }
+      DispatchQueue.global().asyncAfter(deadline: .now() + 5, execute: cancelProbe)
+      defer { cancelProbe.cancel() }
+      probe.coordinate(writingItemAt: expected, options: [], error: &probeError) { coordinated in
+        evidence += "Subsequent coordination probe requested=\(expected.path), returned=\(coordinated.path)\n"
+        for url in [target, expected, coordinated] {
+          do {
+            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+            let data = try Data(contentsOf: url)
+            evidence += "path=\(url.path) device=\(String(describing: attributes[.systemNumber])) inode=\(String(describing: attributes[.systemFileNumber])) bytes=\(data.base64EncodedString())\n"
+          } catch { evidence += "path=\(url.path) error=\(error)\n" }
+        }
+      }
+      evidence += "Subsequent coordination probe error=\(String(reflecting: probeError))\n"
+      FileHandle.standardError.write(Data(evidence.utf8))
+      preconditionFailure("Expected coordinated conflict")
+    }
     precondition(conflict.currentContents == "coordinated external edit")
     let bytes = try Data(contentsOf: target)
     precondition(bytes == Data("coordinated external edit".utf8))
