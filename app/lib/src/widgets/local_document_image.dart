@@ -22,7 +22,13 @@ class LocalDocumentImage extends StatefulWidget {
 }
 
 class _LocalDocumentImageState extends State<LocalDocumentImage> {
-  late final _image = _read();
+  late var _image = _read();
+
+  @override
+  void didUpdateWidget(covariant LocalDocumentImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.path != widget.path) _image = _read();
+  }
 
   Future<({Uint8List bytes, String? svg})> _read() async {
     final file = await File(widget.path).open();
@@ -51,6 +57,7 @@ class _LocalDocumentImageState extends State<LocalDocumentImage> {
   @override
   Widget build(BuildContext context) =>
       FutureBuilder<({Uint8List bytes, String? svg})>(
+        key: ValueKey(widget.path),
         future: _image,
         builder: (context, snapshot) {
           if (snapshot.hasError) {

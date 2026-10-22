@@ -1,5 +1,13 @@
 ## Unreleased
 
+- Add read-only local image attachments to the Linefold desktop editor and iOS
+  reader. Resolve Markdown paths and unique block Wiki embeds within the opened
+  vault, preserve source and image sizing, and keep Obsidian attachment settings
+  read-only. Native no-follow reads, bounded metadata indexes, explicit offline
+  and permission errors, cancellable scoped caches, and raster decode budgets
+  protect automatic previews. SVG/AVIF, inline Wiki images, and attachment
+  import/paste remain outside this phase. See [P1b boundaries and verification](doc/P1B_ATTACHMENT_LOADING.md).
+
 - Add desktop current-buffer Find/Replace with Command-F, next/previous match,
   case matching, exact source highlighting, and single-step replacement undo.
   Live/Read temporarily show source while finding; Read requires an explicit

@@ -15,6 +15,8 @@ import '../editor_commands.dart';
 import '../models/document_session.dart';
 import '../models/workspace_layout.dart';
 import '../services/document_link_service.dart';
+import '../services/attachment_repository.dart';
+import 'document_attachment_scope.dart';
 import '../services/markdown_file_service.dart';
 import 'local_document_image.dart';
 import 'document_diagram.dart';
@@ -39,9 +41,11 @@ class EditorShell extends StatefulWidget {
     this.onOpenSettings,
     this.enableFileDrop = true,
     this.onRetryInitialization,
+    this.attachmentSource = const AppleAttachmentSource(),
   });
 
   final WorkspaceController workspace;
+  final AttachmentSource attachmentSource;
   final bool dark;
   final VoidCallback onToggleTheme;
   final VoidCallback? onUseSystemTheme;
@@ -611,52 +615,82 @@ class _EditorShellState extends State<EditorShell> {
                                                       _saveFromEditor(document),
                                                 );
                                               }
-                                              return IanvsMarkdownLiveEditor(
-                                                key: ValueKey(document.id),
-                                                controller: document.controller,
-                                                focusNode: _editorFocus,
-                                                autofocus: identical(
-                                                  _resumeLiveController,
-                                                  document.controller,
-                                                ),
-                                                clipboardWriter: (data) =>
-                                                    writeIanvsMarkdownRichClipboard(
-                                                      markdown: data.markdown,
-                                                      html: data.html,
+                                              return DocumentAttachmentScope(
+                                                root: workspace.workspaceRoot,
+                                                documentPath: document.path,
+                                                revision: workspace
+                                                    .workspaceFilesRevision,
+                                                source: widget.attachmentSource,
+                                                builder: (context, images) =>
+                                                    IanvsMarkdownLiveEditor(
+                                                      imageBuilder:
+                                                          images.image,
+                                                      wikiEmbedBuilder:
+                                                          images.wiki,
+                                                      key: ValueKey(
+                                                        document.id,
+                                                      ),
+                                                      controller:
+                                                          document.controller,
+                                                      focusNode: _editorFocus,
+                                                      autofocus: identical(
+                                                        _resumeLiveController,
+                                                        document.controller,
+                                                      ),
+                                                      clipboardWriter: (data) =>
+                                                          writeIanvsMarkdownRichClipboard(
+                                                            markdown:
+                                                                data.markdown,
+                                                            html: data.html,
+                                                          ),
+                                                      onTapLink: (_, href, _) =>
+                                                          _guard(
+                                                            () =>
+                                                                DocumentLinkService(
+                                                                  workspace:
+                                                                      workspace,
+                                                                  openImage:
+                                                                      _openImage,
+                                                                ).open(
+                                                                  document,
+                                                                  href,
+                                                                ),
+                                                          ),
+                                                      diagramBuilder:
+                                                          (
+                                                            context,
+                                                            source,
+                                                          ) => DocumentDiagram(
+                                                            source: source,
+                                                            renderer:
+                                                                _mermaidRenderer,
+                                                          ),
+                                                      scrollController: document
+                                                          .scrollController,
+                                                      showToolbar: false,
+                                                      placeholder:
+                                                          'Start writing Markdown…',
+                                                      enableModeShortcuts:
+                                                          false,
+                                                      showNavigationPane: false,
+                                                      showOutlineInPreview:
+                                                          false,
+                                                      showFrontMatter: false,
+                                                      contentMaxWidth:
+                                                          DesktopMetrics
+                                                              .documentMaxWidth,
+                                                      padding:
+                                                          EdgeInsets.fromLTRB(
+                                                            inset,
+                                                            32,
+                                                            inset,
+                                                            56,
+                                                          ),
+                                                      onSaveRequested: (_) =>
+                                                          _saveFromEditor(
+                                                            document,
+                                                          ),
                                                     ),
-                                                onTapLink: (_, href, _) =>
-                                                    _guard(
-                                                      () => DocumentLinkService(
-                                                        workspace: workspace,
-                                                        openImage: _openImage,
-                                                      ).open(document, href),
-                                                    ),
-                                                diagramBuilder:
-                                                    (context, source) =>
-                                                        DocumentDiagram(
-                                                          source: source,
-                                                          renderer:
-                                                              _mermaidRenderer,
-                                                        ),
-                                                scrollController:
-                                                    document.scrollController,
-                                                showToolbar: false,
-                                                placeholder:
-                                                    'Start writing Markdown…',
-                                                enableModeShortcuts: false,
-                                                showNavigationPane: false,
-                                                showOutlineInPreview: false,
-                                                showFrontMatter: false,
-                                                contentMaxWidth: DesktopMetrics
-                                                    .documentMaxWidth,
-                                                padding: EdgeInsets.fromLTRB(
-                                                  inset,
-                                                  32,
-                                                  inset,
-                                                  56,
-                                                ),
-                                                onSaveRequested: (_) =>
-                                                    _saveFromEditor(document),
                                               );
                                             },
                                           ),

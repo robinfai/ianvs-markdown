@@ -115,7 +115,9 @@ R2-01 在 `dba969d` 基线上也复现基准入口的未修改 SDK Profile AOT �
 
 2026-10-10 在未修改的 Flutter 3.44.8 / Xcode 27.0 上重新运行 Linefold macOS Debug 与 iOS Simulator Debug 构建，均通过；iOS 使用 `--simulator --debug --no-codesign`。两次构建设置 `CARGO_PROFILE_RELEASE_STRIP=none`，macOS 另外设置 `FLUTTER_XCODE_ARCHS=arm64`。iOS 原生剪贴板依赖仍通过 CocoaPods 集成，构建提示尚未采用 Swift Package Manager；这继续作为 R1-04 的依赖成本依据，不推断未来工具链的支持期限。
 
-同日 iPhone 18 Pro / iOS 27 模拟器 XCTest 三项通过：八个中文字符生成不同且非空的轮廓、导入副本在源文件删除后保留且同名隔离、工作区远端占位文件枚举与协调读写。它验证原生逻辑和字形轮廓，不代替真机分享界面、读屏或人工视觉检查。目前 CI 的 Native integrations 仍是 macOS job，iOS 构建和 XCTest 为本机证据。
+同日 iPhone 18 Pro / iOS 27 模拟器 XCTest 三项通过：八个中文字符生成不同且非空的轮廓、导入副本在源文件删除后保留且同名隔离、工作区远端占位文件枚举与协调读写。它验证原生逻辑和字形轮廓，不代替真机分享界面、读屏或人工视觉检查。该历史记录中的 Native integrations CI 只有 macOS job，iOS 构建和 XCTest 为本机证据。
+
+2026-10-22 的 P1b 附件加载变更为 Native integrations 新增独立的 iOS Simulator Debug 无签名编译检查，复用 `make build-ios-preview`，单 job 上限 30 分钟。候选版本是否通过以对应 PR 的检查结果为准；该检查不启动模拟器、不执行上述历史 XCTest，也不代表真实设备或沙盒运行已验证。
 
 物理 iPhone 的本地存储版本曾完成签名、安装和启动；原记录明确未独立检查真机中文字形。第三方发送应用/文件提供方的完整分享流程、真机触摸与读屏仍需验收。自动跨设备 iCloud 同步还需要能够配置共享容器的开发者团队，Personal Team 本地版本不提供这项证据。
 

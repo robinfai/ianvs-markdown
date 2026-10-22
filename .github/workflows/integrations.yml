@@ -55,3 +55,33 @@ jobs:
           name: native-rendering
           path: packages/ianvs_mermaid/build/visual-regression/
           if-no-files-found: ignore
+
+  ios-simulator:
+    name: iOS simulator build
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      CARGO_PROFILE_RELEASE_STRIP: none
+      COCOAPODS_DISABLE_STATS: 'true'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.44.8'
+          cache: true
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios-sim, x86_64-apple-ios
+      - name: Record simulator build toolchains and revision
+        run: |
+          git rev-parse HEAD
+          flutter --version
+          rustc --version
+          xcodebuild -version
+          xcrun --sdk iphonesimulator --show-sdk-version
+          pod --version
+      # Compile the actual iOS entry and shared Apple bridge without a device,
+      # signing identity, credentials, simulator boot, or release/upload step.
+      - name: Build unsigned iOS reading preview
+        run: make build-ios-preview
