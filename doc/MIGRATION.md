@@ -1,6 +1,6 @@
 # 从 0.3.1 升级到当前 Unreleased
 
-更新：2026-10-13。面向已使用 0.3.1 的宿主，整理当前仓库候选的行为变化与接入步骤。
+更新：2026-10-22。面向已使用 0.3.1 的宿主，整理当前仓库候选的行为变化与接入步骤。
 仓库版本仍是 `0.3.1`，这些变更尚未发布到 pub.dev；不能仅通过更新版本约束获得它们。
 接入验证应锁定候选提交或该提交的 Pub-selected 包快照，并记录文件哈希。
 本指南不表示 1.0 API 已冻结。2026-10-12 起当前迭代改以 example/app 两个 main 为入口，
@@ -15,6 +15,8 @@
 | 撤销历史 | 无容量上限 | 默认最多 200 个快照、32 MiB 计账文本，含当前状态 | 需要不同容量时配置策略；确需旧行为时显式 `historyPolicy: null` |
 | standard GFM | 正文已支持 opt-in standard | View 也支持 standard；默认仍为 Obsidian | 按阅读用途选择，不向 Live/Source 传入不存在的 standard 编辑参数 |
 | 文案、快捷键与焦点 | 原有标签和命令 | 增加局部配置作用域与可注入焦点 | 需要时 opt in，校验自己的快捷键保留、焦点和对象释放 |
+| Source 范围定位/只读 | 无独立请求 | 新增可选 `highlightedRange` 与 `readOnly`；原默认不变 | 查找使用原文快照和 UTF-16 范围，Reading 临时源码面显式传 `readOnly: true` |
+| Live 初次 autofocus | 固定激活首块 | 按 Controller 当前源码选区激活并定位；晚到外部焦点取消异步恢复 | 若确需从文首开始，先显式设置源码光标为 0；隐藏 YAML 选区转到可见正文 |
 | 异步保存 | 已支持捕获文本确认 | 契约保持；补充文档关闭后迟到确认的保护和接入样例 | 检查存储回调真正等待写入，绑定文档身份；不能把新编辑错误标为已保存 |
 
 内部 renderer 状态隔离、Source 几何复用和 Live 私有模块拆分不要求改用新的公共入口。
@@ -144,6 +146,32 @@ Actions。不要在返回 true 后再次调用 controller，composing 抑制也�
 的结构格式按钮禁用。独立工具栏没有对应焦点时仍使用传入 controller 与 focusNode。
 默认日期字段 Tab 保持分段导航。升级后应分别验菜单、按键、工具栏与原生 IME；
 框架 composing 回归不能替代目标系统/输入法的人工验收。
+
+### R4-05 P1a Source 查找面
+
+既有 `IanvsMarkdownEditor` 调用无需修改。需要当前匹配定位的宿主使用唯一文档 Controller，
+直接传精确的源码快照和 UTF-16 范围，不用复制 Controller 或设置其选区来模拟高亮：
+
+```dart
+IanvsMarkdownEditor(
+  controller: controller,
+  readOnly: controller.mode == IanvsMarkdownEditorMode.preview,
+  highlightedRange: IanvsMarkdownSourceHighlight(
+    source: searchedSource,
+    range: TextRange(start: matchStart, end: matchEnd),
+  ),
+);
+```
+
+新建请求对象表示一次导航；仅普通 rebuild 时应复用请求，下一处/上一处即使落回同一范围
+也要创建新实例。null 清除高亮。文本变化或 Controller 替换后旧请求失效，需要重新搜索；
+无效范围或不匹配的快照被忽略。导航不改变焦点、文本、选择或历史，查询框可继续输入。
+
+`readOnly: true` 保留选择、复制、保存与模式切换，隐藏编辑工具栏并消费修改命令。
+保存沿用 `onSaveRequested`；`enableModeShortcuts: false` 只抑制模式按键，不影响显式
+`IanvsMarkdownShortcuts.invoke` 模式操作。显式宿主回调和程序 Controller 写入不在这个
+只读边界内。Controller.mode 本身不能代替该参数。只读切换还会取消已经发起、
+但尚未完成的智能 URL 粘贴。详见 [范围与失效契约](API_CONTRACTS.md#source-范围导航与只读展示r4-05-p1a)。
 
 ## 7. 按顺序验证升级
 

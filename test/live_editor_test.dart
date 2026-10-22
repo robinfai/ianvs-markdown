@@ -11996,10 +11996,15 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('B'));
-    await tester.pump();
-    controller.selection = const TextSelection.collapsed(offset: 9);
-    await tester.pump();
+    final field = tester.widget<TextField>(
+      find.descendant(
+        of: find.byKey(const ValueKey('ianvs-markdown-active-block')),
+        matching: find.byType(TextField),
+      ),
+    );
+    expect(field.controller?.text, '2. B');
+    expect(field.focusNode?.hasFocus, isTrue);
+    expect(controller.selection, const TextSelection.collapsed(offset: 9));
 
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
     await tester.pumpAndSettle();

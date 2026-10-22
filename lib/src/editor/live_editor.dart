@@ -259,10 +259,90 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     _blockController.addListener(_handleBlockChanged);
     if (widget.autofocus &&
         widget.controller.mode == IanvsMarkdownEditorMode.livePreview) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _blocks.isNotEmpty) _activateBlock(_blocks.first);
-      });
+      _autofocusLiveSelection();
     }
+  }
+
+  void _autofocusLiveSelection() {
+    final controller = widget.controller;
+    final focus = _focusNode;
+    final epoch = _modeSurfaceEpoch;
+    bool ownsSurface() =>
+        mounted &&
+        widget.autofocus &&
+        identical(controller, widget.controller) &&
+        identical(focus, _focusNode) &&
+        epoch == _modeSurfaceEpoch &&
+        controller.mode == IanvsMarkdownEditorMode.livePreview &&
+        !_sourceFallback;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!ownsSurface() || _blocks.isEmpty) return;
+      final focusManager = FocusManager.instance;
+      final hostFocus = Focus.maybeOf(
+        context,
+        scopeOk: true,
+        createDependency: false,
+      );
+      var previousFocus = focusManager.primaryFocus;
+      var focusCancelled = false;
+      void handleFocusChanged() {
+        final current = focusManager.primaryFocus;
+        if (identical(current, previousFocus)) return;
+        previousFocus = current;
+        // Scope/shell focus while mounting is not a competing input intent.
+        // A different descendant or sibling taking focus cancels this restore.
+        if (current != null &&
+            !identical(current, focus) &&
+            !identical(current, hostFocus) &&
+            !(hostFocus?.ancestors.contains(current) ?? false)) {
+          focusCancelled = true;
+        }
+      }
+
+      focusManager.addListener(handleFocusChanged);
+      try {
+        final selection = controller.selection;
+        final surface = _selectionSurfaceFor(selection);
+        if (surface != null && !_isHiddenFrontMatter(surface.first)) {
+          _activateSelectionSurface(selection, surface, requestFocus: false);
+        } else {
+          // A hidden metadata selection has no editable row. Use the same
+          // visible-body redirection as a caret inside hidden front matter.
+          _activateDocumentCaret(
+            selection.isValid ? selection.extentOffset : 0,
+            requestFocus: false,
+          );
+        }
+        final activeStart = _activeBlockStart;
+        if (activeStart == null) return;
+        final source = controller.text;
+        final activatedSelection = controller.selection;
+        bool isCurrent() =>
+            ownsSurface() &&
+            !focusCancelled &&
+            controller.text == source &&
+            controller.selection == activatedSelection &&
+            _activeBlockStart == activeStart;
+        final targetIndex = _blocks.indexWhere(
+          (block) => block.start == activeStart,
+        );
+        await WidgetsBinding.instance.endOfFrame;
+        if (!isCurrent() || !_scrollController.hasClients) return;
+        // A retained source selection can belong to a lazy row that has not
+        // been built. Do not queue focus on its detached node: Flutter would
+        // apply that request on mount even if a newer external focus won.
+        if (await _revealLiveBlock(
+          targetIndex,
+          activeStart,
+          isCurrent: isCurrent,
+          duration: Duration.zero,
+        )) {
+          _requestSurfaceKeyboard(_activeEditorKey);
+        }
+      } finally {
+        focusManager.removeListener(handleFocusChanged);
+      }
+    });
   }
 
   @override
@@ -1412,8 +1492,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     required int lineStart,
     required int lineEnd,
     int? caretOffset,
+    bool requestFocus = true,
   }) {
-    if (_redirectHiddenFrontMatter(active)) return;
+    if (_redirectHiddenFrontMatter(active, requestFocus: requestFocus)) return;
     _blockController.revealLeadingMarker = false;
     _activeGapLine = true;
     _activeGapPrefixLength = lineStart - active.start;
@@ -1444,7 +1525,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     setState(() {});
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _focusNode.requestFocus();
+      if (requestFocus) _focusNode.requestFocus();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted ||
             _activeBlockStart != active.start ||
@@ -1473,8 +1554,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   void _activateBlockHorizontally(
     IanvsMarkdownBlock block, {
     required int localOffset,
+    bool requestFocus = true,
   }) {
-    if (_redirectHiddenFrontMatter(block)) return;
+    if (_redirectHiddenFrontMatter(block, requestFocus: requestFocus)) return;
     _foldedSelectionBridge = null;
     _blockController.revealLeadingMarker = false;
     _activeGapLine = false;
@@ -1491,11 +1573,11 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     _syncBlockFromDocument(block);
     setState(() {});
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focusNode.requestFocus();
+      if (mounted && requestFocus) _focusNode.requestFocus();
     });
   }
 
-  void _activateDocumentCaret(int offset) {
+  void _activateDocumentCaret(int offset, {bool requestFocus = true}) {
     _foldedSelectionBridge = null;
     _blockController.revealLeadingMarker = false;
     if (_blocks.isEmpty) return;
@@ -1504,7 +1586,11 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     final blockIndex = _verticalBlockIndexAt(target);
     if (blockIndex >= 0) {
       final block = _blocks[blockIndex];
-      _activateBlockHorizontally(block, localOffset: target - block.start);
+      _activateBlockHorizontally(
+        block,
+        localOffset: target - block.start,
+        requestFocus: requestFocus,
+      );
       return;
     }
 
@@ -1529,7 +1615,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       );
       setState(() {});
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _focusNode.requestFocus();
+        if (mounted && requestFocus) _focusNode.requestFocus();
       });
       return;
     }
@@ -1544,6 +1630,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       lineStart: _lineStartAt(source, target),
       lineEnd: _lineEndAt(source, target),
       caretOffset: target,
+      requestFocus: requestFocus,
     );
   }
 
@@ -1579,8 +1666,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
 
   void _activateSelectionSurface(
     TextSelection selection,
-    ({IanvsMarkdownBlock first, int start, int end}) surface,
-  ) {
+    ({IanvsMarkdownBlock first, int start, int end}) surface, {
+    bool requestFocus = true,
+  }) {
     _syncSelectionSurfaceFromDocument(selection, surface);
     widget.controller.value = widget.controller.value.copyWith(
       selection: selection,
@@ -1588,7 +1676,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     );
     setState(() {});
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focusNode.requestFocus();
+      if (mounted && requestFocus) _focusNode.requestFocus();
     });
   }
 
@@ -1722,8 +1810,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     IanvsMarkdownBlock block, {
     bool selectWholeSource = false,
     int? documentOffset,
+    bool requestFocus = true,
   }) {
-    if (_redirectHiddenFrontMatter(block)) return;
+    if (_redirectHiddenFrontMatter(block, requestFocus: requestFocus)) return;
     _foldedSelectionBridge = null;
     _projectedRenderedTapBlockStart = null;
     _projectedRenderedTapLocalOffset = null;
@@ -1749,7 +1838,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     _syncBlockFromDocument(block);
     setState(() {});
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focusNode.requestFocus();
+      if (mounted && requestFocus) _focusNode.requestFocus();
     });
   }
 
@@ -1758,14 +1847,21 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       block.type == IanvsMarkdownBlockType.frontMatter &&
       parseMarkdownFrontMatter(block.source).hasFrontMatter;
 
-  bool _redirectHiddenFrontMatter(IanvsMarkdownBlock block) {
+  bool _redirectHiddenFrontMatter(
+    IanvsMarkdownBlock block, {
+    bool requestFocus = true,
+  }) {
     if (!_isHiddenFrontMatter(block)) return false;
     final visible = _blocks.where(
       (candidate) => !_isHiddenFrontMatter(candidate),
     );
     if (visible.isNotEmpty) {
       final first = visible.first;
-      _activateBlock(first, documentOffset: first.start);
+      _activateBlock(
+        first,
+        documentOffset: first.start,
+        requestFocus: requestFocus,
+      );
     } else {
       _activeBlockStart = null;
       _activeGapLine = false;
@@ -2495,7 +2591,23 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       return;
     }
 
-    var blockContext = _blockKeys[request.sourceOffset]?.currentContext;
+    await _revealLiveBlock(
+      targetIndex,
+      request.sourceOffset,
+      isCurrent: isCurrent,
+    );
+  }
+
+  Future<bool> _revealLiveBlock(
+    int targetIndex,
+    int sourceOffset, {
+    required bool Function() isCurrent,
+    Duration duration = const Duration(milliseconds: 260),
+  }) async {
+    if (targetIndex < 0 || !isCurrent() || !_scrollController.hasClients) {
+      return false;
+    }
+    var blockContext = _blockKeys[sourceOffset]?.currentContext;
     if (blockContext == null) {
       final position = _scrollController.position;
       final fraction = _blocks.length <= 1
@@ -2510,8 +2622,10 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       var lower = 0.0;
       double? upper;
       for (var attempt = 0; attempt < 32; attempt += 1) {
-        if (!mounted || !isCurrent() || !_scrollController.hasClients) return;
-        blockContext = _blockKeys[request.sourceOffset]?.currentContext;
+        if (!mounted || !isCurrent() || !_scrollController.hasClients) {
+          return false;
+        }
+        blockContext = _blockKeys[sourceOffset]?.currentContext;
         if (blockContext != null) break;
         final viewport = context.findRenderObject();
         if (viewport is! RenderBox || !viewport.hasSize) break;
@@ -2531,7 +2645,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         if (visibleStarts.isEmpty) break;
         visibleStarts.sort();
         final current = _scrollController.position;
-        if (request.sourceOffset < visibleStarts.first) {
+        if (sourceOffset < visibleStarts.first) {
           upper = current.pixels;
         } else {
           lower = current.pixels;
@@ -2545,15 +2659,16 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         await WidgetsBinding.instance.endOfFrame;
       }
     }
-    if (!mounted || !isCurrent()) return;
-    blockContext = _blockKeys[request.sourceOffset]?.currentContext;
-    if (blockContext == null || !blockContext.mounted) return;
+    if (!mounted || !isCurrent()) return false;
+    blockContext = _blockKeys[sourceOffset]?.currentContext;
+    if (blockContext == null || !blockContext.mounted) return false;
     await Scrollable.ensureVisible(
       blockContext,
-      duration: const Duration(milliseconds: 260),
+      duration: duration,
       curve: Curves.easeOutCubic,
       alignment: .08,
     );
+    return isCurrent();
   }
 
   Widget _buildLiveMode(IanvsMarkdownThemeData colors) {

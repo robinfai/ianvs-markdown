@@ -91,6 +91,7 @@
     "IanvsMarkdownSaveCancelledException": "package:ianvs_markdown/src/editor/editor_toolbar.dart",
     "IanvsMarkdownShortcuts": "package:ianvs_markdown/src/keyboard.dart",
     "IanvsMarkdownSizedImage": "package:ianvs_markdown/src/obsidian_image.dart",
+    "IanvsMarkdownSourceHighlight": "package:ianvs_markdown/src/editor/source_editor.dart",
     "IanvsMarkdownStandardImageSource": "package:ianvs_markdown/src/obsidian_image.dart",
     "IanvsMarkdownStandardImageSourceSyntax": "package:ianvs_markdown/src/obsidian_image.dart",
     "IanvsMarkdownStrikethroughMatch": "package:ianvs_markdown/src/strikethrough.dart",
@@ -3620,6 +3621,19 @@
           "default": "false"
         },
         {
+          "name": "readOnly",
+          "type": "bool",
+          "kind": "named",
+          "required": false,
+          "default": "false"
+        },
+        {
+          "name": "highlightedRange",
+          "type": "IanvsMarkdownSourceHighlight?",
+          "kind": "named",
+          "required": false
+        },
+        {
           "name": "showToolbar",
           "type": "bool",
           "kind": "named",
@@ -3717,6 +3731,14 @@
       "static": false,
       "late": false
     },
+    "IanvsMarkdownEditor/field:highlightedRange": {
+      "kind": "field",
+      "type": "IanvsMarkdownSourceHighlight?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
     "IanvsMarkdownEditor/field:onChanged": {
       "kind": "field",
       "type": "void Function(String)?",
@@ -3744,6 +3766,14 @@
     "IanvsMarkdownEditor/field:placeholder": {
       "kind": "field",
       "type": "String?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownEditor/field:readOnly": {
+      "kind": "field",
+      "type": "bool",
       "const": false,
       "final": true,
       "static": false,
@@ -9357,6 +9387,53 @@
       "parameters": [],
       "static": false,
       "abstract": false
+    },
+    "IanvsMarkdownSourceHighlight": {
+      "kind": "class",
+      "typeParameters": [],
+      "modifiers": [],
+      "supertype": "Object",
+      "interfaces": [],
+      "mixins": []
+    },
+    "IanvsMarkdownSourceHighlight/constructor:new": {
+      "kind": "constructor",
+      "typeParameters": [],
+      "returnType": "IanvsMarkdownSourceHighlight",
+      "parameters": [
+        {
+          "name": "source",
+          "type": "String",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "range",
+          "type": "TextRange",
+          "kind": "named",
+          "required": true
+        }
+      ],
+      "static": false,
+      "abstract": false,
+      "const": true,
+      "factory": false
+    },
+    "IanvsMarkdownSourceHighlight/field:range": {
+      "kind": "field",
+      "type": "TextRange",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownSourceHighlight/field:source": {
+      "kind": "field",
+      "type": "String",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
     },
     "IanvsMarkdownStandardImageSource": {
       "kind": "class",
