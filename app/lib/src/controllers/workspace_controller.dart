@@ -93,14 +93,14 @@ class WorkspaceController extends ChangeNotifier {
       if (_workspaceRoot != null) {
         final epoch = index.epoch;
         unawaited(
-          refreshNoteMoveRecovery().catchError((Object error) {
+          inspectNoteMoveStorage().catchError((Object error) {
             if (!_disposed &&
                 epoch == index.epoch &&
                 error is! MissingPluginException) {
               noteMoveRecoveryNotice = 'Note move recovery needs review';
               notifyListeners();
             }
-            return const WorkspaceNoteMoveJournalList();
+            return WorkspaceNoteMoveStorage();
           }),
         );
       }
@@ -1498,6 +1498,32 @@ class WorkspaceController extends ChangeNotifier {
       );
     }
     return record;
+  }
+
+  /// Pure storage observation. Unlike reconciliation, this must not repair,
+  /// initialize or persist the private journal merely to display its inventory.
+  Future<WorkspaceNoteMoveStorage> inspectNoteMoveStorage() async {
+    final root = _workspaceRoot;
+    final epoch = index.epoch;
+    bool current() =>
+        !_disposed &&
+        root != null &&
+        root == _workspaceRoot &&
+        epoch == index.epoch;
+    if (!current()) {
+      throw StateError('Select a workspace to inspect recovery storage.');
+    }
+    final storage = await noteTransactions.inspectStorage(root!);
+    if (!current()) {
+      throw StateError(
+        'The workspace changed. Reopen recovery in the original workspace.',
+      );
+    }
+    noteMoveRecoveryNotice = storage.needsReview
+        ? 'Note move recovery needs review'
+        : null;
+    notifyListeners();
+    return storage;
   }
 
   Future<WorkspaceNoteMoveJournalList> refreshNoteMoveRecovery() async {

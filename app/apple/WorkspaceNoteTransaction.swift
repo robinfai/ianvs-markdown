@@ -15,7 +15,7 @@ final class WorkspaceNoteTransaction {
   static let shared = WorkspaceNoteTransaction()
   static let methods: Set<String> = ["prepareWorkspaceNoteMove", "executeWorkspaceNoteMove",
     "listWorkspaceNoteMoves", "reconcileWorkspaceNoteMove", "recoverWorkspaceNoteMove",
-    "cancelPreparedWorkspaceNoteMove"]
+    "cancelPreparedWorkspaceNoteMove", "inspectWorkspaceNoteMoveStorage"]
   static let maximumFiles = 128
   static let maximumPayloadBytes = 32 * 1024 * 1024
   static let maximumJournalBytes = 192 * 1024 * 1024
@@ -28,6 +28,10 @@ final class WorkspaceNoteTransaction {
   var parentDeviceOverride: ((String, Int32) -> Int32)?
   var parentAccessOverride: ((String, Bool) -> Bool)?
   var forceDependencyTimeout = false
+  // Synthetic inventory hooks. Production never supplies these; neither is a channel argument.
+  var inventoryArtifactObserver: ((String) -> Void)?
+  var inventoryDatalessOverride: ((String) -> Bool)?
+  var inventoryReadBudgetOverride: Int?
   // Read-only synthetic-test observer. Never exposed on the Flutter channel;
   // the production singleton leaves it nil and emits no path diagnostics.
   struct CoordinationObservation {
@@ -162,6 +166,18 @@ final class WorkspaceNoteTransaction {
 
   /// Call only on CloudWorkspace's serial transaction queue.
   func perform(_ method: String, arguments: [String: Any]) -> Any {
+    // Inspection has its own error path: even a malformed request must never
+    // fall through to load(), which initializes/repairs the private journal.
+    if method == "inspectWorkspaceNoteMoveStorage" {
+      do {
+        return try WorkspaceFileScope.withoutMaterialization {
+          guard let path = arguments["path"] as? String, path.hasPrefix("/"), !path.contains("\0") else {
+            throw Failure("scope_unavailable")
+          }
+          return try inspectStorage(root: URL(fileURLWithPath: path, isDirectory: true))
+        }
+      } catch { return unavailableStorage(code(error)) }
+    }
     do {
       return try WorkspaceFileScope.withoutMaterialization {
         guard let path = arguments["path"] as? String, path.hasPrefix("/"), !path.contains("\0") else {
@@ -1604,9 +1620,16 @@ final class WorkspaceNoteTransaction {
       }
     }
     try requireEmptyACL(fd, failureCode: "private_journal_unavailable")
-    let record = try JSONDecoder().decode(Record.self, from: data)
+    let record = try decodeRecord(data, id: id)
     if observedConsistencyConflicts.contains(id) { record.consistencyConflict = true }
     if unpersistedUncertainty.contains(id) { record.completionVerified = false }
+    return record
+  }
+
+  /// Pure journal decoding/validation. It does not apply live execution state,
+  /// reopen paths, reconcile, save, or initialize any directory.
+  private func decodeRecord(_ data: Data, id: String) throws -> Record {
+    let record = try JSONDecoder().decode(Record.self, from: data)
     guard record.version == 1, record.transactionId == id, record.entries.count > 0,
           record.entries.count <= Self.maximumFiles, record.recoveries.count <= Self.maximumFiles,
           record.entries.reduce(0, { $0 + $1.original.count + $1.replacement.count }) <= Self.maximumPayloadBytes,
@@ -1632,6 +1655,390 @@ final class WorkspaceNoteTransaction {
     }
     return record
   }
+  // MARK: - Bounded, observation-only storage inventory
+
+  private static var cleanupUnavailableCode: String {
+    #if os(iOS)
+    return "platform_recovery_surface_unverified"
+    #else
+    return "cleanup_not_implemented"
+    #endif
+  }
+
+  private func unavailableStorage(_ reason: String) -> [String: Any] {
+    var value: [String: Any] = [
+      "observedComplete": false, "currentRootKnown": false,
+      "records": [[String: Any]](), "cleanupSupported": false,
+      "limits": ["records": maximumStoredRecords, "journalBytes": maximumStoredBytes,
+                 "artifactReservedBytes": Self.maximumArtifactReservationBytes],
+      "blockers": Array(Set([Self.cleanupUnavailableCode, "admission_not_evaluated", reason])).sorted()
+    ]
+    for key in ["globalJournalCount", "globalRecordSlotCount", "globalJournalBytes", "pendingCount",
+                "pendingBytes", "invalidJournalCount", "unknownEntryCount", "unavailableCount",
+                "artifactReservedBytes", "currentRootJournalBytes", "currentRootArtifactBytes",
+                "currentRootArtifactAllocatedBytes", "artifactUnknownCount", "availableBudgetBytes"] {
+      value[key] = NSNull()
+    }
+    return value
+  }
+
+  private final class StorageDirectoryPins {
+    var nodes: [(descriptor: Int32, url: URL, snapshot: stat)] = []
+    var missingChild: String?
+    var descriptor: Int32? { missingChild == nil ? nodes.last?.descriptor : nil }
+    deinit { for node in nodes { close(node.descriptor) } }
+  }
+
+  private func sameStorageMetadata(_ a: stat, _ b: stat) -> Bool {
+    // Normal read atime changes are deliberately excluded. All namespace,
+    // revision, ownership, permissions and allocation observations must agree.
+    WorkspaceFileScope.revision(a) == WorkspaceFileScope.revision(b) &&
+      a.st_mode == b.st_mode && a.st_nlink == b.st_nlink && a.st_uid == b.st_uid &&
+      a.st_gid == b.st_gid && a.st_flags == b.st_flags && a.st_blocks == b.st_blocks
+  }
+
+  private func verifyStorageDirectory(_ pins: StorageDirectoryPins) throws {
+    for node in pins.nodes {
+      var current = stat()
+      guard fstat(node.descriptor, &current) == 0, sameStorageMetadata(current, node.snapshot) else {
+        throw Failure("journal_changed_during_observation")
+      }
+      do { try verifyDirectoryLocation(node.descriptor, url: node.url) }
+      catch { throw Failure("journal_changed_during_observation") }
+    }
+    if let name = pins.missingChild, let parent = pins.nodes.last {
+      var value = stat()
+      guard fstatat(parent.descriptor, name, &value, AT_SYMLINK_NOFOLLOW) != 0, errno == ENOENT else {
+        throw Failure("journal_changed_during_observation")
+      }
+    }
+  }
+
+  /// Does not create, chmod, fsync, mark backup exclusion or repair permissions.
+  /// Only system/base ancestors may have aliases, just as in journalDescriptor;
+  /// every app-owned suffix component is opened relative to a held no-follow fd.
+  private func openExistingJournalDirectory() throws -> StorageDirectoryPins {
+    var anchorURL = journalBaseURL
+    var named = stat()
+    while lstat(anchorURL.path, &named) != 0 {
+      guard errno == ENOENT, anchorURL.path != "/" else { throw Failure("journal_unavailable") }
+      anchorURL.deleteLastPathComponent()
+    }
+    guard named.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR) else { throw Failure("journal_unavailable") }
+    let suffix = Array(journalURL.pathComponents.dropFirst(anchorURL.pathComponents.count))
+    guard !suffix.isEmpty, suffix.count <= WorkspaceFileScope.maximumPathDepth,
+          suffix.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else { throw Failure("journal_unavailable") }
+    anchorURL = anchorURL.resolvingSymlinksInPath().standardizedFileURL
+    let anchor = open(anchorURL.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+    guard anchor >= 0 else { throw Failure("journal_unavailable") }
+    let pins = StorageDirectoryPins()
+    var info = stat()
+    guard fstat(anchor, &info) == 0, info.st_flags & UInt32(SF_DATALESS) == 0 else {
+      close(anchor); throw Failure("journal_unavailable")
+    }
+    pins.nodes.append((anchor, anchorURL, info))
+    for (index, name) in suffix.enumerated() {
+      try verifyStorageDirectory(pins)
+      let parent = pins.nodes.last!
+      if fstatat(parent.descriptor, name, &named, AT_SYMLINK_NOFOLLOW) != 0 {
+        guard errno == ENOENT else { throw Failure("journal_unavailable") }
+        pins.missingChild = name
+        try verifyStorageDirectory(pins)
+        return pins
+      }
+      guard named.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR),
+            named.st_flags & UInt32(SF_DATALESS) == 0 else { throw Failure("journal_unavailable") }
+      let child = openat(parent.descriptor, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+      guard child >= 0 else { throw Failure("journal_unavailable") }
+      guard fstat(child, &info) == 0, sameStorageMetadata(named, info) else {
+        close(child); throw Failure("journal_changed_during_observation")
+      }
+      pins.nodes.append((child, parent.url.appendingPathComponent(name, isDirectory: true), info))
+      guard info.st_uid == getuid(), index != suffix.count - 1 || info.st_mode & 0o777 == 0o700 else {
+        throw Failure("journal_unavailable")
+      }
+      do { try requireEmptyACL(child) } catch { throw Failure("journal_unavailable") }
+    }
+    try verifyStorageDirectory(pins)
+    return pins
+  }
+
+  private struct StorageEntry { let name: String; let metadata: stat? }
+
+  private func storageEntries(_ pins: StorageDirectoryPins, deadline: UInt64) throws -> ([StorageEntry], Bool) {
+    guard let fd = pins.descriptor else { return ([], true) }
+    let duplicate = openat(fd, ".", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+    guard duplicate >= 0 else { throw Failure("journal_unavailable") }
+    guard let stream = fdopendir(duplicate) else { close(duplicate); throw Failure("journal_unavailable") }
+    defer { closedir(stream) }
+    var entries: [StorageEntry] = []
+    while true {
+      guard DispatchTime.now().uptimeNanoseconds < deadline else { return (entries, false) }
+      errno = 0
+      guard let item = readdir(stream) else {
+        guard errno == 0 else { throw Failure("journal_unavailable") }; break
+      }
+      let capacity = Int(item.pointee.d_namlen) + 1
+      let name = withUnsafePointer(to: &item.pointee.d_name) { pointer in
+        pointer.withMemoryRebound(to: CChar.self, capacity: capacity) { String(validatingUTF8: $0) }
+      }
+      guard let name else { throw Failure("journal_unavailable") }
+      if name == "." || name == ".." { continue }
+      guard entries.count < 256 else { return (entries, false) }
+      var info = stat()
+      let metadata = fstatat(fd, name, &info, AT_SYMLINK_NOFOLLOW) == 0 ? info : nil
+      entries.append(StorageEntry(name: name, metadata: metadata))
+    }
+    return (entries.sorted { $0.name < $1.name }, true)
+  }
+
+  private func readStorageRecord(_ item: StorageEntry, directory: Int32, id: String,
+                                 remainingBytes: inout Int, deadline: UInt64) throws -> Record {
+    guard let expected = item.metadata, expected.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+          expected.st_nlink == 1, expected.st_uid == getuid(), expected.st_mode & 0o777 == 0o600,
+          expected.st_flags & UInt32(SF_DATALESS) == 0,
+          inventoryDatalessOverride?("journal:" + item.name) != true else { throw Failure("journal_unavailable") }
+    guard expected.st_size > 0, expected.st_size <= 48 * 1024 * 1024,
+          expected.st_size <= remainingBytes else { throw Failure("journal_read_limit") }
+    try point("inventoryBeforeJournalRead")
+    let fd = openat(directory, item.name, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
+    guard fd >= 0 else { throw Failure("journal_unavailable") }
+    defer { close(fd) }
+    var before = stat()
+    guard fstat(fd, &before) == 0, sameStorageMetadata(before, expected) else {
+      throw Failure("journal_changed_during_observation")
+    }
+    do { try requireEmptyACL(fd) } catch { throw Failure("journal_unavailable") }
+    remainingBytes -= Int(expected.st_size)
+    var data = Data(count: Int(expected.st_size))
+    try data.withUnsafeMutableBytes { buffer in
+      var offset = 0
+      while offset < buffer.count {
+        guard DispatchTime.now().uptimeNanoseconds < deadline else { throw Failure("journal_read_limit") }
+        let count = Darwin.read(fd, buffer.baseAddress!.advanced(by: offset), min(64 * 1024, buffer.count - offset))
+        if count < 0 && errno == EINTR { continue }
+        guard count > 0 else { throw Failure("journal_changed_during_observation") }; offset += count
+      }
+    }
+    try point("inventoryAfterJournalRead")
+    var after = stat(); var named = stat()
+    guard fstat(fd, &after) == 0, sameStorageMetadata(before, after),
+          fstatat(directory, item.name, &named, AT_SYMLINK_NOFOLLOW) == 0,
+          sameStorageMetadata(before, named) else { throw Failure("journal_changed_during_observation") }
+    do {
+      let record = try decodeRecord(data, id: id)
+      guard record.created.isFinite, record.created >= 0, record.rootPath.hasPrefix("/"),
+            record.rootPath.utf16.count <= 4096, !record.rootPath.contains("\0"),
+            record.phase.utf8.count <= 128, (record.code?.utf8.count ?? 0) <= 128 else { throw Failure("journal_invalid") }
+      return record
+    } catch { throw Failure("journal_invalid") }
+  }
+
+  private struct ArtifactStorage {
+    var bytes = 0; var allocated = 0; var count = 0; var missing = 0; var unknown = 0
+    var blockers = Set<String>()
+  }
+
+  private func inspectArtifacts(_ record: Record, scope: WorkspaceTextScope, deadline: UInt64) -> ArtifactStorage {
+    var result = ArtifactStorage()
+    for entry in record.entries {
+      guard let path = entry.artifactPath else { continue }
+      result.count += 1
+      do {
+        guard DispatchTime.now().uptimeNanoseconds < deadline else { throw Failure("artifact_unavailable") }
+        try scope.verifyRootLocation()
+        let parts = try artifactComponents(path)
+        let parent = try scope.parentDescriptor(parts); defer { close(parent) }
+        var parentBefore = stat()
+        guard fstat(parent, &parentBefore) == 0, Self.identity(parentBefore) == entry.parentIdentity,
+              parentBefore.st_flags & UInt32(SF_DATALESS) == 0 else { throw Failure("artifact_unavailable") }
+        inventoryArtifactObserver?(path)
+        try point("inventoryBeforeArtifactStat")
+        var info = stat()
+        let exists = fstatat(parent, parts.last!, &info, AT_SYMLINK_NOFOLLOW) == 0
+        let failure = errno
+        let expectedRevision = entry.displacedRevision ?? entry.stagedRevision
+        let expectedIdentity = entry.displacedRevision == nil ? entry.stagedIdentity : entry.expectedIdentity
+        let expectedPresent = entry.intent != nil || entry.stagedIdentity != nil ||
+          entry.writeRevision != nil || entry.moveRevision != nil || entry.artifactState != "pending"
+        if !exists {
+          guard failure == ENOENT else { throw Failure("artifact_unavailable") }
+          if expectedPresent { throw Failure("artifact_missing") }
+        } else {
+          guard info.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG), info.st_nlink == 1,
+                info.st_flags & UInt32(SF_DATALESS) == 0,
+                inventoryDatalessOverride?("artifact:" + path) != true else { throw Failure("artifact_unavailable") }
+          guard let revision = expectedRevision, let identity = expectedIdentity,
+                WorkspaceFileScope.revision(info) == revision, Self.identity(info) == identity,
+                UInt32(info.st_mode & 0o777) == entry.permissions, info.st_uid == entry.owner,
+                info.st_gid == entry.group,
+                info.st_size == (entry.displacedRevision == nil ? entry.replacement.count : entry.original.count),
+                info.st_blocks >= 0, info.st_blocks <= Int64(Int.max / 512) else { throw Failure("artifact_changed") }
+        }
+        try point("inventoryAfterArtifactStat")
+        var after = stat(); var parentAfter = stat()
+        if exists {
+          guard fstatat(parent, parts.last!, &after, AT_SYMLINK_NOFOLLOW) == 0,
+                sameStorageMetadata(info, after) else { throw Failure("artifact_changed") }
+        } else {
+          guard fstatat(parent, parts.last!, &after, AT_SYMLINK_NOFOLLOW) != 0, errno == ENOENT else {
+            throw Failure("artifact_changed")
+          }
+        }
+        let currentParent = try scope.parentDescriptor(parts); defer { close(currentParent) }
+        guard fstat(currentParent, &parentAfter) == 0, sameStorageMetadata(parentBefore, parentAfter) else {
+          throw Failure("artifact_changed")
+        }
+        try scope.verifyRootLocation()
+        if exists {
+          let (allocated, overflow) = result.allocated.addingReportingOverflow(Int(info.st_blocks) * 512)
+          guard !overflow else { throw Failure("artifact_unavailable") }
+          result.bytes += Int(info.st_size); result.allocated = allocated
+        }
+      } catch {
+        let reason = code(error)
+        let stable = ["artifact_missing", "artifact_changed"].contains(reason) ? reason : "artifact_unavailable"
+        result.unknown += 1
+        if stable == "artifact_missing" { result.missing += 1 }
+        result.blockers.insert(stable)
+      }
+    }
+    return result
+  }
+
+  /// Observation only. No journalDescriptor/load/reconcile/save call is allowed
+  /// on this path. Values describe bounded metadata observations, not content
+  /// verification, a consistent filesystem snapshot or admission for a new move.
+  private func inspectStorage(root: URL) throws -> [String: Any] {
+    let deadline = DispatchTime.now().uptimeNanoseconds + 10_000_000_000
+    var value = unavailableStorage("admission_not_evaluated")
+    var blockers = Set([Self.cleanupUnavailableCode, "admission_not_evaluated"])
+    let scope = try? WorkspaceTextScope(root)
+    let rootIdentity = scope.flatMap { try? scopeIdentity($0) }
+    var rootKnown = rootIdentity != nil
+    if !rootKnown { blockers.insert("scope_unavailable") }
+    try point("inventoryAfterRootOpen")
+    let pins = try openExistingJournalDirectory()
+    let (items, scanComplete) = try storageEntries(pins, deadline: deadline)
+    try point("inventoryAfterDirectoryScan")
+    var complete = scanComplete && rootKnown
+    if !scanComplete { blockers.insert("journal_entry_limit") }
+    var totalBytes = 0; var pendingBytes = 0; var pendingCount = 0; var slots = 0
+    var valid = 0; var invalid = 0; var unknownEntries = 0; var unavailable = 0
+    var reservation = 0; var rootJournalBytes = 0; var artifactBytes = 0; var artifactAllocated = 0; var artifactUnknown = 0
+    var totalsKnown = scanComplete; var pendingKnown = scanComplete; var decodeComplete = scanComplete
+    var membershipKnown = scanComplete; var reservationKnown = scanComplete; var allocationKnown = true
+    var remainingBytes = min(Self.maximumJournalBytes, max(0, inventoryReadBudgetOverride ?? Self.maximumJournalBytes))
+    var records: [[String: Any]] = []
+    for item in items {
+      let isJSON = item.name.hasSuffix(".json"); let isPending = item.name.hasSuffix(".pending")
+      if isJSON { slots += 1 }
+      if isPending { pendingCount += 1 }
+      if !isJSON && !isPending { unknownEntries += 1; complete = false; blockers.insert("journal_unknown_entries") }
+      guard let info = item.metadata, info.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+            info.st_size >= 0, info.st_size <= Int64(Int.max / 256),
+            info.st_flags & UInt32(SF_DATALESS) == 0,
+            inventoryDatalessOverride?("journal:" + item.name) != true else {
+        totalsKnown = false; complete = false; unavailable += 1
+        if isPending { pendingKnown = false }
+        if isJSON { decodeComplete = false; membershipKnown = false; reservationKnown = false }
+        blockers.insert("journal_unavailable"); continue
+      }
+      totalBytes += Int(info.st_size)
+      if isPending { pendingBytes += Int(info.st_size) }
+      guard isJSON else { continue }
+      guard let id = try? transactionId(String(item.name.dropLast(5))), item.name == id + ".json" else {
+        invalid += 1; unavailable += 1; complete = false; membershipKnown = false; reservationKnown = false
+        blockers.insert("journal_invalid"); continue
+      }
+      guard valid < Self.maximumRecords, let directory = pins.descriptor else {
+        decodeComplete = false; membershipKnown = false; reservationKnown = false; complete = false; unavailable += 1
+        blockers.insert("journal_read_limit"); continue
+      }
+      let record: Record
+      do { record = try readStorageRecord(item, directory: directory, id: id, remainingBytes: &remainingBytes, deadline: deadline) }
+      catch {
+        let reason = code(error)
+        if reason == "journal_changed_during_observation" { throw error }
+        unavailable += 1; complete = false; membershipKnown = false; reservationKnown = false
+        if reason == "journal_invalid" { invalid += 1 } else { decodeComplete = false }
+        blockers.insert(["journal_invalid", "journal_read_limit"].contains(reason) ? reason : "journal_unavailable")
+        continue
+      }
+      valid += 1
+      reservation += record.entries.reduce(0) { $0 + ($1.artifactPath == nil ? 0 : $1.original.count + $1.replacement.count) }
+      guard let scope, let rootIdentity, record.rootPath == scope.rootURL.path,
+            record.rootIdentity == rootIdentity else { continue }
+      rootJournalBytes += Int(info.st_size)
+      let artifacts = inspectArtifacts(record, scope: scope, deadline: deadline)
+      artifactBytes += artifacts.bytes; artifactUnknown += artifacts.unknown
+      let (allocated, allocationOverflow) = artifactAllocated.addingReportingOverflow(artifacts.allocated)
+      if allocationOverflow { allocationKnown = false; complete = false; blockers.insert("artifact_unverified") }
+      else { artifactAllocated = allocated }
+      if artifacts.unknown > 0 { complete = false; blockers.insert("artifact_unverified") }
+      var reasons = artifacts.blockers; reasons.insert(Self.cleanupUnavailableCode)
+      if !["completed", "cancelled"].contains(record.phase) { reasons.insert("partial_unverified") }
+      var row: [String: Any] = [
+        "transactionId": record.transactionId, "sourcePath": record.sourcePath, "destinationPath": record.destinationPath,
+        "entryCount": record.entries.count, "storedPhase": record.phase, "created": record.created,
+        "journalBytes": Int(info.st_size), "historicalObservation": true, "cleanupSupported": false,
+        "artifactCount": artifacts.count, "artifactMissingCount": artifacts.missing,
+        "artifactUnknownCount": artifacts.unknown, "blockers": reasons.sorted()
+      ]
+      row["storedCode"] = record.code.map { $0 as Any } ?? NSNull()
+      row["artifactBytes"] = artifacts.unknown == 0 ? artifacts.bytes as Any : NSNull()
+      row["allocatedBytes"] = artifacts.unknown == 0 ? artifacts.allocated as Any : NSNull()
+      records.append(row)
+    }
+    // Recheck every observed name and all pinned directory locations. A changed
+    // private namespace invalidates the whole inventory rather than publishing a
+    // prefix sum or historical bodies as a current global total.
+    try point("inventoryBeforeFinalValidation")
+    if let directory = pins.descriptor {
+      for item in items {
+        if let before = item.metadata {
+          var after = stat()
+          guard fstatat(directory, item.name, &after, AT_SYMLINK_NOFOLLOW) == 0,
+                sameStorageMetadata(before, after) else { throw Failure("journal_changed_during_observation") }
+        }
+      }
+    }
+    try verifyStorageDirectory(pins)
+    if let scope, let rootIdentity {
+      if (try? scopeIdentity(scope)) != rootIdentity {
+        rootKnown = false; complete = false; blockers.insert("scope_changed_during_observation")
+        for index in records.indices {
+          records[index]["artifactBytes"] = NSNull(); records[index]["allocatedBytes"] = NSNull()
+          let count = records[index]["artifactCount"] as? Int ?? 0
+          records[index]["artifactUnknownCount"] = count
+          var reasons = Set(records[index]["blockers"] as? [String] ?? [])
+          reasons.insert("scope_changed_during_observation"); records[index]["blockers"] = reasons.sorted()
+        }
+      }
+    }
+    if pendingCount > 0 { blockers.insert("journal_pending_remnants") }
+    if slots >= maximumStoredRecords { blockers.insert("journal_record_limit") }
+    if totalBytes >= maximumStoredBytes { blockers.insert("journal_byte_limit") }
+    if reservationKnown && reservation >= Self.maximumArtifactReservationBytes { blockers.insert("artifact_reservation_limit") }
+    value["observedComplete"] = complete; value["currentRootKnown"] = rootKnown
+    value["globalJournalCount"] = decodeComplete ? valid as Any : NSNull()
+    value["globalRecordSlotCount"] = scanComplete ? slots as Any : NSNull()
+    value["globalJournalBytes"] = totalsKnown ? totalBytes as Any : NSNull()
+    value["pendingCount"] = scanComplete ? pendingCount as Any : NSNull()
+    value["pendingBytes"] = pendingKnown ? pendingBytes as Any : NSNull()
+    value["invalidJournalCount"] = decodeComplete ? invalid as Any : NSNull()
+    value["unknownEntryCount"] = scanComplete ? unknownEntries as Any : NSNull()
+    value["unavailableCount"] = scanComplete ? unavailable as Any : NSNull()
+    value["artifactReservedBytes"] = reservationKnown ? reservation as Any : NSNull()
+    value["currentRootJournalBytes"] = rootKnown && membershipKnown ? rootJournalBytes as Any : NSNull()
+    value["currentRootArtifactBytes"] = rootKnown && membershipKnown && artifactUnknown == 0 ? artifactBytes as Any : NSNull()
+    value["currentRootArtifactAllocatedBytes"] = rootKnown && membershipKnown && artifactUnknown == 0 && allocationKnown ? artifactAllocated as Any : NSNull()
+    value["artifactUnknownCount"] = rootKnown && membershipKnown ? artifactUnknown as Any : NSNull()
+    value["availableBudgetBytes"] = totalsKnown ? max(0, maximumStoredBytes - totalBytes) as Any : NSNull()
+    value["records"] = records; value["blockers"] = blockers.sorted()
+    return value
+  }
+
   private func list(root: URL) throws -> [String: Any] {
     let scope = try WorkspaceTextScope(root); let identity = try scopeIdentity(scope)
     let directory = try journalDescriptor(); defer { close(directory) }

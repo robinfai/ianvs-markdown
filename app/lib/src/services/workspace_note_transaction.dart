@@ -6,6 +6,9 @@ import 'package:flutter/services.dart';
 import 'apple_workspace_service.dart';
 import 'workspace_index_source.dart';
 import 'workspace_note_move_plan.dart';
+import 'workspace_note_move_storage.dart';
+
+export 'workspace_note_move_storage.dart';
 
 /// A receipt is evidence about one native observation, not an ACID guarantee.
 class WorkspaceNoteMoveReceipt {
@@ -227,6 +230,7 @@ abstract interface class WorkspaceNoteTransactionStore {
     String transactionId,
     String token,
   );
+  Future<WorkspaceNoteMoveStorage> inspectStorage(String root);
   Future<WorkspaceNoteMoveJournalList> list(String root);
   Future<WorkspaceNoteMoveRecord> reconcile(String root, String transactionId);
   Future<WorkspaceNoteMoveRecord> recoverCopies(
@@ -331,6 +335,21 @@ class AppleWorkspaceNoteTransactionStore
     'transactionId': transactionId,
     'token': token,
   });
+
+  @override
+  Future<WorkspaceNoteMoveStorage> inspectStorage(String root) async {
+    if (!root.startsWith('/') || root.contains('\u0000')) {
+      throw const FormatException('Invalid recovery storage scope.');
+    }
+    final result = await channel.invokeMapMethod<Object?, Object?>(
+      'inspectWorkspaceNoteMoveStorage',
+      {'path': root},
+    );
+    if (result == null) {
+      throw const FormatException('Recovery storage could not be observed.');
+    }
+    return WorkspaceNoteMoveStorage.fromMap(result);
+  }
 
   @override
   Future<WorkspaceNoteMoveJournalList> list(String root) async {
