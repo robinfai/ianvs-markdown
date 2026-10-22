@@ -236,6 +236,10 @@ class _Transactions implements WorkspaceNoteTransactionStore {
   }
 
   @override
+  Future<WorkspaceNoteMoveStorage> inspectStorage(String root) async =>
+      WorkspaceNoteMoveStorage(observedComplete: true, currentRootKnown: true);
+
+  @override
   Future<WorkspaceNoteMoveJournalList> list(String root) async {
     calls.add('list');
     return journal;

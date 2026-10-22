@@ -9,7 +9,7 @@ private final class WaitingExportPresenter: NSObject, NSFilePresenter {
   let entered = DispatchSemaphore(value: 0)
   let release = DispatchSemaphore(value: 0)
   init(url: URL) { presentedItemURL = url.resolvingSymlinksInPath(); super.init() }
-  func relinquishPresentedItem(toWriter writer: @escaping ((() -> Void)?) -> Void) {
+  func relinquishPresentedItem(toWriter writer: @escaping @Sendable ((@Sendable () -> Void)?) -> Void) {
     entered.signal()
     release.wait()
     writer(nil)
