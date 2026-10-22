@@ -81,6 +81,7 @@ class IanvsMarkdownLiveEditor extends StatefulWidget {
     this.onSelectionChanged,
     this.onModeChanged,
     this.onSaveRequested,
+    this.onPaste,
     this.onTapLink,
     this.onTapLinkTarget,
     this.imageBuilder,
@@ -138,6 +139,13 @@ class IanvsMarkdownLiveEditor extends StatefulWidget {
   final MarkdownOnSelectionChangedCallback? onSelectionChanged;
   final ValueChanged<IanvsMarkdownEditorMode>? onModeChanged;
   final IanvsMarkdownSaveCallback? onSaveRequested;
+
+  /// Optional asynchronous user Paste interception for Live body and Source
+  /// inputs, including the full-source rendering-budget fallback. See
+  /// [IanvsMarkdownEditor.onPaste] for handling and stale-request obligations.
+  /// Table cells and front matter properties retain their own text paste and
+  /// do not invoke this hook; attachment paste there requires Source mode.
+  final Future<bool> Function()? onPaste;
   final MarkdownTapLinkCallback? onTapLink;
 
   /// Receives parsed link origins. When set, takes precedence over [onTapLink].
@@ -2475,6 +2483,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             enableModeShortcuts: widget.enableModeShortcuts,
             controller: widget.controller,
             onSaveRequested: widget.onSaveRequested,
+            onPaste: widget.onPaste,
             child: ValueListenableBuilder<IanvsMarkdownEditorMode>(
               valueListenable: widget.controller.modeListenable,
               builder: (context, mode, _) => switch (mode) {
@@ -2539,6 +2548,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     highlightSyntax: highlightSyntax,
     padding: widget.padding,
     onSaveRequested: widget.onSaveRequested,
+    onPaste: widget.onPaste,
     theme: colors,
   );
 
@@ -2859,8 +2869,16 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         (styleSheet.p ?? const TextStyle(fontSize: 14.5, height: 1.58))
             .copyWith(color: colors.textPrimary);
     final editor = TextField(
-      contextMenuBuilder: (_, state) =>
-          buildMarkdownTextContextMenu(context, state),
+      contextMenuBuilder: (_, state) => buildMarkdownTextContextMenu(
+        context,
+        state,
+        onPaste: widget.onPaste == null
+            ? null
+            : () => IanvsMarkdownShortcuts.invoke(
+                IanvsMarkdownCommand.paste,
+                controller: widget.controller,
+              ),
+      ),
       key: _activeEditorKey,
       controller: _blockController,
       focusNode: _focusNode,
@@ -3125,8 +3143,16 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       sourceProjections,
     );
     final textEditor = TextField(
-      contextMenuBuilder: (_, state) =>
-          buildMarkdownTextContextMenu(context, state),
+      contextMenuBuilder: (_, state) => buildMarkdownTextContextMenu(
+        context,
+        state,
+        onPaste: widget.onPaste == null
+            ? null
+            : () => IanvsMarkdownShortcuts.invoke(
+                IanvsMarkdownCommand.paste,
+                controller: widget.controller,
+              ),
+      ),
       key: _activeEditorKey,
       controller: _blockController,
       focusNode: _focusNode,

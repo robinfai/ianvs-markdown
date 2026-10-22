@@ -49,6 +49,7 @@ class IanvsMarkdownEditor extends StatefulWidget {
     this.padding = const EdgeInsets.fromLTRB(20, 18, 20, 40),
     this.onChanged,
     this.onSaveRequested,
+    this.onPaste,
     this.theme,
   });
 
@@ -82,6 +83,18 @@ class IanvsMarkdownEditor extends StatefulWidget {
   final EdgeInsetsGeometry padding;
   final ValueChanged<String>? onChanged;
   final IanvsMarkdownSaveCallback? onSaveRequested;
+
+  /// Handles a user Paste before the built-in text/URL paste, including an
+  /// empty selection. Return true to consume it or false to use normal paste.
+  /// Errors consume the request to avoid duplicate insertion. Not invoked in
+  /// Reading mode, on read-only inputs, or during IME composition.
+  ///
+  /// The host owns clipboard access and insertion, and must revalidate its
+  /// document, controller, selection and focus after awaiting asynchronous work.
+  /// The editor guards only its own text fallback against stale requests.
+  /// Installing this hook uses an adaptive menu with Paste available even when
+  /// the clipboard has no text. Direct platform editing updates bypass it.
+  final Future<bool> Function()? onPaste;
   final IanvsMarkdownThemeData? theme;
 
   @override
@@ -588,8 +601,16 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
             return true;
           },
           child: TextField(
-            contextMenuBuilder: (_, state) =>
-                buildMarkdownTextContextMenu(context, state),
+            contextMenuBuilder: (_, state) => buildMarkdownTextContextMenu(
+              context,
+              state,
+              onPaste: widget.onPaste == null || widget.readOnly
+                  ? null
+                  : () => IanvsMarkdownShortcuts.invoke(
+                      IanvsMarkdownCommand.paste,
+                      controller: widget.controller,
+                    ),
+            ),
             key: const ValueKey('ianvs-markdown-source-field'),
             controller: widget.controller,
             focusNode: _focusNode,
@@ -715,6 +736,7 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
     enableModeShortcuts: widget.enableModeShortcuts,
     controller: widget.controller,
     onSaveRequested: widget.onSaveRequested,
+    onPaste: widget.onPaste,
     child: widget.readOnly
         ? Shortcuts(
             // Tab is deliberately excluded from Markdown command dispatch.

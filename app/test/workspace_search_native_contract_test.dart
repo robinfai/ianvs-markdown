@@ -14,9 +14,10 @@ void main() {
     source.indexOf('final class AttachmentScope:'),
     source.indexOf('final class WorkspaceTextScope:'),
   );
-  final text = source.substring(
-    source.indexOf('final class WorkspaceTextScope:'),
-  );
+  // Later native policies are separate top-level sections. Search's contract
+  // must inspect only the text scope, not unrelated readers/writers after it.
+  final textStart = source.indexOf('final class WorkspaceTextScope:');
+  final text = source.substring(textStart, source.indexOf('\n///', textStart));
 
   test(
     'native Wiki creation is exclusive root-relative without parent creation',

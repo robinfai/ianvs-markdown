@@ -286,8 +286,32 @@ List<ContextMenuButtonItem> localizeMarkdownContextMenu(
 
 Widget buildMarkdownTextContextMenu(
   BuildContext context,
-  EditableTextState state,
-) {
+  EditableTextState state, {
+  VoidCallback? onPaste,
+}) {
+  if (onPaste != null && !state.widget.readOnly) {
+    void paste() {
+      state.hideToolbar();
+      onPaste();
+    }
+
+    final items = state.contextMenuButtonItems;
+    return AdaptiveTextSelectionToolbar.buttonItems(
+      anchors: state.contextMenuAnchors,
+      buttonItems: localizeMarkdownContextMenu(context, [
+        for (final item in items)
+          if (item.type == ContextMenuButtonType.paste)
+            item.copyWith(onPressed: paste)
+          else
+            item,
+        if (!items.any((item) => item.type == ContextMenuButtonType.paste))
+          ContextMenuButtonItem(
+            type: ContextMenuButtonType.paste,
+            onPressed: paste,
+          ),
+      ]),
+    );
+  }
   final strings = IanvsMarkdownLocalization.of(context);
   final customized = ContextMenuButtonType.values.any(
     (type) => strings._selectionLabel(type) != null,

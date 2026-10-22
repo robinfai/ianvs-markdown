@@ -3697,6 +3697,12 @@
           "required": false
         },
         {
+          "name": "onPaste",
+          "type": "Future<bool> Function()?",
+          "kind": "named",
+          "required": false
+        },
+        {
           "name": "theme",
           "type": "IanvsMarkdownThemeData?",
           "kind": "named",
@@ -3759,6 +3765,14 @@
     "IanvsMarkdownEditor/field:onChanged": {
       "kind": "field",
       "type": "void Function(String)?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownEditor/field:onPaste": {
+      "kind": "field",
+      "type": "Future<bool> Function()?",
       "const": false,
       "final": true,
       "static": false,
@@ -3917,6 +3931,12 @@
           "type": "FutureOr<void> Function(String)?",
           "kind": "named",
           "required": false
+        },
+        {
+          "name": "onPaste",
+          "type": "Future<bool> Function()?",
+          "kind": "named",
+          "required": false
         }
       ],
       "static": false,
@@ -3943,6 +3963,14 @@
     "IanvsMarkdownEditorShortcuts/field:enableModeShortcuts": {
       "kind": "field",
       "type": "bool",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownEditorShortcuts/field:onPaste": {
+      "kind": "field",
+      "type": "Future<bool> Function()?",
       "const": false,
       "final": true,
       "static": false,
@@ -6936,6 +6964,12 @@
           "required": false
         },
         {
+          "name": "onPaste",
+          "type": "Future<bool> Function()?",
+          "kind": "named",
+          "required": false
+        },
+        {
           "name": "onTapLink",
           "type": "void Function(String, String?, String)?",
           "kind": "named",
@@ -7211,6 +7245,14 @@
     "IanvsMarkdownLiveEditor/field:onModeChanged": {
       "kind": "field",
       "type": "void Function(IanvsMarkdownEditorMode)?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownLiveEditor/field:onPaste": {
+      "kind": "field",
+      "type": "Future<bool> Function()?",
       "const": false,
       "final": true,
       "static": false,

@@ -69,8 +69,10 @@ class ObsidianAttachmentSettings {
       if (json is! Map) {
         return const ObsidianAttachmentSettings(malformed: true);
       }
+      if (!json.containsKey('attachmentFolderPath')) {
+        return const ObsidianAttachmentSettings();
+      }
       final path = json['attachmentFolderPath'];
-      if (path == null) return const ObsidianAttachmentSettings();
       if (path is! String || path.length > 4096) {
         return const ObsidianAttachmentSettings(malformed: true);
       }
@@ -113,11 +115,17 @@ class AttachmentMetadata {
   String get version => '$relativePath\u0000${revision ?? '$size:$modified'}';
 }
 
+/// Platform messages encode UTF-8. Reject lone UTF-16 surrogates rather than
+/// letting encoding silently create a different replacement-character path.
+bool isScalarAttachmentPath(String path) =>
+    !path.runes.any((rune) => rune >= 0xd800 && rune <= 0xdfff);
+
 bool isSafeAttachmentRelativePath(String path, {bool allowHidden = false}) =>
     path.isNotEmpty &&
     path.length <= 4096 &&
+    isScalarAttachmentPath(path) &&
     !path.startsWith('/') &&
-    !path.contains(RegExp(r'[\\:\x00-\x1f]')) &&
+    !path.contains(RegExp(r'[\\:\x00-\x1f\x7f]')) &&
     path
         .split('/')
         .every(
@@ -161,7 +169,7 @@ class AttachmentReference {
     } on FormatException {
       throw const AttachmentFailure(AttachmentFailureKind.invalid);
     }
-    if (path.isEmpty || path.contains(RegExp(r'[\\:\x00-\x1f]'))) {
+    if (path.isEmpty || path.contains(RegExp(r'[\\:\x00-\x1f\x7f]'))) {
       throw const AttachmentFailure(AttachmentFailureKind.invalid);
     }
     if (!attachmentExtensions.contains(p.posix.extension(path).toLowerCase())) {

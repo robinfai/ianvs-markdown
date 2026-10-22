@@ -1,6 +1,12 @@
 import Foundation
 import Darwin
 import CoreFoundation
+import ImageIO
+import CoreGraphics
+#if os(macOS)
+import AppKit
+import UniformTypeIdentifiers
+#endif
 #if os(iOS)
 import Flutter
 #else
@@ -42,14 +48,26 @@ final class CloudWorkspace {
       guard let self else { return }
       let arguments = call.arguments as? [String: Any] ?? [:]
       let method = call.method
+      #if os(macOS)
+      // No clipboard observation/polling. These two entry points are called only
+      // from the editor's explicit Insert Image and Paste actions.
+      if method == "pickAttachmentImage" {
+        self.pickAttachmentImage(result: result)
+        return
+      }
+      if method == "readClipboardAttachmentImage" {
+        self.readClipboardAttachmentImage(result: result)
+        return
+      }
+      #endif
       guard ["defaultDirectory", "listDirectory", "readDocument", "readDocumentBytes", "writeDocument", "writeDocumentGuarded",
-             "listAttachments", "readAttachmentBytes", "normalizeAttachmentPaths",
+             "listAttachments", "readAttachmentBytes", "readAttachmentImportSettings", "normalizeAttachmentPaths", "createWorkspaceAttachment",
              "listWorkspaceDirectory", "readWorkspaceTextBytes", "createWorkspaceNote", "resolveWorkspacePath"].contains(method) else {
         result(FlutterMethodNotImplemented)
         return
       }
       let isSearch = method == "listWorkspaceDirectory" || method == "readWorkspaceTextBytes" || method == "createWorkspaceNote" || method == "resolveWorkspacePath"
-      let isAttachment = method == "listAttachments" || method == "readAttachmentBytes"
+      let isAttachment = method == "listAttachments" || method == "readAttachmentBytes" || method == "readAttachmentImportSettings" || method == "createWorkspaceAttachment"
       let workQueue = method == "createWorkspaceNote" ? self.noteWriteQueue : (isSearch ? self.searchQueue : (isAttachment ? self.attachmentQueue : self.queue))
       workQueue.async {
         do {
@@ -89,6 +107,16 @@ final class CloudWorkspace {
               }
               let contents = try Self.readWorkspaceTextBytes(url, relativePath: relativePath, maximumBytes: maximumBytes)
               value = ["bytes": FlutterStandardTypedData(bytes: contents.bytes), "revision": contents.revision]
+            case "createWorkspaceAttachment":
+              guard let directory = arguments["relativeDirectory"] as? String,
+                    let filename = arguments["filename"] as? String,
+                    let bytes = arguments["bytes"] as? FlutterStandardTypedData,
+                    bytes.elementSize == 1 else { throw AttachmentError.invalid }
+              value = ["relativePath": try Self.createWorkspaceAttachment(
+                url, relativeDirectory: directory, filename: filename, bytes: bytes.data
+              )]
+            case "readAttachmentImportSettings":
+              value = FlutterStandardTypedData(bytes: try Self.readAttachmentImportSettings(url))
             case "listAttachments":
               value = try Self.listAttachments(url)
             case "readAttachmentBytes":
@@ -118,6 +146,11 @@ final class CloudWorkspace {
             }
           }
           DispatchQueue.main.async { result(value) }
+        } catch let error as AttachmentImportWriteFailure {
+          DispatchQueue.main.async {
+            result(FlutterError(code: error.failure.code, message: error.localizedDescription,
+                                details: ["relativePath": error.relativePath, "fileMayRemain": true]))
+          }
         } catch let error as AttachmentError {
           DispatchQueue.main.async {
             result(FlutterError(code: error.code, message: error.localizedDescription, details: nil))
@@ -424,6 +457,26 @@ extension CloudWorkspace {
     catch { throw AttachmentError.classify(error) }
   }
 
+  /// Import destination policy may inspect only already-local Obsidian config.
+  /// Deliberately bypass AttachmentScope.read: preview can request a download,
+  /// whereas imports must not coordinate with or materialize provider content.
+  static func readAttachmentImportSettings(
+    _ root: URL, beforeLocalRead: (() throws -> Void)? = nil, afterLocalRead: (() throws -> Void)? = nil
+  ) throws -> Data {
+    do {
+      return try WorkspaceFileScope.withoutMaterialization {
+        try AttachmentImportSettingsScope(root).read(beforeLocalRead: beforeLocalRead, afterLocalRead: afterLocalRead)
+      }
+    } catch is AttachmentImportSettingsAbsence {
+      // This is the only state that permits Dart to default to the vault root.
+      throw AttachmentError.missing
+    } catch {
+      let failure = AttachmentError.classify(error)
+      // A disappeared root/observed parent/observed leaf is not an absent config.
+      throw failure == .missing ? AttachmentError.unavailable : failure
+    }
+  }
+
   static func readAttachmentBytes(_ root: URL, relativePath: String, maximumBytes: Int) throws -> Data {
     do {
       return try AttachmentScope.withoutMaterialization {
@@ -435,7 +488,7 @@ extension CloudWorkspace {
 }
 
 enum AttachmentError: LocalizedError, Equatable {
-  case missing, offline, denied, invalid, tooLarge, indexLimit, unavailable
+  case missing, offline, denied, invalid, tooLarge, indexLimit, unavailable, collision, unsupported
 
   var code: String {
     switch self {
@@ -446,6 +499,8 @@ enum AttachmentError: LocalizedError, Equatable {
     case .tooLarge: return "attachment_too_large"
     case .indexLimit: return "attachment_index_limit"
     case .unavailable: return "attachment_unavailable"
+    case .collision: return "attachment_collision"
+    case .unsupported: return "attachment_unsupported"
     }
   }
 
@@ -453,18 +508,20 @@ enum AttachmentError: LocalizedError, Equatable {
     switch self {
     case .missing: return "The attachment is missing."
     case .offline: return "The attachment is not available locally. Download it in iCloud Drive and retry."
-    case .denied: return "Permission to read the attachment was denied."
+    case .denied: return "Permission to access the attachment was denied."
     case .invalid: return "The attachment path or file type is not allowed."
     case .tooLarge: return "The attachment exceeds the permitted size."
     case .indexLimit: return "The vault exceeds attachment indexing limits. No partial index was returned."
-    case .unavailable: return "The attachment could not be read. Please retry."
+    case .unavailable: return "The attachment operation could not be completed. Please retry."
+    case .collision: return "An attachment already uses that name. Nothing was overwritten."
+    case .unsupported: return "This image format is not supported."
     }
   }
 
   static func posix(_ code: Int32 = errno) -> AttachmentError {
     switch code {
     case ENOENT: return .missing
-    case EACCES, EPERM: return .denied
+    case EACCES, EPERM, EROFS: return .denied
     case ELOOP, ENOTDIR, EINVAL, ENAMETOOLONG: return .invalid
     case EFBIG: return .tooLarge
     case ENETDOWN, ENETUNREACH, EHOSTUNREACH, ETIMEDOUT, ENXIO, EDEADLK: return .offline
@@ -1094,3 +1151,582 @@ final class WorkspaceTextScope: WorkspaceFileScope {
     )
   }
 }
+
+/// Only a positively confirmed absence may select the default import folder.
+/// Ordinary ENOENT from an observed object or its selected root is an error.
+private enum AttachmentImportSettingsAbsence: Error { case confirmed }
+
+final class AttachmentImportSettingsScope: WorkspaceFileScope {
+  static func requireLocalDirectory(_ attributes: stat) throws {
+    guard attributes.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR) else { throw AttachmentError.invalid }
+    guard attributes.st_flags & UInt32(SF_DATALESS) == 0 else { throw AttachmentError.offline }
+    // UF_HIDDEN is deliberately allowed for the selected vault and this known
+    // .obsidian directory. Visibility is not authority to follow another path.
+  }
+
+  private func state(_ parent: Int32, _ name: String) throws -> stat? {
+    var attributes = stat()
+    if fstatat(parent, name, &attributes, AT_SYMLINK_NOFOLLOW) == 0 { return attributes }
+    guard errno == ENOENT else { throw AttachmentError.posix() }
+    return nil
+  }
+
+  private func rejectPlaceholder(_ parent: Int32, _ name: String) throws {
+    if let marker = try state(parent, ".\(name).icloud") {
+      let kind = marker.st_mode & mode_t(S_IFMT)
+      guard kind == mode_t(S_IFREG) || kind == mode_t(S_IFDIR) else { throw AttachmentError.invalid }
+      throw AttachmentError.offline
+    }
+  }
+
+  private func verifyLocalRoot() throws {
+    try verifyRootLocation()
+    var attributes = stat()
+    guard fstat(rootDescriptor, &attributes) == 0 else { throw AttachmentError.posix() }
+    try Self.requireLocalDirectory(attributes)
+  }
+
+  private func verifyParent(_ descriptor: Int32, original: stat) throws {
+    try verifyLocalRoot()
+    guard let current = try state(rootDescriptor, ".obsidian") else { throw AttachmentError.unavailable }
+    var opened = stat()
+    guard fstat(descriptor, &opened) == 0 else { throw AttachmentError.posix() }
+    try Self.requireLocalDirectory(current)
+    try Self.requireLocalDirectory(opened)
+    guard current.st_dev == original.st_dev, current.st_ino == original.st_ino,
+          opened.st_dev == original.st_dev, opened.st_ino == original.st_ino else { throw AttachmentError.unavailable }
+    try rejectPlaceholder(rootDescriptor, ".obsidian")
+  }
+
+  func read(beforeLocalRead: (() throws -> Void)? = nil, afterLocalRead: (() throws -> Void)? = nil) throws -> Data {
+    try verifyLocalRoot()
+    try rejectPlaceholder(rootDescriptor, ".obsidian")
+    guard let observedParent = try state(rootDescriptor, ".obsidian") else {
+      // Recheck the root, literal parent path and its logical placeholder before
+      // distinguishing true absence from nonlocal or changing provider state.
+      try verifyLocalRoot()
+      guard try state(rootDescriptor, ".obsidian") == nil else { throw AttachmentError.unavailable }
+      try rejectPlaceholder(rootDescriptor, ".obsidian")
+      throw AttachmentImportSettingsAbsence.confirmed
+    }
+    try Self.requireLocalDirectory(observedParent)
+    let parent = openat(rootDescriptor, ".obsidian", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+    guard parent >= 0 else { throw AttachmentError.posix() }
+    defer { close(parent) }
+    try verifyParent(parent, original: observedParent)
+    try rejectPlaceholder(parent, "app.json")
+    guard let observedLeaf = try state(parent, "app.json") else {
+      try verifyParent(parent, original: observedParent)
+      guard try state(parent, "app.json") == nil else { throw AttachmentError.unavailable }
+      try rejectPlaceholder(parent, "app.json")
+      try verifyParent(parent, original: observedParent)
+      throw AttachmentImportSettingsAbsence.confirmed
+    }
+    guard observedLeaf.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG) else { throw AttachmentError.invalid }
+    guard observedLeaf.st_flags & UInt32(SF_DATALESS) == 0 else { throw AttachmentError.offline }
+    // UF_HIDDEN is also allowed on app.json: this exact, intentionally hidden
+    // configuration leaf is the only hidden-file exception, never arbitrary IO.
+    try beforeLocalRead?() // Deterministic test hook, never a channel argument.
+    try verifyParent(parent, original: observedParent)
+    let result = try readLocalBytes(
+      components: [".obsidian", "app.json"], maximumBytes: AttachmentScope.maximumSettingsBytes, verifyRevision: true
+    )
+    try afterLocalRead?()
+    try verifyParent(parent, original: observedParent)
+    try rejectPlaceholder(parent, "app.json")
+    guard let current = try state(parent, "app.json"),
+          current.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+          Self.revision(current) == Self.revision(observedLeaf),
+          result.revision == Self.revision(observedLeaf) else { throw AttachmentError.unavailable }
+    guard current.st_flags & UInt32(SF_DATALESS) == 0 else { throw AttachmentError.offline }
+    return result.bytes
+  }
+}
+
+/// Explicit imports share the read-side descriptor authority, but never download
+/// provider content, follow file URLs from the clipboard, or replace a file.
+extension CloudWorkspace {
+  static func createWorkspaceAttachment(
+    _ root: URL, relativeDirectory: String, filename: String, bytes: Data
+  ) throws -> String {
+    do {
+      return try WorkspaceFileScope.withoutMaterialization {
+        try AttachmentImportScope.validate(relativeDirectory: relativeDirectory, filename: filename, bytes: bytes)
+        let scope = try AttachmentImportScope(root)
+        try scope.checkWritableDirectory(scope.rootDescriptor)
+        var coordinationError: NSError?
+        var outcome: Result<String, Error> = .failure(AttachmentError.unavailable)
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        let deadline = DispatchTime.now() + AttachmentScope.coordinationTimeout
+        let timeout = DispatchWorkItem { coordinator.cancel() }
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: deadline, execute: timeout)
+        defer { timeout.cancel() }
+        // Coordinate the existing root, not an absent directory or provider
+        // placeholder. Recursive mkdir is confined to this explicit operation.
+        coordinator.coordinate(writingItemAt: scope.rootURL, options: .forMerging, error: &coordinationError) { coordinated in
+          outcome = Result {
+            guard DispatchTime.now().uptimeNanoseconds < deadline.uptimeNanoseconds,
+                  Data(coordinated.path.utf8) == Data(scope.rootURL.path.utf8) else {
+              throw AttachmentError.unavailable
+            }
+            return try scope.create(relativeDirectory: relativeDirectory, filename: filename, bytes: bytes)
+          }
+        }
+        if let error = coordinationError {
+          if let path = scope.createdRelativePath {
+            throw AttachmentImportWriteFailure(failure: AttachmentError.classify(error), relativePath: path)
+          }
+          throw error
+        }
+        return try outcome.get()
+      }
+    } catch let error as AttachmentImportWriteFailure { throw error }
+    catch { throw AttachmentError.classify(error) }
+  }
+}
+
+struct AttachmentImportWriteFailure: LocalizedError {
+  let failure: AttachmentError
+  let relativePath: String
+  var errorDescription: String? {
+    "The import could not be verified. A file may remain at \(relativePath); nothing was removed or overwritten automatically."
+  }
+}
+
+final class AttachmentImportScope: WorkspaceFileScope {
+  private(set) var createdRelativePath: String?
+
+  static func directoryComponents(_ path: String) throws -> [String] {
+    if path.isEmpty { return [] }
+    let components = try relativeComponents(path)
+    guard components.count <= maximumPathDepth,
+          components.allSatisfy({ !$0.hasPrefix(".") && $0.utf8.count <= 255 }) else {
+      throw AttachmentError.invalid
+    }
+    return components
+  }
+
+  static func validate(relativeDirectory: String, filename: String, bytes: Data) throws {
+    let directory = try directoryComponents(relativeDirectory)
+    _ = try AttachmentScope.components((directory + [filename]).joined(separator: "/"))
+    let suffix = (filename as NSString).pathExtension
+    let stem = (filename as NSString).deletingPathExtension
+    let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_")
+    guard !stem.isEmpty, stem.utf8.count <= 120,
+          stem.unicodeScalars.allSatisfy({ allowed.contains($0) }),
+          !stem.hasPrefix("-"), !stem.hasPrefix("_"),
+          AttachmentScope.imageExtensions.contains(suffix),
+          filename == stem + "." + suffix else { throw AttachmentError.invalid }
+    let image = try AttachmentImportImage.inspect(bytes, allowTIFF: false)
+    guard suffix == image.extensionName || (suffix == "jpeg" && image.extensionName == "jpg") else {
+      throw AttachmentError.invalid
+    }
+  }
+
+  @discardableResult
+  func checkWritableDirectory(_ descriptor: Int32) throws -> stat {
+    var attributes = stat()
+    guard fstat(descriptor, &attributes) == 0 else { throw AttachmentError.posix() }
+    guard attributes.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR),
+          attributes.st_flags & UInt32(UF_HIDDEN) == 0 else { throw AttachmentError.invalid }
+    guard attributes.st_flags & UInt32(SF_DATALESS) == 0 else { throw AttachmentError.offline }
+    guard attributes.st_mode & mode_t(0o222) != 0,
+          attributes.st_flags & UInt32(UF_IMMUTABLE | SF_IMMUTABLE | UF_APPEND | SF_APPEND) == 0 else {
+      throw AttachmentError.denied
+    }
+    var volume = statfs()
+    guard fstatfs(descriptor, &volume) == 0 else { throw AttachmentError.posix() }
+    guard volume.f_flags & UInt32(MNT_RDONLY) == 0 else { throw AttachmentError.denied }
+    guard faccessat(descriptor, ".", W_OK | X_OK, 0) == 0 else { throw AttachmentError.posix() }
+    return attributes
+  }
+
+  /// Reject case/NFC aliases and logical iCloud placeholders before creating a
+  /// new basename. This bounded listing is metadata-only and never follows links.
+  private func rejectOccupiedName(_ descriptor: Int32, name: String) throws {
+    let duplicate = openat(descriptor, ".", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+    guard duplicate >= 0 else { throw AttachmentError.posix() }
+    guard let directory = fdopendir(duplicate) else {
+      let error = AttachmentError.posix()
+      close(duplicate)
+      throw error
+    }
+    defer { closedir(directory) }
+    let comparison = name.precomposedStringWithCanonicalMapping.lowercased()
+    let placeholder = "." + comparison + ".icloud"
+    var count = 0
+    while true {
+      errno = 0
+      guard let entry = readdir(directory) else {
+        if errno != 0 { throw AttachmentError.posix() }
+        return
+      }
+      count += 1
+      guard count <= AttachmentScope.maximumVisitedEntries else { throw AttachmentError.indexLimit }
+      let candidate = withUnsafePointer(to: &entry.pointee.d_name) {
+        $0.withMemoryRebound(to: CChar.self, capacity: Int(entry.pointee.d_namlen) + 1) {
+          String(validatingUTF8: $0)
+        }
+      }
+      guard let candidate else { throw AttachmentError.invalid }
+      let normalized = candidate.precomposedStringWithCanonicalMapping.lowercased()
+      if normalized == placeholder { throw AttachmentError.offline }
+      if normalized == comparison { throw AttachmentError.collision }
+    }
+  }
+
+  private func verifyDirectories(_ components: [String], identities: [stat]) throws {
+    try verifyRootLocation()
+    var current = dup(rootDescriptor)
+    guard current >= 0 else { throw AttachmentError.posix() }
+    defer { close(current) }
+    for depth in 0...components.count {
+      if depth > 0 {
+        let next = openat(current, components[depth - 1], O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+        guard next >= 0 else { throw AttachmentError.posix() }
+        close(current)
+        current = next
+      }
+      let attributes = try checkWritableDirectory(current)
+      guard attributes.st_dev == identities[depth].st_dev,
+            attributes.st_ino == identities[depth].st_ino else { throw AttachmentError.unavailable }
+    }
+  }
+
+  func create(
+    relativeDirectory: String, filename: String, bytes: Data,
+    beforeDirectoryCreate: ((String) throws -> Void)? = nil,
+    beforeExclusiveCreate: (() throws -> Void)? = nil,
+    afterExclusiveCreate: (() throws -> Void)? = nil
+  ) throws -> String {
+    try Self.validate(relativeDirectory: relativeDirectory, filename: filename, bytes: bytes)
+    let components = try Self.directoryComponents(relativeDirectory)
+    try verifyRootLocation()
+    var parent = dup(rootDescriptor)
+    guard parent >= 0 else { throw AttachmentError.posix() }
+    defer { close(parent) }
+    var identities = [try checkWritableDirectory(parent)]
+    for (depth, name) in components.enumerated() {
+      try verifyDirectories(Array(components.prefix(depth)), identities: identities)
+      var placeholder = stat()
+      if fstatat(parent, ".\(name).icloud", &placeholder, AT_SYMLINK_NOFOLLOW) == 0 {
+        throw AttachmentError.offline
+      }
+      guard errno == ENOENT else { throw AttachmentError.posix() }
+      var child = openat(parent, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+      if child < 0 {
+        guard errno == ENOENT else { throw AttachmentError.posix() }
+        try rejectOccupiedName(parent, name: name)
+        try beforeDirectoryCreate?(Array(components.prefix(depth + 1)).joined(separator: "/"))
+        try verifyDirectories(Array(components.prefix(depth)), identities: identities)
+        // A concurrently won directory is not ours to adopt. Fail closed,
+        // retaining it and all existing contents without rollback or retry.
+        guard mkdirat(parent, name, 0o700) == 0 else {
+          if errno == EEXIST { throw AttachmentError.unavailable }
+          throw AttachmentError.posix()
+        }
+        child = openat(parent, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+      }
+      guard child >= 0 else { throw AttachmentError.posix() }
+      close(parent)
+      parent = child
+      identities.append(try checkWritableDirectory(parent))
+    }
+    try rejectOccupiedName(parent, name: filename)
+    // Hooks are test-only and never accepted through the channel.
+    try beforeExclusiveCreate?()
+    try verifyDirectories(components, identities: identities)
+    // Check again after the hook; O_EXCL remains the final authority for a race
+    // after this metadata check, including a symlink or a same-basename create.
+    try rejectOccupiedName(parent, name: filename)
+    let descriptor = openat(parent, filename, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC, 0o600)
+    guard descriptor >= 0 else {
+      if errno == EEXIST { throw AttachmentError.collision }
+      throw AttachmentError.posix()
+    }
+    defer { close(descriptor) }
+    let relativePath = (components + [filename]).joined(separator: "/")
+    createdRelativePath = relativePath
+    do {
+      let deadline = DispatchTime.now() + Self.readTimeout
+      try bytes.withUnsafeBytes { buffer in
+        var offset = 0
+        while offset < buffer.count {
+          guard DispatchTime.now().uptimeNanoseconds < deadline.uptimeNanoseconds else { throw AttachmentError.unavailable }
+          let written = Darwin.write(descriptor, buffer.baseAddress!.advanced(by: offset), min(64 * 1024, buffer.count - offset))
+          if written < 0 {
+            if errno == EINTR { continue }
+            throw AttachmentError.posix()
+          }
+          guard written > 0 else { throw AttachmentError.unavailable }
+          offset += written
+        }
+      }
+      guard fsync(descriptor) == 0 else { throw AttachmentError.posix() }
+      var written = stat()
+      guard fstat(descriptor, &written) == 0 else { throw AttachmentError.posix() }
+      try afterExclusiveCreate?()
+      try verifyDirectories(components, identities: identities)
+      let finalParent = try directoryDescriptor(components)
+      defer { close(finalParent) }
+      var finalTarget = stat()
+      var finalOpened = stat()
+      guard fstatat(finalParent, filename, &finalTarget, AT_SYMLINK_NOFOLLOW) == 0,
+            fstat(descriptor, &finalOpened) == 0 else { throw AttachmentError.posix() }
+      guard finalTarget.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+            finalTarget.st_flags & UInt32(SF_DATALESS | UF_HIDDEN) == 0,
+            finalTarget.st_nlink == 1, written.st_size == Int64(bytes.count),
+            Self.revision(finalTarget) == Self.revision(written),
+            Self.revision(finalOpened) == Self.revision(written) else { throw AttachmentError.unavailable }
+      // A concurrent uncoordinated rename can move a pinned parent outside the
+      // root during IO. Checks detect observed replacement, not absolute race
+      // immunity. On any error retain uncertain files; never unlink someone else's
+      // path or report a successful import. Dart inserts markup only on success.
+      return relativePath
+    } catch {
+      throw AttachmentImportWriteFailure(failure: AttachmentError.classify(error), relativePath: relativePath)
+    }
+  }
+}
+
+/// Metadata is inspected without decoding first. The only native pixel decode is
+/// explicit TIFF-to-PNG conversion for screenshots; all other formats retain
+/// their original bytes. Neither the advertised UTI nor the extension is trusted.
+enum AttachmentImportImage {
+  static let maximumPixels = 32 * 1024 * 1024
+  // TIFF requires native pixel decode and PNG encoding before Dart validation.
+  // Keep it below the generic raster cap: two 32 MiB encoded copies + three
+  // 4-byte/pixel working buffers + a 32 MiB output fit within 256 MiB at 8 Mpx.
+  static let maximumTIFFPixels = 8 * 1024 * 1024
+  static let maximumFrames = 256
+  struct Information {
+    let source: CGImageSource
+    let extensionName: String
+  }
+
+  static func inspect(_ bytes: Data, allowTIFF: Bool) throws -> Information {
+    guard !bytes.isEmpty else { throw AttachmentError.unsupported }
+    guard bytes.count <= AttachmentScope.maximumImageBytes else { throw AttachmentError.tooLarge }
+    guard let source = CGImageSourceCreateWithData(bytes as CFData, [kCGImageSourceShouldCache: false] as CFDictionary),
+          let type = CGImageSourceGetType(source) else { throw AttachmentError.unsupported }
+    let extensionName: String
+    switch type as String {
+    case "public.png": extensionName = "png"
+    case "public.jpeg": extensionName = "jpg"
+    case "com.compuserve.gif": extensionName = "gif"
+    case "org.webmproject.webp": extensionName = "webp"
+    case "com.microsoft.bmp": extensionName = "bmp"
+    case "public.tiff" where allowTIFF: extensionName = "tiff"
+    default: throw AttachmentError.unsupported
+    }
+    let frames = CGImageSourceGetCount(source)
+    guard frames > 0 else { throw AttachmentError.unsupported }
+    guard frames <= maximumFrames else { throw AttachmentError.tooLarge }
+    for index in 0..<frames {
+      guard let properties = CGImageSourceCopyPropertiesAtIndex(source, index, [kCGImageSourceShouldCache: false] as CFDictionary) as? [String: Any],
+            let width = properties[kCGImagePropertyPixelWidth as String] as? NSNumber,
+            let height = properties[kCGImagePropertyPixelHeight as String] as? NSNumber else { throw AttachmentError.unsupported }
+      try validateDimensions(width: width.doubleValue, height: height.doubleValue)
+      if extensionName == "tiff" {
+        try validateTIFFDimensions(width: width.doubleValue, height: height.doubleValue)
+        guard let depth = properties[kCGImagePropertyDepth as String] as? NSNumber,
+              depth.intValue > 0, depth.intValue <= 8 else { throw AttachmentError.unsupported }
+      }
+    }
+    guard CGImageSourceGetStatus(source) == .statusComplete else { throw AttachmentError.unsupported }
+    return Information(source: source, extensionName: extensionName)
+  }
+
+  static func validateDimensions(width: Double, height: Double) throws {
+    guard width.isFinite, height.isFinite, width >= 1, height >= 1,
+          width.rounded(.down) == width, height.rounded(.down) == height else { throw AttachmentError.unsupported }
+    guard width <= Double(maximumPixels) / height else { throw AttachmentError.tooLarge }
+  }
+
+  static func validateTIFFDimensions(width: Double, height: Double) throws {
+    try validateDimensions(width: width, height: height)
+    // Also exclude extremely narrow/tall rasters whose per-row alignment can
+    // multiply allocation despite a small pixel count.
+    guard width <= 16_384, height <= 16_384,
+          width <= Double(maximumTIFFPixels) / height else { throw AttachmentError.tooLarge }
+  }
+
+  static func prepare(_ bytes: Data, suggestedName: String) throws -> [String: Any] {
+    let image = try inspect(bytes, allowTIFF: true)
+    var output = bytes
+    var suffix = image.extensionName
+    if suffix == "tiff" {
+      guard let decoded = CGImageSourceCreateImageAtIndex(image.source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary) else {
+        throw AttachmentError.unsupported
+      }
+      let sink = BoundedImageOutput()
+      var callbacks = CGDataConsumerCallbacks(putBytes: { info, buffer, count in
+        guard let info else { return 0 }
+        let sink = Unmanaged<BoundedImageOutput>.fromOpaque(info).takeUnretainedValue()
+        guard count <= AttachmentScope.maximumImageBytes - sink.data.count else {
+          sink.exceeded = true
+          return 0
+        }
+        sink.data.append(buffer.assumingMemoryBound(to: UInt8.self), count: count)
+        return count
+      }, releaseConsumer: nil)
+      guard let consumer = CGDataConsumer(info: Unmanaged.passUnretained(sink).toOpaque(), cbks: &callbacks),
+            let destination = CGImageDestinationCreateWithDataConsumer(consumer, "public.png" as CFString, 1, nil) else {
+        throw AttachmentError.unavailable
+      }
+      CGImageDestinationAddImage(destination, decoded, nil)
+      let finalized = CGImageDestinationFinalize(destination)
+      if sink.exceeded { throw AttachmentError.tooLarge }
+      guard finalized else { throw AttachmentError.unavailable }
+      output = sink.data
+      suffix = "png"
+      _ = try inspect(output, allowTIFF: false)
+    }
+    return ["bytes": FlutterStandardTypedData(bytes: output), "extension": suffix, "suggestedName": suggestedName]
+  }
+}
+
+private final class BoundedImageOutput {
+  var data = Data()
+  var exceeded = false
+}
+
+#if os(macOS)
+/// No NSPasteboard dependency in this policy helper: tests inject synthetic
+/// advertised UTIs and bytes, never the real clipboard or file URLs.
+enum AttachmentClipboardImage {
+  static let preferredTypes = ["public.png", "public.jpeg", "com.compuserve.gif", "org.webmproject.webp", "com.microsoft.bmp", "public.tiff"]
+
+  static func read(types: [String], dataForType: (String) -> Data?) throws -> Data? {
+    guard let chosen = preferredTypes.first(where: { types.contains($0) }) else {
+      if types.contains(where: { UTType($0)?.conforms(to: .image) == true }) { throw AttachmentError.unsupported }
+      return nil
+    }
+    guard let bytes = dataForType(chosen) else { throw AttachmentError.unavailable }
+    guard bytes.count <= AttachmentScope.maximumImageBytes else { throw AttachmentError.tooLarge }
+    return bytes
+  }
+}
+
+extension CloudWorkspace {
+  private func completeAttachmentImport(_ result: @escaping FlutterResult, operation: @escaping () throws -> [String: Any]?) {
+    attachmentQueue.async {
+      do {
+        let value = try operation()
+        DispatchQueue.main.async { result(value) }
+      } catch {
+        let failure = AttachmentError.classify(error)
+        DispatchQueue.main.async { result(FlutterError(code: failure.code, message: failure.localizedDescription, details: nil)) }
+      }
+    }
+  }
+
+  private func pickAttachmentImage(result: @escaping FlutterResult) {
+    let panel = NSOpenPanel()
+    panel.title = "Insert Image"
+    panel.prompt = "Insert"
+    panel.allowedContentTypes = AttachmentClipboardImage.preferredTypes.compactMap { UTType($0) }
+    panel.canChooseFiles = true
+    panel.canChooseDirectories = false
+    panel.allowsMultipleSelection = false
+    panel.resolvesAliases = false
+    panel.begin { response in
+      guard response == .OK, let selected = panel.url else { result(nil); return }
+      self.completeAttachmentImport(result) {
+        let accessing = selected.startAccessingSecurityScopedResource()
+        defer { if accessing { selected.stopAccessingSecurityScopedResource() } }
+        let bytes = try Self.readPickedAttachmentImage(selected)
+        return try AttachmentImportImage.prepare(bytes, suggestedName: selected.lastPathComponent)
+      }
+    }
+  }
+
+  static func readPickedAttachmentImage(_ selected: URL) throws -> Data {
+    try WorkspaceFileScope.withoutMaterialization {
+      guard selected.isFileURL, selected.path.hasPrefix("/"), !selected.path.contains("\0"),
+            !selected.lastPathComponent.hasPrefix(".") else { throw AttachmentError.invalid }
+      // A file-selection security scope may not grant access to its parent
+      // directory. Open only the selected leaf, no-follow, while holding that
+      // scope; never widen the grant by requesting/enumerating its directory.
+      var before = stat()
+      if lstat(selected.path, &before) != 0 {
+        guard errno == ENOENT else { throw AttachmentError.posix() }
+        let placeholder = selected.deletingLastPathComponent().appendingPathComponent(".\(selected.lastPathComponent).icloud")
+        var stub = stat()
+        if lstat(placeholder.path, &stub) == 0 { throw AttachmentError.offline }
+        guard errno == ENOENT else { throw AttachmentError.posix() }
+        throw AttachmentError.missing
+      }
+      guard before.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+            before.st_flags & UInt32(UF_HIDDEN) == 0 else { throw AttachmentError.invalid }
+      guard before.st_flags & UInt32(SF_DATALESS) == 0 else { throw AttachmentError.offline }
+      guard before.st_size >= 0, before.st_size <= Int64(AttachmentScope.maximumImageBytes) else { throw AttachmentError.tooLarge }
+      var coordinationError: NSError?
+      var outcome: Result<Data, Error> = .failure(AttachmentError.unavailable)
+      let coordinator = NSFileCoordinator(filePresenter: nil)
+      let deadline = DispatchTime.now() + AttachmentScope.coordinationTimeout
+      let timeout = DispatchWorkItem { coordinator.cancel() }
+      DispatchQueue.global(qos: .utility).asyncAfter(deadline: deadline, execute: timeout)
+      defer { timeout.cancel() }
+      coordinator.coordinate(readingItemAt: selected, options: [], error: &coordinationError) { coordinated in
+        outcome = Result {
+          guard DispatchTime.now().uptimeNanoseconds < deadline.uptimeNanoseconds,
+                Data(coordinated.path.utf8) == Data(selected.path.utf8) else { throw AttachmentError.unavailable }
+          let descriptor = open(selected.path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
+          guard descriptor >= 0 else { throw AttachmentError.posix() }
+          defer { close(descriptor) }
+          var opened = stat()
+          guard fstat(descriptor, &opened) == 0 else { throw AttachmentError.posix() }
+          guard opened.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+                WorkspaceFileScope.revision(opened) == WorkspaceFileScope.revision(before) else { throw AttachmentError.unavailable }
+          guard opened.st_flags & UInt32(SF_DATALESS) == 0 else { throw AttachmentError.offline }
+          var bytes = Data()
+          var chunk = [UInt8](repeating: 0, count: 64 * 1024)
+          let readDeadline = DispatchTime.now() + WorkspaceFileScope.readTimeout
+          while true {
+            guard DispatchTime.now().uptimeNanoseconds < readDeadline.uptimeNanoseconds else { throw AttachmentError.unavailable }
+            let requested = min(chunk.count, AttachmentScope.maximumImageBytes - bytes.count + 1)
+            let count = chunk.withUnsafeMutableBytes { Darwin.read(descriptor, $0.baseAddress!, requested) }
+            if count < 0 {
+              if errno == EINTR { continue }
+              throw AttachmentError.posix()
+            }
+            if count == 0 { break }
+            guard count <= AttachmentScope.maximumImageBytes - bytes.count else { throw AttachmentError.tooLarge }
+            bytes.append(contentsOf: chunk.prefix(count))
+          }
+          var after = stat()
+          var leaf = stat()
+          guard fstat(descriptor, &after) == 0, lstat(selected.path, &leaf) == 0 else { throw AttachmentError.posix() }
+          guard WorkspaceFileScope.revision(after) == WorkspaceFileScope.revision(opened),
+                WorkspaceFileScope.revision(leaf) == WorkspaceFileScope.revision(opened),
+                leaf.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+                leaf.st_flags & UInt32(SF_DATALESS | UF_HIDDEN) == 0,
+                Int64(bytes.count) == opened.st_size else { throw AttachmentError.unavailable }
+          return bytes
+        }
+      }
+      if let error = coordinationError { throw AttachmentError.classify(error) }
+      return try outcome.get()
+    }
+  }
+
+  private func readClipboardAttachmentImage(result: @escaping FlutterResult) {
+    // This is the sole real clipboard access and only runs in the explicit
+    // MethodChannel Paste handler above. No string/fileURL read or observer.
+    do {
+      let pasteboard = NSPasteboard.general
+      let generation = pasteboard.changeCount
+      let bytes = try AttachmentClipboardImage.read(types: (pasteboard.types ?? []).map(\.rawValue)) {
+        pasteboard.data(forType: NSPasteboard.PasteboardType($0))
+      }
+      guard pasteboard.changeCount == generation else { throw AttachmentError.unavailable }
+      guard let bytes else { result(nil); return }
+      completeAttachmentImport(result) { try AttachmentImportImage.prepare(bytes, suggestedName: "image") }
+    } catch {
+      let failure = AttachmentError.classify(error)
+      result(FlutterError(code: failure.code, message: failure.localizedDescription, details: nil))
+    }
+  }
+}
+#endif

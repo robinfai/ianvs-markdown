@@ -22,6 +22,8 @@ import '../services/wiki_note_resolver.dart';
 import '../services/wiki_link_insertion.dart';
 import 'wiki_note_picker.dart';
 import '../services/attachment_repository.dart';
+import '../services/attachment_import_service.dart';
+import '../services/attachment_resolver.dart';
 import 'document_attachment_scope.dart';
 import '../services/markdown_file_service.dart';
 import 'local_document_image.dart';
@@ -48,10 +50,12 @@ class EditorShell extends StatefulWidget {
     this.enableFileDrop = true,
     this.onRetryInitialization,
     this.attachmentSource = const AppleAttachmentSource(),
+    this.attachmentImportPlatform = const AppleAttachmentImportPlatform(),
   });
 
   final WorkspaceController workspace;
   final AttachmentSource attachmentSource;
+  final AttachmentImportPlatform attachmentImportPlatform;
   final bool dark;
   final VoidCallback onToggleTheme;
   final VoidCallback? onUseSystemTheme;
@@ -80,6 +84,12 @@ class _EditorShellState extends State<EditorShell> {
   IanvsMarkdownController? _resumeLiveController;
   int _findSurfaceEpoch = 0;
   int _wikiGeneration = 0;
+  int _attachmentGeneration = 0;
+  int _attachmentRevision = 0;
+  bool _attachmentPending = false;
+  String? _attachmentRoot;
+  final _retainedImports =
+      <(String root, String documentPath, ImportedAttachment image)>[];
   String? _wikiActiveDocumentId;
 
   @override
@@ -88,9 +98,13 @@ class _EditorShellState extends State<EditorShell> {
     _documentInputTarget = DocumentInputTarget(
       mainFocus: _editorFocus,
       document: () => widget.workspace.activeDocument?.controller,
-      onLocalTarget: () => ++_wikiGeneration,
+      onLocalTarget: () {
+        ++_wikiGeneration;
+        ++_attachmentGeneration;
+      },
     );
     _wikiActiveDocumentId = widget.workspace.activeDocument?.id;
+    _attachmentRoot = widget.workspace.workspaceRoot;
     widget.workspace.addListener(_workspaceChanged);
   }
 
@@ -98,6 +112,7 @@ class _EditorShellState extends State<EditorShell> {
   void didUpdateWidget(covariant EditorShell oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.workspace, widget.workspace)) {
+      ++_attachmentGeneration;
       oldWidget.workspace.removeListener(_workspaceChanged);
       _documentInputTarget.reset();
       ++_wikiGeneration;
@@ -108,9 +123,14 @@ class _EditorShellState extends State<EditorShell> {
   }
 
   void _workspaceChanged() {
+    if (_attachmentRoot != widget.workspace.workspaceRoot) {
+      _attachmentRoot = widget.workspace.workspaceRoot;
+      ++_attachmentGeneration;
+    }
     if (_wikiActiveDocumentId != widget.workspace.activeDocument?.id) {
       _wikiActiveDocumentId = widget.workspace.activeDocument?.id;
       ++_wikiGeneration;
+      ++_attachmentGeneration;
       _documentInputTarget.reset();
     }
     if (!identical(
@@ -202,6 +222,147 @@ class _EditorShellState extends State<EditorShell> {
       _findFocus.requestFocus();
     });
   }
+
+  Future<bool> _importImage({bool fromClipboard = false}) async {
+    if (!(ModalRoute.of(context)?.isCurrent ?? true) ||
+        hasEditorComposition(widget.workspace)) {
+      return true;
+    }
+    if (_attachmentPending) return !fromClipboard;
+    final workspace = widget.workspace;
+    final document = workspace.activeDocument;
+    if (document == null) return false;
+    if (!fromClipboard &&
+        document.controller.mode == IanvsMarkdownEditorMode.livePreview &&
+        _documentInputTarget.isLocal) {
+      _showError(
+        'Focus the note body or switch to Source mode before importing an image from a table or property field.',
+      );
+      return true;
+    }
+    final edit = AttachmentInsertion.capture(document.controller);
+    if (edit == null) {
+      if (!fromClipboard) {
+        _showError(
+          'Enter Live or Source mode and finish composition before importing an image.',
+        );
+      }
+      return true;
+    }
+    final root = workspace.workspaceRoot;
+    final documentPath = document.path;
+    final generation = ++_attachmentGeneration;
+    var changed = false;
+    final pasteFocus = fromClipboard
+        ? FocusManager.instance.primaryFocus
+        : null;
+    void focusChanged() {
+      if (fromClipboard && FocusManager.instance.primaryFocus != pasteFocus) {
+        changed = true;
+      }
+    }
+
+    if (fromClipboard) FocusManager.instance.addListener(focusChanged);
+    void sourceChanged() {
+      if (!edit.current(document.controller)) changed = true;
+    }
+
+    bool current() =>
+        mounted &&
+        !changed &&
+        generation == _attachmentGeneration &&
+        identical(widget.workspace, workspace) &&
+        identical(workspace.activeDocument, document) &&
+        workspace.workspaceRoot == root &&
+        document.path == documentPath &&
+        edit.current(document.controller);
+    document.controller.addListener(sourceChanged);
+    document.controller.modeListenable.addListener(sourceChanged);
+    setState(() => _attachmentPending = true);
+    try {
+      // A plain-text Paste must still work in an unsaved document. Ask for the
+      // destination only after the user-requested read actually returns an image.
+      AttachmentImportTarget? target;
+      if (!fromClipboard) {
+        target = AttachmentImportTarget(root: root, documentPath: documentPath);
+      }
+      final payload = fromClipboard
+          ? await widget.attachmentImportPlatform.readClipboardImage()
+          : await widget.attachmentImportPlatform.pickImage();
+      if (payload == null) return !fromClipboard;
+      if (!current()) return true;
+      target ??= AttachmentImportTarget(root: root, documentPath: documentPath);
+      final imported = await AttachmentImportService(
+        source: widget.attachmentSource,
+        platform: widget.attachmentImportPlatform,
+      ).import(target: target, payload: payload, isCurrent: current);
+      if (!mounted) return true;
+      setState(() => _attachmentRevision++);
+      if (!current() || !edit.apply(document.controller, imported.markdown)) {
+        setState(() => _retainedImports.add((root!, documentPath!, imported)));
+      } else {
+        _editorFocus.requestFocus();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Imported ${imported.relativePath}. Undo removes the link, not the image file.',
+            ),
+          ),
+        );
+      }
+      return true;
+    } on Object catch (error) {
+      if (mounted &&
+          attachmentFailure(error).kind != AttachmentFailureKind.cancelled) {
+        final message = error is AttachmentImportFailure
+            ? error.message
+            : attachmentFailure(error).message;
+        final details = error is PlatformException ? error.details : null;
+        final retainedPath =
+            details is Map &&
+                details['fileMayRemain'] == true &&
+                details['relativePath'] is String
+            ? details['relativePath'] as String
+            : null;
+        _showError(
+          'Image import failed: $message${retainedPath == null ? '' : ' A file may remain at $root/$retainedPath. It was not deleted or linked; inspect it before retrying.'}',
+        );
+      }
+      return true;
+    } finally {
+      // Closed sessions dispose their controller after notifying the workspace.
+      // ChangeNotifier permits removing a listener after disposal.
+      if (fromClipboard) FocusManager.instance.removeListener(focusChanged);
+      document.controller.removeListener(sourceChanged);
+      document.controller.modeListenable.removeListener(sourceChanged);
+      if (mounted) setState(() => _attachmentPending = false);
+    }
+  }
+
+  Future<void> _showImportedLink(
+    String root,
+    String documentPath,
+    ImportedAttachment imported,
+  ) => showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Imported image kept'),
+      content: SizedBox(
+        width: 560,
+        child: SingleChildScrollView(
+          child: SelectableText(
+            'Image: $root/${imported.relativePath}\n\nOriginal note: $documentPath\n\nInsert this link into that note when ready:\n${imported.markdown}',
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+      ],
+    ),
+  );
 
   Future<void> _insertWikiLink() async {
     if (!(ModalRoute.of(context)?.isCurrent ?? true) ||
@@ -537,11 +698,11 @@ class _EditorShellState extends State<EditorShell> {
 
   @override
   void dispose() {
+    _documentInputTarget.dispose();
     widget.workspace.removeListener(_workspaceChanged);
     _find?.document.modeListenable.removeListener(_findModeChanged);
     _find?.removeListener(_findChanged);
     _find?.dispose();
-    _documentInputTarget.dispose();
     _editorFocus.dispose();
     _findFocus.dispose();
     _shellFocus.dispose();
@@ -628,6 +789,7 @@ class _EditorShellState extends State<EditorShell> {
           onOpenFolder: () => _guard(workspace.chooseWorkspaceFolder),
           onSave: () => _saveCommand(),
           onSaveAs: () => _saveCommand(saveAs: true),
+          onImportImage: () => unawaited(_importImage()),
           onClose: () => _guard(() => _closeDocument(document)),
           onToggleTheme: widget.onToggleTheme,
           onUseSystemTheme: widget.onUseSystemTheme,
@@ -795,6 +957,34 @@ class _EditorShellState extends State<EditorShell> {
                               onClose: _closeDocument,
                               documentActions: [
                                 IconButton(
+                                  key: const ValueKey('import-image-button'),
+                                  tooltip: _attachmentPending
+                                      ? 'Importing image…'
+                                      : 'Import image',
+                                  onPressed: _attachmentPending
+                                      ? null
+                                      : () => unawaited(_importImage()),
+                                  icon: Icon(
+                                    _attachmentPending
+                                        ? Icons.hourglass_top
+                                        : Icons.add_photo_alternate_outlined,
+                                    size: 16,
+                                    semanticLabel: _attachmentPending
+                                        ? 'Importing image'
+                                        : 'Import image',
+                                  ),
+                                  style: const ButtonStyle(
+                                    minimumSize: WidgetStatePropertyAll(
+                                      Size(32, 32),
+                                    ),
+                                    padding: WidgetStatePropertyAll(
+                                      EdgeInsets.all(6),
+                                    ),
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                ),
+                                IconButton(
                                   key: const ValueKey(
                                     'insert-wiki-link-button',
                                   ),
@@ -819,6 +1009,29 @@ class _EditorShellState extends State<EditorShell> {
                                 ),
                               ],
                             ),
+                            if (_retainedImports.firstOrNull
+                                case final retained?)
+                              MaterialBanner(
+                                content: Text(
+                                  'Image saved to ${retained.$1}/${retained.$3.relativePath}, but the note or selection changed. The file was kept; no link was inserted.',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => _showImportedLink(
+                                      retained.$1,
+                                      retained.$2,
+                                      retained.$3,
+                                    ),
+                                    child: const Text('Show link'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => setState(
+                                      () => _retainedImports.removeAt(0),
+                                    ),
+                                    child: const Text('Dismiss'),
+                                  ),
+                                ],
+                              ),
                             if (_find case final find?)
                               DocumentFindBar(
                                 controller: find,
@@ -903,6 +1116,9 @@ class _EditorShellState extends State<EditorShell> {
                                                   scrollController:
                                                       document.scrollController,
                                                   readOnly: find.readOnly,
+                                                  onPaste: () => _importImage(
+                                                    fromClipboard: true,
+                                                  ),
                                                   highlightedRange:
                                                       find.highlight,
                                                   showToolbar: false,
@@ -922,13 +1138,19 @@ class _EditorShellState extends State<EditorShell> {
                                               return DocumentAttachmentScope(
                                                 root: workspace.workspaceRoot,
                                                 documentPath: document.path,
-                                                revision: workspace
-                                                    .workspaceFilesRevision,
+                                                revision:
+                                                    workspace
+                                                        .workspaceFilesRevision +
+                                                    _attachmentRevision,
                                                 source: widget.attachmentSource,
                                                 builder: (context, images) =>
                                                     IanvsMarkdownLiveEditor(
                                                       imageBuilder:
                                                           images.image,
+                                                      onPaste: () =>
+                                                          _importImage(
+                                                            fromClipboard: true,
+                                                          ),
                                                       wikiEmbedBuilder:
                                                           images.wiki,
                                                       key: ValueKey(

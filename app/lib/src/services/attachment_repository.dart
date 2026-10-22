@@ -13,6 +13,9 @@ abstract class AttachmentSource {
   Future<List<AttachmentMetadata>> list(String root);
   Future<List<String>> normalize(List<String> paths);
   Future<Uint8List> read(String root, String relativePath, int maximumBytes);
+
+  /// Import must never request provider downloads or materialize settings.
+  Future<Uint8List> readImportSettings(String root);
 }
 
 /// Only the native adapter touches the filesystem. In particular, there is no
@@ -52,6 +55,21 @@ class AppleAttachmentSource implements AttachmentSource {
   }
 
   @override
+  Future<Uint8List> readImportSettings(String root) async {
+    final result = await AppleWorkspaceService.channel.invokeMethod<Uint8List>(
+      'readAttachmentImportSettings',
+      {'path': root},
+    );
+    if (result == null) {
+      throw const AttachmentFailure(AttachmentFailureKind.unavailable);
+    }
+    if (result.length > attachmentSettingsMaximumBytes) {
+      throw const AttachmentFailure(AttachmentFailureKind.tooLarge);
+    }
+    return result;
+  }
+
+  @override
   Future<Uint8List> read(
     String root,
     String relativePath,
@@ -84,6 +102,7 @@ AttachmentFailure attachmentFailure(Object error) {
       'attachment_denied' => AttachmentFailureKind.denied,
       'attachment_invalid' => AttachmentFailureKind.invalid,
       'attachment_too_large' => AttachmentFailureKind.tooLarge,
+      'attachment_unsupported' => AttachmentFailureKind.unsupported,
       'attachment_index_limit' => AttachmentFailureKind.indexLimit,
       _ => AttachmentFailureKind.unavailable,
     });
@@ -261,10 +280,25 @@ class AttachmentRepository extends ChangeNotifier {
     }
   }
 
+  /// Validates imported bytes with exactly the same format, actual codec and
+  /// admission limits as preview. No filesystem or clipboard is accessed.
+  Future<String> validateImport(Uint8List bytes) async {
+    if (bytes.isEmpty || bytes.length > attachmentMaximumBytes) {
+      throw const AttachmentFailure(AttachmentFailureKind.tooLarge);
+    }
+    final extension = attachmentRasterExtension(bytes);
+    if (extension == null) {
+      throw const AttachmentFailure(AttachmentFailureKind.unsupported);
+    }
+    final image = await _decode(bytes, _generation);
+    image.dispose();
+    return extension;
+  }
+
   Future<ui.Image> _decode(Uint8List bytes, int generation) async {
     // The engine can decode other formats (for example WBMP) despite an allowed
     // suffix. Require an allowed content signature before invoking any codec.
-    if (!_hasSupportedRasterSignature(bytes)) {
+    if (attachmentRasterExtension(bytes) == null) {
       throw const AttachmentFailure(AttachmentFailureKind.unsupported);
     }
     final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
@@ -360,7 +394,7 @@ class AttachmentRepository extends ChangeNotifier {
 
 // Signatures only admit a codec family. A successful real decode is still
 // required, so a forged/truncated header does not count as a valid image.
-bool _hasSupportedRasterSignature(Uint8List bytes) {
+String? attachmentRasterExtension(Uint8List bytes) {
   bool at(int offset, List<int> signature) {
     if (bytes.length < offset + signature.length) return false;
     for (var i = 0; i < signature.length; i++) {
@@ -369,10 +403,15 @@ bool _hasSupportedRasterSignature(Uint8List bytes) {
     return true;
   }
 
-  return at(0, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) ||
-      at(0, [0xff, 0xd8, 0xff]) ||
-      at(0, [0x47, 0x49, 0x46, 0x38, 0x37, 0x61]) ||
-      at(0, [0x47, 0x49, 0x46, 0x38, 0x39, 0x61]) ||
-      (at(0, [0x52, 0x49, 0x46, 0x46]) && at(8, [0x57, 0x45, 0x42, 0x50])) ||
-      at(0, [0x42, 0x4d]);
+  if (at(0, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return 'png';
+  if (at(0, [0xff, 0xd8, 0xff])) return 'jpg';
+  if (at(0, [0x47, 0x49, 0x46, 0x38, 0x37, 0x61]) ||
+      at(0, [0x47, 0x49, 0x46, 0x38, 0x39, 0x61])) {
+    return 'gif';
+  }
+  if (at(0, [0x52, 0x49, 0x46, 0x46]) && at(8, [0x57, 0x45, 0x42, 0x50])) {
+    return 'webp';
+  }
+  if (at(0, [0x42, 0x4d])) return 'bmp';
+  return null;
 }

@@ -21,12 +21,16 @@ class IanvsMarkdownEditorShortcuts extends StatelessWidget {
     required this.child,
     this.enableModeShortcuts = true,
     this.onSaveRequested,
+    this.onPaste,
   });
 
   final IanvsMarkdownController controller;
   final Widget child;
   final bool enableModeShortcuts;
   final IanvsMarkdownSaveCallback? onSaveRequested;
+
+  /// Optional user Paste interception. See [IanvsMarkdownEditor.onPaste].
+  final Future<bool> Function()? onPaste;
 
   @override
   Widget build(BuildContext context) {
@@ -82,7 +86,7 @@ class IanvsMarkdownEditorShortcuts extends StatelessWidget {
             },
           ),
           _DeleteLineIntent: _DeleteLineAction(controller),
-          PasteTextIntent: _MarkdownPasteAction(controller),
+          PasteTextIntent: _MarkdownPasteAction(controller, onPaste),
           _BoldIntent: CallbackAction<_BoldIntent>(
             onInvoke: (_) {
               if (controller.mode != IanvsMarkdownEditorMode.preview) {
@@ -231,9 +235,10 @@ class _DeleteLineAction extends ContextAction<_DeleteLineIntent> {
 }
 
 class _MarkdownPasteAction extends ContextAction<PasteTextIntent> {
-  _MarkdownPasteAction(this.controller);
+  _MarkdownPasteAction(this.controller, this.onPaste);
 
   final IanvsMarkdownController controller;
+  final Future<bool> Function()? onPaste;
 
   @override
   Object? invoke(PasteTextIntent intent, [BuildContext? context]) {
@@ -242,12 +247,66 @@ class _MarkdownPasteAction extends ContextAction<PasteTextIntent> {
         _isInsideFrontMatterCard(context)) {
       return defaultAction?.invoke(intent);
     }
+    if (onPaste case final callback?) {
+      final kind = markdownFocusedKind(controller);
+      if (kind == MarkdownCommandKind.table ||
+          kind == MarkdownCommandKind.property) {
+        return defaultAction?.invoke(intent);
+      }
+      final request = _MarkdownPasteRequest(controller, context);
+      if (!request.isCurrent || markdownHasComposition(controller)) return null;
+      unawaited(_pasteWithHost(intent, callback, request));
+      return null;
+    }
     final selection = controller.selection;
     if (!selection.isValid || selection.isCollapsed) {
       return defaultAction?.invoke(intent);
     }
     unawaited(_pasteSelectedText(intent, defaultAction, context));
     return null;
+  }
+
+  Future<void> _pasteWithHost(
+    PasteTextIntent intent,
+    Future<bool> Function() callback,
+    _MarkdownPasteRequest request,
+  ) async {
+    request.listen();
+    try {
+      if (await callback()) return;
+      await WidgetsBinding.instance.endOfFrame;
+      if (!request.isCurrent) return;
+      final data = await readPlainTextClipboardSafely();
+      await WidgetsBinding.instance.endOfFrame;
+      if (!request.isCurrent) return;
+      final text = data?.text;
+      if (text == null) return;
+      final replacement = smartUrlPasteValue(controller.value, text);
+      if (replacement != null) {
+        controller.commitHistoryGroup();
+        controller.value = replacement;
+        controller.commitHistoryGroup();
+        return;
+      }
+      // Use the same editing update as EditableText.pasteText, with the data
+      // already read. Calling the default action here would read again and
+      // could paste a changed clipboard into a newer selection after await.
+      final editable = request.editable!;
+      final value = editable.widget.controller.value;
+      editable.userUpdateTextEditingValue(
+        value
+            .copyWith(
+              selection: TextSelection.collapsed(offset: value.selection.end),
+            )
+            .replaced(value.selection, text),
+        intent.cause,
+      );
+    } catch (_) {
+      // A host may already have imported or inserted before failing. Never
+      // launch another paste when its outcome is uncertain.
+    } finally {
+      request.dispose();
+    }
   }
 
   Future<void> _pasteSelectedText(
@@ -283,6 +342,78 @@ class _MarkdownPasteAction extends ContextAction<PasteTextIntent> {
     controller.commitHistoryGroup();
     controller.value = replacement;
     controller.commitHistoryGroup();
+  }
+}
+
+/// Captures both full-source and live-block state before asynchronous paste.
+class _MarkdownPasteRequest {
+  _MarkdownPasteRequest(this.controller, this.context)
+    : editable = context?.findAncestorStateOfType<EditableTextState>(),
+      focus = FocusManager.instance.primaryFocus,
+      mode = controller.mode,
+      value = controller.value {
+    inputController = editable?.widget.controller;
+    inputValue = inputController?.value;
+  }
+
+  final IanvsMarkdownController controller;
+  final BuildContext? context;
+  final EditableTextState? editable;
+  final FocusNode? focus;
+  final IanvsMarkdownEditorMode mode;
+  final TextEditingValue value;
+  late final TextEditingController? inputController;
+  late final TextEditingValue? inputValue;
+  bool _stale = false;
+
+  bool get _sameInput =>
+      controller.mode == mode &&
+      controller.value == value &&
+      inputController?.value == inputValue &&
+      identical(FocusManager.instance.primaryFocus, focus) &&
+      focus?.hasFocus == true;
+
+  bool get isCurrent {
+    if (_stale ||
+        !_sameInput ||
+        mode == IanvsMarkdownEditorMode.preview ||
+        !value.selection.isValid ||
+        context == null ||
+        !context!.mounted ||
+        editable == null ||
+        !editable!.mounted ||
+        editable!.widget.readOnly ||
+        !editable!.widget.selectionEnabled ||
+        !identical(editable!.widget.controller, inputController)) {
+      return false;
+    }
+    final owner = context!
+        .findAncestorWidgetOfExactType<IanvsMarkdownEditorShortcuts>();
+    // Hosts commonly rebuild a busy indicator while their hook is pending;
+    // an equivalent closure created by that build must not cancel text paste.
+    return identical(owner?.controller, controller) && owner?.onPaste != null;
+  }
+
+  void _checkInput() {
+    if (!_sameInput) _stale = true;
+  }
+
+  void listen() {
+    controller.addListener(_checkInput);
+    controller.modeListenable.addListener(_checkInput);
+    if (!identical(inputController, controller)) {
+      inputController?.addListener(_checkInput);
+    }
+    focus?.addListener(_checkInput);
+  }
+
+  void dispose() {
+    controller.removeListener(_checkInput);
+    controller.modeListenable.removeListener(_checkInput);
+    if (!identical(inputController, controller)) {
+      inputController?.removeListener(_checkInput);
+    }
+    focus?.removeListener(_checkInput);
   }
 }
 
