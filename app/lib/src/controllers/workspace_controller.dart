@@ -8,6 +8,8 @@ import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:path/path.dart' as p;
 
 import '../models/document_session.dart';
+import '../models/document_sync_status.dart';
+import 'document_sync_controller.dart';
 import 'file_browser_controller.dart';
 import '../models/workspace_layout.dart';
 import '../services/markdown_file_service.dart';
@@ -30,7 +32,19 @@ class WorkspaceController extends ChangeNotifier {
     required this.sessionStore,
     this.defaultWorkspaceDirectory,
     WorkspaceIndexSource? indexSource,
+    DocumentSyncSource? syncSource,
   }) {
+    final metadataSource =
+        syncSource ??
+        (fileService is DocumentSyncSource
+            ? fileService as DocumentSyncSource
+            : null);
+    sync = DocumentSyncController(
+      canRead: metadataSource != null,
+      read:
+          metadataSource?.readSyncMetadata ??
+          (_) async => const DocumentSyncMetadata(),
+    );
     index = WorkspaceIndex(
       source:
           indexSource ??
@@ -42,6 +56,9 @@ class WorkspaceController extends ChangeNotifier {
     browser = FileBrowserController(fileService, index: index)
       ..addListener(_schedulePersist);
   }
+  late final DocumentSyncController sync;
+  final _saveFailures = <String>{};
+  final _recoveryCopies = <String, (String, String)>{};
   late final FileBrowserController browser;
   late final WorkspaceIndex index;
   late final WorkspaceReferenceIndex references;
@@ -53,6 +70,11 @@ class WorkspaceController extends ChangeNotifier {
 
   @override
   void notifyListeners() {
+    if (_disposed) return;
+    sync.configure(
+      path: activeDocument?.path,
+      identity: (_workspaceRoot, activeDocument?.id),
+    );
     index.configure(_workspaceRoot);
     for (final document in _documents) {
       _indexDocument(document);
@@ -114,6 +136,31 @@ class WorkspaceController extends ChangeNotifier {
   bool get outlineVisible => _outlineVisible;
   bool get initialized => _initialized;
 
+  DocumentPersistenceStatus persistenceStatus(DocumentSession document) {
+    final dirty = document.controller.isDirty;
+    final local = _initializing
+        ? LocalDocumentState.restoring
+        : _pendingSaves.containsKey(document.id)
+        ? LocalDocumentState.saving
+        : _saveFailures.contains(document.id)
+        ? LocalDocumentState.failed
+        : document.path == null
+        ? LocalDocumentState.draft
+        : dirty
+        ? LocalDocumentState.edited
+        : LocalDocumentState.saved;
+    final recovered = _recoveryCopies[document.id];
+    return DocumentPersistenceStatus(
+      local: local,
+      recovery: recoveryError != null
+          ? RecoveryCopyState.failed
+          : recovered == (document.controller.text, document.persistedText)
+          ? RecoveryCopyState.saved
+          : RecoveryCopyState.pending,
+      conflict: document.hasExternalChanges,
+    );
+  }
+
   Future<void> initialize() async {
     if (_initialized || _initializing) return;
     _initializing = true;
@@ -168,6 +215,10 @@ class WorkspaceController extends ChangeNotifier {
         _outlineVisible = snapshot.outlineVisible;
         for (final documentJson in snapshot.documents) {
           final restored = DocumentSession.fromJson(documentJson);
+          _recoveryCopies[restored.id] = (
+            restored.controller.text,
+            restored.persistedText,
+          );
           var path = restored.path;
           if (!restoreLocalWorkspace &&
               path != null &&
@@ -517,6 +568,8 @@ class WorkspaceController extends ChangeNotifier {
     SaveConflictResolver? onConflict,
   }) {
     _saveRevision += 1;
+    _saveFailures.remove(document.id);
+    if (identical(activeDocument, document)) sync.invalidate();
     final savedText = document.controller.text;
     document.controller.commitHistoryGroup();
     final previousSave = _pendingSaves[document.id];
@@ -530,7 +583,7 @@ class WorkspaceController extends ChangeNotifier {
         }
       }
       try {
-        return await _serializeFileOperation(
+        final result = await _serializeFileOperation(
           () => _saveDocumentSnapshot(
             document,
             savedText,
@@ -538,13 +591,23 @@ class WorkspaceController extends ChangeNotifier {
             onConflict: onConflict,
           ),
         );
+        if (result) _saveFailures.remove(document.id);
+        return result;
+      } on Object {
+        _saveFailures.add(document.id);
+        rethrow;
       } finally {
         if (identical(_pendingSaves[document.id], saving)) {
           _pendingSaves.remove(document.id);
+          if (!_disposed) {
+            notifyListeners();
+            if (identical(activeDocument, document)) sync.scheduleRefresh();
+          }
         }
       }
     }();
     _pendingSaves[document.id] = saving;
+    notifyListeners();
     return saving;
   }
 
@@ -678,6 +741,11 @@ class WorkspaceController extends ChangeNotifier {
       ..encoding = file.encoding
       ..lineEnding = file.lineEnding
       ..replaceFromDisk(file.contents, preserveHistory: true);
+    _saveFailures.remove(document.id);
+    if (identical(activeDocument, document)) {
+      sync.invalidate();
+      sync.scheduleRefresh();
+    }
     notifyListeners();
     _schedulePersist();
   }
@@ -687,6 +755,8 @@ class WorkspaceController extends ChangeNotifier {
     if (index < 0) return;
     _documents.removeAt(index);
     _dirtyStates.remove(document.id);
+    _saveFailures.remove(document.id);
+    _recoveryCopies.remove(document.id);
     _unwatch(document.id);
     final listener = _documentListeners.remove(document.id);
     if (listener != null) document.controller.removeListener(listener);
@@ -1101,6 +1171,7 @@ class WorkspaceController extends ChangeNotifier {
           .listen(
             (event) {
               if (!p.equals(event.path, path)) return;
+              if (identical(activeDocument, document)) sync.scheduleRefresh();
               unawaited(_checkForExternalChanges(document, path));
             },
             onError: (Object error, StackTrace stackTrace) {
@@ -1235,9 +1306,21 @@ class WorkspaceController extends ChangeNotifier {
     _persistTail = tail;
     return writing.then<void>(
       (_) {
-        if (!_disposed && recoveryError != null) {
+        if (!_disposed) {
           recoveryError = null;
-          notifyListeners();
+          _recoveryCopies
+            ..clear()
+            ..addEntries(
+              snapshot.documents.map(
+                (entry) => MapEntry(entry['id'] as String, (
+                  entry['text'] as String,
+                  entry['persistedText'] as String,
+                )),
+              ),
+            );
+          // Recovery status changed, not the workspace/catalog. Avoid triggering
+          // an unrelated index reconfiguration or a second folder scan.
+          super.notifyListeners();
         }
       },
       onError: (Object error, StackTrace stackTrace) {
@@ -1255,6 +1338,7 @@ class WorkspaceController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    sync.dispose();
     _persistTimer?.cancel();
     browser.removeListener(_schedulePersist);
     browser.dispose();

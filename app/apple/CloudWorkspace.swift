@@ -22,6 +22,7 @@ final class CloudWorkspace {
   private let queue = DispatchQueue(label: "work.ianvs.linefold.workspace", qos: .userInitiated)
   private let attachmentQueue = DispatchQueue(label: "work.ianvs.linefold.attachments", qos: .userInitiated)
   private let noteWriteQueue = DispatchQueue(label: "work.ianvs.linefold.note-create", qos: .userInitiated)
+  private let readScheduler = WorkspaceReadScheduler()
   private let searchQueue = DispatchQueue(label: "work.ianvs.linefold.search", qos: .utility)
   private var channel: FlutterMethodChannel?
   private var query: NSMetadataQuery?
@@ -62,8 +63,51 @@ final class CloudWorkspace {
       #endif
       guard ["defaultDirectory", "listDirectory", "readDocument", "readDocumentBytes", "writeDocument", "writeDocumentGuarded",
              "listAttachments", "readAttachmentBytes", "readAttachmentImportSettings", "normalizeAttachmentPaths", "createWorkspaceAttachment",
-             "listWorkspaceDirectory", "readWorkspaceTextBytes", "createWorkspaceNote", "resolveWorkspacePath"].contains(method) else {
+             "listWorkspaceDirectory", "readWorkspaceTextBytes", "createWorkspaceNote", "resolveWorkspacePath", "readDocumentSyncMetadata"].contains(method) else {
         result(FlutterMethodNotImplemented)
+        return
+      }
+      if let readKind = WorkspaceReadScheduler.Kind(method: method) {
+        // The channel handler runs on the platform/main thread. Snapshot only
+        // immutable request values here; readers never consult container,
+        // security-scope or monitor state on their independent worker queues.
+        guard let path = arguments["path"] as? String, path.hasPrefix("/") else {
+          result(FlutterError(code: "workspace_unavailable", message: WorkspaceError.invalidPath.localizedDescription, details: nil))
+          return
+        }
+        let recursive = arguments["recursive"] as? Bool ?? false
+        let maximumBytes = arguments["maximumBytes"] as? Int
+        self.readScheduler.execute(kind: readKind, operation: { () throws -> Any in
+          // URL(fileURLWithPath:) may query the filesystem to infer whether the
+          // path is a directory. Construct it only after worker admission, not
+          // on main and not for rejected requests.
+          let url = URL(fileURLWithPath: path)
+          switch readKind {
+          case .directory:
+            return try Self.list(url, recursive: recursive)
+          case .metadata:
+            return try Self.readSyncMetadata(url)
+          case .body:
+            let contents = try Self.read(url, maximumBytes: maximumBytes)
+            if method == "readDocumentBytes" {
+              return FlutterStandardTypedData(bytes: Data(contents.utf8))
+            }
+            return contents
+          }
+        }, completion: { outcome in
+          // The scheduler completes every admitted/rejected request once on
+          // main. Dart may already have discarded a timed-out or stale result.
+          switch outcome {
+          case .success(let value):
+            result(value)
+          case .failure(let error):
+            if error as? WorkspaceReadQueueError == .busy {
+              result(FlutterError(code: "workspace_busy", message: "Workspace reads are busy. Retry after an earlier read finishes.", details: ["retryable": true]))
+            } else {
+              result(FlutterError(code: "workspace_unavailable", message: error.localizedDescription, details: nil))
+            }
+          }
+        })
         return
       }
       let isSearch = method == "listWorkspaceDirectory" || method == "readWorkspaceTextBytes" || method == "createWorkspaceNote" || method == "resolveWorkspacePath"
@@ -129,13 +173,6 @@ final class CloudWorkspace {
               value = FlutterStandardTypedData(bytes: try Self.readAttachmentBytes(
                 url, relativePath: relativePath, maximumBytes: maximumBytes
               ))
-            case "listDirectory":
-              value = try Self.list(url, recursive: arguments["recursive"] as? Bool ?? false)
-            case "readDocument":
-              value = try Self.read(url, maximumBytes: arguments["maximumBytes"] as? Int)
-            case "readDocumentBytes":
-              let contents = try Self.read(url, maximumBytes: arguments["maximumBytes"] as? Int)
-              value = FlutterStandardTypedData(bytes: Data(contents.utf8))
             case "writeDocumentGuarded":
               try Self.writeGuarded(url, arguments: arguments)
               value = true
@@ -184,6 +221,7 @@ final class CloudWorkspace {
     observers.removeAll()
     monitoredRoot = root
     let query = NSMetadataQuery()
+    query.notificationBatchingInterval = 0.5
     query.searchScopes = [NSMetadataQueryUbiquitousDocumentsScope]
     query.predicate = NSPredicate(format: "%K BEGINSWITH %@", NSMetadataItemPathKey, root.path + "/")
     for name in [NSNotification.Name.NSMetadataQueryDidFinishGathering, NSNotification.Name.NSMetadataQueryDidUpdate] {
@@ -193,6 +231,52 @@ final class CloudWorkspace {
     }
     self.query = query
     query.start()
+  }
+
+  /// Read only the requested document's resource metadata. Do not coordinate a
+  /// content read, call startDownloadingUbiquitousItem, list a directory, request
+  /// nonlocal versions, or establish a new container/security scope here.
+  /// isUploaded describes an OS observation, not completion of our local write.
+  static func readSyncMetadata(_ source: URL) throws -> [String: Any] {
+    guard source.isFileURL, !source.path.contains("\0"),
+          extensions.contains(source.pathExtension.lowercased()) else {
+      throw WorkspaceError.invalidPath
+    }
+    var url = source
+    url.removeAllCachedResourceValues()
+    let keys: Set<URLResourceKey> = [
+      .isSymbolicLinkKey, .isDirectoryKey, .isUbiquitousItemKey,
+      .ubiquitousItemIsUploadedKey, .ubiquitousItemIsUploadingKey,
+      .ubiquitousItemIsDownloadingKey, .ubiquitousItemDownloadingStatusKey,
+      .ubiquitousItemUploadingErrorKey, .ubiquitousItemDownloadingErrorKey,
+      .ubiquitousItemHasUnresolvedConflictsKey,
+    ]
+    let values = try url.resourceValues(forKeys: keys)
+    guard values.isSymbolicLink != true, values.isDirectory != true else {
+      throw WorkspaceError.invalidPath
+    }
+    var observation = WorkspaceSyncObservation(
+      isUbiquitous: values.isUbiquitousItem,
+      isUploaded: values.ubiquitousItemIsUploaded,
+      isUploading: values.ubiquitousItemIsUploading,
+      isDownloading: values.ubiquitousItemIsDownloading,
+      downloadingStatus: values.ubiquitousItemDownloadingStatus,
+      uploadError: values.ubiquitousItemUploadingError?.localizedDescription,
+      downloadError: values.ubiquitousItemDownloadingError?.localizedDescription,
+      hasUnresolvedConflicts: values.ubiquitousItemHasUnresolvedConflicts
+    )
+    if values.isUbiquitousItem == true && values.ubiquitousItemHasUnresolvedConflicts == true,
+       let versions = NSFileVersion.unresolvedConflictVersionsOfItem(at: url) {
+      observation.conflictsAvailable = true
+      observation.conflicts = versions.prefix(50).map { version in
+        var record: [String: Any] = ["name": version.localizedName ?? "Conflicting version"]
+        if let modified = version.modificationDate {
+          record["modified"] = modified.timeIntervalSince1970 * 1000
+        }
+        return record
+      }
+    }
+    return observation.dictionary(observedAt: Date())
   }
 
   static func list(_ root: URL, recursive: Bool) throws -> [[String: Any]] {
@@ -1730,3 +1814,121 @@ extension CloudWorkspace {
   }
 }
 #endif
+
+/// Isolate metadata-only directory listing and active-document metadata from
+/// potentially blocking content reads, without borrowing any write/transaction
+/// queue. Each lane is serial: concurrent requests never materialize body reads
+/// in parallel. Bounds include both the running operation and queued operations.
+final class WorkspaceReadScheduler {
+  enum Kind {
+    case body, directory, metadata
+
+    init?(method: String) {
+      switch method {
+      case "readDocument", "readDocumentBytes": self = .body
+      case "listDirectory": self = .directory
+      case "readDocumentSyncMetadata": self = .metadata
+      default: return nil
+      }
+    }
+  }
+
+  private let body = BoundedWorkspaceReadQueue(label: "work.ianvs.linefold.read-body", qos: .userInitiated, capacity: 8)
+  private let directory = BoundedWorkspaceReadQueue(label: "work.ianvs.linefold.read-directory", qos: .userInitiated, capacity: 2)
+  private let metadata = BoundedWorkspaceReadQueue(label: "work.ianvs.linefold.sync-metadata", qos: .utility, capacity: 2)
+
+  @discardableResult
+  func execute<Value>(kind: Kind, operation: @escaping () throws -> Value,
+                      completion: @escaping (Result<Value, Error>) -> Void) -> Bool {
+    let queue: BoundedWorkspaceReadQueue
+    switch kind {
+    case .body: queue = body
+    case .directory: queue = directory
+    case .metadata: queue = metadata
+    }
+    return queue.execute(operation: operation, completion: completion)
+  }
+}
+
+enum WorkspaceReadQueueError: Error, Equatable {
+  case busy
+}
+
+private final class BoundedWorkspaceReadQueue {
+  private let queue: DispatchQueue
+  private let capacity: Int
+  private let lock = NSLock()
+  private var outstanding = 0
+
+  init(label: String, qos: DispatchQoS, capacity: Int) {
+    precondition(capacity > 0)
+    queue = DispatchQueue(label: label, qos: qos)
+    self.capacity = capacity
+  }
+
+  /// A Dart timeout/cancellation cannot interrupt arbitrary provider I/O or
+  /// guarantee that NSFileCoordinator has returned. Keep that request's budget
+  /// until its native operation really exits; reject excess retries immediately
+  /// instead of accumulating dispatch blocks behind a stalled provider.
+  @discardableResult
+  func execute<Value>(operation: @escaping () throws -> Value,
+                      completion: @escaping (Result<Value, Error>) -> Void) -> Bool {
+    lock.lock()
+    guard outstanding < capacity else {
+      lock.unlock()
+      DispatchQueue.main.async { completion(.failure(WorkspaceReadQueueError.busy)) }
+      return false
+    }
+    outstanding += 1
+    lock.unlock()
+    queue.async {
+      let outcome = self.perform(operation)
+      DispatchQueue.main.async { completion(outcome) }
+    }
+    return true
+  }
+
+  private func perform<Value>(_ operation: () throws -> Value) -> Result<Value, Error> {
+    // Release on success and throw, before delivering completion so that an
+    // immediate retry from the main-thread callback can use the freed slot.
+    defer {
+      lock.lock()
+      outstanding -= 1
+      lock.unlock()
+    }
+    return Result(catching: operation)
+  }
+}
+
+/// Optional booleans remain absent rather than becoming false. This wire-only
+/// projection is separately tested with synthetic observations on native CI.
+struct WorkspaceSyncObservation {
+  var isUbiquitous: Bool? = nil
+  var isUploaded: Bool? = nil
+  var isUploading: Bool? = nil
+  var isDownloading: Bool? = nil
+  var downloadingStatus: URLUbiquitousItemDownloadingStatus? = nil
+  var uploadError: String? = nil
+  var downloadError: String? = nil
+  var hasUnresolvedConflicts: Bool? = nil
+  var conflictsAvailable = false
+  var conflicts: [[String: Any]] = []
+
+  func dictionary(observedAt: Date) -> [String: Any] {
+    var result: [String: Any] = [
+      "observedAt": observedAt.timeIntervalSince1970 * 1000,
+      "conflictsAvailable": conflictsAvailable, "conflicts": conflicts,
+    ]
+    if let isUbiquitous { result["isUbiquitous"] = isUbiquitous }
+    if let isUploaded { result["isUploaded"] = isUploaded }
+    if let isUploading { result["isUploading"] = isUploading }
+    if let isDownloading { result["isDownloading"] = isDownloading }
+    if let hasUnresolvedConflicts { result["hasUnresolvedConflicts"] = hasUnresolvedConflicts }
+    if let uploadError { result["uploadError"] = uploadError }
+    if let downloadError { result["downloadError"] = downloadError }
+    if downloadingStatus == .current { result["downloadingStatus"] = "current" }
+    if downloadingStatus == .downloaded { result["downloadingStatus"] = "downloaded" }
+    if downloadingStatus == .notDownloaded { result["downloadingStatus"] = "notDownloaded" }
+    return result
+  }
+}

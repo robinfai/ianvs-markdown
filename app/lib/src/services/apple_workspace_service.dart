@@ -4,10 +4,11 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 
 import 'markdown_text_codec.dart';
+import '../models/document_sync_status.dart';
 
 /// Shared native iCloud access for macOS and iOS. Native file coordination also
 /// materializes an evicted document before exposing its contents to Dart.
-class AppleWorkspaceService {
+class AppleWorkspaceService implements DocumentSyncSource {
   const AppleWorkspaceService();
 
   static const channel = MethodChannel('work.ianvs.linefold/workspace');
@@ -55,6 +56,23 @@ class AppleWorkspaceService {
     });
     if (bytes == null) throw StateError('The document bytes are unavailable.');
     return decodeMarkdownUtf8(bytes);
+  }
+
+  @override
+  Future<DocumentSyncMetadata> readSyncMetadata(String path) async {
+    try {
+      final result = await channel.invokeMapMethod<Object?, Object?>(
+        'readDocumentSyncMetadata',
+        {'path': path},
+      );
+      return result == null
+          ? const DocumentSyncMetadata()
+          : DocumentSyncMetadata.fromMap(result);
+    } on MissingPluginException {
+      // Older native hosts and providers without this optional capability stay
+      // usable. Absence of metadata never implies successful synchronization.
+      return const DocumentSyncMetadata();
+    }
   }
 
   Future<void> write(String path, String contents) async {

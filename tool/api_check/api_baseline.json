@@ -12045,6 +12045,13 @@
           "required": false
         },
         {
+          "name": "preserveScrollOnUpdate",
+          "type": "bool",
+          "kind": "named",
+          "required": false,
+          "default": "false"
+        },
+        {
           "name": "padding",
           "type": "EdgeInsetsGeometry",
           "kind": "named",
@@ -12490,6 +12497,14 @@
     "IanvsMarkdownView/field:padding": {
       "kind": "field",
       "type": "EdgeInsetsGeometry",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownView/field:preserveScrollOnUpdate": {
+      "kind": "field",
+      "type": "bool",
       "const": false,
       "final": true,
       "static": false,

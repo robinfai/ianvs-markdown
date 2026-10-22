@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../services/apple_workspace_service.dart';
+import '../models/document_sync_status.dart';
 import 'preview_platform.dart';
 
 const previewExtensions = {'.md', '.markdown', '.mdown', '.mkd', '.txt'};
@@ -51,7 +52,21 @@ class PreviewLibrary {
 
   final Future<Directory> Function() _documentsDirectory;
   final AppleWorkspaceService? workspaceService;
-  PreviewWorkspace? workspace;
+  PreviewWorkspace? _workspace;
+  int _workspaceGeneration = 0;
+  int _workspaceRequest = 0;
+
+  PreviewWorkspace? get workspace => _workspace;
+  set workspace(PreviewWorkspace? value) {
+    _workspace = value;
+    ++_workspaceGeneration;
+    ++_workspaceRequest;
+  }
+
+  // Monotonic even when changing A → B → A, unlike a path equality check.
+  int get workspaceGeneration => _workspaceGeneration;
+
+  void invalidateWorkspaceRequests() => ++_workspaceRequest;
   Future<void> _historyWrite = Future.value();
 
   Future<Directory> _root() async => workspace == null
@@ -60,16 +75,22 @@ class PreviewLibrary {
 
   Future<void> useDefaultWorkspace() async {
     if (workspaceService == null) return;
+    final request = ++_workspaceRequest;
     final result = await PreviewPlatform.channel
         .invokeMapMethod<String, dynamic>('defaultWorkspace');
-    workspace = PreviewWorkspace.fromMap(result!);
+    if (request != _workspaceRequest) return;
+    if (result == null) {
+      throw StateError('The default workspace is unavailable.');
+    }
+    workspace = PreviewWorkspace.fromMap(result);
   }
 
   Future<bool> chooseWorkspace() async {
     if (workspaceService == null) return false;
+    final request = ++_workspaceRequest;
     final result = await PreviewPlatform.channel
         .invokeMapMethod<String, dynamic>('chooseWorkspace');
-    if (result == null) return false;
+    if (request != _workspaceRequest || result == null) return false;
     workspace = PreviewWorkspace.fromMap(result);
     return true;
   }
@@ -81,11 +102,13 @@ class PreviewLibrary {
     )..createSync(recursive: true);
   }
 
-  String _historyKey(String path, Directory root) => workspaceService == null
+  String _historyKey(String path, Directory root, bool isCloud) =>
+      workspaceService == null
       ? p.relative(path, from: root.path)
-      : '${workspace?.isCloud == true ? 'icloud' : root.path}/${p.relative(path, from: root.path)}';
+      : '${isCloud ? 'icloud' : root.path}/${p.relative(path, from: root.path)}';
 
   Future<List<PreviewDocument>> list() async {
+    final isCloud = workspace?.isCloud == true;
     final root = await _root();
     final history = await _readHistory(await _historyRoot(root));
     if (workspaceService != null) {
@@ -98,6 +121,7 @@ class PreviewLibrary {
             openedAt: switch (history[_historyKey(
               entry['path'] as String,
               root,
+              isCloud,
             )]) {
               final time? => DateTime.fromMicrosecondsSinceEpoch(time),
               null => DateTime.fromMillisecondsSinceEpoch(
@@ -149,17 +173,19 @@ class PreviewLibrary {
     }
   }
 
-  Future<void> _recordOpen(File file) {
+  Future<void> _recordOpen(File file, Directory root, int scope, bool isCloud) {
     final next = _historyWrite.then((_) async {
-      final root = await _root();
+      if (scope != workspaceGeneration) return;
       final historyRoot = await _historyRoot(root);
       final history = await _readHistory(historyRoot);
       // Relative paths survive iOS changing the application container on update.
       final key = _historyKey(
         file.path,
         Directory(await root.resolveSymbolicLinks()),
+        isCloud,
       );
       history[key] = DateTime.now().microsecondsSinceEpoch;
+      if (scope != workspaceGeneration) return;
       final target = File(p.join(historyRoot.path, '.recent.json'));
       final temporary = File('${target.path}.tmp');
       await temporary.writeAsString(jsonEncode(history), flush: true);
@@ -170,8 +196,7 @@ class PreviewLibrary {
     return _historyWrite;
   }
 
-  Future<File> _ownedFile(String path) async {
-    final root = await _root();
+  Future<File> _ownedFile(String path, Directory root) async {
     final file = File(path);
     final resolved = await file.exists()
         ? await file.resolveSymbolicLinks()
@@ -183,14 +208,36 @@ class PreviewLibrary {
     return File(resolved);
   }
 
-  Future<String> read(String path) async {
-    final file = await _ownedFile(path);
+  /// Metadata-only, scoped to the same already selected folder as content reads.
+  /// This never reads text, updates recent history, or requests a download.
+  Future<DocumentSyncMetadata> readSyncMetadata(String path) async {
+    if (workspaceService == null) return const DocumentSyncMetadata();
+    final scope = workspaceGeneration;
+    final root = await _root();
+    final file = await _ownedFile(path, root);
+    if (scope != workspaceGeneration) return const DocumentSyncMetadata();
+    return workspaceService!.readSyncMetadata(file.path);
+  }
+
+  Future<String> read(String path) => _read(path, recordOpen: true);
+
+  /// Refreshes only the selected body, without changing recent-open history.
+  Future<String> refreshContent(String path) => _read(path, recordOpen: false);
+
+  Future<String> _read(String path, {required bool recordOpen}) async {
+    final scope = workspaceGeneration;
+    final isCloud = workspace?.isCloud == true;
+    final root = await _root();
+    final file = await _ownedFile(path, root);
+    if (scope != workspaceGeneration) {
+      throw StateError('The preview workspace changed.');
+    }
     if (workspaceService != null) {
       final text = await workspaceService!.read(
         file.path,
         maximumBytes: previewMaximumBytes,
       );
-      await _recordOpen(file);
+      if (recordOpen) await _recordOpen(file, root, scope, isCloud);
       return text.startsWith('\uFEFF') ? text.substring(1) : text;
     }
     // Limit the actual read as well as the metadata, including files changed
@@ -202,7 +249,7 @@ class PreviewLibrary {
         throw const FormatException('文档超过 5 MB，暂时无法预览。');
       }
       final text = utf8.decode(bytes);
-      await _recordOpen(file);
+      if (recordOpen) await _recordOpen(file, root, scope, isCloud);
       return text.startsWith('\uFEFF') ? text.substring(1) : text;
     } on FormatException catch (error) {
       if (error.message.contains('5 MB')) rethrow;

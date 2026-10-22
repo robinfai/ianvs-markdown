@@ -66,6 +66,19 @@ void main() {
   );
 
   test(
+    'active body refresh observes edits without rewriting recent history',
+    () async {
+      final file = await document('one/note.md', '# Initial');
+      await library.read(file.path);
+      final history = File('${root.path}/Imports/.recent.json');
+      final before = await history.readAsString();
+      await file.writeAsString('# Updated externally');
+      expect(await library.refreshContent(file.path), '# Updated externally');
+      expect(await history.readAsString(), before);
+    },
+  );
+
+  test(
     'one broken delivery does not prevent later files, and errors remain visible',
     () async {
       final file = await document('good/note.md', '# Shared');

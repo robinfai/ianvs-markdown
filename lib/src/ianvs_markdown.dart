@@ -1325,6 +1325,7 @@ class IanvsMarkdownView extends StatefulWidget {
     required this.data,
     this.syntaxPreset = IanvsMarkdownSyntaxPreset.obsidian,
     this.controller,
+    this.preserveScrollOnUpdate = false,
     this.padding = const EdgeInsets.fromLTRB(28, 24, 32, 44),
     this.showFrontMatter = false,
     this.compactFrontMatter = true,
@@ -1370,6 +1371,13 @@ class IanvsMarkdownView extends StatefulWidget {
   /// source; [showFrontMatter] and [showDocumentTitle] have no effect there.
   final IanvsMarkdownSyntaxPreset syntaxPreset;
   final ScrollController? controller;
+
+  /// Keep the current scroll position when source or rendering options update.
+  ///
+  /// Defaults to false, which resets to the start. Hosts updating the same
+  /// document in place can opt in; use a new widget key for a different document.
+  /// Shorter content is clamped by the scroll position's normal layout handling.
+  final bool preserveScrollOnUpdate;
   final EdgeInsetsGeometry padding;
   final bool showFrontMatter;
   final bool compactFrontMatter;
@@ -1480,11 +1488,15 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
         oldWidget.renderBudget != widget.renderBudget) {
       _parseDocument();
       _activeHeadingIndex = null;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _scrollController.hasClients) {
-          _scrollController.jumpTo(0);
-        }
-      });
+      if (!widget.preserveScrollOnUpdate) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted &&
+              !widget.preserveScrollOnUpdate &&
+              _scrollController.hasClients) {
+            _scrollController.jumpTo(0);
+          }
+        });
+      }
     }
   }
 

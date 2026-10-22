@@ -209,6 +209,82 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'View preserves current position only when opted in and clamps shorter source',
+    (tester) async {
+      final scroll = _TrackedScrollController();
+      addTearDown(scroll.dispose);
+      final source = List.generate(
+        60,
+        (i) => '# Section $i\n\nParagraph $i.',
+      ).join('\n\n');
+      Widget host(String data) => MaterialApp(
+        home: Scaffold(
+          body: IanvsMarkdownView(
+            data: data,
+            controller: scroll,
+            preserveScrollOnUpdate: true,
+            showOutline: false,
+          ),
+        ),
+      );
+      await tester.pumpWidget(host(source));
+      await tester.pumpAndSettle();
+      scroll.jumpTo(1200);
+      await tester.pump();
+      await tester.pumpWidget(host('$source\n\nAppended text.'));
+      await tester.pumpAndSettle();
+      expect(scroll.offset, 1200);
+      await tester.pumpWidget(host('# Short\n\nOnly this.'));
+      await tester.pumpAndSettle();
+      expect(scroll.offset, scroll.position.maxScrollExtent);
+      expect(scroll.offset, 0);
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(scroll.disposals, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'preserving View scroll retains existing matching heading folds',
+    (tester) async {
+      const source =
+          '# Folded\n\nHidden paragraph.\n\n# Visible\n\nVisible paragraph.';
+      final folds = IanvsMarkdownHeadingFoldController();
+      addTearDown(folds.dispose);
+      final folded = IanvsMarkdownHeadingFoldModel.parse(
+        source,
+      ).sections.first.identity;
+      folds.toggleIdentity(folded);
+      Widget host(String data) => MaterialApp(
+        home: Scaffold(
+          body: IanvsMarkdownView(
+            data: data,
+            preserveScrollOnUpdate: true,
+            headingFoldController: folds,
+            enableHeadingFolding: true,
+            showOutline: false,
+          ),
+        ),
+      );
+      await tester.pumpWidget(host(source));
+      await tester.pumpAndSettle();
+      expect(folds.isCollapsed(folded), isTrue);
+      expect(find.text('Hidden paragraph.', findRichText: true), findsNothing);
+      await tester.pumpWidget(
+        host('Intro inserted before headings.\n\n$source\n\nAppended text.'),
+      );
+      await tester.pumpAndSettle();
+      expect(folds.isCollapsed(folded), isTrue);
+      expect(find.text('Hidden paragraph.', findRichText: true), findsNothing);
+      await tester.pumpWidget(host('# Visible\n\nVisible paragraph.'));
+      await tester.pumpAndSettle();
+      expect(folds.isCollapsed(folded), isFalse);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 }
 
 class _TrackedFocusNode extends FocusNode {
