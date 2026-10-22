@@ -12,9 +12,11 @@ import '../models/document_session.dart';
 import '../desktop_theme.dart';
 import '../desktop_typography.dart';
 import '../services/markdown_file_service.dart';
+import '../services/workspace_note_move_plan.dart';
 import 'file_context_menu.dart';
 import 'middle_ellipsis_text.dart';
 import 'window_app_title.dart';
+import 'workspace_note_move_preview.dart';
 
 const _background = Color(0xff17191a);
 final _secondary = IanvsTokens.dark.muted;
@@ -40,6 +42,7 @@ class WorkspaceSidebar extends StatefulWidget {
 }
 
 class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
+  bool _previewingMove = false;
   FileBrowserController get browser => widget.workspace.browser;
   final _search = TextEditingController();
   final _searchFocus = FocusNode();
@@ -1403,6 +1406,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
           if (row?.entry?.isDirectory == false && !isMarkdownFileName(name)) {
             throw const FormatException('Use a Markdown or text extension.');
           }
+          if (!await _confirmUnmaintainedMove([old], [result])) return;
           await widget.workspace.moveFileEntry(old, result);
           _message('Renamed. Relative Markdown links were not updated.');
         }
@@ -1471,6 +1475,11 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
     for (final source in paths) {
       if (!await _authorize(p.dirname(source))) return;
     }
+    if (!await _confirmUnmaintainedMove(paths, [
+      for (final path in paths) p.join(target, p.basename(path)),
+    ])) {
+      return;
+    }
     await _batch(paths, (path) async {
       await widget.workspace.moveFileEntry(
         path,
@@ -1478,6 +1487,46 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
       );
       return true;
     }, 'moved');
+  }
+
+  Future<bool> _confirmUnmaintainedMove(
+    List<String> sources,
+    List<String> destinations,
+  ) async {
+    if (_previewingMove) return false;
+    _previewingMove = true;
+    try {
+      Future<WorkspaceNoteMovePlan>? preview;
+      String? unavailable;
+      final root = widget.workspace.workspaceRoot;
+      final epoch = widget.workspace.index.epoch;
+      if (sources.length == 1 &&
+          root != null &&
+          p.isWithin(root, sources.single) &&
+          p.isWithin(root, destinations.single)) {
+        preview = widget.workspace.previewNoteMove(
+          sources.single,
+          destinations.single,
+        );
+      } else if (sources.length == 1) {
+        unavailable =
+            'This item is outside the selected workspace. Complete incoming reference coverage is unavailable.';
+      }
+      if (!mounted) return false;
+      final accepted = await showWorkspaceNoteMovePreview(
+        context: context,
+        sources: sources,
+        destinations: destinations,
+        preview: preview,
+        unavailable: unavailable,
+      );
+      return accepted &&
+          mounted &&
+          root == widget.workspace.workspaceRoot &&
+          epoch == widget.workspace.index.epoch;
+    } finally {
+      _previewingMove = false;
+    }
   }
 
   Future<void> _trash(List<String> paths) async {

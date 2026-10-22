@@ -44,11 +44,12 @@ Markdown targets, fragments, queries, display aliases, syntax kind and effective
 reference-definition identity. Wiki targets are not URI-decoded. Definition uses
 point to their authoritative definition's destination span, not their label.
 The source parser, including unsupported contexts, is documented separately.
-Table bodies currently have unknown coverage and contribute no references or
-tags. Whole-table inline parsing is not renderer-equivalent and would create
-false or missing links across cells. Source-mapped, per-cell table parsing is a
-required follow-up before safe rename can cover notes containing tables; this
-phase does not claim full reference coverage.
+P1g1 adds renderer-aligned, source-mapped per-cell table parsing, including
+escaped pipes and the renderer's irregular-table projection. Whole-table inline
+parsing is never used. Unverifiable projections still report unknown coverage;
+see [note semantics](NOTE_SEMANTICS.md). The read-only move proposal and the
+remaining native execution/recovery requirements are documented in
+[P1g safe note move](P1G_SAFE_NOTE_MOVE.md).
 
 - Wiki note lookup reuses `WikiNoteResolver`, including root-relative, explicit
   relative and bare-basename `.md` policy and real case/NFC collision choices.

@@ -15,6 +15,9 @@ import '../services/workspace_session_store.dart';
 import '../services/workspace_index.dart';
 import '../services/workspace_index_source.dart';
 import '../services/workspace_reference_index.dart';
+import '../services/workspace_note_move_plan.dart';
+import '../services/attachment_repository.dart';
+import '../services/attachment_resolver.dart';
 
 enum SaveConflictChoice { cancel, keepBoth, overwrite }
 
@@ -920,6 +923,55 @@ class WorkspaceController extends ChangeNotifier {
     browser.remap(source, destination);
     await _afterFileOperation([p.dirname(source), p.dirname(destination)]);
   });
+
+  /// Read-only proposal. The existing file move remains a separate, explicitly
+  /// warned action until the recoverable native executor is available.
+  Future<WorkspaceNoteMovePlan> previewNoteMove(
+    String source,
+    String destination,
+  ) async {
+    final root = _workspaceRoot;
+    if (root == null ||
+        !p.isWithin(root, source) ||
+        !p.isWithin(root, destination)) {
+      throw StateError(
+        'Reference maintenance requires one selected workspace.',
+      );
+    }
+    final snapshot = await references.refresh(refreshMetadata: true);
+    final from = p.posix.relative(source, from: root);
+    final to = p.posix.relative(destination, from: root);
+    final dirty = {
+      for (final document in _documents)
+        if (document.controller.isDirty) document.id,
+    };
+    AttachmentIndex? attachments;
+    if (p.posix.dirname(from) != p.posix.dirname(to) &&
+        snapshot.edges.any(
+          (edge) =>
+              edge.note.source.path == source &&
+              edge.status == WorkspaceReferenceStatus.external &&
+              attachmentExtensions.contains(
+                p.posix.extension(edge.reference.target).toLowerCase(),
+              ),
+        )) {
+      try {
+        // Metadata only; never reads image bytes or downloads provider files.
+        attachments = AttachmentIndex(
+          await const AppleAttachmentSource().list(root),
+        );
+      } on Object {
+        // The planner reports unknown coverage instead of guessing.
+      }
+    }
+    return WorkspaceNoteMovePlanner(references).build(
+      snapshot: snapshot,
+      sourcePath: from,
+      destinationPath: to,
+      dirtySessionIds: dirty,
+      attachments: attachments,
+    );
+  }
 
   Future<String> duplicateFileEntry(
     String source,

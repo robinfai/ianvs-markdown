@@ -1,5 +1,12 @@
 import 'package:flutter/services.dart';
+import 'package:markdown/markdown.dart' as md;
 
+import '../callout.dart';
+import '../markdown_table_syntax.dart';
+import '../math.dart' show IanvsMarkdownDisplayMathSyntax;
+import '../obsidian_metadata.dart'
+    show ianvsMarkdownLivePreviewFootnoteReferences;
+import '../wiki_embed.dart' show IanvsMarkdownWikiEmbedSyntax;
 import 'editor_models.dart';
 
 final RegExp _blockquotePrefixPattern = RegExp(r'^ {0,3}>[ \t]?');
@@ -293,17 +300,26 @@ _MarkdownProjection _dequoteBlock(
 }
 
 final class _MarkdownProjection {
-  const _MarkdownProjection._(this.source, this._originalCodeUnits);
+  const _MarkdownProjection._(
+    this.source,
+    this._originalCodeUnits,
+    this._originalCodeUnitEnds,
+  );
 
   factory _MarkdownProjection.root(String source) {
-    return _MarkdownProjection._(source, null);
+    return _MarkdownProjection._(source, null, null);
   }
 
   final String source;
   final List<int>? _originalCodeUnits;
+  final List<int>? _originalCodeUnitEnds;
 
   int originalCodeUnitOffset(int offset) {
     return _originalCodeUnits?[offset] ?? offset;
+  }
+
+  int originalCodeUnitEnd(int offset) {
+    return _originalCodeUnitEnds?[offset] ?? originalCodeUnitOffset(offset) + 1;
   }
 
   List<TextRange> originalRanges(int start, int end) {
@@ -331,12 +347,22 @@ final class _MarkdownProjectionBuilder {
   final _MarkdownProjection parent;
   final StringBuffer _source = StringBuffer();
   final List<int> _originalCodeUnits = <int>[];
+  final List<int> _originalCodeUnitEnds = <int>[];
 
   void appendRange(int start, int end) {
     for (var index = start; index < end; index += 1) {
       _source.writeCharCode(parent.source.codeUnitAt(index));
       _originalCodeUnits.add(parent.originalCodeUnitOffset(index));
+      _originalCodeUnitEnds.add(parent.originalCodeUnitEnd(index));
     }
+  }
+
+  // TableSyntax removes this escape before inline parsing. Keep the whole
+  // source token attached to the resulting pipe, including at range edges.
+  void appendTablePipe(int slashIndex) {
+    _source.write('|');
+    _originalCodeUnits.add(parent.originalCodeUnitOffset(slashIndex));
+    _originalCodeUnitEnds.add(parent.originalCodeUnitEnd(slashIndex + 1));
   }
 
   void appendSyntheticSpaces(int count, int parentCodeUnitIndex) {
@@ -344,6 +370,9 @@ final class _MarkdownProjectionBuilder {
     for (var index = 0; index < count; index += 1) {
       _source.writeCharCode(0x20);
       _originalCodeUnits.add(originalOffset);
+      _originalCodeUnitEnds.add(
+        parent.originalCodeUnitEnd(parentCodeUnitIndex),
+      );
     }
   }
 
@@ -353,6 +382,7 @@ final class _MarkdownProjectionBuilder {
     return _MarkdownProjection._(
       source,
       List<int>.unmodifiable(_originalCodeUnits),
+      List<int>.unmodifiable(_originalCodeUnitEnds),
     );
   }
 }
@@ -404,11 +434,37 @@ final class _Dedent {
 /// Container prefixes are removed using the same projection as code exclusion.
 /// All offsets still map to the unchanged original UTF-16 source.
 final class IanvsMarkdownSemanticSourceRegion {
-  IanvsMarkdownSemanticSourceRegion._(this._projection, this.type);
+  IanvsMarkdownSemanticSourceRegion._(
+    this._projection,
+    this.type, {
+    this.unsupportedContext,
+  });
 
   final _MarkdownProjection _projection;
   final IanvsMarkdownBlockType type;
+  final String? unsupportedContext;
   String get source => _projection.source;
+
+  // Internal only: this class is not exported by the package. Every source
+  // token must be adjacent and unchanged, except a proven table \| token.
+  bool matchesOriginalSource(int start, int end, String originalSource) {
+    if (start == end) return true;
+    var cursor = _projection.originalCodeUnitOffset(start);
+    for (var index = start; index < end; index++) {
+      final tokenStart = _projection.originalCodeUnitOffset(index);
+      final tokenEnd = _projection.originalCodeUnitEnd(index);
+      if (tokenStart != cursor) return false;
+      final token = originalSource.substring(tokenStart, tokenEnd);
+      if (token != source[index] &&
+          !(type == IanvsMarkdownBlockType.table &&
+              token == r'\|' &&
+              source[index] == '|')) {
+        return false;
+      }
+      cursor = tokenEnd;
+    }
+    return true;
+  }
 
   TextRange originalRange(int start, int end) {
     final length = source.length;
@@ -416,12 +472,10 @@ final class IanvsMarkdownSemanticSourceRegion {
         ? _projection.originalCodeUnitOffset(start)
         : length == 0
         ? 0
-        : _projection.originalCodeUnitOffset(length - 1) + 1;
+        : _projection.originalCodeUnitEnd(length - 1);
     return TextRange(
       start: first,
-      end: start == end
-          ? first
-          : _projection.originalCodeUnitOffset(end - 1) + 1,
+      end: start == end ? first : _projection.originalCodeUnitEnd(end - 1),
     );
   }
 }
@@ -447,26 +501,94 @@ List<IanvsMarkdownSemanticSourceRegion> ianvsMarkdownSemanticSourceRegions(
   }
   builder.appendRange(cursor, source.length);
   final regions = <IanvsMarkdownSemanticSourceRegion>[];
-  _collectSemanticSourceRegions(builder.build(), regions);
+  final projected = builder.build();
+  // The renderer expands inline footnotes before table splitting, potentially
+  // moving content out of a column that the table parser would otherwise drop.
+  // Detect the actual shared grammar before any such loss of source coverage.
+  for (final footnote in ianvsMarkdownLivePreviewFootnoteReferences(
+    projected.source,
+  )) {
+    if (!projected.source.startsWith('^[', footnote.sourceRange.start)) {
+      continue;
+    }
+    final context = _MarkdownProjectionBuilder(projected)
+      ..appendRange(footnote.sourceRange.start, footnote.sourceRange.end);
+    regions.add(
+      IanvsMarkdownSemanticSourceRegion._(
+        context.build(),
+        IanvsMarkdownBlockType.paragraph,
+        unsupportedContext: 'inlineFootnoteContext',
+      ),
+    );
+    break; // One explicit limitation is sufficient to invalidate completeness.
+  }
+  _collectSemanticSourceRegions(
+    projected,
+    regions,
+    _rendererTablePadding(projected),
+  );
   return regions;
 }
 
 void _collectSemanticSourceRegions(
   _MarkdownProjection projection,
-  List<IanvsMarkdownSemanticSourceRegion> regions, [
+  List<IanvsMarkdownSemanticSourceRegion> regions,
+  Map<int, ({int columns, bool separator})> tablePadding, [
   int depth = 0,
+  bool scanTables = true,
 ]) {
   if (depth > 64) {
     throw const FormatException('Semantic container depth exceeds 64.');
+  }
+  if (scanTables) {
+    final tables = _nativeTableSourceRegions(projection, tablePadding);
+    if (tables.isNotEmpty) {
+      var cursor = 0;
+      void collectGap(int end) {
+        if (cursor >= end) return;
+        final gap = _MarkdownProjectionBuilder(projection)
+          ..appendRange(cursor, end);
+        _collectSemanticSourceRegions(
+          gap.build(),
+          regions,
+          tablePadding,
+          depth,
+          false,
+        );
+      }
+
+      for (final table in tables) {
+        collectGap(table.start);
+        regions.addAll(table.regions);
+        cursor = table.end;
+      }
+      collectGap(projection.source.length);
+      return;
+    }
   }
   for (final block in parseMarkdownBlocks(
     projection.source,
     groupStandaloneComments: false,
   )) {
     if (block.type == IanvsMarkdownBlockType.blockquote) {
+      if (parseIanvsMarkdownCalloutHeader(block.source) != null) {
+        // Callout titles and bodies instantiate their own renderer, including
+        // another preprocessing/padding pass and an independent definition map.
+        // Ordinary dequoting is not a source proof for those recursive contexts.
+        final context = _MarkdownProjectionBuilder(projection)
+          ..appendRange(block.start, block.end);
+        regions.add(
+          IanvsMarkdownSemanticSourceRegion._(
+            context.build(),
+            block.type,
+            unsupportedContext: 'calloutContext',
+          ),
+        );
+        continue;
+      }
       final child = _dequoteBlock(projection, block.start, block.end);
       if (child.source.isNotEmpty) {
-        _collectSemanticSourceRegions(child, regions, depth + 1);
+        _collectSemanticSourceRegions(child, regions, tablePadding, depth + 1);
       }
       continue;
     }
@@ -486,7 +608,12 @@ void _collectSemanticSourceRegions(
             block.type == IanvsMarkdownBlockType.orderedList,
       )) {
         if (child.source.isNotEmpty) {
-          _collectSemanticSourceRegions(child, regions, depth + 1);
+          _collectSemanticSourceRegions(
+            child,
+            regions,
+            tablePadding,
+            depth + 1,
+          );
         }
       }
       continue;
@@ -494,7 +621,237 @@ void _collectSemanticSourceRegions(
     final builder = _MarkdownProjectionBuilder(projection)
       ..appendRange(block.start, block.end);
     regions.add(
-      IanvsMarkdownSemanticSourceRegion._(builder.build(), block.type),
+      IanvsMarkdownSemanticSourceRegion._(
+        builder.build(),
+        block.type == IanvsMarkdownBlockType.table
+            ? IanvsMarkdownBlockType.paragraph
+            : block.type,
+      ),
     );
   }
+}
+
+// Run the actual block parser, not the editor's approximate table classifier.
+// In particular, escaped trailing pipes and heading-like headers can differ.
+// Nested parsers are collected after the existing container source projection.
+List<({int start, int end, List<IanvsMarkdownSemanticSourceRegion> regions})>
+_nativeTableSourceRegions(
+  _MarkdownProjection parent,
+  Map<int, ({int columns, bool separator})> tablePadding,
+) {
+  if (!parent.source.contains('|')) return const [];
+  final lines = _projectionLines(parent, 0, parent.source.length);
+  if (lines.length < 2) return const [];
+  final nativeLines = <md.Line>[];
+  for (final line in lines) {
+    var text = line.text;
+    final padding = text.isEmpty
+        ? null
+        : tablePadding[parent.originalCodeUnitEnd(line.contentEnd - 1)];
+    if (padding != null) {
+      while (countMarkdownTableCells(text) < padding.columns) {
+        final length = text.trimRight().length;
+        final cell = padding.separator ? '---' : '';
+        text = length > 0 && text[length - 1] == '|'
+            ? '${text.substring(0, length)} $cell |${text.substring(length)}'
+            : cell.isEmpty
+            ? '$text |  |'
+            : '$text | $cell';
+      }
+    }
+    nativeLines.add(md.Line(text));
+  }
+  final syntax = _SourceTableSyntax(parent, lines, nativeLines);
+  md.BlockParser(
+    nativeLines,
+    md.Document(
+      extensionSet: md.ExtensionSet(
+        md.ExtensionSet.gitHubFlavored.blockSyntaxes
+            .where((syntax) => syntax is! md.TableSyntax)
+            .toList(),
+        md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
+      ),
+      blockSyntaxes: [
+        const md.CodeBlockSyntax(),
+        const IanvsMarkdownDisplayMathSyntax(),
+        const IanvsMarkdownWikiEmbedSyntax(),
+        const IanvsMarkdownCalloutSyntax(),
+        syntax,
+      ],
+    ),
+  ).parseLines();
+  return syntax.tables;
+}
+
+final class _SourceTableSyntax extends md.TableSyntax {
+  _SourceTableSyntax(this.parent, this.lines, this.nativeLines);
+  final _MarkdownProjection parent;
+  final List<_ProjectionLine> lines;
+  final List<md.Line> nativeLines;
+  final tables =
+      <
+        ({int start, int end, List<IanvsMarkdownSemanticSourceRegion> regions})
+      >[];
+
+  @override
+  md.Node? parse(md.BlockParser parser) {
+    final root = identical(parser.lines, nativeLines);
+    final first = root ? nativeLines.indexOf(parser.current) : -1;
+    final node = super.parse(parser);
+    if (!root || node is! md.Element || node.tag != 'table') return node;
+    final next = parser.isDone
+        ? lines.length
+        : nativeLines.indexOf(parser.current);
+    final rows = <md.Element>[
+      for (final section in node.children!.cast<md.Element>())
+        ...section.children!.cast<md.Element>(),
+    ];
+    if (first < 0 || next < 0 || rows.length != next - first - 1) {
+      throw const FormatException('Table rows could not be source-mapped.');
+    }
+    final regions = <IanvsMarkdownSemanticSourceRegion>[];
+    for (var row = 0; row < rows.length; row++) {
+      final line = lines[first + (row == 0 ? 0 : row + 1)];
+      final cells = _tableRowProjections(parent, line);
+      final nativeCells = rows[row].children!.cast<md.Element>().toList();
+      for (var column = 0; column < nativeCells.length; column++) {
+        final children = nativeCells[column].children!;
+        if (children.isEmpty ||
+            (children.length == 1 &&
+                column >= cells.length &&
+                children.single.textContent.isEmpty)) {
+          continue; // Synthetic empty cells have no source occurrence.
+        }
+        if (children.length != 1 ||
+            children.single is! md.UnparsedContent ||
+            column >= cells.length ||
+            cells[column].source != children.single.textContent) {
+          throw const FormatException(
+            'Table cell source projection disagrees.',
+          );
+        }
+        regions.add(
+          IanvsMarkdownSemanticSourceRegion._(
+            cells[column],
+            IanvsMarkdownBlockType.table,
+          ),
+        );
+      }
+    }
+    tables.add((
+      start: lines[first].start,
+      end: lines[next - 1].end,
+      regions: regions,
+    ));
+    return node;
+  }
+}
+
+List<_MarkdownProjection> _tableRowProjections(
+  _MarkdownProjection parent,
+  _ProjectionLine line,
+) {
+  final text = line.text;
+  var index = 0;
+  int skipWhitespace(int at) {
+    while (at < text.length &&
+        (text.codeUnitAt(at) == 0x20 || text.codeUnitAt(at) == 0x09)) {
+      at++;
+    }
+    return at;
+  }
+
+  index = skipWhitespace(index);
+  if (index < text.length && text.codeUnitAt(index) == 0x7c) {
+    index = skipWhitespace(index + 1);
+  }
+  final cells = <_MarkdownProjection>[];
+  var builder = _MarkdownProjectionBuilder(parent);
+  void finishCell() {
+    final cell = builder.build();
+    final trimmed = _MarkdownProjectionBuilder(cell)
+      ..appendRange(0, cell.source.trimRight().length);
+    cells.add(trimmed.build());
+    builder = _MarkdownProjectionBuilder(parent);
+  }
+
+  while (true) {
+    if (index >= text.length) {
+      finishCell();
+      break;
+    }
+    final unit = text.codeUnitAt(index);
+    if (unit == 0x5c && index + 1 < text.length) {
+      if (text.codeUnitAt(index + 1) == 0x7c) {
+        builder.appendTablePipe(line.start + index);
+      } else {
+        builder.appendRange(line.start + index, line.start + index + 2);
+      }
+      index += 2;
+    } else if (unit == 0x7c) {
+      finishCell();
+      index = skipWhitespace(index + 1);
+      if (index >= text.length) break;
+    } else {
+      builder.appendRange(line.start + index, line.start + index + 1);
+      index++;
+    }
+  }
+  return cells;
+}
+
+// Mirror _projectIrregularObsidianTables before removing container prefixes.
+// The view pads only eligible raw source rows, not arbitrary nested tables.
+// Keys use the original end of each affected line so dedenting retains identity.
+Map<int, ({int columns, bool separator})> _rendererTablePadding(
+  _MarkdownProjection projection,
+) {
+  final source = projection.source;
+  if (!source.contains('|')) return const {};
+  final lines = _projectionLines(projection, 0, source.length);
+  final raw = [
+    for (final line in lines)
+      source.substring(
+        line.start,
+        line.end > line.start && source.codeUnitAt(line.end - 1) == 0x0a
+            ? line.end - 1
+            : line.end,
+      ),
+  ];
+  final code = ianvsMarkdownBlockCodeRanges(source);
+  bool codeLine(int index) => code.any(
+    (range) => range.start < lines[index].end && range.end > lines[index].start,
+  );
+  final result = <int, ({int columns, bool separator})>{};
+  for (var row = 0; row + 1 < lines.length; row++) {
+    final headerCount = countMarkdownTableCells(raw[row]);
+    if (codeLine(row) ||
+        codeLine(row + 1) ||
+        !isMarkdownTableDelimiterRow(raw[row + 1]) ||
+        countMarkdownTableCells(raw[row + 1]) != headerCount) {
+      continue;
+    }
+    var end = row + 1;
+    while (end + 1 < lines.length &&
+        !codeLine(end + 1) &&
+        ianvsMarkdownTableBodyContinues(
+          raw[end + 1],
+          nextLine: end + 2 < lines.length ? raw[end + 2] : null,
+        )) {
+      end++;
+    }
+    var columns = headerCount;
+    for (var body = row + 2; body <= end; body++) {
+      final count = countMarkdownTableCells(raw[body]);
+      if (count > columns) columns = count;
+    }
+    for (var padded = row; padded <= end; padded++) {
+      result[projection.originalCodeUnitEnd(lines[padded].contentEnd - 1)] = (
+        columns: columns,
+        separator: padded == row + 1,
+      );
+    }
+    row = end;
+  }
+  return result;
 }

@@ -150,7 +150,7 @@ class WorkspaceReferenceIndex extends ChangeNotifier {
     _catalogRevision = index.catalogRevision;
     index.addListener(_indexChanged);
   }
-  static const _parserVersion = 1;
+  static const _parserVersion = 2;
   final WorkspaceIndex index;
   final WikiNoteResolver resolver;
   final int maximumSourceBytes;
