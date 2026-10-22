@@ -716,28 +716,63 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
     controller: widget.controller,
     onSaveRequested: widget.onSaveRequested,
     child: widget.readOnly
-        ? Actions(
-            // Shadow the enclosing editor Actions. These Flutter intents
-            // otherwise bypass the read-only Markdown command boundary.
-            actions: <Type, Action<Intent>>{
-              PasteTextIntent: CallbackAction<PasteTextIntent>(
-                onInvoke: (_) => null,
-              ),
-              DeleteToNextWordBoundaryIntent:
-                  CallbackAction<DeleteToNextWordBoundaryIntent>(
-                    onInvoke: (_) => null,
-                  ),
-              UndoTextIntent: CallbackAction<UndoTextIntent>(
-                onInvoke: (_) => null,
-              ),
-              RedoTextIntent: CallbackAction<RedoTextIntent>(
-                onInvoke: (_) => null,
-              ),
+        ? Shortcuts(
+            // Tab is deliberately excluded from Markdown command dispatch.
+            // Shadow the editor's private indentation intents at this surface
+            // instead, retaining ordinary forward/backward focus traversal.
+            shortcuts: const <ShortcutActivator, Intent>{
+              SingleActivator(LogicalKeyboardKey.tab):
+                  _ReadOnlySourceTraversalIntent(),
+              SingleActivator(LogicalKeyboardKey.tab, shift: true):
+                  _ReadOnlySourceTraversalIntent(backwards: true),
             },
-            child: child,
+            child: Actions(
+              // Shadow the enclosing editor Actions. These Flutter intents
+              // otherwise bypass the read-only Markdown command boundary.
+              actions: <Type, Action<Intent>>{
+                _ReadOnlySourceTraversalIntent:
+                    _ReadOnlySourceTraversalAction(),
+                PasteTextIntent: CallbackAction<PasteTextIntent>(
+                  onInvoke: (_) => null,
+                ),
+                DeleteToNextWordBoundaryIntent:
+                    CallbackAction<DeleteToNextWordBoundaryIntent>(
+                      onInvoke: (_) => null,
+                    ),
+                UndoTextIntent: CallbackAction<UndoTextIntent>(
+                  onInvoke: (_) => null,
+                ),
+                RedoTextIntent: CallbackAction<RedoTextIntent>(
+                  onInvoke: (_) => null,
+                ),
+              },
+              child: child,
+            ),
           )
         : child,
   );
+}
+
+class _ReadOnlySourceTraversalIntent extends Intent {
+  const _ReadOnlySourceTraversalIntent({this.backwards = false});
+
+  final bool backwards;
+}
+
+class _ReadOnlySourceTraversalAction
+    extends ContextAction<_ReadOnlySourceTraversalIntent> {
+  @override
+  Object? invoke(
+    _ReadOnlySourceTraversalIntent intent, [
+    BuildContext? context,
+  ]) {
+    // This action always consumes Tab, even when the host has disabled or
+    // omitted traversal. Otherwise Shortcuts may fall back to indentation.
+    if (context == null) return null;
+    return intent.backwards
+        ? Actions.maybeInvoke(context, const PreviousFocusIntent())
+        : Actions.maybeInvoke(context, const NextFocusIntent());
+  }
 }
 
 // Flutter's native UndoHistory can invoke userUpdateTextEditingValue directly,

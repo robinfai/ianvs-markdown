@@ -20,11 +20,13 @@ Widget _host({
   ScrollController? scroll,
   FocusNode? sourceFocus,
   FocusNode? findFocus,
+  FocusNode? afterFocus,
   IanvsMarkdownSourceHighlight? highlight,
   bool readOnly = false,
   bool showToolbar = false,
   bool highlightSyntax = false,
   bool enclosingShortcuts = false,
+  bool disableTraversal = false,
   bool enableModeShortcuts = true,
   IanvsMarkdownSaveCallback? onSaveRequested,
 }) {
@@ -39,6 +41,15 @@ Widget _host({
     enableModeShortcuts: enableModeShortcuts,
     onSaveRequested: onSaveRequested,
   );
+  if (disableTraversal) {
+    source = Actions(
+      actions: {
+        NextFocusIntent: _DisabledTraversal<NextFocusIntent>(),
+        PreviousFocusIntent: _DisabledTraversal<PreviousFocusIntent>(),
+      },
+      child: source,
+    );
+  }
   if (enclosingShortcuts) {
     source = IanvsMarkdownEditorShortcuts(
       controller: controller,
@@ -54,6 +65,7 @@ Widget _host({
           children: [
             TextField(key: _findFieldKey, focusNode: findFocus),
             Expanded(child: source),
+            if (afterFocus != null) TextField(focusNode: afterFocus),
           ],
         ),
       ),
@@ -103,6 +115,14 @@ Future<void> _chord(
   if (control) await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
   if (meta) await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
   await tester.pump();
+}
+
+class _DisabledTraversal<T extends Intent> extends Action<T> {
+  @override
+  bool isEnabled(T intent) => false;
+
+  @override
+  Object? invoke(T intent) => null;
 }
 
 void main() {
@@ -415,6 +435,55 @@ void main() {
 
   for (final mode in IanvsMarkdownEditorMode.values) {
     testWidgets(
+      '$mode read-only Tab cannot fall back when host traversal is disabled',
+      (tester) async {
+        final controller = IanvsMarkdownController(text: '    one\n    two')
+          ..mode = mode;
+        final sourceFocus = FocusNode();
+        final beforeFocus = FocusNode();
+        final afterFocus = FocusNode();
+        addTearDown(controller.dispose);
+        addTearDown(sourceFocus.dispose);
+        addTearDown(beforeFocus.dispose);
+        addTearDown(afterFocus.dispose);
+        await tester.pumpWidget(
+          _host(
+            controller: controller,
+            readOnly: true,
+            disableTraversal: true,
+            enclosingShortcuts: true,
+            sourceFocus: sourceFocus,
+            findFocus: beforeFocus,
+            afterFocus: afterFocus,
+          ),
+        );
+        sourceFocus.requestFocus();
+        controller.selection = TextSelection(
+          baseOffset: 0,
+          extentOffset: controller.text.length,
+        );
+        await tester.pump();
+        final before = controller.value;
+        final history = controller.retainedHistoryEntries;
+        for (final backwards in [false, true]) {
+          await _chord(tester, LogicalKeyboardKey.tab, shift: backwards);
+          expect(controller.value, before);
+          expect(controller.isDirty, isFalse);
+          expect(controller.retainedHistoryEntries, history);
+          expect(sourceFocus.hasFocus, isTrue);
+          expect(beforeFocus.hasFocus || afterFocus.hasFocus, isFalse);
+        }
+        expect(tester.takeException(), isNull);
+      },
+      variant: const TargetPlatformVariant({
+        TargetPlatform.macOS,
+        TargetPlatform.linux,
+      }),
+    );
+  }
+
+  for (final mode in IanvsMarkdownEditorMode.values) {
+    testWidgets(
       'read-only $mode preserves save and explicit mode commands',
       (tester) async {
         final controller = IanvsMarkdownController(text: 'saved text')
@@ -693,6 +762,113 @@ void main() {
         TargetPlatform.linux,
       }),
     );
+  }
+
+  for (final mode in IanvsMarkdownEditorMode.values) {
+    for (final sample in const [
+      (
+        label: 'selection',
+        text: 'one\ntwo',
+        selection: TextSelection(baseOffset: 0, extentOffset: 7),
+      ),
+      (
+        label: 'list',
+        text: '- one\n- two',
+        selection: TextSelection.collapsed(offset: 3),
+      ),
+      (
+        label: 'quote',
+        text: '> one\n> two',
+        selection: TextSelection.collapsed(offset: 3),
+      ),
+      (
+        label: 'fenced code',
+        text: '```\n    code\n```',
+        selection: TextSelection.collapsed(offset: 8),
+      ),
+      (
+        label: 'indented code',
+        text: '    code',
+        selection: TextSelection.collapsed(offset: 6),
+      ),
+    ]) {
+      testWidgets(
+        '$mode read-only Tab traverses ${sample.label} without editing',
+        (tester) async {
+          final controller = IanvsMarkdownController(text: sample.text)
+            ..mode = mode;
+          final beforeFocus = FocusNode();
+          final sourceFocus = FocusNode();
+          final afterFocus = FocusNode();
+          addTearDown(controller.dispose);
+          addTearDown(beforeFocus.dispose);
+          addTearDown(sourceFocus.dispose);
+          addTearDown(afterFocus.dispose);
+          await tester.pumpWidget(
+            _host(
+              controller: controller,
+              readOnly: true,
+              enclosingShortcuts: true,
+              sourceFocus: sourceFocus,
+              findFocus: beforeFocus,
+              afterFocus: afterFocus,
+            ),
+          );
+          final history = controller.retainedHistoryEntries;
+          for (final backwards in [false, true]) {
+            sourceFocus.requestFocus();
+            controller.selection = sample.selection;
+            await tester.pump();
+            expect(controller.canIndentSelection, isTrue);
+            final before = controller.value;
+            await _chord(tester, LogicalKeyboardKey.tab, shift: backwards);
+            expect(controller.value, before);
+            expect(controller.isDirty, isFalse);
+            expect(controller.retainedHistoryEntries, history);
+            expect(
+              (backwards ? beforeFocus : afterFocus).hasFocus,
+              isTrue,
+              reason: 'Tab must still traverse in the requested direction',
+            );
+          }
+          expect(tester.takeException(), isNull);
+        },
+        variant: const TargetPlatformVariant({
+          TargetPlatform.macOS,
+          TargetPlatform.linux,
+        }),
+      );
+    }
+  }
+
+  for (final mode in [
+    IanvsMarkdownEditorMode.source,
+    IanvsMarkdownEditorMode.livePreview,
+  ]) {
+    testWidgets('$mode editable source retains Tab indentation', (
+      tester,
+    ) async {
+      final controller = IanvsMarkdownController(text: 'one\ntwo')..mode = mode;
+      final sourceFocus = FocusNode();
+      addTearDown(controller.dispose);
+      addTearDown(sourceFocus.dispose);
+      await tester.pumpWidget(
+        _host(controller: controller, sourceFocus: sourceFocus),
+      );
+      sourceFocus.requestFocus();
+      controller.selection = const TextSelection(
+        baseOffset: 0,
+        extentOffset: 7,
+      );
+      await tester.pump();
+      await _chord(tester, LogicalKeyboardKey.tab);
+      expect(controller.text, '    one\n    two');
+      expect(sourceFocus.hasFocus, isTrue);
+      await _chord(tester, LogicalKeyboardKey.tab, shift: true);
+      expect(controller.text, 'one\ntwo');
+      expect(sourceFocus.hasFocus, isTrue);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   for (final transition in ['read-only', 'controller swap', 'unmount']) {
