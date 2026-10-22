@@ -1426,21 +1426,22 @@ extension CloudWorkspace {
     try WorkspaceFileScope.withoutMaterialization {
       try validateAuthority?()
       let scope = try WorkspaceNoteWriteScope(root)
-      _ = try WorkspaceTextScope.textComponents(relativePath, directory: false)
+      let components = try WorkspaceTextScope.textComponents(relativePath, directory: false)
+      let parent = try scope.parentDescriptor(components)
+      defer { close(parent) }
       let target = scope.rootURL.appendingPathComponent(relativePath)
       var coordinationError: NSError?
       var outcome: Result<Void, Error> = .failure(WorkspaceError.unavailable)
       NSFileCoordinator().coordinate(writingItemAt: target, options: [], error: &coordinationError) { coordinated in
         outcome = Result {
-          guard Data(coordinated.path.utf8) == Data(target.path.utf8) else {
-            #if LINEFOLD_SCOPED_WRITE_DIAGNOSTICS
-            FileHandle.standardError.write(Data("Scoped coordination mismatch requested=\(target.path), returned=\(coordinated.path)\n".utf8))
-            #endif
-            throw WorkspaceError.invalidPath
+          // The callback may run on another thread; the no-materialization
+          // policy must cover its validation and IO, not only the caller.
+          try WorkspaceFileScope.withoutMaterialization {
+            try scope.verifyCoordinatedURL(coordinated, relativePath: relativePath, parentDescriptor: parent)
+            try validateAuthority?()
+            try scope.writeNote(relativePath: relativePath, contents: contents, expectedContents: expectedContents,
+                                coordinatedParent: parent, validateAuthority: validateAuthority, beforeCommit: beforeCommit, afterCommit: afterCommit)
           }
-          try validateAuthority?()
-          try scope.writeNote(relativePath: relativePath, contents: contents, expectedContents: expectedContents,
-                              validateAuthority: validateAuthority, beforeCommit: beforeCommit, afterCommit: afterCommit)
         }
       }
       if let coordinationError { throw coordinationError }
@@ -1452,6 +1453,59 @@ extension CloudWorkspace {
 /// Mobile explicit edits use a separate write policy from search's create-only
 /// policy. Every descendant and staging file is relative to a pinned directory.
 final class WorkspaceNoteWriteScope: WorkspaceFileScope {
+  /// Like note transactions, accept only a root-ancestor alias followed by
+  /// byte-identical planned components. Never resolve descendant/leaf links,
+  /// rebind the grant, or write through the coordinator's returned URL.
+  func verifyCoordinatedURL(_ observed: URL, relativePath: String, parentDescriptor: Int32) throws {
+    do {
+      try WorkspaceFileScope.withoutMaterialization {
+        guard observed.isFileURL, observed.host == nil || observed.host == "",
+              observed.user == nil, observed.password == nil, observed.port == nil,
+              observed.query == nil, observed.fragment == nil, !observed.hasDirectoryPath,
+              observed.path.hasPrefix("/"), observed.path.utf16.count <= 4096 else {
+          throw WorkspaceError.invalidPath
+        }
+        guard let encoded = URLComponents(url: observed, resolvingAgainstBaseURL: false)?.percentEncodedPath,
+              encoded.split(separator: "/", omittingEmptySubsequences: false).allSatisfy({
+                guard let component = String($0).removingPercentEncoding else { return false }
+                return component != "." && component != ".."
+              }) else { throw WorkspaceError.invalidPath }
+        let planned = try WorkspaceTextScope.textComponents(relativePath, directory: false)
+        let received = observed.pathComponents
+        guard received.count > planned.count, !received.contains("."), !received.contains(".."),
+              zip(received.suffix(planned.count), planned).allSatisfy({
+                $0.0.utf8.elementsEqual($0.1.utf8)
+              }) else { throw WorkspaceError.invalidPath }
+        var spelling = observed
+        for _ in planned { spelling.deleteLastPathComponent() }
+        let candidate = try WorkspaceFileScope(spelling)
+        var originalRoot = stat(), receivedRoot = stat()
+        guard fstat(rootDescriptor, &originalRoot) == 0,
+              fstat(candidate.rootDescriptor, &receivedRoot) == 0,
+              candidate.rootURL.path.utf8.elementsEqual(rootURL.path.utf8),
+              originalRoot.st_dev == receivedRoot.st_dev, originalRoot.st_ino == receivedRoot.st_ino,
+              originalRoot.st_flags & UInt32(SF_DATALESS) == 0,
+              receivedRoot.st_flags & UInt32(SF_DATALESS) == 0 else { throw WorkspaceError.invalidPath }
+        let receivedParent = try candidate.parentDescriptor(planned)
+        defer { close(receivedParent) }
+        var original = stat(), current = stat()
+        guard fstat(parentDescriptor, &original) == 0, fstat(receivedParent, &current) == 0,
+              original.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR),
+              current.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR),
+              original.st_dev == current.st_dev, original.st_ino == current.st_ino,
+              original.st_flags & UInt32(SF_DATALESS) == 0,
+              current.st_flags & UInt32(SF_DATALESS) == 0 else { throw WorkspaceError.invalidPath }
+        var leaf = stat()
+        if fstatat(receivedParent, planned.last!, &leaf, AT_SYMLINK_NOFOLLOW) == 0 {
+          guard leaf.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+                leaf.st_flags & UInt32(SF_DATALESS) == 0 else { throw WorkspaceError.invalidPath }
+        } else if errno != ENOENT { throw WorkspaceError.invalidPath }
+        try verifyRootLocation()
+        try candidate.verifyRootLocation()
+      }
+    } catch { throw WorkspaceError.invalidPath }
+  }
+
   static func validate(contents: String, expectedContents: String?) throws {
     for text in [contents, expectedContents].compactMap({ $0 }) {
       guard text.utf8.count <= WorkspaceTextScope.maximumTextBytes else { throw WorkspaceError.tooLarge }
@@ -1461,6 +1515,7 @@ final class WorkspaceNoteWriteScope: WorkspaceFileScope {
 
   func writeNote(
     relativePath: String, contents: String, expectedContents: String?,
+    coordinatedParent: Int32,
     validateAuthority: (() throws -> Void)? = nil,
     beforeCommit: (() throws -> Void)? = nil,
     afterCommit: (() throws -> Void)? = nil
@@ -1470,7 +1525,10 @@ final class WorkspaceNoteWriteScope: WorkspaceFileScope {
     let name = components.last!
     let target = rootURL.appendingPathComponent(relativePath)
     try verifyRootLocation()
-    let parent = try parentDescriptor(components)
+    // Keep the parent captured before coordination through commit. Reopening
+    // here would let a parent replacement after callback validation rebind IO.
+    let parent = dup(coordinatedParent)
+    guard parent >= 0 else { throw AttachmentError.posix() }
     defer { close(parent) }
     var originalParent = stat()
     guard fstat(parent, &originalParent) == 0 else { throw AttachmentError.posix() }

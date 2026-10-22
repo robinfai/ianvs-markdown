@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 import FlutterMacOS
 
 @main
@@ -225,6 +226,7 @@ struct ScopedNoteSaveTests {
     }
     check(try bytes(target) == Data("external".utf8))
 
+    try verifyCoordinatorAliases(sandbox: sandbox)
     try verifyCoordinatedConflict(root: root, target: target)
 
     let directory = root.appendingPathComponent("folder")
@@ -269,6 +271,101 @@ struct ScopedNoteSaveTests {
     rejects { try fresh.validate() }
     fresh.finish()
     print("PASS: scoped note saves, raw UTF-8, conflicts, exclusive absence, root/parent/symlink fences, bounds, file coordination and native epoch leases")
+  }
+
+  static func verifyCoordinatorAliases(sandbox: URL) throws {
+    let manager = FileManager.default
+    let root = sandbox.appendingPathComponent("callback-vault")
+    let folder = root.appendingPathComponent("folder")
+    let target = folder.appendingPathComponent("note.md")
+    try manager.createDirectory(at: folder, withIntermediateDirectories: true)
+    try Data("unchanged".utf8).write(to: target)
+    let scope = try WorkspaceNoteWriteScope(root)
+    let parent = try scope.parentDescriptor(["folder", "note.md"])
+    defer { close(parent) }
+    func reject(_ url: URL, _ relative: String = "folder/note.md") {
+      do {
+        try scope.verifyCoordinatedURL(url, relativePath: relative, parentDescriptor: parent)
+        preconditionFailure("Coordinator redirect must not authorize another spelling/target: \(url)")
+      } catch {}
+    }
+    let ancestor = sandbox.appendingPathComponent("callback-ancestor")
+    try manager.createSymbolicLink(at: ancestor, withDestinationURL: sandbox)
+    let aliasedRoot = ancestor.appendingPathComponent("callback-vault")
+    for spelling in [root, scope.rootURL, aliasedRoot] {
+      for relative in ["folder/note.md", "folder/missing.md"] {
+        try scope.verifyCoordinatedURL(spelling.appendingPathComponent(relative),
+                                        relativePath: relative, parentDescriptor: parent)
+      }
+    }
+    // Same inode is insufficient: planned components must remain byte exact.
+    let alternate = folder.appendingPathComponent("alternate.md")
+    try manager.linkItem(at: target, to: alternate)
+    reject(alternate)
+    reject(folder.appendingPathComponent("NOTE.md"))
+    reject(folder.appendingPathComponent("Cafe\u{0301}.md"), "folder/Café.md")
+    let rootLink = sandbox.appendingPathComponent("callback-root-link")
+    try manager.createSymbolicLink(at: rootLink, withDestinationURL: root)
+    reject(rootLink.appendingPathComponent("folder/note.md"))
+    let inner = root.appendingPathComponent("folder-link")
+    try manager.createSymbolicLink(at: inner, withDestinationURL: folder)
+    reject(inner.appendingPathComponent("note.md"), "folder-link/note.md")
+    let leaf = folder.appendingPathComponent("leaf.md")
+    try manager.createSymbolicLink(at: leaf, withDestinationURL: target)
+    reject(leaf, "folder/leaf.md")
+    let directoryLeaf = folder.appendingPathComponent("directory.md")
+    try manager.createDirectory(at: directoryLeaf, withIntermediateDirectories: false)
+    reject(directoryLeaf, "folder/directory.md")
+    var extra = URLComponents(url: target, resolvingAgainstBaseURL: false)!
+    extra.query = "redirect=1"; reject(extra.url!)
+    extra.query = nil; extra.fragment = "redirect"; reject(extra.url!)
+    extra.fragment = nil; extra.host = "localhost"; reject(extra.url!)
+    reject(URL(string: root.absoluteString + "/folder/%2e%2e/folder/note.md")!)
+    let foreign = sandbox.appendingPathComponent("callback-foreign/folder/note.md")
+    try manager.createDirectory(at: foreign.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try Data("unchanged".utf8).write(to: foreign)
+    reject(foreign)
+    // A replaced parent or root cannot inherit a pre-coordination descriptor.
+    try manager.moveItem(at: folder, to: sandbox.appendingPathComponent("callback-old-parent"))
+    try manager.createDirectory(at: folder, withIntermediateDirectories: false)
+    try Data("unchanged".utf8).write(to: target)
+    reject(target)
+    do {
+      try scope.writeNote(relativePath: "folder/note.md", contents: "must not write", expectedContents: "unchanged",
+                          coordinatedParent: parent)
+      preconditionFailure("A callback-to-commit parent replacement must not rebind the pinned write")
+    } catch {}
+    let unchangedOld = try Data(contentsOf: sandbox.appendingPathComponent("callback-old-parent/note.md"))
+    let unchangedNew = try Data(contentsOf: target)
+    precondition(unchangedOld == Data("unchanged".utf8) && unchangedNew == unchangedOld)
+    try manager.moveItem(at: root, to: sandbox.appendingPathComponent("callback-old-root"))
+    try manager.createDirectory(at: folder, withIntermediateDirectories: true)
+    try Data("unchanged".utf8).write(to: target)
+    reject(target)
+    let bytes = try Data(contentsOf: target)
+    precondition(bytes == Data("unchanged".utf8))
+
+    // Deterministically replace the parent after callback validation but before
+    // writeNote starts. Identical bytes must not make the new directory inherit
+    // the earlier coordination claim or pinned parent authority.
+    let movedAfterValidation = sandbox.appendingPathComponent("callback-after-validation")
+    var validations = 0
+    do {
+      try CloudWorkspace.writeWorkspaceNoteGuarded(root, relativePath: "folder/note.md",
+        contents: "must not write", expectedContents: "unchanged", validateAuthority: {
+          validations += 1
+          if validations == 2 {
+            try manager.moveItem(at: folder, to: movedAfterValidation)
+            try manager.createDirectory(at: folder, withIntermediateDirectories: false)
+            try Data("unchanged".utf8).write(to: target)
+          }
+        })
+      preconditionFailure("The callback-to-write window must not rebind parent identity")
+    } catch {}
+    precondition(validations >= 3, "The fixture must reach writeNote after callback validation")
+    let oldBytes = try Data(contentsOf: movedAfterValidation.appendingPathComponent("note.md"))
+    let newBytes = try Data(contentsOf: target)
+    precondition(oldBytes == Data("unchanged".utf8) && newBytes == oldBytes)
   }
 
   static func verifyCoordinatedConflict(root: URL, target: URL) throws {
@@ -335,6 +432,11 @@ struct ScopedNoteSaveTests {
       preconditionFailure("Expected coordinated conflict")
     }
     precondition(conflict.currentContents == "coordinated external edit")
+    let selection = try WorkspaceWriteAuthority().activate(root)
+    let selectedTarget = URL(fileURLWithPath: selection["path"]!).appendingPathComponent("设计.md")
+    precondition(conflict.path.utf8.elementsEqual(selectedTarget.path.utf8))
+    let returned = try Data(contentsOf: URL(fileURLWithPath: conflict.path))
+    precondition(returned == Data("coordinated external edit".utf8))
     let bytes = try Data(contentsOf: target)
     precondition(bytes == Data("coordinated external edit".utf8))
   }

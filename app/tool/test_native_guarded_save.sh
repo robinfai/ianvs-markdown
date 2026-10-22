@@ -36,7 +36,6 @@ xcrun swiftc \
 # Root-scoped iOS edit semantics use synthetic local fixtures only. This also
 # compiles the shared production implementation with the real Flutter module.
 xcrun swiftc \
-  -D LINEFOLD_SCOPED_WRITE_DIAGNOSTICS \
   -swift-version 5 -target "$(uname -m)-apple-macosx12.0" \
   -module-cache-path "$linefold_test_dir/module-cache" \
   -F "$framework_dir" -framework FlutterMacOS \
