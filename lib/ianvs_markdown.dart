@@ -37,6 +37,7 @@ export 'src/keyboard.dart' show IanvsMarkdownCommand, IanvsMarkdownShortcuts;
 export 'src/localization.dart'
     show IanvsMarkdownMessage, IanvsMarkdownStrings, IanvsMarkdownLocalization;
 export 'src/markdown_document.dart';
+export 'src/note_semantics.dart';
 export 'src/obsidian_inline.dart';
 export 'src/obsidian_image.dart';
 export 'src/obsidian_metadata.dart';

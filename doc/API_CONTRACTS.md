@@ -5,7 +5,7 @@
 ## API 漂移校验
 
 仓库的 `make check-api`（同时包含在 `make check-core` 和双 SDK Core CI 中）解析公共入口，
-比较 176 个项目导出、11 个第三方重导出，以及它们声明的公开成员、类型、默认值和常量。
+比较 182 个项目导出、11 个第三方重导出，以及它们声明的公开成员、类型、默认值和常量。
 新增、删除和修改都要求审查；检查不会自动重写基线。修改 API 时先更新本契约、迁移说明和
 行为测试，再显式生成并审查基线差异。工具不比较继承成员的实现或任意行为，不能证明
 语义版本兼容，也不表示 1.0 API 已冻结。维护工具与基线不进入发布包，操作说明见
@@ -26,6 +26,18 @@
 普通 Markdown、HTML 和脚注链接为 `markdown`；Wiki 属性和 embed 为 `wiki`。
 Live 仅 Wiki 导航直接交给宿主；普通链接仍保留原有渲染控制/编辑行为，tag 点击仍进入编辑。
 Reading 的 inline tag 回调带 `tag`。任何点击都不会改写 Markdown 原文。
+
+## 源码保真笔记语义（P1f）
+
+`parseIanvsMarkdownNoteSemantics(source)` 返回不可变的 references/tags/aliases/issues。
+它是纯核心解析，不读取工作区或解析文件身份。所有范围是原文 UTF-16 半开范围，保留
+BOM/CRLF/emoji；reference use 的目标范围指向 first-definition-wins 的有效 definition，
+不是 label。Markdown `target` 先分离 query/fragment 再 percent 解码一次；Wiki 不解码，
+宿主不得重复解码。`destinationRange` 只覆盖路径，`rawDestination` 保留完整原始目标。
+`complete` 必须与结果一起检查；超预算、未知语法和不能安全映射的路径不能解释成空引用。
+`aliasesComplete` 与正文覆盖独立；YAML 元数据按 64 KiB/每类合计 1,024 项解析，不复用
+properties UI 的 40/16 展示截断。完整字段、支持范围与未知边界见
+[笔记语义契约](NOTE_SEMANTICS.md)。这是加法 API，不改变已有渲染或点击回调。
 
 ## 四种入口
 
@@ -342,6 +354,10 @@ final legacy = IanvsMarkdownController(text: initialMarkdown, historyPolicy: nul
 ### [lib/src/obsidian_image.dart](../lib/src/obsidian_image.dart)
 
 `IanvsMarkdownImageDimensions`、`IanvsMarkdownImageEditHandler`、`IanvsMarkdownImageResizeHandler`、`IanvsMarkdownImageResizeRequest`、`IanvsMarkdownImageSourceSyntax`、`IanvsMarkdownInteractiveImage`、`IanvsMarkdownSizedImage`、`IanvsMarkdownStandardImageSource`、`IanvsMarkdownStandardImageSourceSyntax`、`findIanvsMarkdownStandardImageSource`、`parseIanvsMarkdownImageDimensions`、`rewriteIanvsMarkdownImageWidth`、`rewriteIanvsMarkdownWikiImageWidth`
+
+### [lib/src/note_semantics.dart](../lib/src/note_semantics.dart)
+
+`IanvsMarkdownNoteSemantics`、`IanvsMarkdownSourceReference`、`IanvsMarkdownSourceReferenceKind`、`IanvsMarkdownSourceTag`、`IanvsMarkdownSemanticIssue`、`parseIanvsMarkdownNoteSemantics`
 
 ### [lib/src/obsidian_inline.dart](../lib/src/obsidian_inline.dart)
 

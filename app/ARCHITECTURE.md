@@ -362,9 +362,10 @@ and never retrospectively deleted, because another writer may now own the path.
 Editing/saving the resulting session uses the existing P0 guarded save path. Opening existing targets uses `index.read()` directly,
 without an ordinary file-read fallback that could download or follow a symlink.
 
-Limitations are explicit in the picker and failure notices: frontmatter YAML
-aliases are not indexed; the truncated property-card UI model is never treated
-as a complete alias database. Wiki heading/block navigation, non-`.md` note
+P1f adds bounded YAML aliases to bare-name resolution through the shared
+source-preserving reference index. The insertion picker remains filename-based;
+the truncated property-card UI model is never used as an alias database.
+Wiki heading/block navigation, non-`.md` note
 matching, cross-vault navigation, link-aware rename transactions and graphs are
 not implemented in this phase. Display aliases (`[[Note|label]]`) still render
 and route normally. These conservative duplicate-name rules are not a claim to
@@ -377,3 +378,29 @@ case/NFC ambiguity, raw Wiki paths, partial catalogs, creation cancellation,
 collisions, failure and stale tab/scope results. Native acceptance scenarios live
 in `native_attachment_test.swift`; Linux source-contract tests do not establish
 Swift compilation, real sandbox/iCloud behavior or Apple UI/device acceptance.
+
+
+## Source references, backlinks and tags (P1f)
+
+`WorkspaceController.references` owns a read-only semantic projection of
+`WorkspaceIndex` effective snapshots. Dirty/clean open buffers win over disk,
+every text revision invalidates the note projection, and scope/catalog epochs
+gate publication and navigation. No separate filesystem scan or implicit cloud
+download is allowed. Markdown and Wiki source spans, shared reference-definition
+identity, body/YAML tags and complete bounded aliases come from the storage-free
+core parser, not rendered UI models.
+
+Backlinks use the existing compact document actions row; rendered tag clicks
+in Read mode open postings from the same index. Live Preview keeps its existing
+tag-click caret/source-editing behavior. Results distinguish unknown coverage from absence,
+retain exact revision-bound source ranges, and reuse dirty tabs and source-find
+navigation. UI display limits do not truncate the index. `previewImpact` exposes
+confirmed/possible rename-affected references only; it does not perform writes.
+Cross-file rename requires a later journal/CAS implementation and source-mapped
+per-cell table parsing. Table bodies currently contribute explicit unknown
+coverage, never guessed references or tags. A forced metadata refresh queued
+during a scan must rerun before publishing to any joined caller.
+
+See [reference-index contract](../doc/WORKSPACE_REFERENCE_INDEX.md) and
+[parser semantic boundaries](../doc/NOTE_SEMANTICS.md) for budgets, supported
+syntax, URI decoding, collision rules, incomplete coverage and test evidence.

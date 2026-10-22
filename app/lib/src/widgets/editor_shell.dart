@@ -13,6 +13,7 @@ import '../controllers/workspace_controller.dart';
 import '../controllers/document_find_controller.dart';
 import '../controllers/workspace_search_controller.dart';
 import 'workspace_search_dialog.dart';
+import 'workspace_references_panel.dart';
 import '../editor_commands.dart';
 import '../editor_input_target.dart';
 import '../models/document_session.dart';
@@ -446,8 +447,33 @@ class _EditorShellState extends State<EditorShell> {
         generation == _wikiGeneration &&
         epoch == widget.workspace.index.epoch &&
         identical(origin, widget.workspace.activeDocument);
-    final resolver = WikiNoteResolver(widget.workspace.index);
-    final resolution = await resolver.resolve(target, originPath: origin.path);
+    ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? progress;
+    final progressTimer = Timer(const Duration(milliseconds: 500), () {
+      if (!current()) return;
+      progress = ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(minutes: 5),
+          content: const Text('Resolving local note names and aliases…'),
+          action: SnackBarAction(
+            label: 'Cancel',
+            onPressed: () {
+              _wikiGeneration++;
+              widget.workspace.references.cancel();
+            },
+          ),
+        ),
+      );
+    });
+    final WikiNoteResolution resolution;
+    try {
+      resolution = await widget.workspace.references.resolveWiki(
+        target,
+        originPath: origin.path,
+      );
+    } finally {
+      progressTimer.cancel();
+      if (mounted) progress?.close();
+    }
     if (!mounted || !current()) return;
     WikiNoteCandidate? selected;
     switch (resolution.status) {
@@ -485,10 +511,10 @@ class _EditorShellState extends State<EditorShell> {
         if (!current() || create != true) return;
         // Reconcile after the user's decision; never overwrite a racing note or
         // silently turn approval for one path into creation of another.
-        final latest = await resolver.resolve(
+        final latest = await widget.workspace.references.resolveWiki(
           target,
           originPath: origin.path,
-          refresh: true,
+          refreshMetadata: true,
         );
         if (!mounted || !current()) return;
         if (latest.status != WikiNoteStatus.missing ||
@@ -553,8 +579,49 @@ class _EditorShellState extends State<EditorShell> {
       );
       if (!mounted || match == null) return;
       search.cancel();
+      await _openWorkspaceSourceMatch(match);
+    } on Object catch (error) {
+      if (mounted) _showError('Unable to open search result: $error');
+    } finally {
+      search.dispose();
+    }
+  }
+
+  Future<void> _openWorkspaceReferences({String? tag}) async {
+    if (!(ModalRoute.of(context)?.isCurrent ?? true) ||
+        hasEditorComposition(widget.workspace)) {
+      return;
+    }
+    final document = widget.workspace.activeDocument;
+    final root = widget.workspace.index.root;
+    final path = document?.path;
+    if (tag == null &&
+        (root == null || path == null || !p.posix.isWithin(root, path))) {
+      _showError('Open a note inside a workspace to show its backlinks.');
+      return;
+    }
+    final match = await showDialog<WorkspaceSourceMatch>(
+      context: context,
+      builder: (_) => WorkspaceReferencesPanel(
+        index: widget.workspace.references,
+        targetPath: tag == null ? p.posix.relative(path!, from: root) : null,
+        targetSessionId: document?.id,
+        tag: tag,
+      ),
+    );
+    if (mounted && match != null) await _openWorkspaceSourceMatch(match);
+  }
+
+  Future<void> _openWorkspaceSourceMatch(WorkspaceSourceMatch match) async {
+    final search = WorkspaceSearchController(widget.workspace.index);
+    final generation = _wikiGeneration;
+    try {
       final snapshot = await search.resolve(match);
-      if (!mounted) return;
+      if (!mounted ||
+          generation != _wikiGeneration ||
+          hasEditorComposition(widget.workspace)) {
+        return;
+      }
       if (snapshot == null) {
         _showError(
           'Source changed since this result. Search again to use current offsets.',
@@ -578,7 +645,9 @@ class _EditorShellState extends State<EditorShell> {
       if (!mounted) return;
       if (document == null ||
           document.controller.text != snapshot.text ||
-          widget.workspace.index.epoch != match.scopeEpoch) {
+          widget.workspace.index.epoch != match.scopeEpoch ||
+          !identical(widget.workspace.activeDocument, document) ||
+          hasEditorComposition(widget.workspace)) {
         _showError(
           'Source changed while opening. Search again to use current offsets.',
         );
@@ -592,7 +661,7 @@ class _EditorShellState extends State<EditorShell> {
         expectedSource: snapshot.text,
       );
     } on Object catch (error) {
-      if (mounted) _showError('Unable to open search result: $error');
+      if (mounted) _showError('Unable to open source result: $error');
     } finally {
       search.dispose();
     }
@@ -986,6 +1055,28 @@ class _EditorShellState extends State<EditorShell> {
                                 ),
                                 IconButton(
                                   key: const ValueKey(
+                                    'workspace-backlinks-button',
+                                  ),
+                                  tooltip: 'Backlinks',
+                                  onPressed: () => _openWorkspaceReferences(),
+                                  icon: const Icon(
+                                    Icons.link,
+                                    size: 16,
+                                    semanticLabel: 'Backlinks',
+                                  ),
+                                  style: const ButtonStyle(
+                                    minimumSize: WidgetStatePropertyAll(
+                                      Size(32, 32),
+                                    ),
+                                    padding: WidgetStatePropertyAll(
+                                      EdgeInsets.all(6),
+                                    ),
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                ),
+                                IconButton(
+                                  key: const ValueKey(
                                     'insert-wiki-link-button',
                                   ),
                                   tooltip:
@@ -1143,86 +1234,86 @@ class _EditorShellState extends State<EditorShell> {
                                                         .workspaceFilesRevision +
                                                     _attachmentRevision,
                                                 source: widget.attachmentSource,
-                                                builder: (context, images) =>
-                                                    IanvsMarkdownLiveEditor(
-                                                      imageBuilder:
-                                                          images.image,
-                                                      onPaste: () =>
-                                                          _importImage(
-                                                            fromClipboard: true,
-                                                          ),
-                                                      wikiEmbedBuilder:
-                                                          images.wiki,
-                                                      key: ValueKey(
-                                                        document.id,
+                                                builder: (context, images) => IanvsMarkdownLiveEditor(
+                                                  imageBuilder: images.image,
+                                                  onPaste: () => _importImage(
+                                                    fromClipboard: true,
+                                                  ),
+                                                  wikiEmbedBuilder: images.wiki,
+                                                  key: ValueKey(document.id),
+                                                  controller:
+                                                      document.controller,
+                                                  focusNode: _editorFocus,
+                                                  autofocus: identical(
+                                                    _resumeLiveController,
+                                                    document.controller,
+                                                  ),
+                                                  clipboardWriter: (data) =>
+                                                      writeIanvsMarkdownRichClipboard(
+                                                        markdown: data.markdown,
+                                                        html: data.html,
                                                       ),
-                                                      controller:
-                                                          document.controller,
-                                                      focusNode: _editorFocus,
-                                                      autofocus: identical(
-                                                        _resumeLiveController,
-                                                        document.controller,
-                                                      ),
-                                                      clipboardWriter: (data) =>
-                                                          writeIanvsMarkdownRichClipboard(
-                                                            markdown:
-                                                                data.markdown,
-                                                            html: data.html,
-                                                          ),
-                                                      onTapLinkTarget: (link) => _guard(
-                                                        () =>
-                                                            link.kind ==
-                                                                IanvsMarkdownLinkKind
-                                                                    .wiki
-                                                            ? _openWikiLink(
-                                                                document,
-                                                                link.href ?? '',
-                                                              )
-                                                            : DocumentLinkService(
-                                                                workspace:
-                                                                    workspace,
-                                                                openImage:
-                                                                    _openImage,
-                                                              ).open(
-                                                                document,
-                                                                link.href,
-                                                              ),
-                                                      ),
-                                                      diagramBuilder:
-                                                          (
-                                                            context,
-                                                            source,
-                                                          ) => DocumentDiagram(
-                                                            source: source,
-                                                            renderer:
-                                                                _mermaidRenderer,
-                                                          ),
-                                                      scrollController: document
-                                                          .scrollController,
-                                                      showToolbar: false,
-                                                      placeholder:
-                                                          'Start writing Markdown…',
-                                                      enableModeShortcuts:
-                                                          false,
-                                                      showNavigationPane: false,
-                                                      showOutlineInPreview:
-                                                          false,
-                                                      showFrontMatter: false,
-                                                      contentMaxWidth:
-                                                          DesktopMetrics
-                                                              .documentMaxWidth,
-                                                      padding:
-                                                          EdgeInsets.fromLTRB(
-                                                            inset,
-                                                            32,
-                                                            inset,
-                                                            56,
-                                                          ),
-                                                      onSaveRequested: (_) =>
-                                                          _saveFromEditor(
+                                                  onTapLinkTarget: (link) => _guard(
+                                                    () =>
+                                                        link.kind ==
+                                                            IanvsMarkdownLinkKind
+                                                                .wiki
+                                                        ? _openWikiLink(
                                                             document,
+                                                            link.href ?? '',
+                                                          )
+                                                        : link.kind ==
+                                                              IanvsMarkdownLinkKind
+                                                                  .tag
+                                                        ? _openWorkspaceReferences(
+                                                            tag: (link.href ?? '')
+                                                                .replaceFirst(
+                                                                  RegExp(
+                                                                    r'^tag:#?',
+                                                                  ),
+                                                                  '',
+                                                                ),
+                                                          )
+                                                        : DocumentLinkService(
+                                                            workspace:
+                                                                workspace,
+                                                            openImage:
+                                                                _openImage,
+                                                          ).open(
+                                                            document,
+                                                            link.href,
                                                           ),
-                                                    ),
+                                                  ),
+                                                  diagramBuilder:
+                                                      (
+                                                        context,
+                                                        source,
+                                                      ) => DocumentDiagram(
+                                                        source: source,
+                                                        renderer:
+                                                            _mermaidRenderer,
+                                                      ),
+                                                  scrollController:
+                                                      document.scrollController,
+                                                  showToolbar: false,
+                                                  placeholder:
+                                                      'Start writing Markdown…',
+                                                  enableModeShortcuts: false,
+                                                  showNavigationPane: false,
+                                                  showOutlineInPreview: false,
+                                                  showFrontMatter: false,
+                                                  contentMaxWidth:
+                                                      DesktopMetrics
+                                                          .documentMaxWidth,
+                                                  padding: EdgeInsets.fromLTRB(
+                                                    inset,
+                                                    32,
+                                                    inset,
+                                                    56,
+                                                  ),
+                                                  onSaveRequested: (_) =>
+                                                      _saveFromEditor(document),
+                                                ),
                                               );
                                             },
                                           ),

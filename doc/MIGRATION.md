@@ -22,6 +22,15 @@
 内部 renderer 状态隔离、Source 几何复用和 Live 私有模块拆分不要求改用新的公共入口。
 不要引用 `lib/src/` 的内部实现；完整参数与语义见 [API 契约](API_CONTRACTS.md)。
 
+### 可选笔记语义接入（P1f）
+
+新增 `parseIanvsMarkdownNoteSemantics(source)`，已有宿主无需迁移。需要建立引用索引时，
+保存原文修订并消费 source ranges，不从渲染文本反推路径。先检查 `complete`/`issues`，
+不要将未知覆盖视为没有引用；aliases 可单独依赖 `aliasesComplete`。Markdown `target`
+已 percent 解码一次，宿主不得再做一次 URI 解码；Wiki 保留字面 percent 拼写。
+reference use 与有效 definition 共用目标范围，重命名计划必须去重并另行获得写入授权。
+完整限制和元数据 bounds 见 [笔记语义契约](NOTE_SEMANTICS.md)。
+
 ## 2. 复制：明确选择纯文本或原生双格式
 
 不传 `clipboardWriter` 的正文/View 及 Live 阅读面会使用核心纯文本 writer。

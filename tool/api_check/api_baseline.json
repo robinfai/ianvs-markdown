@@ -85,15 +85,20 @@
     "IanvsMarkdownMetadataListChanged": "package:ianvs_markdown/src/front_matter_card.dart",
     "IanvsMarkdownMetadataNumberChanged": "package:ianvs_markdown/src/front_matter_card.dart",
     "IanvsMarkdownMetadataTextChanged": "package:ianvs_markdown/src/front_matter_card.dart",
+    "IanvsMarkdownNoteSemantics": "package:ianvs_markdown/src/note_semantics.dart",
     "IanvsMarkdownObsidianMetadataMode": "package:ianvs_markdown/src/obsidian_metadata.dart",
     "IanvsMarkdownRenderBudget": "package:ianvs_markdown/src/render_budget.dart",
     "IanvsMarkdownRenderDecision": "package:ianvs_markdown/src/render_budget.dart",
     "IanvsMarkdownRenderedWhitespaceSyntax": "package:ianvs_markdown/src/obsidian_inline.dart",
     "IanvsMarkdownSaveCallback": "package:ianvs_markdown/src/editor/editor_toolbar.dart",
     "IanvsMarkdownSaveCancelledException": "package:ianvs_markdown/src/editor/editor_toolbar.dart",
+    "IanvsMarkdownSemanticIssue": "package:ianvs_markdown/src/note_semantics.dart",
     "IanvsMarkdownShortcuts": "package:ianvs_markdown/src/keyboard.dart",
     "IanvsMarkdownSizedImage": "package:ianvs_markdown/src/obsidian_image.dart",
     "IanvsMarkdownSourceHighlight": "package:ianvs_markdown/src/editor/source_editor.dart",
+    "IanvsMarkdownSourceReference": "package:ianvs_markdown/src/note_semantics.dart",
+    "IanvsMarkdownSourceReferenceKind": "package:ianvs_markdown/src/note_semantics.dart",
+    "IanvsMarkdownSourceTag": "package:ianvs_markdown/src/note_semantics.dart",
     "IanvsMarkdownStandardImageSource": "package:ianvs_markdown/src/obsidian_image.dart",
     "IanvsMarkdownStandardImageSourceSyntax": "package:ianvs_markdown/src/obsidian_image.dart",
     "IanvsMarkdownStrikethroughMatch": "package:ianvs_markdown/src/strikethrough.dart",
@@ -170,6 +175,7 @@
     "normalizeMarkdownCodeLanguage": "package:ianvs_markdown/src/code_block.dart",
     "parseIanvsMarkdownCalloutHeader": "package:ianvs_markdown/src/callout.dart",
     "parseIanvsMarkdownImageDimensions": "package:ianvs_markdown/src/obsidian_image.dart",
+    "parseIanvsMarkdownNoteSemantics": "package:ianvs_markdown/src/note_semantics.dart",
     "parseMarkdownBlocks": "package:ianvs_markdown/src/editor/editor_models.dart",
     "parseMarkdownFrontMatter": "package:ianvs_markdown/src/front_matter.dart",
     "parseMarkdownHeadings": "package:ianvs_markdown/src/markdown_document.dart",
@@ -9146,6 +9152,105 @@
       "typeParameters": [],
       "aliasedType": "void Function(MarkdownMetadataEntry, String)"
     },
+    "IanvsMarkdownNoteSemantics": {
+      "kind": "class",
+      "typeParameters": [],
+      "modifiers": [
+        "final"
+      ],
+      "supertype": "Object",
+      "interfaces": [],
+      "mixins": []
+    },
+    "IanvsMarkdownNoteSemantics/constructor:new": {
+      "kind": "constructor",
+      "typeParameters": [],
+      "returnType": "IanvsMarkdownNoteSemantics",
+      "parameters": [
+        {
+          "name": "references",
+          "type": "List<IanvsMarkdownSourceReference>",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "tags",
+          "type": "List<IanvsMarkdownSourceTag>",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "aliases",
+          "type": "List<String>",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "issues",
+          "type": "List<IanvsMarkdownSemanticIssue>",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "aliasesComplete",
+          "type": "bool",
+          "kind": "named",
+          "required": true
+        }
+      ],
+      "static": false,
+      "abstract": false,
+      "const": false,
+      "factory": false
+    },
+    "IanvsMarkdownNoteSemantics/field:aliases": {
+      "kind": "field",
+      "type": "List<String>",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownNoteSemantics/field:aliasesComplete": {
+      "kind": "field",
+      "type": "bool",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownNoteSemantics/field:issues": {
+      "kind": "field",
+      "type": "List<IanvsMarkdownSemanticIssue>",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownNoteSemantics/field:references": {
+      "kind": "field",
+      "type": "List<IanvsMarkdownSourceReference>",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownNoteSemantics/field:tags": {
+      "kind": "field",
+      "type": "List<IanvsMarkdownSourceTag>",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownNoteSemantics/getter:complete": {
+      "kind": "getter",
+      "typeParameters": [],
+      "returnType": "bool",
+      "parameters": [],
+      "static": false,
+      "abstract": false
+    },
     "IanvsMarkdownObsidianMetadataMode": {
       "kind": "enum",
       "typeParameters": [],
@@ -9419,6 +9524,69 @@
       "const": true,
       "factory": false
     },
+    "IanvsMarkdownSemanticIssue": {
+      "kind": "class",
+      "typeParameters": [],
+      "modifiers": [
+        "final"
+      ],
+      "supertype": "Object",
+      "interfaces": [],
+      "mixins": []
+    },
+    "IanvsMarkdownSemanticIssue/constructor:new": {
+      "kind": "constructor",
+      "typeParameters": [],
+      "returnType": "IanvsMarkdownSemanticIssue",
+      "parameters": [
+        {
+          "name": "code",
+          "type": "String",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "message",
+          "type": "String",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "range",
+          "type": "TextRange?",
+          "kind": "named",
+          "required": false
+        }
+      ],
+      "static": false,
+      "abstract": false,
+      "const": true,
+      "factory": false
+    },
+    "IanvsMarkdownSemanticIssue/field:code": {
+      "kind": "field",
+      "type": "String",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownSemanticIssue/field:message": {
+      "kind": "field",
+      "type": "String",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownSemanticIssue/field:range": {
+      "kind": "field",
+      "type": "TextRange?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
     "IanvsMarkdownShortcuts": {
       "kind": "class",
       "typeParameters": [],
@@ -9669,6 +9837,312 @@
     "IanvsMarkdownSourceHighlight/field:source": {
       "kind": "field",
       "type": "String",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownSourceReference": {
+      "kind": "class",
+      "typeParameters": [],
+      "modifiers": [
+        "final"
+      ],
+      "supertype": "Object",
+      "interfaces": [],
+      "mixins": []
+    },
+    "IanvsMarkdownSourceReference/constructor:new": {
+      "kind": "constructor",
+      "typeParameters": [],
+      "returnType": "IanvsMarkdownSourceReference",
+      "parameters": [
+        {
+          "name": "range",
+          "type": "TextRange",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "destinationRange",
+          "type": "TextRange",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "rawDestination",
+          "type": "String",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "target",
+          "type": "String",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "kind",
+          "type": "IanvsMarkdownSourceReferenceKind",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "fragment",
+          "type": "String?",
+          "kind": "named",
+          "required": false
+        },
+        {
+          "name": "query",
+          "type": "String?",
+          "kind": "named",
+          "required": false
+        },
+        {
+          "name": "alias",
+          "type": "String?",
+          "kind": "named",
+          "required": false
+        },
+        {
+          "name": "title",
+          "type": "String?",
+          "kind": "named",
+          "required": false
+        },
+        {
+          "name": "definitionIdentity",
+          "type": "String?",
+          "kind": "named",
+          "required": false
+        },
+        {
+          "name": "definitionRange",
+          "type": "TextRange?",
+          "kind": "named",
+          "required": false
+        }
+      ],
+      "static": false,
+      "abstract": false,
+      "const": true,
+      "factory": false
+    },
+    "IanvsMarkdownSourceReference/field:alias": {
+      "kind": "field",
+      "type": "String?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownSourceReference/field:definitionIdentity": {
+      "kind": "field",
+      "type": "String?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownSourceReference/field:definitionRange": {
+      "kind": "field",
+      "type": "TextRange?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownSourceReference/field:destinationRange": {
+      "kind": "field",
+      "type": "TextRange",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownSourceReference/field:fragment": {
+      "kind": "field",
+      "type": "String?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownSourceReference/field:kind": {
+      "kind": "field",
+      "type": "IanvsMarkdownSourceReferenceKind",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownSourceReference/field:query": {
+      "kind": "field",
+      "type": "String?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownSourceReference/field:range": {
+      "kind": "field",
+      "type": "TextRange",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownSourceReference/field:rawDestination": {
+      "kind": "field",
+      "type": "String",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownSourceReference/field:target": {
+      "kind": "field",
+      "type": "String",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownSourceReference/field:title": {
+      "kind": "field",
+      "type": "String?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownSourceReferenceKind": {
+      "kind": "enum",
+      "typeParameters": [],
+      "supertype": "Enum",
+      "interfaces": [],
+      "mixins": [],
+      "values": [
+        "markdownLink",
+        "markdownImage",
+        "markdownReferenceLink",
+        "markdownReferenceImage",
+        "markdownDefinition",
+        "wikiLink",
+        "wikiEmbed"
+      ]
+    },
+    "IanvsMarkdownSourceReferenceKind/constructor:new": {
+      "kind": "constructor",
+      "typeParameters": [],
+      "returnType": "IanvsMarkdownSourceReferenceKind",
+      "parameters": [],
+      "static": false,
+      "abstract": false,
+      "const": true,
+      "factory": false
+    },
+    "IanvsMarkdownSourceReferenceKind/field:markdownDefinition": {
+      "kind": "field",
+      "type": "IanvsMarkdownSourceReferenceKind",
+      "const": true,
+      "final": false,
+      "static": true,
+      "late": false
+    },
+    "IanvsMarkdownSourceReferenceKind/field:markdownImage": {
+      "kind": "field",
+      "type": "IanvsMarkdownSourceReferenceKind",
+      "const": true,
+      "final": false,
+      "static": true,
+      "late": false
+    },
+    "IanvsMarkdownSourceReferenceKind/field:markdownLink": {
+      "kind": "field",
+      "type": "IanvsMarkdownSourceReferenceKind",
+      "const": true,
+      "final": false,
+      "static": true,
+      "late": false
+    },
+    "IanvsMarkdownSourceReferenceKind/field:markdownReferenceImage": {
+      "kind": "field",
+      "type": "IanvsMarkdownSourceReferenceKind",
+      "const": true,
+      "final": false,
+      "static": true,
+      "late": false
+    },
+    "IanvsMarkdownSourceReferenceKind/field:markdownReferenceLink": {
+      "kind": "field",
+      "type": "IanvsMarkdownSourceReferenceKind",
+      "const": true,
+      "final": false,
+      "static": true,
+      "late": false
+    },
+    "IanvsMarkdownSourceReferenceKind/field:wikiEmbed": {
+      "kind": "field",
+      "type": "IanvsMarkdownSourceReferenceKind",
+      "const": true,
+      "final": false,
+      "static": true,
+      "late": false
+    },
+    "IanvsMarkdownSourceReferenceKind/field:wikiLink": {
+      "kind": "field",
+      "type": "IanvsMarkdownSourceReferenceKind",
+      "const": true,
+      "final": false,
+      "static": true,
+      "late": false
+    },
+    "IanvsMarkdownSourceTag": {
+      "kind": "class",
+      "typeParameters": [],
+      "modifiers": [
+        "final"
+      ],
+      "supertype": "Object",
+      "interfaces": [],
+      "mixins": []
+    },
+    "IanvsMarkdownSourceTag/constructor:new": {
+      "kind": "constructor",
+      "typeParameters": [],
+      "returnType": "IanvsMarkdownSourceTag",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "String",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "range",
+          "type": "TextRange",
+          "kind": "named",
+          "required": true
+        }
+      ],
+      "static": false,
+      "abstract": false,
+      "const": true,
+      "factory": false
+    },
+    "IanvsMarkdownSourceTag/field:name": {
+      "kind": "field",
+      "type": "String",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownSourceTag/field:range": {
+      "kind": "field",
+      "type": "TextRange",
       "const": false,
       "final": true,
       "static": false,
@@ -15418,6 +15892,21 @@
         {
           "name": "alt",
           "type": "String?",
+          "kind": "positional",
+          "required": true
+        }
+      ],
+      "static": true,
+      "abstract": false
+    },
+    "parseIanvsMarkdownNoteSemantics": {
+      "kind": "function",
+      "typeParameters": [],
+      "returnType": "IanvsMarkdownNoteSemantics",
+      "parameters": [
+        {
+          "name": "source",
+          "type": "String",
           "kind": "positional",
           "required": true
         }
