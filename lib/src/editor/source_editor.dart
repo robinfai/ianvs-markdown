@@ -1,5 +1,6 @@
 import '../localization.dart';
 import '../keyboard.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -13,6 +14,22 @@ import 'editor_models.dart';
 import 'editor_shortcuts.dart';
 import 'editor_toolbar.dart';
 
+/// A source highlight and navigation request for [IanvsMarkdownEditor].
+///
+/// [source] is the exact text snapshot in which [range] was found. Offsets use
+/// UTF-16 code units, like [TextSelection]. Empty, invalid or stale ranges are
+/// ignored. Create a fresh instance to navigate again, even to the same range.
+@immutable
+class IanvsMarkdownSourceHighlight {
+  const IanvsMarkdownSourceHighlight({
+    required this.source,
+    required this.range,
+  });
+
+  final String source;
+  final TextRange range;
+}
+
 /// Full-source Markdown editor with syntax styling and Markdown-aware input.
 ///
 /// This widget is height-filling. Place it in a bounded parent.
@@ -23,6 +40,8 @@ class IanvsMarkdownEditor extends StatefulWidget {
     this.focusNode,
     this.scrollController,
     this.autofocus = false,
+    this.readOnly = false,
+    this.highlightedRange,
     this.showToolbar = true,
     this.highlightSyntax = true,
     this.enableModeShortcuts = true,
@@ -37,6 +56,18 @@ class IanvsMarkdownEditor extends StatefulWidget {
   final FocusNode? focusNode;
   final ScrollController? scrollController;
   final bool autofocus;
+
+  /// Keeps source selectable and copyable, but disables user edits and the
+  /// editing toolbar, regardless of mode. Save and mode commands remain usable;
+  /// [enableModeShortcuts] still controls keyboard mode changes.
+  /// Programmatic updates through [controller] remain allowed.
+  final bool readOnly;
+
+  /// Paints the exact source match without changing selection, focus or history.
+  /// Each new request instance reveals its range after layout. Null clears it.
+  /// Text or controller changes invalidate the accepted request; the host must
+  /// provide a fresh request for the current source snapshot to highlight again.
+  final IanvsMarkdownSourceHighlight? highlightedRange;
   final bool showToolbar;
 
   /// False keeps full source editing while disabling Markdown syntax styling
@@ -68,6 +99,8 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
   late FocusNode _focusNode;
   late ScrollController _scrollController;
   late String _lastText;
+  final _highlight = ValueNotifier<IanvsMarkdownSourceHighlight?>(null);
+  int _highlightNavigationVersion = 0;
 
   bool get _ownsFocusNode => widget.focusNode == null;
   bool get _ownsScrollController => widget.scrollController == null;
@@ -79,6 +112,7 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
     _scrollController = widget.scrollController ?? ScrollController();
     _lastText = widget.controller.text;
     widget.controller.addListener(_handleControllerChanged);
+    _acceptHighlight();
   }
 
   @override
@@ -89,6 +123,7 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
       oldWidget.controller.removeListener(_handleControllerChanged);
       _lastText = widget.controller.text;
       _backgroundRanges.clear();
+      _clearHighlight();
       widget.controller.addListener(_handleControllerChanged);
     }
     if (!identical(oldWidget.focusNode, widget.focusNode)) {
@@ -98,7 +133,82 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
     if (!identical(oldWidget.scrollController, widget.scrollController)) {
       if (oldWidget.scrollController == null) _scrollController.dispose();
       _scrollController = widget.scrollController ?? ScrollController();
+      _scheduleHighlightNavigation();
     }
+    if (!identical(oldWidget.highlightedRange, widget.highlightedRange)) {
+      _acceptHighlight();
+    }
+  }
+
+  void _clearHighlight() {
+    _highlightNavigationVersion++;
+    _highlight.value = null;
+  }
+
+  void _acceptHighlight() {
+    _clearHighlight();
+    final request = widget.highlightedRange;
+    if (request == null ||
+        request.source != widget.controller.text ||
+        !request.range.isValid ||
+        !request.range.isNormalized ||
+        request.range.isCollapsed ||
+        request.range.end > request.source.length) {
+      return;
+    }
+    _highlight.value = request;
+    _scheduleHighlightNavigation();
+  }
+
+  void _scheduleHighlightNavigation() {
+    final request = _highlight.value;
+    if (request == null) return;
+    final version = ++_highlightNavigationVersion;
+    final controller = widget.controller;
+    final scroll = _scrollController;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          version != _highlightNavigationVersion ||
+          !identical(controller, widget.controller) ||
+          !identical(scroll, _scrollController) ||
+          !identical(request, _highlight.value) ||
+          request.source != controller.text ||
+          !scroll.hasClients) {
+        return;
+      }
+      final geometry = _backgroundLayout.resolve();
+      if (geometry == null) return;
+      final editable = geometry.editable;
+      final boxes = editable.getBoxesForSelection(
+        TextSelection(
+          baseOffset: request.range.start,
+          extentOffset: request.range.end,
+        ),
+      );
+      // Newline-only matches can have no selection box. The first caret still
+      // identifies the source location without changing the actual selection.
+      final bounds = boxes.isEmpty
+          ? editable.getLocalRectForCaret(
+              TextPosition(offset: request.range.start),
+            )
+          : boxes
+                .map((box) => box.toRect())
+                .reduce((a, b) => a.expandToInclude(b));
+      const margin = 8.0;
+      final viewportHeight = editable.size.height;
+      final delta =
+          bounds.height > viewportHeight - 2 * margin || bounds.top < margin
+          ? bounds.top - margin
+          : bounds.bottom > viewportHeight - margin
+          ? bounds.bottom - viewportHeight + margin
+          : 0.0;
+      final position = scroll.position;
+      final target = (position.pixels + delta).clamp(
+        position.minScrollExtent,
+        position.maxScrollExtent,
+      );
+      if (target != position.pixels) scroll.jumpTo(target);
+    });
   }
 
   void _handleControllerChanged() {
@@ -106,6 +216,7 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
     if (next == _lastText) return;
     _lastText = next;
     _backgroundRanges.clear();
+    _clearHighlight();
     widget.onChanged?.call(next);
   }
 
@@ -114,6 +225,7 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
   // platform event before the outer Shortcuts widget can invoke them.
   // ignore: deprecated_member_use
   KeyEventResult _handleRawKey(RawKeyEvent event) {
+    if (widget.readOnly) return KeyEventResult.ignored;
     if (markdownShortcutHandledRaw(event)) return KeyEventResult.handled;
     // ignore: deprecated_member_use
     final metaPressed = event.isMetaPressed;
@@ -200,6 +312,7 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
   }
 
   KeyEventResult _handleKeyEvent(KeyEvent event) {
+    if (widget.readOnly) return KeyEventResult.ignored;
     final keyboard = HardwareKeyboard.instance;
     if (event is KeyDownEvent &&
         event.logicalKey == LogicalKeyboardKey.keyZ &&
@@ -423,6 +536,7 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
     widget.controller.removeListener(_handleControllerChanged);
     if (_ownsFocusNode) _focusNode.dispose();
     if (_ownsScrollController) _scrollController.dispose();
+    _highlight.dispose();
     super.dispose();
   }
 
@@ -453,7 +567,20 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
         onKey: (_, event) => _handleRawKey(event),
         child: MarkdownCommandTarget(
           kind: MarkdownCommandKind.source,
+          controller: widget.controller,
+          modeShortcutsEnabled: widget.enableModeShortcuts,
           onCommand: (command, focused) {
+            if (widget.readOnly) {
+              if (command == IanvsMarkdownCommand.save ||
+                  markdownCommandIsMode(command)) {
+                return false;
+              }
+              if (command == IanvsMarkdownCommand.copy ||
+                  command == IanvsMarkdownCommand.selectAll) {
+                return invokeMarkdownTextCommand(command, focused);
+              }
+              return true;
+            }
             if (command != IanvsMarkdownCommand.deleteLine) return false;
             widget.controller.deleteSelectedLines(
               preferredCaretOffset: _preferredDeleteLineCaret(),
@@ -468,6 +595,7 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
             focusNode: _focusNode,
             scrollController: _scrollController,
             autofocus: widget.autofocus,
+            readOnly: widget.readOnly,
             expands: true,
             minLines: null,
             maxLines: null,
@@ -478,9 +606,12 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
             autocorrect: false,
             enableSuggestions: false,
             inputFormatters: <TextInputFormatter>[
-              IanvsMarkdownEditingFormatter(
-                budget: widget.controller.parseBudget,
-              ),
+              if (widget.readOnly)
+                const _ReadOnlySourceFormatter()
+              else
+                IanvsMarkdownEditingFormatter(
+                  budget: widget.controller.parseBudget,
+                ),
             ],
             style: textStyle,
             cursorColor: colors.accent,
@@ -502,7 +633,7 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (widget.showToolbar)
+          if (widget.showToolbar && !widget.readOnly)
             IanvsMarkdownEditorToolbar(
               focusNode: _focusNode,
               controller: widget.controller,
@@ -510,11 +641,8 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
               theme: colors,
             ),
           Expanded(
-            child: IanvsMarkdownEditorShortcuts(
-              enableModeShortcuts: widget.enableModeShortcuts,
-              controller: widget.controller,
-              onSaveRequested: widget.onSaveRequested,
-              child: Stack(
+            child: _wrapShortcuts(
+              Stack(
                 key: _backgroundSurfaceKey,
                 fit: StackFit.expand,
                 children: [
@@ -558,6 +686,22 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
                     ),
                   ),
                   field,
+                  IgnorePointer(
+                    child: CustomPaint(
+                      key: const ValueKey('ianvs-markdown-source-highlight'),
+                      painter: _SourceHighlightPainter(
+                        highlight: _highlight,
+                        controller: widget.controller,
+                        layout: _backgroundLayout,
+                        color: colors.accent.withValues(alpha: .28),
+                        repaint: Listenable.merge(<Listenable>[
+                          _highlight,
+                          widget.controller,
+                          _scrollController,
+                        ]),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -566,6 +710,124 @@ class _IanvsMarkdownEditorState extends State<IanvsMarkdownEditor> {
       ),
     );
   }
+
+  Widget _wrapShortcuts(Widget child) => IanvsMarkdownEditorShortcuts(
+    enableModeShortcuts: widget.enableModeShortcuts,
+    controller: widget.controller,
+    onSaveRequested: widget.onSaveRequested,
+    child: widget.readOnly
+        ? Shortcuts(
+            // Tab is deliberately excluded from Markdown command dispatch.
+            // Shadow the editor's private indentation intents at this surface
+            // instead, retaining ordinary forward/backward focus traversal.
+            shortcuts: const <ShortcutActivator, Intent>{
+              SingleActivator(LogicalKeyboardKey.tab):
+                  _ReadOnlySourceTraversalIntent(),
+              SingleActivator(LogicalKeyboardKey.tab, shift: true):
+                  _ReadOnlySourceTraversalIntent(backwards: true),
+            },
+            child: Actions(
+              // Shadow the enclosing editor Actions. These Flutter intents
+              // otherwise bypass the read-only Markdown command boundary.
+              actions: <Type, Action<Intent>>{
+                _ReadOnlySourceTraversalIntent:
+                    _ReadOnlySourceTraversalAction(),
+                PasteTextIntent: CallbackAction<PasteTextIntent>(
+                  onInvoke: (_) => null,
+                ),
+                DeleteToNextWordBoundaryIntent:
+                    CallbackAction<DeleteToNextWordBoundaryIntent>(
+                      onInvoke: (_) => null,
+                    ),
+                UndoTextIntent: CallbackAction<UndoTextIntent>(
+                  onInvoke: (_) => null,
+                ),
+                RedoTextIntent: CallbackAction<RedoTextIntent>(
+                  onInvoke: (_) => null,
+                ),
+              },
+              child: child,
+            ),
+          )
+        : child,
+  );
+}
+
+class _ReadOnlySourceTraversalIntent extends Intent {
+  const _ReadOnlySourceTraversalIntent({this.backwards = false});
+
+  final bool backwards;
+}
+
+class _ReadOnlySourceTraversalAction
+    extends ContextAction<_ReadOnlySourceTraversalIntent> {
+  @override
+  Object? invoke(
+    _ReadOnlySourceTraversalIntent intent, [
+    BuildContext? context,
+  ]) {
+    // This action always consumes Tab, even when the host has disabled or
+    // omitted traversal. Otherwise Shortcuts may fall back to indentation.
+    if (context == null) return null;
+    return intent.backwards
+        ? Actions.maybeInvoke(context, const PreviousFocusIntent())
+        : Actions.maybeInvoke(context, const NextFocusIntent());
+  }
+}
+
+// Flutter's native UndoHistory can invoke userUpdateTextEditingValue directly,
+// bypassing EditableText.updateEditingValue's read-only guard. Input formatters
+// cover that path without restricting programmatic controller updates.
+class _ReadOnlySourceFormatter extends TextInputFormatter {
+  const _ReadOnlySourceFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) => oldValue;
+}
+
+class _SourceHighlightPainter extends CustomPainter {
+  _SourceHighlightPainter({
+    required this.highlight,
+    required this.controller,
+    required this.layout,
+    required this.color,
+    required Listenable repaint,
+  }) : super(repaint: repaint);
+
+  final ValueListenable<IanvsMarkdownSourceHighlight?> highlight;
+  final IanvsMarkdownController controller;
+  final _SourceBackgroundLayout layout;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final request = highlight.value;
+    if (request == null || request.source != controller.text) return;
+    final geometry = layout.resolve();
+    if (geometry == null) return;
+    final editable = geometry.editable;
+    final boxes = editable.getBoxesForSelection(
+      TextSelection(
+        baseOffset: request.range.start,
+        extentOffset: request.range.end,
+      ),
+    );
+    final paint = Paint()..color = color;
+    canvas.save();
+    canvas.clipRect(
+      (geometry.origin & editable.size).intersect(Offset.zero & size),
+    );
+    for (final box in boxes) {
+      canvas.drawRect(box.toRect().shift(geometry.origin), paint);
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _SourceHighlightPainter oldDelegate) => true;
 }
 
 RenderEditable? _findRenderEditable(RenderObject? root) {

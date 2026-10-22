@@ -246,16 +246,32 @@ class _MarkdownPasteAction extends ContextAction<PasteTextIntent> {
     if (!selection.isValid || selection.isCollapsed) {
       return defaultAction?.invoke(intent);
     }
-    unawaited(_pasteSelectedText(intent, defaultAction));
+    unawaited(_pasteSelectedText(intent, defaultAction, context));
     return null;
   }
 
   Future<void> _pasteSelectedText(
     PasteTextIntent intent,
     Action<PasteTextIntent>? defaultAction,
+    BuildContext? context,
   ) async {
+    final editable = context?.findAncestorStateOfType<EditableTextState>();
+    final inputController = editable?.widget.controller;
     final data = await readPlainTextClipboardSafely();
-    if (controller.mode == IanvsMarkdownEditorMode.preview) return;
+    // A tab may have been removed or switched synchronously while its old
+    // EditableText is still mounted until the next frame. Let pending surface
+    // changes settle before deciding whether this clipboard request is current.
+    await WidgetsBinding.instance.endOfFrame;
+    // A pending clipboard read must not edit an old document or a Source
+    // surface that became read-only while the platform was responding.
+    if (controller.mode == IanvsMarkdownEditorMode.preview ||
+        (context != null && !context.mounted) ||
+        (editable != null &&
+            (!editable.mounted ||
+                editable.widget.readOnly ||
+                !identical(editable.widget.controller, inputController)))) {
+      return;
+    }
     final pastedText = data?.text;
     if (pastedText == null) return;
     final replacement = smartUrlPasteValue(controller.value, pastedText);

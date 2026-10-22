@@ -1,11 +1,11 @@
 # 公共 API 与行为契约
 
-适用范围：2026-10-13 的仓库版本（`0.3.1` + `Unreleased`）。本文件对应 R1-01 / R1-02 / R2-02、R1-03 文案/命令/焦点、R1-04 剪贴板默认行为迁移及 R2-05 预解析/复制预算、L07/L08 降级提示和输入连接。后续修改预设、预算或默认行为时必须同步更新。平台范围见 [构建与交互证据](PLATFORM_SUPPORT.md)，不能从 Dart 类型可用推断平台支持。
+适用范围：2026-10-22 的仓库版本（`0.3.1` + `Unreleased`）。本文件对应 R1-01 / R1-02 / R2-02、R1-03 文案/命令/焦点、R1-04 剪贴板默认行为迁移及 R2-05 预解析/复制预算、L07/L08 降级提示和输入连接。后续修改预设、预算或默认行为时必须同步更新。平台范围见 [构建与交互证据](PLATFORM_SUPPORT.md)，不能从 Dart 类型可用推断平台支持。
 
 ## API 漂移校验
 
 仓库的 `make check-api`（同时包含在 `make check-core` 和双 SDK Core CI 中）解析公共入口，
-比较 172 个项目导出、11 个第三方重导出，以及它们声明的公开成员、类型、默认值和常量。
+比较 173 个项目导出、11 个第三方重导出，以及它们声明的公开成员、类型、默认值和常量。
 新增、删除和修改都要求审查；检查不会自动重写基线。修改 API 时先更新本契约、迁移说明和
 行为测试，再显式生成并审查基线差异。工具不比较继承成员的实现或任意行为，不能证明
 语义版本兼容，也不表示 1.0 API 已冻结。维护工具与基线不进入发布包，操作说明见
@@ -81,6 +81,10 @@
 
 正文和 View 新增可选、宿主持有的 `focusNode` / `autofocus`（默认 false）；正文仅在整文档选择开启时使用。替换或卸载不释放宿主焦点对象。内置工具栏属于文本输入 TapRegion；格式/历史/保存动作保留当前局部编辑焦点，未找到本 controller 的焦点目标时使用显式传入的编辑焦点；独立工具栏可传同一 `focusNode`，未传时保持原有行为。Live 在当前组件内触发模式变化后恢复新模式焦点和源码选区；外部输入正持有焦点时，程序更新模式不主动抢焦点，宿主显式 autofocus 另行生效。
 
+Live 初次挂载的 `autofocus:true` 尊重 Controller 现有源码光标或选区，而非固定激活首块；
+远处的虚拟块先定位再连接输入。隐藏 YAML 内的选区回到首个可见正文块；只有隐藏 YAML
+时不创建不可见的编辑焦点。异步定位期间外部输入接管焦点后，不再抢回输入。
+
 接入与兼容说明见 [快捷键与焦点](INTEGRATION_GUIDE.md#快捷键与焦点)。自动证据见 [命令配置回归](../test/keyboard_configuration_test.dart) 与 [包外 smoke host](../tool/package_smoke_test.dart)。真实输入和系统剪贴板按当前 [双入口执行清单](R3_ACCEPTANCE.md) 在 example/app 中验收；已记录的本机结果不扩大其他平台或输入法范围。原生 IME 的用户人工确认与自动输入协议分开记载，读屏未执行。
 
 ## 原文、选择与更新
@@ -92,6 +96,35 @@
 - 模式切换使用同一 Controller 的原文、dirty 和历史。Live 与 Reading 的选区是不同交互面，不保证恢复阅读态的拖选区域或所有模式的滚动像素位置。
 - 持续追加和异步资源遵守 [R2-03 宿主接入](INTEGRATION_GUIDE.md#持续追加内容r2-03)：正文可由宿主跟随/暂停滚动，View 默认更新回到顶部；旧阅读选择不跨源码版本保留。资源结果按文档、版本和资源身份隔离，资源缓存仍由宿主管理。
 - 没有独立的 document ID API。推荐每个文档持有一个 Controller，宿主保存文档身份并用稳定 Key 区分文档。直接替换 `controller.text` 不会自动重置历史或保存基线。
+
+## Source 范围导航与只读展示（R4-05 P1a）
+
+`IanvsMarkdownEditor` 新增可选的 `highlightedRange`（默认 null）与 `readOnly`（默认 false）。
+默认编辑行为和 Controller API 不变；查找查询、结果集与替换仍由宿主管理。
+
+- `IanvsMarkdownSourceHighlight(source: snapshot, range: TextRange(...))` 是不可变请求。
+  `source` 必须等于当前 Controller 原文；`range` 使用 UTF-16 偏移且必须非空、正向、有效并在文本内。
+  快照不一致、越界、负值、反向或空范围会被忽略，不夹紧到另一个可能错误的位置。
+- 每个新的请求实例在布局后把准确源码范围滚入 Source 视口，不修改 Controller 的文本、
+  选区、composing、dirty 或历史，也不主动请求焦点。覆盖多行且高于视口的匹配定位到起点。
+  再次定位同一范围也要创建新实例；复用同一实例的普通 rebuild 不抢回用户滚动位置。
+- 高亮独立于输入框焦点与源码语法高亮；查询框可以持续持有焦点。高亮跟随实际源码排版、
+  换行和滚动，设为 null 立即清除而不恢复旧滚动位置。它不是阅读投影范围或第二份选区。
+- 原文编辑、撤销/重做造成的文字变化及 Controller 替换使已接受的请求失效；撤回到旧文字也不会
+  复活旧请求。宿主须基于最新原文计算并发送新实例。延迟导航会检查实例、原文、Controller、
+  滚动对象与挂载状态。替换 ScrollController 保留 Flutter 自身的位置迁移行为，不承诺回顶。
+- `readOnly: true` 与 Controller.mode 独立，包括 Controller 仍为 Reading 时直接展示 Source。
+  完整原文可以选择和复制；输入、剪切、粘贴、删除、格式化和用户 Undo/Redo 不修改原文。
+  编辑工具栏不显示，修改命令在 Source 边界被消费；selectAll/copy、保存和模式命令保留。
+  保存沿用 `onSaveRequested`；`enableModeShortcuts: false` 仍抑制模式按键，但不抑制
+  `IanvsMarkdownShortcuts.invoke` 的显式模式操作。不要把只读当成 Controller 的权限或不可变性。
+- 宿主仍持有唯一 Controller，并可程序更新文字和历史。只读只限制本 Source 的用户编辑路径；
+  明确配置的宿主回调或其他编辑面仍由宿主管理。正在等待剪贴板的源码智能链接粘贴会在原输入面
+  被替换、卸载或改为只读后取消，不能把迟到结果写入当前只读面。
+
+自动证据见 [Source 查找面回归](../test/source_search_surface_test.dart)，包含焦点保留、
+重复/清除/失效、对象替换、只读命令与迟到粘贴。macOS/Linux 的 widget 平台变体不等于
+原生菜单、系统输入法或真实剪贴板的物理验收。
 
 ## 语法预设的范围（R1-02）
 
@@ -215,7 +248,7 @@ final legacy = IanvsMarkdownController(text: initialMarkdown, historyPolicy: nul
 
 ### [lib/src/editor/source_editor.dart](../lib/src/editor/source_editor.dart)
 
-`IanvsMarkdownEditor`、`ianvsMarkdownSyntaxTheme`
+`IanvsMarkdownEditor`、`IanvsMarkdownSourceHighlight`、`ianvsMarkdownSyntaxTheme`
 
 ### [lib/src/emphasis.dart](../lib/src/emphasis.dart)
 

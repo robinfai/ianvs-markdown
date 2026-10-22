@@ -1,5 +1,25 @@
 ## Unreleased
 
+- Add desktop current-buffer Find/Replace with Command-F, next/previous match,
+  case matching, exact source highlighting, and single-step replacement undo.
+  Live/Read temporarily show source while finding; Read requires an explicit
+  edit action before replacement. Closing returns to the previous view, and
+  composition, tab changes, and stale matches are guarded. No workspace index
+  or regular-expression query language is introduced. Large-buffer searches
+  are debounced and scanned in cancellable chunks with an explicit searching
+  state; stale or partial results cannot be used for replacement.
+
+- Add opt-in Source match navigation with `IanvsMarkdownSourceHighlight` and
+  `highlightedRange`. Exact UTF-16 ranges retain find-field focus and paint
+  independently of selection; source/controller changes invalidate old requests.
+  Add `readOnly` Source presentation with selection/copy but no user edits or
+  editing toolbar. Cancel pending smart URL paste after its input surface is
+  replaced, unmounted, or made read-only. Existing defaults remain unchanged.
+
+- Restore Live autofocus at the retained source selection, including distant
+  lazy blocks, without overriding a later external focus choice. Hidden YAML
+  selections resume in visible body text rather than an invisible input field.
+
 - Use the public TextKit 1 compatibility path for the two macOS hosts' hidden
   Flutter text-input view on macOS 27, before activation and outside composition.
   Keep full text, selection and accessibility intact. Two paired Profile runs
