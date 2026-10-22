@@ -70,6 +70,8 @@
     "IanvsMarkdownInlineMathSource": "package:ianvs_markdown/src/editor/editor_controller.dart",
     "IanvsMarkdownInlineMathSyntax": "package:ianvs_markdown/src/math.dart",
     "IanvsMarkdownInteractiveImage": "package:ianvs_markdown/src/obsidian_image.dart",
+    "IanvsMarkdownLinkKind": "package:ianvs_markdown/src/link_target.dart",
+    "IanvsMarkdownLinkTarget": "package:ianvs_markdown/src/link_target.dart",
     "IanvsMarkdownLiveEditor": "package:ianvs_markdown/src/editor/live_editor.dart",
     "IanvsMarkdownLivePreviewFootnoteReference": "package:ianvs_markdown/src/obsidian_metadata.dart",
     "IanvsMarkdownLocalization": "package:ianvs_markdown/src/localization.dart",
@@ -102,6 +104,7 @@
     "IanvsMarkdownSyntaxPreset": "package:ianvs_markdown/src/syntax_preset.dart",
     "IanvsMarkdownSyntaxTheme": "package:ianvs_markdown/src/editor/editor_controller.dart",
     "IanvsMarkdownTagSyntax": "package:ianvs_markdown/src/obsidian_inline.dart",
+    "IanvsMarkdownTapLinkTargetCallback": "package:ianvs_markdown/src/link_target.dart",
     "IanvsMarkdownTaskCheckbox": "package:ianvs_markdown/src/task_checkbox.dart",
     "IanvsMarkdownThemeData": "package:ianvs_markdown/src/theme.dart",
     "IanvsMarkdownView": "package:ianvs_markdown/src/ianvs_markdown.dart",
@@ -275,6 +278,12 @@
         {
           "name": "onTapLink",
           "type": "void Function(String, String?, String)?",
+          "kind": "named",
+          "required": false
+        },
+        {
+          "name": "onTapLinkTarget",
+          "type": "void Function(IanvsMarkdownLinkTarget)?",
           "kind": "named",
           "required": false
         },
@@ -674,6 +683,14 @@
     "IanvsMarkdown/field:onTapLink": {
       "kind": "field",
       "type": "void Function(String, String?, String)?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdown/field:onTapLinkTarget": {
+      "kind": "field",
+      "type": "void Function(IanvsMarkdownLinkTarget)?",
       "const": false,
       "final": true,
       "static": false,
@@ -4488,6 +4505,12 @@
           "required": true
         },
         {
+          "name": "onTapLinkTarget",
+          "type": "void Function(IanvsMarkdownLinkTarget)?",
+          "kind": "named",
+          "required": false
+        },
+        {
           "name": "superscriptFontFeatureTag",
           "type": "String?",
           "kind": "named",
@@ -4508,6 +4531,14 @@
     "IanvsMarkdownFootnoteSuperscriptBuilder/field:onTapLink": {
       "kind": "field",
       "type": "void Function(String, String?, String)?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownFootnoteSuperscriptBuilder/field:onTapLinkTarget": {
+      "kind": "field",
+      "type": "void Function(IanvsMarkdownLinkTarget)?",
       "const": false,
       "final": true,
       "static": false,
@@ -4640,6 +4671,12 @@
           "required": false
         },
         {
+          "name": "onTapLinkTarget",
+          "type": "void Function(IanvsMarkdownLinkTarget)?",
+          "kind": "named",
+          "required": false
+        },
+        {
           "name": "onTextChanged",
           "type": "void Function(MarkdownMetadataEntry, String)?",
           "kind": "named",
@@ -4764,6 +4801,14 @@
     "IanvsMarkdownFrontMatterCard/field:onTapLink": {
       "kind": "field",
       "type": "void Function(String, String?, String)?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownFrontMatterCard/field:onTapLinkTarget": {
+      "kind": "field",
+      "type": "void Function(IanvsMarkdownLinkTarget)?",
       "const": false,
       "final": true,
       "static": false,
@@ -6207,6 +6252,12 @@
           "required": true
         },
         {
+          "name": "onTapLinkTarget",
+          "type": "void Function(IanvsMarkdownLinkTarget)?",
+          "kind": "named",
+          "required": false
+        },
+        {
           "name": "enableFileLinkChips",
           "type": "bool",
           "kind": "named",
@@ -6256,6 +6307,14 @@
     "IanvsMarkdownInlineLinkBuilder/field:onTapLink": {
       "kind": "field",
       "type": "void Function(String, String?, String)?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownInlineLinkBuilder/field:onTapLinkTarget": {
+      "kind": "field",
+      "type": "void Function(IanvsMarkdownLinkTarget)?",
       "const": false,
       "final": true,
       "static": false,
@@ -6594,6 +6653,130 @@
       "static": false,
       "abstract": false
     },
+    "IanvsMarkdownLinkKind": {
+      "kind": "enum",
+      "typeParameters": [],
+      "supertype": "Enum",
+      "interfaces": [],
+      "mixins": [],
+      "values": [
+        "markdown",
+        "wiki",
+        "tag"
+      ]
+    },
+    "IanvsMarkdownLinkKind/constructor:new": {
+      "kind": "constructor",
+      "typeParameters": [],
+      "returnType": "IanvsMarkdownLinkKind",
+      "parameters": [],
+      "static": false,
+      "abstract": false,
+      "const": true,
+      "factory": false
+    },
+    "IanvsMarkdownLinkKind/field:markdown": {
+      "kind": "field",
+      "type": "IanvsMarkdownLinkKind",
+      "const": true,
+      "final": false,
+      "static": true,
+      "late": false
+    },
+    "IanvsMarkdownLinkKind/field:tag": {
+      "kind": "field",
+      "type": "IanvsMarkdownLinkKind",
+      "const": true,
+      "final": false,
+      "static": true,
+      "late": false
+    },
+    "IanvsMarkdownLinkKind/field:wiki": {
+      "kind": "field",
+      "type": "IanvsMarkdownLinkKind",
+      "const": true,
+      "final": false,
+      "static": true,
+      "late": false
+    },
+    "IanvsMarkdownLinkTarget": {
+      "kind": "class",
+      "typeParameters": [],
+      "modifiers": [
+        "final"
+      ],
+      "supertype": "Object",
+      "interfaces": [],
+      "mixins": []
+    },
+    "IanvsMarkdownLinkTarget/constructor:new": {
+      "kind": "constructor",
+      "typeParameters": [],
+      "returnType": "IanvsMarkdownLinkTarget",
+      "parameters": [
+        {
+          "name": "text",
+          "type": "String",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "href",
+          "type": "String?",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "kind",
+          "type": "IanvsMarkdownLinkKind",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "title",
+          "type": "String",
+          "kind": "named",
+          "required": false,
+          "default": "''"
+        }
+      ],
+      "static": false,
+      "abstract": false,
+      "const": true,
+      "factory": false
+    },
+    "IanvsMarkdownLinkTarget/field:href": {
+      "kind": "field",
+      "type": "String?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownLinkTarget/field:kind": {
+      "kind": "field",
+      "type": "IanvsMarkdownLinkKind",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownLinkTarget/field:text": {
+      "kind": "field",
+      "type": "String",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownLinkTarget/field:title": {
+      "kind": "field",
+      "type": "String",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
     "IanvsMarkdownLiveEditor": {
       "kind": "class",
       "typeParameters": [],
@@ -6755,6 +6938,12 @@
         {
           "name": "onTapLink",
           "type": "void Function(String, String?, String)?",
+          "kind": "named",
+          "required": false
+        },
+        {
+          "name": "onTapLinkTarget",
+          "type": "void Function(IanvsMarkdownLinkTarget)?",
           "kind": "named",
           "required": false
         },
@@ -7054,6 +7243,14 @@
     "IanvsMarkdownLiveEditor/field:onTapLink": {
       "kind": "field",
       "type": "void Function(String, String?, String)?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownLiveEditor/field:onTapLinkTarget": {
+      "kind": "field",
+      "type": "void Function(IanvsMarkdownLinkTarget)?",
       "const": false,
       "final": true,
       "static": false,
@@ -10313,6 +10510,11 @@
       "static": false,
       "abstract": false
     },
+    "IanvsMarkdownTapLinkTargetCallback": {
+      "kind": "type alias",
+      "typeParameters": [],
+      "aliasedType": "void Function(IanvsMarkdownLinkTarget)"
+    },
     "IanvsMarkdownTaskCheckbox": {
       "kind": "class",
       "typeParameters": [],
@@ -11461,6 +11663,12 @@
           "required": false
         },
         {
+          "name": "onTapLinkTarget",
+          "type": "void Function(IanvsMarkdownLinkTarget)?",
+          "kind": "named",
+          "required": false
+        },
+        {
           "name": "imageBuilder",
           "type": "Widget Function(Uri, String?, String?)?",
           "kind": "named",
@@ -11739,6 +11947,14 @@
       "static": false,
       "late": false
     },
+    "IanvsMarkdownView/field:onTapLinkTarget": {
+      "kind": "field",
+      "type": "void Function(IanvsMarkdownLinkTarget)?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
     "IanvsMarkdownView/field:outlineBreakpoint": {
       "kind": "field",
       "type": "double",
@@ -11903,6 +12119,12 @@
           "required": false
         },
         {
+          "name": "onTapLinkTarget",
+          "type": "void Function(IanvsMarkdownLinkTarget)?",
+          "kind": "named",
+          "required": false
+        },
+        {
           "name": "onTapText",
           "type": "void Function()?",
           "kind": "named",
@@ -11939,6 +12161,14 @@
     "IanvsMarkdownWikiEmbed/field:onTapLink": {
       "kind": "field",
       "type": "void Function(String, String?, String)?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownWikiEmbed/field:onTapLinkTarget": {
+      "kind": "field",
+      "type": "void Function(IanvsMarkdownLinkTarget)?",
       "const": false,
       "final": true,
       "static": false,
@@ -12008,6 +12238,12 @@
           "required": true
         },
         {
+          "name": "onTapLinkTarget",
+          "type": "void Function(IanvsMarkdownLinkTarget)?",
+          "kind": "named",
+          "required": false
+        },
+        {
           "name": "onTapText",
           "type": "void Function()?",
           "kind": "named",
@@ -12056,6 +12292,14 @@
     "IanvsMarkdownWikiEmbedElementBuilder/field:onTapLink": {
       "kind": "field",
       "type": "void Function(String, String?, String)?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownWikiEmbedElementBuilder/field:onTapLinkTarget": {
+      "kind": "field",
+      "type": "void Function(IanvsMarkdownLinkTarget)?",
       "const": false,
       "final": true,
       "static": false,

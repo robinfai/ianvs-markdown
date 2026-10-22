@@ -1,3 +1,4 @@
+import '../link_target.dart';
 import '../localization.dart';
 import '../keyboard.dart';
 import 'dart:async';
@@ -37,7 +38,6 @@ import '../task_checkbox.dart';
 import '../task_syntax.dart';
 import '../theme.dart';
 import '../wiki_embed.dart';
-import '../wiki_link_reference.dart';
 import 'editor_controller.dart';
 import 'block_identity.dart';
 import 'editor_models.dart';
@@ -82,6 +82,7 @@ class IanvsMarkdownLiveEditor extends StatefulWidget {
     this.onModeChanged,
     this.onSaveRequested,
     this.onTapLink,
+    this.onTapLinkTarget,
     this.imageBuilder,
     this.diagramBuilder,
     this.mathBuilder,
@@ -138,6 +139,9 @@ class IanvsMarkdownLiveEditor extends StatefulWidget {
   final ValueChanged<IanvsMarkdownEditorMode>? onModeChanged;
   final IanvsMarkdownSaveCallback? onSaveRequested;
   final MarkdownTapLinkCallback? onTapLink;
+
+  /// Receives parsed link origins. When set, takes precedence over [onTapLink].
+  final IanvsMarkdownTapLinkTargetCallback? onTapLinkTarget;
   final MarkdownImageBuilder? imageBuilder;
   final IanvsMarkdownDiagramBuilder? diagramBuilder;
   final IanvsMarkdownMathBuilder? mathBuilder;
@@ -2497,6 +2501,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
                   styleSheet: widget.styleSheet,
                   onSelectionChanged: widget.onSelectionChanged,
                   onTapLink: widget.onTapLink,
+                  onTapLinkTarget: widget.onTapLinkTarget,
                   imageBuilder: widget.imageBuilder,
                   builders: widget.builders,
                   softLineBreak: widget.softLineBreak,
@@ -3080,6 +3085,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     )..linkReferences.addAll(_linkReferences.references);
     final linkBuilder = IanvsMarkdownInlineLinkBuilder(
       onTapLink: widget.onTapLink,
+      onTapLinkTarget: widget.onTapLinkTarget,
       enableFileLinkChips: widget.enableFileLinkChips,
       editing: true,
       wikiLinkExists: widget.wikiLinkExists,
@@ -3372,6 +3378,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
               documentSelection: false,
               styleSheet: widget.styleSheet,
               onTapLink: widget.onTapLink,
+              onTapLinkTarget: widget.onTapLinkTarget,
               imageBuilder: widget.imageBuilder,
               builders: widget.builders,
               softLineBreak: widget.softLineBreak,
@@ -3576,6 +3583,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           initiallyExpanded: true,
           showDocumentTitle: widget.showDocumentTitle,
           onTapLink: widget.onTapLink,
+          onTapLinkTarget: widget.onTapLinkTarget,
           onTextChanged: (entry, value) =>
               _setFrontMatterText(block, entry, value),
           onBooleanChanged: (entry, value) =>
@@ -3619,8 +3627,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             _activateRenderedBlock(block, tapCount: _pointerTapCount),
         onCalloutToggle: () =>
             _activateRenderedBlock(block, tapCount: _pointerTapCount),
-        onTapLink: (text, href, title) =>
-            _handleRenderedLinkTap(block, text: text, href: href, title: title),
+        onTapLinkTarget: (target) => _handleRenderedLinkTap(block, target),
         imageBuilder: widget.imageBuilder,
         onImageResize: (request) => _resizeImage(block, request),
         onEditImage: (imageIndex) => _editStandardImage(block, imageIndex),
@@ -3712,44 +3719,23 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   }
 
   void _handleRenderedLinkTap(
-    IanvsMarkdownBlock block, {
-    required String text,
-    required String? href,
-    required String title,
-  }) {
-    final navigatesInLivePreview =
-        RegExp(r'^ {0,3}!\[\[[^\]\n]+\]\][ \t]*$').hasMatch(block.source) ||
-        _sourceContainsMatchingWikiLink(block.source, text: text, href: href);
-    if (navigatesInLivePreview && widget.onTapLink != null) {
+    IanvsMarkdownBlock block,
+    IanvsMarkdownLinkTarget target,
+  ) {
+    final navigatesInLivePreview = target.kind == IanvsMarkdownLinkKind.wiki;
+    if (navigatesInLivePreview &&
+        (widget.onTapLinkTarget != null || widget.onTapLink != null)) {
       _pendingRenderedTapGlobal = null;
-      widget.onTapLink!(text, href, title);
+      dispatchIanvsMarkdownLinkTap(
+        target,
+        onTapLinkTarget: widget.onTapLinkTarget,
+        onTapLink: widget.onTapLink,
+      );
       return;
     }
-    // Obsidian keeps ordinary Markdown links as rendered controls on a normal
-    // click. The inline-link builder consumes that interaction in Live
-    // Preview; navigation remains available in Reading mode, while Wiki links
-    // use the host callback directly in Live Preview.
+    // Ordinary Markdown controls retain their existing Live editing behavior.
+    // Navigation decisions use the parsed origin, never label/href matching.
     _activateRenderedBlock(block, tapCount: _pointerTapCount);
-  }
-
-  bool _sourceContainsMatchingWikiLink(
-    String source, {
-    required String text,
-    required String? href,
-  }) {
-    final targetHref = href?.trim();
-    if (targetHref == null || targetHref.isEmpty) return false;
-    final tappedLabel = text.trim();
-    final pattern = RegExp(r'\[\[([^\]\n]+)\]\]');
-    for (final match in pattern.allMatches(source)) {
-      final reference = parseIanvsMarkdownWikiLinkBody(match.group(1)!);
-      if (reference != null &&
-          reference.target == targetHref &&
-          reference.label == tappedLabel) {
-        return true;
-      }
-    }
-    return false;
   }
 
   void _resizeImage(

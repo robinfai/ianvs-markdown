@@ -27,6 +27,20 @@ class WorkspaceNoteSnapshot {
   bool get fromBuffer => sessionId != null;
 }
 
+/// A metadata-only view of the shared catalog. Incomplete is never "missing".
+class WorkspaceCatalogSnapshot {
+  const WorkspaceCatalogSnapshot({
+    required this.epoch,
+    required this.entries,
+    required this.complete,
+    required this.issues,
+  });
+  final int epoch;
+  final List<WorkspaceMetadata> entries;
+  final bool complete;
+  final Set<WorkspaceReadIssue> issues;
+}
+
 class _DirectoryTask {
   late final Future<WorkspaceDirectorySnapshot> future;
   bool refreshAgain = false;
@@ -48,6 +62,7 @@ class WorkspaceIndex extends ChangeNotifier {
   bool _disposed = false;
   final _directories = <String, WorkspaceDirectorySnapshot>{};
   final _entries = <String, WorkspaceMetadata>{};
+  final _catalogFailures = <String, WorkspaceReadIssue>{};
   final _listedAt = <String, DateTime>{};
   final _directoryTasks = <String, _DirectoryTask>{};
   final _directoryVersions = <String, int>{};
@@ -77,6 +92,70 @@ class WorkspaceIndex extends ChangeNotifier {
   WorkspaceDirectorySnapshot? cachedDirectory(String relativePath) =>
       _directories[relativePath];
 
+  /// Reads only already shared metadata; no IO or body preload.
+  WorkspaceCatalogSnapshot get catalogSnapshot {
+    final entries = <WorkspaceMetadata>[];
+    final issues = <WorkspaceReadIssue>{};
+    final pending = <String>[if (_root != null) ''];
+    final visited = <String>{};
+    while (pending.isNotEmpty) {
+      final path = pending.removeLast();
+      if (!visited.add(path)) continue;
+      final directory = _directories[path];
+      if (_catalogFailures[path] case final issue?) issues.add(issue);
+      if (directory == null) {
+        issues.add(WorkspaceReadIssue.unavailable);
+        continue;
+      }
+      if (!directory.complete) issues.add(WorkspaceReadIssue.limit);
+      entries.addAll(directory.entries);
+      pending.addAll(
+        directory.entries
+            .where((e) => e.isDirectory)
+            .map((e) => e.relativePath),
+      );
+    }
+    return WorkspaceCatalogSnapshot(
+      epoch: _epoch,
+      entries: List.unmodifiable(entries),
+      complete: _root != null && issues.isEmpty,
+      issues: Set.unmodifiable(issues),
+    );
+  }
+
+  /// Hydrates through the same single-flight directory cache as tree/search.
+  /// The native boundary remains scoped, local-only and metadata-only.
+  Future<WorkspaceCatalogSnapshot> catalog({bool refresh = false}) async {
+    final epoch = _epoch;
+    if (_root == null) return catalogSnapshot;
+    final pending = <String>[''];
+    final visited = <String>{};
+    while (pending.isNotEmpty) {
+      _check(epoch);
+      final path = pending.removeLast();
+      if (!visited.add(path)) continue;
+      try {
+        final snapshot = await directory(
+          path,
+          reconcile: true,
+          refresh: refresh,
+        );
+        _check(epoch);
+        pending.addAll(
+          snapshot.entries
+              .where((e) => e.isDirectory)
+              .map((e) => e.relativePath),
+        );
+      } on Object {
+        _check(epoch);
+        // The snapshot marks this directory unknown; do not use a raw IO fallback.
+      }
+      await Future<void>.delayed(Duration.zero);
+    }
+    _check(epoch);
+    return catalogSnapshot;
+  }
+
   void configure(String? root) {
     if (_disposed || _root == root) return;
     if (root != null &&
@@ -90,6 +169,7 @@ class WorkspaceIndex extends ChangeNotifier {
     _directories.clear();
     _entries.clear();
     _listedAt.clear();
+    _catalogFailures.clear();
     _directoryTasks.clear();
     _directoryVersions.clear();
     _changedDirectories.clear();
@@ -206,6 +286,7 @@ class WorkspaceIndex extends ChangeNotifier {
             _entries[entry.relativePath] = entry;
           }
           _directories[relativePath] = snapshot;
+          _catalogFailures.remove(relativePath);
           _listedAt[relativePath] = DateTime.now();
           if (old != null) {
             final current = {
@@ -230,6 +311,18 @@ class WorkspaceIndex extends ChangeNotifier {
           _emit();
           return snapshot;
         }
+      } on Object catch (error) {
+        if (!_disposed &&
+            epoch == _epoch &&
+            (_directoryVersions[relativePath] ?? 0) == version) {
+          _catalogFailures[relativePath] = workspaceReadIssue(error);
+          _changedDirectories
+            ..clear()
+            ..add(relativePath);
+          ++_catalogRevision;
+          _emit();
+        }
+        rethrow;
       } finally {
         if (identical(_directoryTasks[relativePath], task)) {
           _directoryTasks.remove(relativePath);
@@ -266,6 +359,7 @@ class WorkspaceIndex extends ChangeNotifier {
         }
       }
       _listedAt.remove(key);
+      _catalogFailures.remove(key);
     }
   }
 

@@ -1,3 +1,4 @@
+import 'link_target.dart';
 import 'localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -116,6 +117,7 @@ class IanvsMarkdownWikiEmbedSyntax extends md.BlockSyntax {
 class IanvsMarkdownWikiEmbedElementBuilder extends MarkdownElementBuilder {
   IanvsMarkdownWikiEmbedElementBuilder({
     required this.onTapLink,
+    this.onTapLinkTarget,
     required this.onTapText,
     this.contentBuilder,
     this.onResizeImage,
@@ -123,6 +125,9 @@ class IanvsMarkdownWikiEmbedElementBuilder extends MarkdownElementBuilder {
   });
 
   final MarkdownTapLinkCallback? onTapLink;
+
+  /// Receives parsed link origins. When set, takes precedence over [onTapLink].
+  final IanvsMarkdownTapLinkTargetCallback? onTapLinkTarget;
   final VoidCallback? onTapText;
   final IanvsMarkdownWikiEmbedContentBuilder? contentBuilder;
   final void Function(String source, int? width)? onResizeImage;
@@ -155,6 +160,7 @@ class IanvsMarkdownWikiEmbedElementBuilder extends MarkdownElementBuilder {
       contentBuilder: contentBuilder,
       onResizeImage: onResizeImage,
       onTapLink: onTapLink,
+      onTapLinkTarget: onTapLinkTarget,
       onTapText: onTapText,
       theme: theme,
     );
@@ -169,6 +175,7 @@ class IanvsMarkdownWikiEmbed extends StatelessWidget {
     this.contentBuilder,
     this.onResizeImage,
     this.onTapLink,
+    this.onTapLinkTarget,
     this.onTapText,
     this.theme,
   });
@@ -177,6 +184,9 @@ class IanvsMarkdownWikiEmbed extends StatelessWidget {
   final IanvsMarkdownWikiEmbedContentBuilder? contentBuilder;
   final void Function(String source, int? width)? onResizeImage;
   final MarkdownTapLinkCallback? onTapLink;
+
+  /// Receives parsed link origins. When set, takes precedence over [onTapLink].
+  final IanvsMarkdownTapLinkTargetCallback? onTapLinkTarget;
   final VoidCallback? onTapText;
   final IanvsMarkdownThemeData? theme;
 
@@ -256,17 +266,21 @@ class IanvsMarkdownWikiEmbed extends StatelessWidget {
                     minWidth: 32,
                     minHeight: 32,
                   ),
-                  onPressed: onTapLink == null
+                  onPressed: onTapLinkTarget == null && onTapLink == null
                       ? null
-                      : () => onTapLink!(
-                          reference.displayLabel,
-                          reference.target,
-                          '',
+                      : () => dispatchIanvsMarkdownLinkTap(
+                          IanvsMarkdownLinkTarget(
+                            text: reference.displayLabel,
+                            href: reference.target,
+                            kind: IanvsMarkdownLinkKind.wiki,
+                          ),
+                          onTapLinkTarget: onTapLinkTarget,
+                          onTapLink: onTapLink,
                         ),
                   icon: Icon(
                     Icons.open_in_new_rounded,
                     size: 15,
-                    color: onTapLink == null
+                    color: onTapLinkTarget == null && onTapLink == null
                         ? colors.textTertiary
                         : colors.accentDark,
                   ),

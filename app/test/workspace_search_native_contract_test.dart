@@ -18,6 +18,54 @@ void main() {
     source.indexOf('final class WorkspaceTextScope:'),
   );
 
+  test(
+    'native Wiki creation is exclusive root-relative without parent creation',
+    () {
+      expect(source, contains('case "createWorkspaceNote":'));
+      expect(
+        source,
+        contains('try scope.createNote(relativePath: relativePath)'),
+      );
+      expect(
+        text,
+        contains('O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC'),
+      );
+      expect(text, contains('let parent = try parentDescriptor(components)'));
+      expect(
+        text,
+        contains(
+          'current.st_dev == attributes.st_dev && current.st_ino == attributes.st_ino',
+        ),
+      );
+      expect(text, contains('listing["complete"] as? Bool == true'));
+      expect(text, contains('comparisonPath'));
+      expect(
+        text,
+        contains('precomposedStringWithCanonicalMapping.lowercased()'),
+      );
+      expect(text, isNot(contains('createDirectory(')));
+      expect(source, contains('coordinator.coordinate(writingItemAt: target'));
+      expect(
+        text,
+        contains('let finalParent = try parentDescriptor(components)'),
+      );
+      expect(
+        text,
+        contains(
+          'finalTarget.st_dev == created.st_dev && finalTarget.st_ino == created.st_ino',
+        ),
+      );
+      expect(
+        text,
+        contains('Self.revision(finalTarget) == Self.revision(created)'),
+      );
+      expect(text, contains('try afterExclusiveCreate?()'));
+      expect(text, isNot(contains('unlinkat(')));
+      expect(text, isNot(contains('O_TRUNC')));
+      expect(text, isNot(contains('rename(')));
+    },
+  );
+
   test('native text source contract: serial scoped channels and raw bytes', () {
     expect(source, contains('private let searchQueue = DispatchQueue('));
     expect(source, contains('isSearch ? self.searchQueue'));

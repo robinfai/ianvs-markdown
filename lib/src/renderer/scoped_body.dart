@@ -10,6 +10,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import '../editor/editor_diagnostics.dart';
+import '../link_target.dart';
 import 'fallback_style_io.dart'
     if (dart.library.js_interop) 'fallback_style_web.dart';
 import 'scoped_builder.dart';
@@ -27,6 +28,7 @@ class ScopedMarkdownBody extends MarkdownBody {
     super.syntaxHighlighter,
     super.onSelectionChanged,
     super.onTapLink,
+    this.onTapLinkTarget,
     super.onTapText,
     super.contextMenuBuilder,
     super.imageDirectory,
@@ -42,6 +44,8 @@ class ScopedMarkdownBody extends MarkdownBody {
     super.fitContent,
     super.softLineBreak,
   }) : super(imageBuilder: imageBuilder);
+
+  final IanvsMarkdownTapLinkTargetCallback? onTapLinkTarget;
 
   @override
   State<ScopedMarkdownBody> createState() => _ScopedMarkdownBodyState();
@@ -65,7 +69,9 @@ class _ScopedMarkdownBodyState extends State<ScopedMarkdownBody>
   void didUpdateWidget(ScopedMarkdownBody oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.data != oldWidget.data ||
-        widget.styleSheet != oldWidget.styleSheet) {
+        widget.styleSheet != oldWidget.styleSheet ||
+        widget.onTapLinkTarget != oldWidget.onTapLinkTarget ||
+        widget.onTapLink != oldWidget.onTapLink) {
       _parseMarkdown();
     }
   }
@@ -122,9 +128,13 @@ class _ScopedMarkdownBodyState extends State<ScopedMarkdownBody>
   }
 
   @override
-  GestureRecognizer createLink(String text, String? href, String title) {
+  GestureRecognizer createLink(IanvsMarkdownLinkTarget target) {
     final recognizer = TapGestureRecognizer()
-      ..onTap = () => widget.onTapLink?.call(text, href, title);
+      ..onTap = () => dispatchIanvsMarkdownLinkTap(
+        target,
+        onTapLinkTarget: widget.onTapLinkTarget,
+        onTapLink: widget.onTapLink,
+      );
     _recognizers.add(recognizer);
     return recognizer;
   }

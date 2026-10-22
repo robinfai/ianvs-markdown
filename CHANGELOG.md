@@ -1,5 +1,17 @@
 ## Unreleased
 
+- Add opt-in typed link callbacks (`IanvsMarkdownLinkTarget` and
+  `onTapLinkTarget`) preserving raw Wiki targets/aliases while keeping the legacy
+  callback as fallback. The desktop app now resolves current-vault `.md` Wiki
+  links, offers explicit Command/Control-Shift-K completion and missing-note
+  creation, and shows ambiguous or unsupported targets explicitly. Shared
+  metadata, verified filesystem identities, per-file recovery bookmarks and
+  guarded source edits preserve dirty tabs. Creation uses coordinated exclusive
+  no-follow IO and checks outcomes; an uncoordinated parent rename can leave a
+  reported residual empty file, not a successful navigation. YAML aliases,
+  Wiki heading/block navigation and cross-file rename remain deferred.
+  See [the app boundaries](app/ARCHITECTURE.md#wiki-note-links-p1d).
+
 - Add read-only local image attachments to the Linefold desktop editor and iOS
   reader. Resolve Markdown paths and unique block Wiki embeds within the opened
   vault, preserve source and image sizing, and keep Obsidian attachment settings

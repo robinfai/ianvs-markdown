@@ -30,6 +30,7 @@ export 'src/front_matter_card.dart';
 export 'src/heading_folding.dart';
 export 'src/highlight.dart';
 export 'src/inline_link.dart';
+export 'src/link_target.dart' hide dispatchIanvsMarkdownLinkTap;
 export 'src/ianvs_markdown.dart';
 export 'src/math.dart';
 export 'src/keyboard.dart' show IanvsMarkdownCommand, IanvsMarkdownShortcuts;

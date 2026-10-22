@@ -417,6 +417,72 @@ struct AttachmentTests {
     rejects(.invalid) { _ = try scope.listDirectory(relativePath: "") }
     try manager.removeItem(at: root)
     try manager.moveItem(at: oldRoot, to: root)
+    // Wiki missing-note creation is a separate explicit, exclusive operation.
+    try CloudWorkspace.createWorkspaceNote(root, relativePath: "nested/新笔记😀.md")
+    let emptyNote = try read("nested/新笔记😀.md")
+    precondition(emptyNote.bytes.isEmpty)
+    rejects(.unavailable) { try CloudWorkspace.createWorkspaceNote(root, relativePath: "nested/新笔记😀.md") }
+    try write("CreateCollision.md", Data("preserve me".utf8))
+    rejects(.unavailable) { try CloudWorkspace.createWorkspaceNote(root, relativePath: "createcollision.md") }
+    let originalCollision = try read("CreateCollision.md")
+    precondition(originalCollision.bytes == Data("preserve me".utf8))
+    try write("Cafe\u{0301}.md")
+    rejects(.unavailable) { try CloudWorkspace.createWorkspaceNote(root, relativePath: "Café.md") }
+    for path in ["../outside.md", "/outside.md", ".private/new.md", "nested/../new.md", "linked-dir/new.md", "bad.txt"] {
+      rejects(.invalid) { try CloudWorkspace.createWorkspaceNote(root, relativePath: path) }
+    }
+    rejects(.missing) { try CloudWorkspace.createWorkspaceNote(root, relativePath: "absent/new.md") }
+    precondition(!manager.fileExists(atPath: root.appendingPathComponent("absent").path))
+    precondition(!manager.fileExists(atPath: outside.appendingPathComponent("new.md").path))
+    let canonical = try CloudWorkspace.resolveWorkspacePath(root, relativePath: "CreateCollision.md")
+    precondition(canonical["relativePath"] == "CreateCollision.md")
+    if manager.fileExists(atPath: root.appendingPathComponent("createcollision.md").path) {
+      let caseAlias = try CloudWorkspace.resolveWorkspacePath(root, relativePath: "createcollision.md")
+      precondition(caseAlias == canonical, "Case aliases must resolve through actual filesystem identity")
+    }
+    rejects(.invalid) { _ = try CloudWorkspace.resolveWorkspacePath(root, relativePath: "linked-dir/secret.md") }
+    try write("ignore\u{007F}.md")
+    let filtered = try CloudWorkspace.listWorkspaceDirectory(root, relativePath: "")
+    precondition(filtered["complete"] as? Bool == true)
+    precondition(!(filtered["entries"] as! [[String: Any]]).contains { ($0["relativePath"] as? String)?.contains("\u{007F}") == true })
+    // Deterministic non-cooperating rename in the final syscall window. No
+    // claim of cross-directory atomic isolation: report failure and preserve
+    // the observable empty file rather than deleting an unknown writer's path.
+    let moving = root.appendingPathComponent("moving-parent")
+    let movedOutside = outside.appendingPathComponent("moved-parent")
+    try manager.createDirectory(at: moving, withIntermediateDirectories: false)
+    rejects(.missing) {
+      try scope.createNote(relativePath: "moving-parent/Late.md", beforeExclusiveCreate: {
+        try manager.moveItem(at: moving, to: movedOutside)
+      })
+    }
+    let residual = movedOutside.appendingPathComponent("Late.md")
+    precondition(manager.fileExists(atPath: residual.path))
+    let residualBytes = try Data(contentsOf: residual)
+    precondition(residualBytes.isEmpty)
+    precondition(!manager.fileExists(atPath: moving.appendingPathComponent("Late.md").path))
+    rejects(.unavailable) {
+      try scope.createNote(relativePath: "writer-race.md", afterExclusiveCreate: {
+        try Data("other writer".utf8).write(to: root.appendingPathComponent("writer-race.md"), options: .atomic)
+      })
+    }
+    let otherWriter = try read("writer-race.md")
+    precondition(otherWriter.bytes == Data("other writer".utf8), "Failed create verification must not unlink or overwrite another writer")
+    rejects(.unavailable) {
+      try scope.createNote(relativePath: "in-place-writer.md", afterExclusiveCreate: {
+        // Even an empty final file is not ours to report as unchanged if an
+        // in-place writer touched it after the exclusive creation snapshot.
+        try manager.setAttributes([.modificationDate: Date(timeIntervalSince1970: 1)], ofItemAtPath: root.appendingPathComponent("in-place-writer.md").path)
+      })
+    }
+    precondition(manager.fileExists(atPath: root.appendingPathComponent("in-place-writer.md").path))
+    // A root replaced after the scope was captured cannot be used for create.
+    try manager.moveItem(at: root, to: oldRoot)
+    try manager.createSymbolicLink(at: root, withDestinationURL: outside)
+    rejects(.invalid) { try scope.createNote(relativePath: "new.md") }
+    try manager.removeItem(at: root)
+    try manager.moveItem(at: oldRoot, to: root)
+    print("PASS: scoped exclusive Wiki create, collision preservation, Unicode, missing parents and symlink rejection")
     print("PASS: local-only text metadata, exact bytes/revisions, offline stubs, no-follow scope, partial limits and replacement checks")
   }
 
