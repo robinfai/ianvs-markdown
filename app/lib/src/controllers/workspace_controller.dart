@@ -13,6 +13,11 @@ import '../models/workspace_layout.dart';
 import '../services/markdown_file_service.dart';
 import '../services/workspace_session_store.dart';
 
+enum SaveConflictChoice { cancel, keepBoth, overwrite }
+
+typedef SaveConflictResolver =
+    Future<SaveConflictChoice> Function(MarkdownSaveConflict conflict);
+
 class WorkspaceController extends ChangeNotifier {
   WorkspaceController({
     required this.fileService,
@@ -65,6 +70,10 @@ class WorkspaceController extends ChangeNotifier {
   var _workspaceFilesRevision = 0;
   var _saveRevision = 0;
   var _initialized = false;
+  var _initializing = false;
+  var _disposed = false;
+  String? recoveryError;
+  String? recoveryNotice;
   String? _workspaceRoot;
   String? _workspaceAccessToken;
   bool _sidebarVisible = true;
@@ -83,7 +92,10 @@ class WorkspaceController extends ChangeNotifier {
   bool get initialized => _initialized;
 
   Future<void> initialize() async {
-    if (_initialized) return;
+    if (_initialized || _initializing) return;
+    _initializing = true;
+    recoveryError = null;
+    recoveryNotice = null;
     if (defaultWorkspaceDirectory != null) await _resolveDefaultWorkspace();
     // iCloud remains the default when available. Local builds must recover
     // the workspace the user selected when automatic iCloud is unavailable.
@@ -92,6 +104,7 @@ class WorkspaceController extends ChangeNotifier {
     try {
       final snapshot = await sessionStore.load();
       if (snapshot != null) {
+        recoveryNotice = snapshot.recoveryNotice;
         // Tree preferences do not select a root or restore security scopes.
         // Keep them available when a workspace is explicitly selected again.
         browser.restore(snapshot.browserState);
@@ -188,6 +201,24 @@ class WorkspaceController extends ChangeNotifier {
       }
     } on Object catch (error, stackTrace) {
       debugPrint('Unable to restore workspace: $error\n$stackTrace');
+      // Do not replace failed recovery data with a fresh Welcome snapshot.
+      // A failed restore may have attached some documents before it failed.
+      for (final document in _documents) {
+        await _unwatch(document.id);
+        document.dispose();
+      }
+      _documents.clear();
+      _dirtyStates.clear();
+      _operationGrants.clear();
+      _favoriteAccessTokens.clear();
+      _activeIndex = 0;
+      _nextDocumentId = 1;
+      _initializing = false;
+      recoveryError =
+          'Unable to restore recovery data. The existing recovery '
+          'files have not been replaced. $error';
+      notifyListeners();
+      return;
     }
     if (_documents.isEmpty) {
       _documents.add(
@@ -199,6 +230,7 @@ class WorkspaceController extends ChangeNotifier {
       );
     }
     _initialized = true;
+    _initializing = false;
     notifyListeners();
     _schedulePersist();
   }
@@ -313,13 +345,20 @@ class WorkspaceController extends ChangeNotifier {
     _schedulePersist();
   }
 
-  Future<bool> saveActive({bool saveAs = false}) async {
+  Future<bool> saveActive({
+    bool saveAs = false,
+    SaveConflictResolver? onConflict,
+  }) async {
     final document = activeDocument;
     if (document == null) return false;
-    return saveDocument(document, saveAs: saveAs);
+    return saveDocument(document, saveAs: saveAs, onConflict: onConflict);
   }
 
-  Future<bool> saveDocument(DocumentSession document, {bool saveAs = false}) {
+  Future<bool> saveDocument(
+    DocumentSession document, {
+    bool saveAs = false,
+    SaveConflictResolver? onConflict,
+  }) {
     _saveRevision += 1;
     final savedText = document.controller.text;
     document.controller.commitHistoryGroup();
@@ -335,7 +374,12 @@ class WorkspaceController extends ChangeNotifier {
       }
       try {
         return await _serializeFileOperation(
-          () => _saveDocumentSnapshot(document, savedText, saveAs: saveAs),
+          () => _saveDocumentSnapshot(
+            document,
+            savedText,
+            saveAs: saveAs,
+            onConflict: onConflict,
+          ),
         );
       } finally {
         if (identical(_pendingSaves[document.id], saving)) {
@@ -351,24 +395,78 @@ class WorkspaceController extends ChangeNotifier {
     DocumentSession document,
     String savedText, {
     required bool saveAs,
+    SaveConflictResolver? onConflict,
   }) async {
     if (!_documents.contains(document)) return false;
     var path = saveAs ? null : document.path;
     path ??= await fileService.chooseSavePath(document.name);
     if (path == null) return false;
-    final normalized = p.normalize(p.absolute(path));
-    await fileService.writeMarkdownFileAtomic(normalized, savedText);
+    var normalized = p.normalize(p.absolute(path));
+    var expectedContents =
+        document.path != null && p.equals(document.path!, normalized)
+        ? document.persistedText
+        : null;
+    while (true) {
+      try {
+        await _writeGuarded(normalized, savedText, expectedContents);
+        break;
+      } on MarkdownSaveConflict catch (conflict) {
+        if (document.path != null && p.equals(document.path!, normalized)) {
+          document.hasExternalChanges = true;
+          notifyListeners();
+        }
+        final choice =
+            await onConflict?.call(conflict) ?? SaveConflictChoice.cancel;
+        if (!_documents.contains(document) ||
+            choice == SaveConflictChoice.cancel) {
+          return false;
+        }
+        if (choice == SaveConflictChoice.keepBoth) {
+          // Preserve the external file in place, and save this captured local
+          // version under a distinct name. Never claim an occupied copy path.
+          final base = p.withoutExtension(normalized);
+          final extension = p.extension(normalized);
+          if (canManage(p.dirname(normalized))) {
+            var number = 1;
+            String candidate;
+            do {
+              final suffix = number == 1 ? '' : ' $number';
+              candidate = '$base local copy$suffix$extension';
+              number++;
+            } while (await fileService.entryExists(candidate));
+            normalized = candidate;
+          } else {
+            // Opening one file does not grant access to create siblings in a
+            // sandbox. Let the save panel grant this specific destination.
+            final selected = await fileService.chooseSavePath(
+              '${p.basename(base)} local copy$extension',
+            );
+            if (selected == null || !_documents.contains(document)) {
+              return false;
+            }
+            normalized = p.normalize(p.absolute(selected));
+          }
+          expectedContents = null;
+        } else {
+          // Approval covers only the version shown by this conflict. A newer
+          // external write must be presented again, not silently overwritten.
+          expectedContents = conflict.currentContents;
+        }
+      }
+    }
     final previousPath = document.path;
     final needsAccessToken =
         document.accessToken == null ||
         previousPath == null ||
         !p.equals(previousPath, normalized);
+    // A bookmark for the old file must never redirect the new copy on restore.
+    // If creation fails, preserve the selected path without an unrelated token.
     final accessToken = needsAccessToken
         ? await fileService.createPersistentAccessToken(normalized)
         : document.accessToken;
     document
       ..path = normalized
-      ..accessToken = accessToken ?? document.accessToken
+      ..accessToken = accessToken
       ..name = p.basename(normalized)
       ..encoding = 'UTF-8'
       ..lineEnding = _lineEndingOf(savedText)
@@ -386,6 +484,35 @@ class WorkspaceController extends ChangeNotifier {
     return true;
   }
 
+  Future<void> _writeGuarded(
+    String path,
+    String contents,
+    String? expectedContents,
+  ) async {
+    final service = fileService;
+    if (service is GuardedMarkdownFileService) {
+      await (service as GuardedMarkdownFileService).writeMarkdownFileGuarded(
+        path,
+        contents,
+        expectedContents: expectedContents,
+      );
+      return;
+    }
+    // Legacy/test hosts still get save-time validation, independent of watcher
+    // delivery. Production hosts also validate at the atomic-write boundary.
+    final current = service.fileExists(path)
+        ? (await service.readMarkdownFile(path)).contents
+        : null;
+    if (current != expectedContents) {
+      throw MarkdownSaveConflict(
+        path: path,
+        expectedContents: expectedContents,
+        currentContents: current,
+      );
+    }
+    await service.writeMarkdownFileAtomic(path, contents);
+  }
+
   Future<void> reloadFromDisk(DocumentSession document) async {
     final path = document.path;
     if (path == null) return;
@@ -396,11 +523,6 @@ class WorkspaceController extends ChangeNotifier {
       ..replaceFromDisk(file.contents, preserveHistory: true);
     notifyListeners();
     _schedulePersist();
-  }
-
-  void keepLocalVersion(DocumentSession document) {
-    document.hasExternalChanges = false;
-    notifyListeners();
   }
 
   void removeDocument(DocumentSession document) {
@@ -838,6 +960,13 @@ class WorkspaceController extends ChangeNotifier {
     } while (revision != _persistRevision);
   }
 
+  Future<void> retryRecovery() => _initialized ? flushSession() : initialize();
+
+  void dismissRecoveryNotice() {
+    recoveryNotice = null;
+    notifyListeners();
+  }
+
   Future<void> _persistNow() async {
     try {
       await _queueSnapshot();
@@ -879,11 +1008,28 @@ class WorkspaceController extends ChangeNotifier {
       onError: (Object error, StackTrace stackTrace) => completed(),
     );
     _persistTail = tail;
-    return writing;
+    return writing.then<void>(
+      (_) {
+        if (!_disposed && recoveryError != null) {
+          recoveryError = null;
+          notifyListeners();
+        }
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        if (!_disposed) {
+          recoveryError =
+              'Recovery backup could not be saved. Keep Linefold open '
+              'and retry. $error';
+          notifyListeners();
+        }
+        Error.throwWithStackTrace(error, stackTrace);
+      },
+    );
   }
 
   @override
   void dispose() {
+    _disposed = true;
     _persistTimer?.cancel();
     browser.removeListener(_schedulePersist);
     browser.dispose();

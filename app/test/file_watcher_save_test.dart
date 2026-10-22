@@ -163,8 +163,14 @@ void main() {
       await tester.pump();
       expect(files.nextRead, isNull);
 
-      // Re-saving identical text must invalidate the old read too.
-      expect(await workspace.saveDocument(document), isTrue);
+      // An explicitly approved overwrite must invalidate the old read too.
+      expect(
+        await workspace.saveDocument(
+          document,
+          onConflict: (_) async => SaveConflictChoice.overwrite,
+        ),
+        isTrue,
+      );
       await tester.pump();
       delayedRead.complete(
         MarkdownFileData(

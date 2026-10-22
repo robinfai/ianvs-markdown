@@ -36,6 +36,7 @@ class EditorShell extends StatefulWidget {
     this.onUseSystemTheme,
     this.onOpenSettings,
     this.enableFileDrop = true,
+    this.onRetryInitialization,
   });
 
   final WorkspaceController workspace;
@@ -44,6 +45,7 @@ class EditorShell extends StatefulWidget {
   final VoidCallback? onUseSystemTheme;
   final VoidCallback? onOpenSettings;
   final bool enableFileDrop;
+  final Future<void> Function()? onRetryInitialization;
 
   @override
   State<EditorShell> createState() => _EditorShellState();
@@ -99,6 +101,34 @@ class _EditorShellState extends State<EditorShell> {
       builder: (context, _) {
         final workspace = widget.workspace;
         final document = workspace.activeDocument;
+        if (!workspace.initialized && workspace.recoveryError != null) {
+          return Scaffold(
+            body: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Recovery needs attention'),
+                      const SizedBox(height: 12),
+                      SelectableText(workspace.recoveryError!),
+                      const SizedBox(height: 16),
+                      FilledButton(
+                        onPressed: () => _guard(
+                          widget.onRetryInitialization ??
+                              workspace.retryRecovery,
+                        ),
+                        child: const Text('Retry recovery'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
         if (!workspace.initialized || document == null) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
@@ -234,14 +264,36 @@ class _EditorShellState extends State<EditorShell> {
                               workspace: workspace,
                               onClose: _closeDocument,
                             ),
+                            if (workspace.recoveryError != null ||
+                                workspace.recoveryNotice != null)
+                              MaterialBanner(
+                                content: Text(
+                                  workspace.recoveryError ??
+                                      workspace.recoveryNotice!,
+                                ),
+                                actions: [
+                                  if (workspace.recoveryError != null)
+                                    TextButton(
+                                      onPressed: () =>
+                                          _guard(workspace.retryRecovery),
+                                      child: const Text('Retry recovery'),
+                                    )
+                                  else
+                                    TextButton(
+                                      onPressed:
+                                          workspace.dismissRecoveryNotice,
+                                      child: const Text('Dismiss'),
+                                    ),
+                                ],
+                              ),
                             if (document.hasExternalChanges)
                               _ExternalChangeBanner(
                                 document: document,
                                 onReload: () => _guard(
                                   () => workspace.reloadFromDisk(document),
                                 ),
-                                onKeepLocal: () =>
-                                    workspace.keepLocalVersion(document),
+                                onResolve: () =>
+                                    _guard(() => _saveDocument(document)),
                               ),
                             Expanded(
                               child: DropTarget(
@@ -358,13 +410,63 @@ class _EditorShellState extends State<EditorShell> {
         )) {
       return;
     }
-    _guard(() => widget.workspace.saveActive(saveAs: saveAs));
+    final document = widget.workspace.activeDocument;
+    if (document != null) _guard(() => _saveDocument(document, saveAs: saveAs));
+  }
+
+  Future<bool> _saveDocument(DocumentSession document, {bool saveAs = false}) =>
+      widget.workspace.saveDocument(
+        document,
+        saveAs: saveAs,
+        onConflict: _resolveSaveConflict,
+      );
+
+  Future<SaveConflictChoice> _resolveSaveConflict(
+    MarkdownSaveConflict conflict,
+  ) async {
+    if (!mounted) return SaveConflictChoice.cancel;
+    return await showDialog<SaveConflictChoice>(
+          context: context,
+          builder: (context) => AlertDialog(
+            constraints: const BoxConstraints(maxWidth: 520),
+            title: Text('“${p.basename(conflict.path)}” changed on disk'),
+            content: Text(
+              conflict.currentContents == null
+                  ? 'The file was removed outside Linefold. Keep Both saves your '
+                        'version as a new local copy. Overwrite recreates the original '
+                        'file. Cancel keeps your edits unsaved.'
+                  : 'The disk version differs from the version you opened. Keep Both '
+                        'leaves the disk file untouched and saves your version as a new '
+                        'local copy. Overwrite replaces the disk version with your '
+                        'captured edits. Cancel keeps your edits unsaved.',
+            ),
+            actions: [
+              OutlinedButton(
+                onPressed: () =>
+                    Navigator.pop(context, SaveConflictChoice.cancel),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () =>
+                    Navigator.pop(context, SaveConflictChoice.overwrite),
+                child: const Text('Overwrite'),
+              ),
+              FilledButton(
+                autofocus: true,
+                onPressed: () =>
+                    Navigator.pop(context, SaveConflictChoice.keepBoth),
+                child: const Text('Keep Both'),
+              ),
+            ],
+          ),
+        ) ??
+        SaveConflictChoice.cancel;
   }
 
   Future<void> _saveFromEditor(DocumentSession document) async {
     final bool saved;
     try {
-      saved = await widget.workspace.saveDocument(document);
+      saved = await _saveDocument(document);
     } on Object catch (error) {
       _showError(describeFileError(error));
       // The host has reported the error. Do not let the editor acknowledge
@@ -412,9 +514,17 @@ class _EditorShellState extends State<EditorShell> {
         ),
       );
       if (!mounted || choice == null || choice == _CloseChoice.cancel) return;
-      if (choice == _CloseChoice.save &&
-          !await widget.workspace.saveDocument(document)) {
-        return;
+      if (choice == _CloseChoice.save) {
+        try {
+          if (!await _saveDocument(document) || document.controller.isDirty) {
+            // A save acknowledges its captured snapshot, not later edits made
+            // while resolving the conflict or waiting for disk.
+            return;
+          }
+        } on Object catch (error) {
+          _showError(describeFileError(error));
+          return;
+        }
       }
     }
     widget.workspace.removeDocument(document);
@@ -434,12 +544,12 @@ class _ExternalChangeBanner extends StatelessWidget {
   const _ExternalChangeBanner({
     required this.document,
     required this.onReload,
-    required this.onKeepLocal,
+    required this.onResolve,
   });
 
   final DocumentSession document;
   final VoidCallback onReload;
-  final VoidCallback onKeepLocal;
+  final VoidCallback onResolve;
 
   @override
   Widget build(BuildContext context) {
@@ -465,8 +575,8 @@ class _ExternalChangeBanner extends StatelessWidget {
               ),
             ),
             OutlinedButton(
-              onPressed: onKeepLocal,
-              child: const Text('Keep My Changes'),
+              onPressed: onResolve,
+              child: const Text('Resolve & Save'),
             ),
             FilledButton(onPressed: onReload, child: const Text('Reload')),
           ],
