@@ -232,6 +232,11 @@ struct NativeNoteTransactionAcceptance {
     try run("recoveryIndependentOfOldReadSet", recoveryIndependentOfOldReadSet)
     try run("coordinatorRootAliases", coordinatorRootAliases)
     try run("presenterMoveNotifications", presenterMoveNotifications)
+    try run("storageInventoryReadOnly", storageInventoryReadOnly)
+    try run("storageInventoryMissingAndPermissions", storageInventoryMissingAndPermissions)
+    try run("storageInventoryCountsAndBounds", storageInventoryCountsAndBounds)
+    try run("storageInventoryScopeAndArtifacts", storageInventoryScopeAndArtifacts)
+    try run("storageInventoryRaces", storageInventoryRaces)
     print("PASS: synthetic atomic note transactions, receipts, recovery, races, bounds and privacy")
   }
   private static func run(_ name: String, _ body: () throws -> Void) throws {
@@ -1052,6 +1057,281 @@ struct NativeNoteTransactionAcceptance {
         try require(try f.identity(f.source) != originalIdentity, "The current planned leaf is the replacement inode")
       }
       try require(!accepts(executor, observed, scope, f.source, parent), "Root identity, pinned parent and exact leaf cannot be redirected: \(scenario)")
+    }
+  }
+
+  private static func inventory(_ executor: WorkspaceNoteTransaction, _ fixture: Fixture) throws -> [String: Any] {
+    try fixture.invoke(executor, "inspectWorkspaceNoteMoveStorage", ["path": fixture.root.path])
+  }
+
+  private static func inventoryRows(_ value: [String: Any]) throws -> [[String: Any]] {
+    guard let rows = value["records"] as? [[String: Any]] else {
+      throw TestFailure(description: "Inventory must expose bounded records, including an empty array")
+    }
+    return rows
+  }
+
+  private static func inventorySnapshot(_ base: URL) throws -> [String: String] {
+    var snapshots: [String: String] = [:]
+    func walk(_ url: URL, relative: String) throws {
+      var info = stat()
+      try require(lstat(url.path, &info) == 0, "Fixture metadata must be readable")
+      let kind = info.st_mode & mode_t(S_IFMT)
+      var fingerprint = "\(WorkspaceFileScope.revision(info)):\(info.st_mode):\(info.st_nlink):\(info.st_uid):\(info.st_gid):\(info.st_flags):\(info.st_blocks)"
+      if kind == mode_t(S_IFREG) && info.st_size <= 1024 * 1024 {
+        fingerprint += ":" + (try Data(contentsOf: url)).base64EncodedString()
+      }
+      snapshots[relative] = fingerprint
+      if kind == mode_t(S_IFDIR) {
+        for name in try FileManager.default.contentsOfDirectory(atPath: url.path).sorted() {
+          try walk(url.appendingPathComponent(name), relative: relative + "/" + name)
+        }
+      }
+    }
+    try walk(base, relative: ".")
+    return snapshots
+  }
+
+  private static func storageInventoryReadOnly() throws {
+    let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+    let request = try f.request(); let prepared = try f.prepare(executor, request)
+    let completed = try f.invoke(executor, "executeWorkspaceNoteMove", f.command(request, token: prepared["token"]))
+    try require(completed["phase"] as? String == "completed", "Inventory fixture must start completed")
+    // A later dependency change must not cause an inventory read to reconcile,
+    // mutate the journal or relabel its saved historical completion.
+    try f.write(f.unrelated, Data("External edit after completion".utf8))
+    try f.write("user-recovery-copy.md", Data("Not an automatic cleanup artifact".utf8))
+    let before = try inventorySnapshot(f.directory)
+    let names = try f.manager.contentsOfDirectory(atPath: f.journal.path)
+    let journal = f.journal.appendingPathComponent(names.first { $0.hasSuffix(".json") }!)
+    let journalBytes = try Data(contentsOf: journal).count
+    executor.fault = { point in
+      try require(point.hasPrefix("inventory"), "Inventory invoked a mutation/reconciliation boundary: \(point)")
+    }
+    for _ in 0..<3 {
+      let value = try inventory(executor, f)
+      try require(value["observedComplete"] as? Bool == true, "A stable local inventory should be complete")
+      try require(value["globalJournalCount"] as? Int == 1 && value["globalRecordSlotCount"] as? Int == 1,
+                  "Valid count and occupied record slots are independently reported")
+      try require(value["globalJournalBytes"] as? Int == journalBytes && value["currentRootJournalBytes"] as? Int == journalBytes,
+                  "Encoded journal bytes must be exact, not the raw payload count")
+      let reserved = f.originalSource.count + f.replacementSource.count + f.originalIncoming.count + f.replacementIncoming.count
+      try require(value["artifactReservedBytes"] as? Int == reserved, "Reservation must match executor admission accounting")
+      try require(value["currentRootArtifactBytes"] as? Int == f.originalSource.count + f.originalIncoming.count,
+                  "Only retained known artifacts are included, never recovery copies or visible notes")
+      let rows = try inventoryRows(value)
+      try require(rows.count == 1 && rows[0]["storedPhase"] as? String == "completed", "Saved phase must not be recomputed")
+      try require(rows[0]["historicalObservation"] as? Bool == true && rows[0]["cleanupSupported"] as? Bool == false,
+                  "Inventory is historical observation, never cleanup approval")
+      try require(rows[0]["entryCount"] as? Int == 2 && rows[0]["sourcePath"] as? String == f.source &&
+                  rows[0]["destinationPath"] as? String == f.destination && (rows[0]["created"] as? Double ?? 0) > 0,
+                  "Recovery UI must receive bounded original manifest metadata")
+      try require(rows[0]["artifactCount"] as? Int == 2 && rows[0]["artifactUnknownCount"] as? Int == 0,
+                  "Known retained artifacts should have metadata-only totals")
+      try require(value["availableBudgetBytes"] as? Int == WorkspaceNoteTransaction.maximumJournalBytes - journalBytes,
+                  "Budget remainder is encoded storage allowance, not free disk or move admission")
+      try require(try inventorySnapshot(f.directory) == before,
+                  "Repeated inventory must preserve bytes, entry sets, modes, identities, mtime and ctime (atime excluded)")
+    }
+  }
+
+  private static func storageInventoryMissingAndPermissions() throws {
+    do {
+      let f = try Fixture()
+      let absent = f.directory.appendingPathComponent("never-created/Linefold/NoteMoveJournal", isDirectory: true)
+      let executor = WorkspaceNoteTransaction(journalDirectory: absent)
+      let before = try inventorySnapshot(f.directory)
+      let value = try inventory(executor, f)
+      try require(value["observedComplete"] as? Bool == true && value["globalJournalBytes"] as? Int == 0 &&
+                  value["globalRecordSlotCount"] as? Int == 0, "An absent journal is known empty without initialization")
+      try require(!f.manager.fileExists(atPath: absent.path) &&
+                  !f.manager.fileExists(atPath: f.directory.appendingPathComponent("never-created").path),
+                  "Inspection must not create missing ancestors")
+      let malformed = try f.invoke(executor, "inspectWorkspaceNoteMoveStorage", ["path": "relative", "transactionId": UUID().uuidString])
+      try require(malformed["globalJournalBytes"] is NSNull, "Malformed inspection must not enter the old load error path")
+      try require(try inventorySnapshot(f.directory) == before, "No-directory observation and errors are read-only")
+    }
+    for scenario in ["directoryMode", "directorySymlink", "journalSymlink", "offlineJournal"] {
+      let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let request = try f.request(); _ = try f.prepare(executor, request)
+      let id = (request["transactionId"] as! String).lowercased()
+      let file = f.journal.appendingPathComponent(id + ".json")
+      var inspecting = executor
+      switch scenario {
+      case "directoryMode": try require(chmod(f.journal.path, 0o755) == 0, "Test mode setup")
+      case "directorySymlink":
+        let alias = f.directory.appendingPathComponent("journal-link", isDirectory: true)
+        try f.manager.createSymbolicLink(at: alias, withDestinationURL: f.journal)
+        inspecting = WorkspaceNoteTransaction(journalDirectory: alias)
+      case "journalSymlink":
+        try f.manager.moveItem(at: file, to: f.outside.appendingPathComponent("held.json"))
+        try f.manager.createSymbolicLink(at: file, withDestinationURL: f.url(f.source))
+      default: executor.inventoryDatalessOverride = { $0 == "journal:" + id + ".json" }
+      }
+      let before = try inventorySnapshot(f.directory)
+      let value = try inventory(inspecting, f)
+      try require(value["observedComplete"] as? Bool == false && value["globalJournalBytes"] is NSNull,
+                  "Unavailable, redirected or offline journal storage is unknown, never known zero: \(scenario)")
+      try require(try inventorySnapshot(f.directory) == before, "Inspection must not repair permissions or follow symlinks")
+      try f.expectOriginals()
+    }
+  }
+
+  private static func storageInventoryCountsAndBounds() throws {
+    do {
+      let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let request = try f.request(); let prepared = try f.prepare(executor, request)
+      _ = try f.invoke(executor, "cancelPreparedWorkspaceNoteMove", f.command(request, token: prepared["token"]))
+      let id = (request["transactionId"] as! String).lowercased()
+      let data = try Data(contentsOf: f.journal.appendingPathComponent(id + ".json"))
+      for index in 0..<31 { try data.write(to: f.journal.appendingPathComponent("\(id).\(index).pending")) }
+      let before = try inventorySnapshot(f.directory)
+      let value = try inventory(executor, f)
+      try require(value["globalJournalCount"] as? Int == 1 && value["globalRecordSlotCount"] as? Int == 1 &&
+                  value["pendingCount"] as? Int == 31 && value["pendingBytes"] as? Int == data.count * 31,
+                  "Pending remnants consume bytes, not JSON record slots")
+      try require(!(value["blockers"] as? [String] ?? []).contains("journal_record_limit"),
+                  "32 total directory entries must not be mistaken for 32 records")
+      try require(try inventorySnapshot(f.directory) == before, "Pending remnants must never be pruned")
+      let bad = f.journal.appendingPathComponent(UUID().uuidString.lowercased() + ".json")
+      try Data("invalid JSON".utf8).write(to: bad); try require(chmod(bad.path, 0o600) == 0, "Test private mode setup")
+      try Data("unrecognized".utf8).write(to: f.journal.appendingPathComponent("unexpected.bin"))
+      let invalidBefore = try inventorySnapshot(f.directory)
+      let invalid = try inventory(executor, f)
+      try require(invalid["globalJournalCount"] as? Int == 1 && invalid["globalRecordSlotCount"] as? Int == 2 &&
+                  invalid["invalidJournalCount"] as? Int == 1 && invalid["unknownEntryCount"] as? Int == 1,
+                  "Invalid JSON occupies an actual slot without becoming a valid record")
+      try require(invalid["artifactReservedBytes"] is NSNull && invalid["currentRootJournalBytes"] is NSNull,
+                  "Unknown membership/reservation must not masquerade as a prefix sum")
+      try require(invalid["globalJournalBytes"] as? Int == data.count * 32 + "invalid JSON".utf8.count + "unrecognized".utf8.count,
+                  "Known regular-file bytes include invalid, pending and unexpected files")
+      try require(try inventorySnapshot(f.directory) == invalidBefore, "Invalid and unknown data must remain untouched")
+      executor.inventoryReadBudgetOverride = 0
+      let limited = try inventory(executor, f)
+      try require(limited["globalJournalCount"] is NSNull && limited["artifactReservedBytes"] is NSNull &&
+                  (limited["blockers"] as? [String] ?? []).contains("journal_read_limit"), "Read budget exhaustion is explicit")
+    }
+    do {
+      let f = try Fixture(); try require(chmod(f.journal.path, 0o700) == 0, "Test private directory setup")
+      let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      for index in 0..<256 { try Data().write(to: f.journal.appendingPathComponent("\(index).pending")) }
+      let atLimit = try inventory(executor, f)
+      try require(atLimit["observedComplete"] as? Bool == true && atLimit["pendingCount"] as? Int == 256,
+                  "Exactly 256 entries must be observable")
+      try Data().write(to: f.journal.appendingPathComponent("overflow.pending"))
+      let before = try inventorySnapshot(f.directory)
+      let overflow = try inventory(executor, f)
+      try require(overflow["observedComplete"] as? Bool == false && overflow["globalJournalBytes"] is NSNull &&
+                  overflow["globalRecordSlotCount"] is NSNull && overflow["pendingBytes"] is NSNull,
+                  "An entry-limit prefix is not a complete inventory")
+      try require(try inventorySnapshot(f.directory) == before, "Bounded inspection cannot remove overflow files")
+    }
+    do {
+      let f = try Fixture(); try require(chmod(f.journal.path, 0o700) == 0, "Test private directory setup")
+      let huge = f.journal.appendingPathComponent(UUID().uuidString.lowercased() + ".json")
+      try Data().write(to: huge); try require(chmod(huge.path, 0o600) == 0, "Test private file setup")
+      let handle = try FileHandle(forWritingTo: huge)
+      try handle.truncate(atOffset: UInt64(WorkspaceNoteTransaction.maximumJournalBytes + 1)); try handle.close()
+      let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let before = try inventorySnapshot(f.directory)
+      let value = try inventory(executor, f)
+      try require(value["globalJournalBytes"] as? Int == WorkspaceNoteTransaction.maximumJournalBytes + 1 &&
+                  value["availableBudgetBytes"] as? Int == 0 && value["artifactReservedBytes"] is NSNull,
+                  "Oversized sparse metadata is counted without allocating or decoding its body")
+      try require((value["blockers"] as? [String] ?? []).contains("journal_byte_limit") &&
+                  (value["blockers"] as? [String] ?? []).contains("journal_read_limit"), "Byte/read limits are independent")
+      try require(try inventorySnapshot(f.directory) == before, "Oversized data must remain unchanged")
+    }
+  }
+
+  private static func storageInventoryScopeAndArtifacts() throws {
+    do {
+      let f = try Fixture(); let other = try Fixture()
+      let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      for fixture in [f, other] {
+        let request = try fixture.request(); let prepared = try fixture.prepare(executor, request)
+        let result = try fixture.invoke(executor, "executeWorkspaceNoteMove", fixture.command(request, token: prepared["token"]))
+        try require(result["phase"] as? String == "completed", "Both synthetic roots must prepare independent journals")
+      }
+      // Make the other recorded root unavailable. Inventory must neither reopen
+      // its stored path nor inspect any artifact under that root.
+      try other.manager.moveItem(at: other.root, to: other.outside.appendingPathComponent("held-vault"))
+      var observedPaths: [String] = []
+      executor.inventoryArtifactObserver = { observedPaths.append($0) }
+      let before = try inventorySnapshot(f.directory); let otherBefore = try inventorySnapshot(other.directory)
+      let value = try inventory(executor, f); let rows = try inventoryRows(value)
+      try require(value["globalJournalCount"] as? Int == 2 && rows.count == 1 && observedPaths.count == 2,
+                  "Global managed journals may be decoded; artifacts are inspected only in the current authorized root")
+      let currentID = rows[0]["transactionId"] as! String
+      try require(observedPaths.allSatisfy { $0.contains(currentID) }, "Never touch artifacts by a different record's saved root path")
+      try require(value["observedComplete"] as? Bool == true, "Another root's availability is not silently probed")
+      try require(try inventorySnapshot(f.directory) == before && inventorySnapshot(other.directory) == otherBefore,
+                  "Neither root may be changed by observation")
+    }
+    for scenario in ["missing", "changed", "symlink", "offline", "parentChanged"] {
+      let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let request = try f.request(); let prepared = try f.prepare(executor, request)
+      let result = try f.invoke(executor, "executeWorkspaceNoteMove", f.command(request, token: prepared["token"]))
+      let artifacts = result["retainedArtifacts"] as! [[String: Any]]
+      let path = artifacts.first { ($0["path"] as? String)?.hasPrefix("notes/") == true }!["path"] as! String
+      switch scenario {
+      case "missing": try f.manager.moveItem(at: f.url(path), to: f.outside.appendingPathComponent("held-original.md"))
+      case "changed": try f.overwriteSameInode(path, Data("Concurrent retained version".utf8))
+      case "symlink":
+        try f.manager.moveItem(at: f.url(path), to: f.outside.appendingPathComponent("held-original.md"))
+        try f.manager.createSymbolicLink(at: f.url(path), withDestinationURL: f.url(f.destination))
+      case "offline": executor.inventoryDatalessOverride = { $0 == "artifact:" + path }
+      default:
+        try f.manager.moveItem(at: f.url("notes"), to: f.outside.appendingPathComponent("held-notes"))
+        try f.manager.createDirectory(at: f.url("notes"), withIntermediateDirectories: false)
+      }
+      let before = try inventorySnapshot(f.directory)
+      let value = try inventory(executor, f); let row = try inventoryRows(value)[0]
+      try require(value["observedComplete"] as? Bool == false && value["currentRootArtifactBytes"] is NSNull &&
+                  row["artifactBytes"] is NSNull && row["artifactUnknownCount"] as? Int == 1,
+                  "A missing/changed/offline/redirected artifact cannot become a known zero or prefix total: \(scenario)")
+      if scenario == "missing" { try require(row["artifactMissingCount"] as? Int == 1, "Missing evidence is separately reported") }
+      try require(row["storedPhase"] as? String == "completed", "Observation cannot rewrite historical transaction phase")
+      try require(try inventorySnapshot(f.directory) == before, "Artifact inspection never edits, restores or materializes data")
+    }
+  }
+
+  private static func storageInventoryRaces() throws {
+    for scenario in ["root", "journal", "artifact"] {
+      let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let request = try f.request(); let prepared = try f.prepare(executor, request)
+      let result = try f.invoke(executor, "executeWorkspaceNoteMove", f.command(request, token: prepared["token"]))
+      let artifact = (result["retainedArtifacts"] as! [[String: Any]])[0]["path"] as! String
+      let journal = f.journal.appendingPathComponent((request["transactionId"] as! String).lowercased() + ".json")
+      let originalJournal = try Data(contentsOf: journal)
+      var hit = false
+      executor.fault = { point in
+        if !hit && scenario == "root" && point == "inventoryAfterRootOpen" {
+          hit = true
+          try f.manager.moveItem(at: f.root, to: f.outside.appendingPathComponent("held-root"))
+          try f.manager.createDirectory(at: f.root, withIntermediateDirectories: false)
+        } else if !hit && scenario == "journal" && point == "inventoryAfterJournalRead" {
+          hit = true; try (originalJournal + Data("\n".utf8)).write(to: journal)
+        } else if !hit && scenario == "artifact" && point == "inventoryAfterArtifactStat" {
+          hit = true; try f.overwriteSameInode(artifact, Data("Writer version must survive".utf8))
+        }
+      }
+      let value = try inventory(executor, f)
+      try require(hit && value["observedComplete"] as? Bool == false, "Race hook must invalidate observation: \(scenario)")
+      if scenario == "journal" {
+        try require(value["globalJournalBytes"] is NSNull &&
+                    (value["blockers"] as? [String] ?? []).contains("journal_changed_during_observation"),
+                    "Journal races invalidate complete totals")
+        try require(try Data(contentsOf: journal) == originalJournal + Data("\n".utf8), "Do not overwrite racing journal evidence")
+      } else if scenario == "root" {
+        try require(value["currentRootKnown"] as? Bool == false && value["currentRootArtifactBytes"] is NSNull,
+                    "A replaced root must not preserve authority from its path spelling")
+        try require(try Data(contentsOf: journal) == originalJournal, "A root race must not save a newly inferred transaction phase")
+      } else {
+        try require(value["currentRootArtifactBytes"] is NSNull, "Artifact race cannot publish an apparently complete sum")
+        try require(try f.bytes(artifact) == Data("Writer version must survive".utf8), "Concurrent artifact bytes remain untouched")
+        try require(try Data(contentsOf: journal) == originalJournal, "Artifact race must not trigger reconcile/save")
+      }
     }
   }
 

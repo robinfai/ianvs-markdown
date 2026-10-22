@@ -214,3 +214,86 @@ All fixtures are synthetic. Focused core renderer-oracle tests and app planner /
 warning / cancel tests run locally with `flutter test --no-pub`. Package publication,
 publish dry-run, cloud metadata and user vaults are not used. Native Mac/iOS CI and
 real-device acceptance are separate gates; Linux tests do not establish them.
+
+## P1g3a: observation-only recovery storage inventory
+
+**Note Move Recovery** now opens a read-only storage inventory. Opening the view,
+refreshing it or inspecting the selected workspace on startup no longer calls the
+legacy `list → reconcile → save` path. The new `inspectWorkspaceNoteMoveStorage`
+route opens only existing private directories and never creates them, changes
+permissions/backup attributes, syncs, repairs or writes a journal. Original-copy
+recovery remains a separate explicitly confirmed action using the existing
+exclusive-copy protocol. Its result is displayed separately from historical
+storage observations. No cleanup, Trash or deletion operation is exposed.
+
+The inventory separates these quantities:
+
+- Global app-managed journal storage: valid decoded journals, all `.json` record
+  slots (including invalid records), invalid/unavailable entries, `.pending`
+  remnants and encoded file bytes. Pending remnants consume the byte budget, not
+  the 32-record admission count. Only the app's own private journal directory is
+  inspected for these global figures. Other workspace directories are not opened.
+- The 192 MiB encoded journal budget, the independent 192 MiB artifact reservation
+  and remaining journal-budget headroom. Headroom is **not free disk space** and
+  is not a promise that another move will pass preflight: atomic receipt rewrites,
+  a proposed payload and actual capacity require their existing separate checks.
+- Current authorized workspace records and their journal bytes, retained-artifact
+  logical bytes, reported allocated bytes, missing/unverifiable artifacts and
+  reasons for retaining the evidence. Allocation is a sum of filesystem metadata,
+  not exclusive physical usage or a measurement of space that deletion would free.
+  User-created original recovery copies are not counted as retained artifacts.
+
+Stored phases/codes are explicitly historical. A stored `completed` value is not
+new proof that files or references still agree. Artifact inspection reads metadata
+only, never artifact bodies; matching identity/revision/metadata does not prove
+content or make an item eligible for cleanup. Root, parent and leaf checks remain
+no-follow and non-materializing; only artifact paths from valid journals matching
+both the selected root identity and canonical path are inspected. Metadata/identity
+changes during observation invalidate affected figures, and a changed private
+journal namespace invalidates the inventory. This is not an atomic cross-file
+snapshot. Normal filesystem read-access timestamps are outside the no-write claim.
+
+The walk is bounded to 256 directory names, 32 decoded valid records, 48 MiB per
+journal and 192 MiB total journal reads. A ten-second cooperative deadline is
+checked between bounded read/stat operations; it cannot interrupt a blocking OS
+filesystem call or promise a maximum UI latency. Unavailable, offline, invalid,
+changed or over-budget inputs produce explicit reasons and nullable totals. Null
+means unknown, never zero or a prefix sum presented as a complete total. Each
+response contains at most 32 current-workspace records and no other-root paths or
+note bodies. The read remains on the existing serial native transaction queue.
+The dialog can close while observation is pending, rejects stale workspace epochs
+and never adopts a late result after disposal. Only original-copy execution blocks
+dismissal and requires renewed explicit confirmation.
+
+This stage does **not** release slots, prune pending files or solve every capacity
+blocker. At the limit, maintained moves remain blocked rather than discarding any
+unique original, displaced version or uncertain recovery evidence. Recovering
+original copies consumes additional space and does not reclaim this budget.
+
+### Deferred: user-selected, recoverable cleanup
+
+A future stage would need independent review and explicit user selection before
+using the normal system Trash. It is not implemented or enabled here. Apple's
+[`FileManager.trashItem`](https://developer.apple.com/documentation/foundation/filemanager/trashitem(at:resultingitemurl:))
+is available on macOS and iOS; iOS is not described as lacking the API. What is
+unverified is a reliable, user-visible recovery surface for this app's private
+journal and each supported sandbox/provider/volume. The API's returned Trash URL
+and access behavior are described in
+[Apple's sandboxing session](https://developer.apple.com/videos/play/wwdc2019/701/?time=1995),
+but availability alone is not acceptance testing or durable recovery evidence.
+
+Any future design must preserve all unique evidence for partial/unknown records,
+prove every proposed target, keep journal originals until other targets have
+verified recoverable results, and handle interruption without replaying deletion
+or treating source absence as success. It must also account for unresolved intents
+when charging storage, including a missing final receipt. It must never scan all
+Trash, request broader permissions silently, automatically prune records or fall
+back to permanent `unlink`/delete. User/system emptying Trash can remove recovery
+and Trash may not free physical space; it is not a permanent backup.
+
+The URL-only Trash API has no expected-inode compare-and-swap parameter. Advisory
+coordination and checks before/after the call do not eliminate a non-cooperating
+writer's check-to-Trash race. Reporting an uncertain result afterward is not a
+substitute for a safe mutation protocol. This unresolved boundary is another
+reason this stage keeps every cleanup mutation disabled rather than claiming a
+safe garbage collector. No separate cleanup ledger or transaction is introduced.
