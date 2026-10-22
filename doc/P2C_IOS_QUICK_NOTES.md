@@ -103,3 +103,13 @@ save error and long recoverable filenames have explicit interaction regressions.
 Every exclusive create uses a full bounded filename scan, including symlink and
 special-file names, before O_EXCL. A display index that filters those entries
 cannot be used as evidence that a case/NFC/placeholder alias is absent.
+
+Workspace selection is also an authority handoff, not a cancellable content
+read. Once its native call is issued, Dart consumes the terminal root/token
+result even if the old controller is disposed. Handoffs are serialized across
+replacement controllers; pending selection disables writes, navigation and
+recovery/create entry points. A long wait is labelled as still pending, never
+as a successful cancellation. The system folder picker can still cancel before
+activation, and native failure retains the prior capability. Incoming file
+copies wait for the handoff before opening. Ordinary reads retain their bounded
+cancel/retry behavior. No extra token is persisted or accepted by native writes.

@@ -247,10 +247,14 @@ struct ScopedNoteSaveTests {
     // invalidates the original token; a pending write prevents any root switch.
     let authority = WorkspaceWriteAuthority()
     let a = try authority.activate(root)
+    // Failed folder activation must leave the retained Dart capability usable.
+    // Picker cancellation never calls activate; failure occurs before commit.
+    rejects { _ = try authority.activate(sandbox.appendingPathComponent("missing-selected-root")) }
     let lease = try authority.admit(path: a["path"]!, token: a["workspaceToken"]!)
     try lease.validate()
     do { _ = try authority.activate(outside); preconditionFailure("Pending writes must retain their root") }
     catch WorkspaceWriteAuthorityError.busy {}
+    try lease.validate()
     lease.finish()
     lease.finish() // Idempotent completion and deinit must not underflow.
     do {

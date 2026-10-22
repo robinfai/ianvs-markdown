@@ -58,7 +58,10 @@ class _LinefoldPreviewAppState extends State<LinefoldPreviewApp>
   String? _fragment;
   int _fragmentRequest = 0;
   bool get _canStartEditing =>
-      _editor.canBegin && !_controller.busy && !_controller.navigating;
+      _editor.canBegin &&
+      !_controller.busy &&
+      !_controller.navigating &&
+      !_controller.selectingWorkspace;
 
   @override
   void initState() {
@@ -197,6 +200,7 @@ class _LinefoldPreviewAppState extends State<LinefoldPreviewApp>
   }
 
   Future<void> _navigate(FutureOr<void> Function() action) async {
+    if (_controller.selectingWorkspace) return;
     if (await _leaveEditor() && mounted) {
       _fragment = null;
       await action();
@@ -423,7 +427,8 @@ class _LinefoldPreviewAppState extends State<LinefoldPreviewApp>
                         _controller.library.workspaceService != null)
                       PopupMenuButton<String>(
                         tooltip: '切换文件夹',
-                        enabled: !_editor.busy,
+                        enabled:
+                            !_editor.busy && !_controller.selectingWorkspace,
                         icon: const Icon(CupertinoIcons.ellipsis_circle),
                         onSelected: (value) => _navigate(
                           () => _controller.changeWorkspace(
@@ -457,7 +462,7 @@ class _LinefoldPreviewAppState extends State<LinefoldPreviewApp>
                             ? () => _editor.begin(_controller.activePath!)
                             : null,
                       ),
-                    if (_controller.busy)
+                    if (_controller.busy && !_controller.selectingWorkspace)
                       IconButton(
                         tooltip: '取消等待',
                         icon: const Icon(CupertinoIcons.xmark),
@@ -474,7 +479,9 @@ class _LinefoldPreviewAppState extends State<LinefoldPreviewApp>
                     IconButton(
                       tooltip: '打开文件',
                       icon: const Icon(CupertinoIcons.folder_open),
-                      onPressed: _editor.busy ? null : _chooseFiles,
+                      onPressed: _editor.busy || _controller.selectingWorkspace
+                          ? null
+                          : _chooseFiles,
                     ),
                   ],
           ),
@@ -483,7 +490,10 @@ class _LinefoldPreviewAppState extends State<LinefoldPreviewApp>
             child: LayoutBuilder(
               builder: (context, viewport) => Column(
                 children: [
-                  if (_editor.error ?? _controller.error case final error?)
+                  if (_editor.error ??
+                          _controller.error ??
+                          _controller.workspaceHandoffNotice
+                      case final error?)
                     ConstrainedBox(
                       constraints: BoxConstraints(
                         maxHeight: viewport.maxHeight * .24,
@@ -509,14 +519,15 @@ class _LinefoldPreviewAppState extends State<LinefoldPreviewApp>
                                         onPressed: _controller.retry,
                                         child: const Text('重试'),
                                       ),
-                                    IconButton(
-                                      tooltip: '关闭提示',
-                                      icon: const Icon(CupertinoIcons.xmark),
-                                      onPressed: () {
-                                        _editor.error = null;
-                                        _controller.clearError();
-                                      },
-                                    ),
+                                    if (!_controller.selectingWorkspace)
+                                      IconButton(
+                                        tooltip: '关闭提示',
+                                        icon: const Icon(CupertinoIcons.xmark),
+                                        onPressed: () {
+                                          _editor.error = null;
+                                          _controller.clearError();
+                                        },
+                                      ),
                                   ],
                                 ),
                               ],
@@ -526,6 +537,7 @@ class _LinefoldPreviewAppState extends State<LinefoldPreviewApp>
                       ),
                     ),
                   if (_controller.busy ||
+                      _controller.selectingWorkspace ||
                       (_editor.busy && !_editor.awaitingDecision))
                     const LinearProgressIndicator(),
                   if (_editor.recovery case final draft? when !_editor.editing)

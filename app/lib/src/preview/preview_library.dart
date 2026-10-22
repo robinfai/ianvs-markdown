@@ -61,19 +61,36 @@ class PreviewLibrary {
   final AppleWorkspaceService? workspaceService;
   PreviewWorkspace? _workspace;
   int _workspaceGeneration = 0;
-  int _workspaceRequest = 0;
+  // One native authority is shared by the preview bridge. Keep its handoffs
+  // serialized even when a view/controller is disposed and recreated. Once
+  // issued, an activation result must be consumed, not discarded as a read.
+  static Future<void>? _selectionTail;
+  static int _pendingSelections = 0;
+  bool get selectingWorkspace => _pendingSelections != 0;
+
+  Future<T> _selectWorkspace<T>(Future<T> Function() action) {
+    ++_pendingSelections;
+    final next = _selectionTail == null
+        ? Future<T>.sync(action)
+        : _selectionTail!.then((_) => action());
+    _selectionTail = next.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    return next.whenComplete(() {
+      if (--_pendingSelections == 0) _selectionTail = null;
+    });
+  }
 
   PreviewWorkspace? get workspace => _workspace;
   set workspace(PreviewWorkspace? value) {
     _workspace = value;
     ++_workspaceGeneration;
-    ++_workspaceRequest;
   }
 
   // Monotonic even when changing A → B → A, unlike a path equality check.
   int get workspaceGeneration => _workspaceGeneration;
 
-  void invalidateWorkspaceRequests() => ++_workspaceRequest;
   Future<void> _historyWrite = Future.value();
 
   Future<Directory> _root() async => workspace == null
@@ -82,24 +99,25 @@ class PreviewLibrary {
 
   Future<void> useDefaultWorkspace() async {
     if (workspaceService == null) return;
-    final request = ++_workspaceRequest;
-    final result = await PreviewPlatform.channel
-        .invokeMapMethod<String, dynamic>('defaultWorkspace');
-    if (request != _workspaceRequest) return;
-    if (result == null) {
-      throw StateError('The default workspace is unavailable.');
-    }
-    workspace = PreviewWorkspace.fromMap(result);
+    await _selectWorkspace(() async {
+      final result = await PreviewPlatform.channel
+          .invokeMapMethod<String, dynamic>('defaultWorkspace');
+      if (result == null) {
+        throw StateError('The default workspace is unavailable.');
+      }
+      workspace = PreviewWorkspace.fromMap(result);
+    });
   }
 
   Future<bool> chooseWorkspace() async {
     if (workspaceService == null) return false;
-    final request = ++_workspaceRequest;
-    final result = await PreviewPlatform.channel
-        .invokeMapMethod<String, dynamic>('chooseWorkspace');
-    if (request != _workspaceRequest || result == null) return false;
-    workspace = PreviewWorkspace.fromMap(result);
-    return true;
+    return _selectWorkspace(() async {
+      final result = await PreviewPlatform.channel
+          .invokeMapMethod<String, dynamic>('chooseWorkspace');
+      if (result == null) return false;
+      workspace = PreviewWorkspace.fromMap(result);
+      return true;
+    });
   }
 
   Future<Directory> _historyRoot(Directory root) async {
@@ -227,7 +245,9 @@ class PreviewLibrary {
   }
 
   bool get canWrite =>
-      workspaceService != null && workspace?.workspaceToken != null;
+      !selectingWorkspace &&
+      workspaceService != null &&
+      workspace?.workspaceToken != null;
 
   /// Source is never normalized: BOM, CRLF and Unicode are save baselines.
   Future<String> readSource(String path) =>

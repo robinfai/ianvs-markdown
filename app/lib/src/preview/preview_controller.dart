@@ -37,6 +37,12 @@ class PreviewController extends ChangeNotifier {
   bool get _editing => blocksNavigation?.call() == true;
   bool _disposed = false;
   bool _navigating = false;
+  bool _workspaceHandoff = false;
+  final List<String> _pendingIncoming = [];
+  bool get selectingWorkspace =>
+      _workspaceHandoff || library.selectingWorkspace;
+  String? get workspaceHandoffNotice =>
+      selectingWorkspace ? '正在切换文件夹，请等待系统返回结果。完成前暂不能导航、新建或编辑。' : null;
   int _request = 0;
   Object? _refreshToken;
   Future<void>? _refreshFuture;
@@ -46,7 +52,8 @@ class PreviewController extends ChangeNotifier {
 
   String get title => activePath == null ? 'Linefold' : p.basename(activePath!);
   bool get navigating => _navigating;
-  bool get canRetry => _retry != null && !busy;
+  bool get canRetry =>
+      _retry != null && !busy && !selectingWorkspace && !_editing;
 
   void _notify() {
     if (_disposed) return;
@@ -63,7 +70,6 @@ class PreviewController extends ChangeNotifier {
       (scope == null || scope == library.workspaceGeneration);
 
   int _beginIntent() {
-    library.invalidateWorkspaceRequests();
     _refreshToken = null;
     _refreshFuture = null;
     _cloudTimer?.cancel();
@@ -77,19 +83,46 @@ class PreviewController extends ChangeNotifier {
 
   Future<T> _bounded<T>(Future<T> future) => future.timeout(operationTimeout);
 
+  Future<T> _handoffWorkspace<T>(Future<T> Function() action) async {
+    _workspaceHandoff = true;
+    _notify();
+    const waiting = '文件夹切换仍在处理中；请求尚未结束，不能将超时当作取消。请等待系统返回结果。';
+    final timer = Timer(operationTimeout, () {
+      if (!_disposed && _workspaceHandoff) {
+        error = waiting;
+        _notify();
+      }
+    });
+    try {
+      // The native side may already have revoked the previous token. Own this
+      // Future through its terminal result, including after controller disposal.
+      return await action();
+    } finally {
+      timer.cancel();
+      _workspaceHandoff = false;
+      if (error == waiting) error = null;
+      _notify();
+      if (!_disposed && _pendingIncoming.isNotEmpty) {
+        final incoming = List<String>.of(_pendingIncoming);
+        _pendingIncoming.clear();
+        scheduleMicrotask(() => unawaited(receive(incoming)));
+      }
+    }
+  }
+
   Future<void> initialize() async {
+    if (_workspaceHandoff || _editing || _disposed) return;
     final request = _beginIntent();
     error = null;
     _navigating = true;
     try {
-      await _bounded(library.useDefaultWorkspace());
+      await _handoffWorkspace(library.useDefaultWorkspace);
       if (!_current(request)) return;
       final scope = library.workspaceGeneration;
       final recent = await _bounded(library.list());
       if (_current(request, scope)) documents = recent;
     } on Object {
       if (_current(request)) {
-        library.invalidateWorkspaceRequests();
         error = '无法载入最近文档，请重新打开文件。';
         _retry = initialize;
       }
@@ -104,7 +137,7 @@ class PreviewController extends ChangeNotifier {
   }
 
   Future<void> open(String path) async {
-    if (_editing) return;
+    if (_editing || selectingWorkspace || _disposed) return;
     final request = _beginIntent();
     await _open(path, request);
   }
@@ -152,6 +185,10 @@ class PreviewController extends ChangeNotifier {
 
   Future<void> receive(List<String> paths) async {
     if (paths.isEmpty || _disposed) return;
+    if (selectingWorkspace) {
+      _pendingIncoming.addAll(paths);
+      return;
+    }
     if (_editing) {
       reportError('已接收导入副本。请先保存或取消编辑，再从默认文件夹打开。');
       return;
@@ -161,7 +198,7 @@ class PreviewController extends ChangeNotifier {
     busy = true;
     _notify();
     try {
-      await _bounded(library.useDefaultWorkspace());
+      await _handoffWorkspace(library.useDefaultWorkspace);
       if (!_current(request)) return;
       final scope = library.workspaceGeneration;
       final failures = <String>[];
@@ -180,7 +217,6 @@ class PreviewController extends ChangeNotifier {
       if (failures.isNotEmpty) reportError(failures.join('\n'));
     } on Object {
       if (_current(request)) {
-        library.invalidateWorkspaceRequests();
         reportError('无法打开共享文件，请重试。');
         _retry = () => receive(paths);
       }
@@ -195,14 +231,14 @@ class PreviewController extends ChangeNotifier {
   }
 
   Future<void> changeWorkspace({bool useCloud = false}) async {
-    if (_editing) return;
+    if (_editing || selectingWorkspace || _disposed) return;
     final request = _beginIntent();
     _navigating = true;
     _notify();
     try {
       if (useCloud) {
-        await _bounded(library.useDefaultWorkspace());
-      } else if (!await library.chooseWorkspace()) {
+        await _handoffWorkspace(library.useDefaultWorkspace);
+      } else if (!await _handoffWorkspace(library.chooseWorkspace)) {
         return;
       }
       if (!_current(request)) return;
@@ -216,7 +252,6 @@ class PreviewController extends ChangeNotifier {
       await refresh();
     } on Object {
       if (_current(request)) {
-        library.invalidateWorkspaceRequests();
         reportError('无法打开文件夹，请重试。');
         _retry = () => changeWorkspace(useCloud: useCloud);
       }
@@ -256,7 +291,7 @@ class PreviewController extends ChangeNotifier {
   }
 
   Future<void> refresh() {
-    if (_disposed || _navigating) return Future.value();
+    if (_disposed || _navigating || selectingWorkspace) return Future.value();
     sync.scheduleRefresh();
     if (_refreshFuture case final pending?) return pending;
     _cloudTimer?.cancel();
@@ -282,7 +317,7 @@ class PreviewController extends ChangeNotifier {
       // A fallback root may recover only while displaying the library. Changing
       // roots under an active reader must not reinterpret its existing path.
       if (path == null && !_editing && library.workspace?.notice != null) {
-        await _bounded(library.useDefaultWorkspace());
+        await _handoffWorkspace(library.useDefaultWorkspace);
         if (!_current(request) || !identical(_refreshToken, token)) return;
         scope = library.workspaceGeneration;
       }
@@ -331,7 +366,6 @@ class PreviewController extends ChangeNotifier {
       ]);
     } on Object catch (failure) {
       if (!current()) return;
-      library.invalidateWorkspaceRequests();
       error = failure is TimeoutException
           ? '刷新超时，已保留当前内容，请重试。'
           : '无法刷新文档，已保留当前内容，请检查网络或重新选择文件夹。';
@@ -351,16 +385,17 @@ class PreviewController extends ChangeNotifier {
     if (canRetry) await _retry!();
   }
 
-  /// Invalidates Dart results, not native reads or picker side effects.
+  /// Only content reads can be abandoned. A native authority handoff must
+  /// settle first; the system folder picker retains its own real Cancel action.
   void cancelPendingOperation() {
-    if (_editing) return;
+    if (_editing || selectingWorkspace || _disposed) return;
     sync.invalidate();
     _beginIntent();
     _notify();
   }
 
   void showLibrary() {
-    if (_editing) return;
+    if (_editing || selectingWorkspace || _disposed) return;
     _beginIntent();
     activePath = null;
     activeRoot = null;

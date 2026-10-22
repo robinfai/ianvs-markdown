@@ -76,7 +76,7 @@ test-native-attachments: ## Verify scoped native attachment indexing and binary 
 	FLUTTER="$(FLUTTER)" PYTHON="$(PYTHON)" bash app/tool/test_native_attachments.sh
 
 test-ios-preview: test-native-import test-native-guarded-save ## Check iOS reading, quick notes, and native safety
-	cd app && $(FLUTTER) test test/preview_app_test.dart test/preview_library_test.dart test/preview_platform_test.dart test/preview_editor_controller_test.dart test/preview_write_bridge_test.dart test/preview_links_test.dart test/preview_quick_notes_widget_test.dart test/preview_recovery_races_test.dart
+	cd app && $(FLUTTER) test test/preview_app_test.dart test/preview_library_test.dart test/preview_platform_test.dart test/preview_editor_controller_test.dart test/preview_write_bridge_test.dart test/preview_links_test.dart test/preview_quick_notes_widget_test.dart test/preview_recovery_races_test.dart test/preview_workspace_handoff_test.dart
 
 build-ios-preview: ## Build the iOS reader and quick notes for the simulator
 	cd app && $(FLUTTER) build ios --simulator --debug --no-codesign
