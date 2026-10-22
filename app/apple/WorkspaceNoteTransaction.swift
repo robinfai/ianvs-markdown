@@ -675,40 +675,113 @@ final class WorkspaceNoteTransaction {
     return result(record)
   }
 
+  /// Accept only another spelling of this exact authorized root, followed by
+  /// byte-identical planned components. Never resolve the leaf or descendants.
+  /// Internal for synthetic tests; no Flutter arguments can call this helper.
+  func verifyCoordinatedURL(_ observed: URL, scope: WorkspaceFileScope,
+                            relativePath: String, parentDescriptor: Int32) throws {
+    do {
+      try WorkspaceFileScope.withoutMaterialization {
+        guard observed.isFileURL, observed.host == nil || observed.host == "",
+              observed.user == nil, observed.password == nil, observed.port == nil,
+              observed.query == nil, observed.fragment == nil, !observed.hasDirectoryPath,
+              observed.path.hasPrefix("/"), observed.path.utf16.count <= 4096 else {
+          throw Failure("coordinator_redirected")
+        }
+        guard let encodedPath = URLComponents(url: observed, resolvingAgainstBaseURL: false)?.percentEncodedPath,
+              encodedPath.split(separator: "/", omittingEmptySubsequences: false).allSatisfy({
+                guard let component = String($0).removingPercentEncoding else { return false }
+                return component != "." && component != ".."
+              }) else { throw Failure("coordinator_redirected") }
+        let planned = try WorkspaceFileScope.relativeComponents(relativePath)
+        let received = observed.pathComponents
+        guard received.count > planned.count,
+              !received.contains("."), !received.contains(".."),
+              zip(received.suffix(planned.count), planned).allSatisfy({
+                $0.0.utf8.elementsEqual($0.1.utf8)
+              }) else { throw Failure("coordinator_redirected") }
+        var rootSpelling = observed
+        for _ in planned { rootSpelling.deleteLastPathComponent() }
+        // Only ancestors of the root may contain aliases, as at initial scope
+        // authorization. The root itself and every descendant are no-follow.
+        let candidate = try WorkspaceFileScope(rootSpelling)
+        let originalRootIdentity = try scopeIdentity(scope) // Uses the pinned root descriptor.
+        let candidateRootIdentity = try scopeIdentity(candidate)
+        guard candidate.rootURL.path.utf8.elementsEqual(scope.rootURL.path.utf8),
+              candidateRootIdentity == originalRootIdentity else {
+          throw Failure("coordinator_redirected")
+        }
+        let candidateParent = try candidate.parentDescriptor(planned)
+        defer { close(candidateParent) }
+        var original = stat(); var current = stat()
+        guard fstat(parentDescriptor, &original) == 0, fstat(candidateParent, &current) == 0,
+              original.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR),
+              current.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR),
+              Self.identity(original) == Self.identity(current),
+              original.st_flags & UInt32(SF_DATALESS) == 0,
+              current.st_flags & UInt32(SF_DATALESS) == 0 else {
+          throw Failure("coordinator_redirected")
+        }
+        // A missing leaf is valid for the exclusive move/copy destination and
+        // for the old source after a move. A symlink is never a missing leaf.
+        var leaf = stat()
+        if fstatat(candidateParent, planned.last!, &leaf, AT_SYMLINK_NOFOLLOW) == 0 {
+          guard leaf.st_mode & mode_t(S_IFMT) != mode_t(S_IFLNK),
+                leaf.st_flags & UInt32(SF_DATALESS) == 0 else { throw Failure("coordinator_redirected") }
+        } else if errno != ENOENT { throw Failure("coordinator_redirected") }
+        try scope.verifyRootLocation(); try candidate.verifyRootLocation()
+      }
+    } catch { throw Failure("coordinator_redirected") }
+  }
+
   private func coordinate(_ scope: WorkspaceFileScope, path: String, destination: String? = nil, moving: Bool = true,
                           coordinator: NSFileCoordinator = NSFileCoordinator(), body: () throws -> Void) throws {
     let url = scope.rootURL.appendingPathComponent(path)
+    let sourceParent = try WorkspaceFileScope.withoutMaterialization {
+      try Parent(scope: scope, components: WorkspaceFileScope.relativeComponents(path))
+    }
     var coordinationError: NSError?; var outcome: Result<Void, Error> = .failure(Failure("coordination_failed"))
     let deadline = DispatchTime.now() + WorkspaceTextScope.coordinationTimeout
     let timeout = DispatchWorkItem { coordinator.cancel() }
     DispatchQueue.global(qos: .utility).asyncAfter(deadline: deadline, execute: timeout)
     defer { timeout.cancel() }
-    // Avoid provider data materialization even if coordination temporarily moves
-    // execution to another worker thread. Paths from the callback must match.
+    // All callback validation I/O shares the no-materialization policy, even
+    // when Foundation dispatches the callback to another worker thread.
     if let destination {
       let target = scope.rootURL.appendingPathComponent(destination)
+      let targetParent = try WorkspaceFileScope.withoutMaterialization {
+        try Parent(scope: scope, components: WorkspaceFileScope.relativeComponents(destination))
+      }
       coordinator.coordinate(writingItemAt: url, options: moving ? .forMoving : [],
         writingItemAt: target, options: [], error: &coordinationError) { a, b in
         outcome = Result {
-          coordinationObserver?(CoordinationObservation(expectedSource: url, observedSource: a,
-            expectedDestination: target, observedDestination: b, moving: moving,
-            deadlineExpired: DispatchTime.now().uptimeNanoseconds >= deadline.uptimeNanoseconds))
-          guard DispatchTime.now().uptimeNanoseconds < deadline.uptimeNanoseconds,
-                a.standardizedFileURL == url.standardizedFileURL, b.standardizedFileURL == target.standardizedFileURL else {
-            throw Failure("coordinator_redirected")
+          try WorkspaceFileScope.withoutMaterialization {
+            coordinationObserver?(CoordinationObservation(expectedSource: url, observedSource: a,
+              expectedDestination: target, observedDestination: b, moving: moving,
+              deadlineExpired: DispatchTime.now().uptimeNanoseconds >= deadline.uptimeNanoseconds))
+            guard DispatchTime.now().uptimeNanoseconds < deadline.uptimeNanoseconds else { throw Failure("coordinator_redirected") }
+            try verifyCoordinatedURL(a, scope: scope, relativePath: path, parentDescriptor: sourceParent.descriptor)
+            try verifyCoordinatedURL(b, scope: scope, relativePath: destination, parentDescriptor: targetParent.descriptor)
+            guard DispatchTime.now().uptimeNanoseconds < deadline.uptimeNanoseconds else { throw Failure("coordinator_redirected") }
+            try body() // The body still uses only its original pinned authority.
+            try verifyCoordinatedURL(a, scope: scope, relativePath: path, parentDescriptor: sourceParent.descriptor)
+            try verifyCoordinatedURL(b, scope: scope, relativePath: destination, parentDescriptor: targetParent.descriptor)
           }
-          try WorkspaceFileScope.withoutMaterialization(body)
         }
       }
     } else {
       coordinator.coordinate(writingItemAt: url, options: [], error: &coordinationError) { current in
         outcome = Result {
-          coordinationObserver?(CoordinationObservation(expectedSource: url, observedSource: current,
-            expectedDestination: nil, observedDestination: nil, moving: false,
-            deadlineExpired: DispatchTime.now().uptimeNanoseconds >= deadline.uptimeNanoseconds))
-          guard DispatchTime.now().uptimeNanoseconds < deadline.uptimeNanoseconds,
-                current.standardizedFileURL == url.standardizedFileURL else { throw Failure("coordinator_redirected") }
-          try WorkspaceFileScope.withoutMaterialization(body)
+          try WorkspaceFileScope.withoutMaterialization {
+            coordinationObserver?(CoordinationObservation(expectedSource: url, observedSource: current,
+              expectedDestination: nil, observedDestination: nil, moving: false,
+              deadlineExpired: DispatchTime.now().uptimeNanoseconds >= deadline.uptimeNanoseconds))
+            guard DispatchTime.now().uptimeNanoseconds < deadline.uptimeNanoseconds else { throw Failure("coordinator_redirected") }
+            try verifyCoordinatedURL(current, scope: scope, relativePath: path, parentDescriptor: sourceParent.descriptor)
+            guard DispatchTime.now().uptimeNanoseconds < deadline.uptimeNanoseconds else { throw Failure("coordinator_redirected") }
+            try body()
+            try verifyCoordinatedURL(current, scope: scope, relativePath: path, parentDescriptor: sourceParent.descriptor)
+          }
         }
       }
     }

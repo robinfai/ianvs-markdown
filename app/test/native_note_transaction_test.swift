@@ -230,6 +230,7 @@ struct NativeNoteTransactionAcceptance {
     try run("journalDirectoryDurabilityAndPrivacy", journalDirectoryDurabilityAndPrivacy)
     try run("inheritedRecoveryACL", inheritedRecoveryACL)
     try run("recoveryIndependentOfOldReadSet", recoveryIndependentOfOldReadSet)
+    try run("coordinatorRootAliases", coordinatorRootAliases)
     try run("presenterMoveNotifications", presenterMoveNotifications)
     print("PASS: synthetic atomic note transactions, receipts, recovery, races, bounds and privacy")
   }
@@ -960,6 +961,100 @@ struct NativeNoteTransactionAcceptance {
     }
   }
 
+  private static func coordinatorRootAliases() throws {
+    func accepts(_ executor: WorkspaceNoteTransaction, _ observed: URL,
+                 _ scope: WorkspaceFileScope, _ relative: String, _ parent: Int32) -> Bool {
+      do {
+        try executor.verifyCoordinatedURL(observed, scope: scope, relativePath: relative, parentDescriptor: parent)
+        return true
+      } catch { return false }
+    }
+    do {
+      let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let initial = try WorkspaceTextScope(f.root)
+      let alias = f.directory.appendingPathComponent("ancestor-alias", isDirectory: true)
+      try f.manager.createSymbolicLink(at: alias, withDestinationURL: f.directory)
+      var spellings = [initial.rootURL, alias.appendingPathComponent("vault", isDirectory: true)]
+      let canonical = initial.rootURL.pathComponents
+      if canonical.starts(with: ["/", "private", "var"]) {
+        spellings.append(URL(fileURLWithPath: "/var", isDirectory: true)
+          .appendingPathComponent(canonical.dropFirst(3).joined(separator: "/"), isDirectory: true))
+      }
+      for authorized in spellings {
+        let scope = try WorkspaceTextScope(authorized)
+        for path in [f.source, f.destination] {
+          let parent = try scope.parentDescriptor(WorkspaceFileScope.relativeComponents(path)); defer { close(parent) }
+          for callbackRoot in spellings {
+            try require(accepts(executor, callbackRoot.appendingPathComponent(path), scope, path, parent),
+                        "Existing and missing leaves permit both directions of verified root ancestor aliases")
+          }
+        }
+      }
+      let scope = try WorkspaceTextScope(f.root)
+      let parent = try scope.parentDescriptor(WorkspaceFileScope.relativeComponents(f.source)); defer { close(parent) }
+      let base = f.url(f.source)
+      var query = URLComponents(url: base, resolvingAgainstBaseURL: false)!; query.query = "not-authorized"
+      var fragment = URLComponents(url: base, resolvingAgainstBaseURL: false)!; fragment.fragment = "not-authorized"
+      let invalid = [query.url!, fragment.url!, URL(string: "https://example.invalid/notes/Old.md")!,
+        URL(string: "file://localhost" + base.path)!, URL(string: "file://remote.invalid" + base.path)!,
+        URL(string: "file://user:password@localhost" + base.path)!,
+        URL(string: "file://localhost:99" + base.path)!,
+        URL(string: f.root.absoluteString + "notes/../notes/Old.md")!,
+        URL(string: f.root.absoluteString + "notes/%2e%2e/notes/Old.md")!,
+        URL(string: f.root.absoluteString + "./notes/Old.md")!]
+      for callback in invalid {
+        try require(!accepts(executor, callback, scope, f.source, parent), "URI metadata, remote authorities and dot segments are not root aliases")
+      }
+      let composed = "notes/Caf\u{00e9}.md"
+      let decomposed = "notes/Cafe\u{0301}.md"
+      try f.write(composed, Data("synthetic".utf8))
+      try require(!accepts(executor, f.url(decomposed), scope, composed, parent),
+                  "Canonical Unicode equality is not byte-identical planned leaf equality")
+      try require(!accepts(executor, f.url("notes/old.md"), scope, f.source, parent), "Case-only leaf redirects stay rejected")
+      try f.expectOriginals()
+    }
+    for scenario in ["rootSymlink", "parentSymlink", "leafSymlink", "otherRoot", "siblingRoot", "artifact", "parentReplaced", "rootReplaced"] {
+      let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let scope = try WorkspaceTextScope(f.root)
+      let parent = try scope.parentDescriptor(WorkspaceFileScope.relativeComponents(f.source)); defer { close(parent) }
+      var observed = f.url(f.source)
+      if scenario == "rootSymlink" {
+        let link = f.directory.appendingPathComponent("root-link", isDirectory: true)
+        try f.manager.createSymbolicLink(at: link, withDestinationURL: f.root)
+        observed = link.appendingPathComponent(f.source)
+      } else if scenario == "parentSymlink" || scenario == "parentReplaced" {
+        let saved = f.outside.appendingPathComponent("saved-notes", isDirectory: true)
+        try f.manager.moveItem(at: f.url("notes"), to: saved)
+        if scenario == "parentSymlink" { try f.manager.createSymbolicLink(at: f.url("notes"), withDestinationURL: saved) }
+        else { try f.write(f.source, f.originalSource) }
+      } else if scenario == "rootReplaced" {
+        try f.manager.moveItem(at: f.root, to: f.outside.appendingPathComponent("saved-vault", isDirectory: true))
+        try f.write(f.source, f.originalSource)
+      } else if scenario == "leafSymlink" {
+        let saved = f.outside.appendingPathComponent("original.md")
+        try f.manager.moveItem(at: f.url(f.source), to: saved)
+        try f.manager.createSymbolicLink(at: f.url(f.source), withDestinationURL: saved)
+      } else if scenario == "otherRoot" || scenario == "siblingRoot" {
+        let root = scenario == "otherRoot" ? f.outside : f.directory.appendingPathComponent("vault-sibling", isDirectory: true)
+        observed = root.appendingPathComponent(f.source)
+        try f.manager.createDirectory(at: observed.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try f.originalSource.write(to: observed)
+      } else {
+        let originalIdentity = try f.identity(f.source)
+        let request = try f.request(); let prepared = try f.prepare(executor, request)
+        executor.fault = { point in if point == "afterWriteReceipt" { throw InjectedFailure(boundary: point) } }
+        let stopped = try f.invoke(executor, "executeWorkspaceNoteMove", f.command(request, token: prepared["token"]))
+        guard let artifact = (stopped["retainedArtifacts"] as? [[String: Any]])?.first(where: { $0["state"] as? String == "retained" })?["path"] as? String else {
+          throw TestFailure(description: "Synthetic swap must retain the displaced original before redirect testing")
+        }
+        observed = f.url(artifact)
+        try require(try f.identity(artifact) == originalIdentity, "Rejected artifact really is the old authorized inode")
+        try require(try f.identity(f.source) != originalIdentity, "The current planned leaf is the replacement inode")
+      }
+      try require(!accepts(executor, observed, scope, f.source, parent), "Root identity, pinned parent and exact leaf cannot be redirected: \(scenario)")
+    }
+  }
+
   private static func presenterMoveNotifications() throws {
     for scenario in ["success", "renameFailure", "syncFailure"] {
       let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
@@ -988,13 +1083,27 @@ struct NativeNoteTransactionAcceptance {
         // Canonicalization is synthetic diagnostic evidence only, never an
         // executor acceptance check. Do not log paths outside this fixture.
         let canonical = url.resolvingSymlinksInPath().standardizedFileURL
-        guard url.isFileURL,
-              canonical.pathComponents.starts(with: f.root.resolvingSymlinksInPath().standardizedFileURL.pathComponents) else {
+        let canonicalRoot = f.root.resolvingSymlinksInPath().standardizedFileURL.pathComponents
+        let canonicalParent = url.deletingLastPathComponent().resolvingSymlinksInPath().standardizedFileURL.pathComponents
+        guard url.isFileURL, canonicalParent.starts(with: canonicalRoot),
+              let diagnosticScope = try? WorkspaceFileScope(f.root),
+              let expectedParent = try? diagnosticScope.parentDescriptor(
+                Array(canonicalParent.dropFirst(canonicalRoot.count)) + [url.lastPathComponent]) else {
           return "outside-synthetic-root (suppressed)"
+        }
+        defer { close(expectedParent) }
+        let observedParent = open(url.deletingLastPathComponent().path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+        guard observedParent >= 0 else { return "unverified-synthetic-parent (suppressed)" }
+        defer { close(observedParent) }
+        var expected = stat(); var actual = stat()
+        guard fstat(expectedParent, &expected) == 0, fstat(observedParent, &actual) == 0,
+              expected.st_dev == actual.st_dev, expected.st_ino == actual.st_ino else {
+          return "different-synthetic-parent (suppressed)"
         }
         var attributes = stat()
         let metadata: String
         if lstat(url.path, &attributes) == 0 {
+          guard attributes.st_mode & mode_t(S_IFMT) != mode_t(S_IFLNK) else { return "synthetic-leaf-symlink (canonical suppressed)" }
           metadata = "dev:ino=\(attributes.st_dev):\(attributes.st_ino) revision=\(WorkspaceFileScope.revision(attributes)) " +
             "mode=\(attributes.st_mode) flags=\(attributes.st_flags)"
         } else {
