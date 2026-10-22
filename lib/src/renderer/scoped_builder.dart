@@ -9,6 +9,8 @@ import 'package:markdown/markdown.dart' as md;
 
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
+import 'inline_control_height_scope.dart';
+
 const Set<String> _standardBlockTags = <String>{
   'p',
   'h1',
@@ -1072,7 +1074,11 @@ class ScopedMarkdownBuilder implements md.NodeVisitor {
             fontSize: baseStyle.fontSize ?? styleSheet.p?.fontSize,
             height: baseStyle.height ?? styleSheet.p?.height,
             leading: 0,
-            forceStrutHeight: true,
+            // Reference definitions need the full wrapped control height.
+            // Editable paragraphs keep their matching fixed-strut geometry.
+            forceStrutHeight: !MarkdownInlineControlHeightScope.enabledOf(
+              delegate.context,
+            ),
           )
         : null;
     if (selectable) {

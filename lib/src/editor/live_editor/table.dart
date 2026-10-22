@@ -865,7 +865,12 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                 key: _tableGeometryKey,
                 defaultVerticalAlignment: TableCellVerticalAlignment.middle,
                 defaultColumnWidth: const IntrinsicColumnWidth(),
-                columnWidths: _obsidianTableColumnWidths(_model),
+                columnWidths: _obsidianTableColumnWidths(
+                  _model,
+                  context,
+                  syntaxTheme,
+                  widget.linkReferenceLabels,
+                ),
                 border: TableBorder.all(color: widget.colors.borderSoft),
                 children: [
                   for (final row in _model.rows)
@@ -1441,50 +1446,202 @@ enum _EditableTableAlignment { none, left, center, right }
 
 Map<int, TableColumnWidth> _obsidianTableColumnWidths(
   _EditableTableModel model,
+  BuildContext context,
+  IanvsMarkdownSyntaxTheme syntaxTheme,
+  Set<String> referenceLabels,
 ) {
   if (model.rows.isEmpty || model.rows.first.isEmpty) {
     return const <int, TableColumnWidth>{};
   }
   final columnCount = model.rows.first.length;
-  final contentScores = List<int>.filled(columnCount, 1);
-  for (final row in model.rows) {
-    for (var column = 0; column < row.length; column += 1) {
-      final score = _tableCellDisplayScore(row[column].text);
-      if (score > contentScores[column]) contentScores[column] = score;
-    }
-  }
-  final largestScore = contentScores.reduce((left, right) {
-    return left > right ? left : right;
-  });
-  final flexibleThreshold = largestScore * .8;
+  final textScaler = MediaQuery.textScalerOf(context);
+  final theme = Theme.of(context);
+  final baseStyle = (theme.useMaterial3
+      ? theme.textTheme.bodyLarge
+      : theme.textTheme.titleMedium)!;
+  final spans = <List<TextSpan>>[
+    for (final row in model.rows)
+      <TextSpan>[
+        for (final cell in row)
+          // Use the inactive cell projection, including hidden reference
+          // syntax, emphasis, font metrics and the host's text scaling.
+          buildMarkdownSourceTextSpan(
+            TextEditingValue(text: cell.text),
+            style: baseStyle.copyWith(
+              fontSize: 13.5,
+              height: 1.35,
+              fontWeight: cell.isHeader ? FontWeight.w600 : FontWeight.w400,
+            ),
+            syntaxTheme: syntaxTheme,
+            withComposing: false,
+            hideInactiveInlineMarkers: true,
+            hideInactiveEscapeMarkers: true,
+            linkReferenceLabels: referenceLabels,
+          ),
+      ],
+  ];
+  final layout = _TableWrapLayout(
+    spans,
+    Directionality.of(context),
+    textScaler,
+  );
   return <int, TableColumnWidth>{
     for (var column = 0; column < columnCount; column += 1)
-      column: _WrappingIntrinsicColumnWidth(
-        columnCount: columnCount,
-        flex: contentScores[column] >= flexibleThreshold ? 1 : null,
-      ),
+      column: _WrappingIntrinsicColumnWidth(layout, column),
   };
 }
 
-final class _WrappingIntrinsicColumnWidth extends IntrinsicColumnWidth {
-  const _WrappingIntrinsicColumnWidth({required this.columnCount, super.flex});
+/// Solve all columns together: reducing an individual cell's line count only
+/// helps the table if it also reduces the tallest cell in that row. Header
+/// wrapping is measured exactly like body wrapping, with an extra readability
+/// weight. A bounded search and per-width cache keep layout work predictable.
+final class _TableWrapLayout {
+  _TableWrapLayout(this.rows, this.direction, this.textScaler);
 
-  final int columnCount;
+  final List<List<TextSpan>> rows;
+  final TextDirection direction;
+  final TextScaler textScaler;
+  double? _containerWidth;
+  List<double>? _widths;
 
-  @override
-  double minIntrinsicWidth(Iterable<RenderBox> cells, double containerWidth) {
-    // Long tokens can exceed the document width. Let them wrap so columns stay
-    // inside the table's painted and interactive bounds, while retaining their
-    // content-based preferred widths and flex allocation.
-    return math.min(
-      super.minIntrinsicWidth(cells, containerWidth),
-      containerWidth / columnCount,
+  List<double> widths(double available) {
+    if (_containerWidth == available && _widths != null) return _widths!;
+    final count = rows.first.length;
+    final painter = TextPainter(
+      textDirection: direction,
+      textScaler: textScaler,
     );
+    try {
+      final maximums = List<double>.filled(count, 0);
+      final totals = List<double>.filled(count, 0);
+      for (final row in rows) {
+        for (var column = 0; column < count; column++) {
+          painter.text = row[column];
+          painter.layout();
+          // Match 20 px cell padding plus the 1.5 px cursor and 1 px gap.
+          final width = painter.width + 22.5;
+          maximums[column] = math.max(maximums[column], width);
+          totals[column] += width;
+        }
+      }
+      if (!available.isFinite) return maximums;
+      final floor = math.min(22.5 + textScaler.scale(27), available / count);
+      final minimums = [for (final width in maximums) math.min(width, floor)];
+      final remaining = available - minimums.reduce((a, b) => a + b);
+      final weights = <double>[
+        for (var column = 0; column < count; column++)
+          math.sqrt(maximums[column] * totals[column] / rows.length),
+      ];
+      final totalWeight = weights.reduce((a, b) => a + b);
+      final widths = <double>[
+        for (var column = 0; column < count; column++)
+          minimums[column] + remaining * weights[column] / totalWeight,
+      ];
+      final caches = List.generate(count, (_) => <double, List<double>>{});
+      List<double> heights(int column, double width) =>
+          caches[column].putIfAbsent(width, () {
+            final result = <double>[];
+            for (final row in rows) {
+              painter.text = row[column];
+              painter.layout(maxWidth: math.max(0, width - 22.5));
+              result.add(math.max(32.0, painter.height + 14));
+            }
+            return result;
+          });
+      double score(List<List<double>> columns) {
+        var result = 0.0;
+        for (var row = 0; row < rows.length; row++) {
+          var tallest = 0.0;
+          var total = 0.0;
+          for (final column in columns) {
+            tallest = math.max(tallest, column[row]);
+            total += column[row];
+          }
+          result += tallest * (row == 0 ? 1.5 : 1);
+          // Break equal row-height ties by avoiding needless cell wrapping.
+          result += total * .01 / count;
+        }
+        return result;
+      }
+
+      var current = [for (var c = 0; c < count; c++) heights(c, widths[c])];
+      var currentScore = score(current);
+      // Equal distribution is another feasible starting point. Compare its
+      // actual wrapped rows instead of assuming the length-based seed wins.
+      final equal = <double>[
+        for (var c = 0; c < count; c++) minimums[c] + remaining / count,
+      ];
+      final equalHeights = [
+        for (var c = 0; c < count; c++) heights(c, equal[c]),
+      ];
+      final equalScore = score(equalHeights);
+      if (equalScore < currentScore - .01) {
+        widths.setAll(0, equal);
+        current = equalHeights;
+        currentScore = equalScore;
+      }
+      // Each transfer preserves total width. Only accept improvements to the
+      // whole table; do not independently widen every long cell.
+      for (final fraction in [.08, .04, .02, .01]) {
+        final step = math.max(2.0, available * fraction);
+        for (var pass = 0; pass < 6; pass++) {
+          var bestScore = currentScore;
+          var donor = -1;
+          var receiver = -1;
+          final narrower = <int, List<double>>{};
+          final wider = <int, List<double>>{};
+          for (var c = 0; c < count; c++) {
+            if (widths[c] - step >= minimums[c]) {
+              narrower[c] = heights(c, widths[c] - step);
+            }
+            if (widths[c] < maximums[c]) {
+              wider[c] = heights(c, widths[c] + step);
+            }
+          }
+          for (final from in narrower.keys) {
+            for (final to in wider.keys) {
+              if (from == to) continue;
+              final trial = List<List<double>>.of(current)
+                ..[from] = narrower[from]!
+                ..[to] = wider[to]!;
+              final trialScore = score(trial);
+              if (trialScore < bestScore - .01) {
+                bestScore = trialScore;
+                donor = from;
+                receiver = to;
+              }
+            }
+          }
+          if (donor < 0) break;
+          widths[donor] -= step;
+          widths[receiver] += step;
+          current = List<List<double>>.of(current)
+            ..[donor] = narrower[donor]!
+            ..[receiver] = wider[receiver]!;
+          currentScore = bestScore;
+        }
+      }
+      _containerWidth = available;
+      return _widths = widths;
+    } finally {
+      painter.dispose();
+    }
   }
 }
 
-int _tableCellDisplayScore(String source) {
-  return _tableCellDisplayText(source).runes.length;
+final class _WrappingIntrinsicColumnWidth extends IntrinsicColumnWidth {
+  const _WrappingIntrinsicColumnWidth(this.layout, this.column);
+
+  final _TableWrapLayout layout;
+  final int column;
+
+  @override
+  double maxIntrinsicWidth(Iterable<RenderBox> cells, double containerWidth) =>
+      layout.widths(containerWidth)[column];
+
+  @override
+  double minIntrinsicWidth(Iterable<RenderBox> cells, double containerWidth) =>
+      maxIntrinsicWidth(cells, containerWidth);
 }
 
 String _tableCellDisplayText(String source) {
