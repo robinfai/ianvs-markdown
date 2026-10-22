@@ -12,7 +12,7 @@ conventions with a user-selected black workspace sidebar.
 | --- | --- | --- |
 | Main process and renderer shell | Flutter macOS runner + `EditorShell` | Native file access stays behind services instead of entering editor widgets. |
 | Open-file tabs | `WorkspaceController` + `DocumentSession` | Every tab owns source, selection, history, mode, and scroll state. |
-| Folder sidebar | `WorkspaceSidebar` + `FileBrowserController` | Virtualized visible rows; lazily cached directories form the incremental search index. No database is required. |
+| Folder sidebar | `WorkspaceSidebar` + `FileBrowserController` | Virtualized visible rows consume the session-owned `WorkspaceIndex` catalog; tree preferences remain separate. No database is required. |
 | Outline sidebar | `FloatingOutline` | A toggleable right-hand inspector participates in layout so it cannot cover document content. The existing class name is retained. |
 | Editor modes | `IanvsMarkdownEditorMode` | Live Preview, Source, and Read all share one exact Markdown source string. |
 | Window/session state | `WorkspaceSessionStore` | Open tabs, active tab, layout visibility, sidebar width, per-workspace browser preferences, favorites, and unsaved source are recovered after restart. |
@@ -239,3 +239,64 @@ and exposes local storage honestly; regular builds retain the shared container.
 continues through individual batch failures. `PreviewPlatform` serializes
 native queue drains. Tests cover real file copies, queue ordering, recovery,
 same-named documents, bad input, and narrow/large-text reading layouts.
+
+## Workspace source search (P1c)
+
+`WorkspaceController` owns one `WorkspaceIndex`. The file tree/path-name search
+and `WorkspaceSearchController` share its root-relative metadata snapshots and
+per-directory singleflight requests. The browser owns view preferences and
+watcher hints, not another filesystem database. Simultaneous refreshes coalesce
+and a refresh arriving during enumeration is replayed; incomplete/error listings
+are never evidence that an old subtree was deleted. Each catalog revision carries
+its affected directory paths; the tree applies only changed snapshots, rather
+than rebuilding unrelated visible entries for every scanned sibling.
+
+Search has a separate sidebar action and Command-Shift-F / Control-Shift-F. It
+matches literal Markdown source (including front matter, code and destinations),
+not rendered text or regex. In-document Find and workspace search share
+`LiteralSourceMatcher`: Unicode simple case folding, no normalization, UTF-16
+ranges, non-overlapping matches and scalar-safe chunk boundaries.
+
+Every open session supplies an overlay, even a clean-but-conflicted buffer.
+Listeners compare text rather than the dirty flag, so successive dirty edits,
+undo, reload and save races remain current without cursor-triggered indexing.
+An old save baseline never replaces newer input. Root epochs, query generations,
+metadata revisions and native disk stamps discard obsolete work. Result clicks
+recheck their revision, then use the existing `openPath`/session and compare the
+opened text exactly before temporarily showing the existing Source Find surface.
+Search never saves, reloads, or replaces source. A standalone-file grant searches
+only open buffers and never enumerates a parent folder.
+
+`AppleWorkspaceIndexSource` uses new native scoped metadata/local-text channels.
+`WorkspaceFileScope` shares pinned-root/no-follow descriptor safety with image
+attachments while `WorkspaceTextScope` has a separate Markdown allow-list and
+never downloads or coordinates cloud documents. It turns materialization off
+for the worker thread, rejects dataless files, bounds byte reads and checks the
+file descriptor and rooted path identity before/after reading. There is no Dart
+absolute-path `File` read fallback. Image policy/cache is unchanged and separate.
+
+Bounds: 5 MiB per disk source; 32 MiB UTF-16 body LRU (not an RSS claim); at most
+two Dart body reads and one native search queue; 50,000 total catalog entries;
+64 directory levels; native enumeration caps of 50,000 returned/100,000 visited
+entries and a one-second progress deadline; 64 Ki UTF-16 literal query budget.
+A syscall already in progress is not claimed to be forcibly cancellable. Source
+matching yields between 16 Ki windows and directory traversal periodically
+yields. The first 500 snippets are displayed, but scanning/counting continues;
+there is no cumulative body-byte limit silently hiding later documents. Snippets
+are bounded separately and do not retain full document bodies.
+
+Offline, denied, oversized, changed, invalid, missing and incomplete sources are
+visible separately from result display limits. Cancellation is visibly incomplete.
+Search/refresh reconciles metadata (two-second reuse window for overlapping
+consumers); loaded tree watchers and iCloud notifications are only hints. Manual
+iOS providers are not claimed to have real-time or complete watchers. The shared
+source implementation is included in the iOS host, but P1c exposes its search UI only in
+the desktop editor; the iOS reading library is not yet a full-workspace search UI.
+
+Synthetic Dart tests cover 1k/10k flat catalogs and sibling directories, exact IO
+and consumer snapshot-application counts, partial deep trees, bounded cache and
+concurrency, live buffer/save conflicts, stale epochs/revisions, partial coverage,
+Unicode windows, and navigation. They are not measured end-user latency, memory
+or Apple provider performance. Native synthetic filesystem tests, macOS build,
+and unsigned iOS build are CI gates. Real sandbox/iCloud/Files behavior and
+profile performance still need Apple-device acceptance.

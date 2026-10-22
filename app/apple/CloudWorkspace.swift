@@ -15,6 +15,7 @@ final class CloudWorkspace {
   static let extensions: Set<String> = ["md", "markdown", "mdown", "mkd", "txt"]
   private let queue = DispatchQueue(label: "work.ianvs.linefold.workspace", qos: .userInitiated)
   private let attachmentQueue = DispatchQueue(label: "work.ianvs.linefold.attachments", qos: .userInitiated)
+  private let searchQueue = DispatchQueue(label: "work.ianvs.linefold.search", qos: .utility)
   private var channel: FlutterMethodChannel?
   private var query: NSMetadataQuery?
   private var observers: [NSObjectProtocol] = []
@@ -41,11 +42,14 @@ final class CloudWorkspace {
       let arguments = call.arguments as? [String: Any] ?? [:]
       let method = call.method
       guard ["defaultDirectory", "listDirectory", "readDocument", "readDocumentBytes", "writeDocument", "writeDocumentGuarded",
-             "listAttachments", "readAttachmentBytes", "normalizeAttachmentPaths"].contains(method) else {
+             "listAttachments", "readAttachmentBytes", "normalizeAttachmentPaths",
+             "listWorkspaceDirectory", "readWorkspaceTextBytes"].contains(method) else {
         result(FlutterMethodNotImplemented)
         return
       }
-      let workQueue = method == "listAttachments" || method == "readAttachmentBytes" ? self.attachmentQueue : self.queue
+      let isSearch = method == "listWorkspaceDirectory" || method == "readWorkspaceTextBytes"
+      let isAttachment = method == "listAttachments" || method == "readAttachmentBytes"
+      let workQueue = isSearch ? self.searchQueue : (isAttachment ? self.attachmentQueue : self.queue)
       workQueue.async {
         do {
           let value: Any
@@ -55,16 +59,28 @@ final class CloudWorkspace {
             value = try self.defaultDirectory().path
           } else {
             guard let path = arguments["path"] as? String, path.hasPrefix("/") else {
-              if method == "listAttachments" || method == "readAttachmentBytes" {
+              if isAttachment || isSearch {
                 throw AttachmentError.invalid
               }
               throw WorkspaceError.invalidPath
             }
-            if (method == "listAttachments" || method == "readAttachmentBytes") && path.contains("\0") {
+            if (isAttachment || isSearch) && path.contains("\0") {
               throw AttachmentError.invalid
             }
             let url = URL(fileURLWithPath: path)
             switch method {
+            case "listWorkspaceDirectory":
+              guard let relativePath = arguments["relativePath"] as? String else { throw AttachmentError.invalid }
+              value = try Self.listWorkspaceDirectory(url, relativePath: relativePath)
+            case "readWorkspaceTextBytes":
+              guard let relativePath = arguments["relativePath"] as? String,
+                    let number = arguments["maximumBytes"] as? NSNumber,
+                    CFGetTypeID(number) != CFBooleanGetTypeID(),
+                    let maximumBytes = arguments["maximumBytes"] as? Int else {
+                throw AttachmentError.invalid
+              }
+              let contents = try Self.readWorkspaceTextBytes(url, relativePath: relativePath, maximumBytes: maximumBytes)
+              value = ["bytes": FlutterStandardTypedData(bytes: contents.bytes), "revision": contents.revision]
             case "listAttachments":
               value = try Self.listAttachments(url)
             case "readAttachmentBytes":
@@ -331,10 +347,28 @@ enum WorkspaceError: LocalizedError {
   }
 }
 
-// Attachment IO deliberately does not reuse the text reader. A vault root is
-// the authority, not a concatenated absolute image URL; every component below
-// that root is opened relative to a pinned directory descriptor without links.
+// Automatic attachment and search IO never reuse the downloading document
+// reader. The explicit root is the authority, not a concatenated absolute file
+// URL; every descendant is opened relative to a pinned descriptor without links.
 extension CloudWorkspace {
+  static func listWorkspaceDirectory(_ root: URL, relativePath: String) throws -> [String: Any] {
+    do {
+      return try WorkspaceFileScope.withoutMaterialization {
+        try WorkspaceTextScope(root).listDirectory(relativePath: relativePath)
+      }
+    } catch { throw AttachmentError.classify(error) }
+  }
+
+  static func readWorkspaceTextBytes(
+    _ root: URL, relativePath: String, maximumBytes: Int = WorkspaceTextScope.maximumTextBytes
+  ) throws -> WorkspaceTextBytes {
+    do {
+      return try WorkspaceFileScope.withoutMaterialization {
+        try WorkspaceTextScope(root).readText(relativePath: relativePath, maximumBytes: maximumBytes)
+      }
+    } catch { throw AttachmentError.classify(error) }
+  }
+
   static func normalizeAttachmentPaths(_ value: Any?) throws -> [String] {
     guard let paths = value as? [String], paths.count <= 32,
           paths.allSatisfy({ $0.utf16.count <= 4096 }) else { throw AttachmentError.invalid }
@@ -422,15 +456,16 @@ enum AttachmentError: LocalizedError, Equatable {
   }
 }
 
-/// Internal to the native bridge, also exercised by the synthetic macOS tests.
-final class AttachmentScope {
-  static let imageExtensions: Set<String> = ["png", "jpg", "jpeg", "gif", "webp", "bmp"]
-  static let maximumImageBytes = 32 * 1024 * 1024
-  static let maximumSettingsBytes = 64 * 1024
-  static let maximumEntries = 10_000
-  static let maximumVisitedEntries = 50_000
-  static let maximumDepth = 64
-  static let coordinationTimeout: TimeInterval = 5
+struct WorkspaceTextBytes {
+  let bytes: Data
+  let revision: String
+}
+
+/// Shared descriptor authority, not a document/image policy. Only the selected
+/// root is opened by absolute path; descendants always use no-follow openat.
+class WorkspaceFileScope {
+  static let maximumPathDepth = 64
+  static let readTimeout: TimeInterval = 5
 
   /// Apple TN3150: do not implicitly fetch dataless files, even when eviction
   /// races a prior metadata check. Restore the worker thread's original policy.
@@ -443,7 +478,7 @@ final class AttachmentScope {
     return try body()
   }
   let rootURL: URL
-  private let rootDescriptor: Int32
+  fileprivate let rootDescriptor: Int32
   private let identity: stat
 
   init(_ root: URL) throws {
@@ -474,28 +509,36 @@ final class AttachmentScope {
 
   deinit { close(rootDescriptor) }
 
-  static func components(_ path: String) throws -> [String] {
+  static func relativeComponents(_ path: String) throws -> [String] {
     guard !path.isEmpty, path.utf16.count <= 4096, !path.hasPrefix("/"),
           !path.contains("\\"), !path.unicodeScalars.contains(where: { $0.value < 32 }), !path.contains(":") else {
       throw AttachmentError.invalid
     }
     let components = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
-    guard components.count <= maximumDepth + 1,
+    guard components.count <= maximumPathDepth + 1,
           components.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else {
-      throw AttachmentError.invalid
-    }
-    if path == ".obsidian/app.json" { return components }
-    guard !components.contains(where: { $0.hasPrefix(".") }),
-          imageExtensions.contains((path as NSString).pathExtension.lowercased()) else {
       throw AttachmentError.invalid
     }
     return components
   }
 
-  private func parentDescriptor(_ components: [String]) throws -> Int32 {
+  func parentDescriptor(_ components: [String]) throws -> Int32 {
+    guard try Self.relativeComponents(components.joined(separator: "/")) == components else {
+      throw AttachmentError.invalid
+    }
+    return try directoryDescriptor(Array(components.dropLast()))
+  }
+
+  func directoryDescriptor(_ components: [String]) throws -> Int32 {
+    guard components.count <= Self.maximumPathDepth else { throw AttachmentError.invalid }
+    if !components.isEmpty {
+      guard try Self.relativeComponents(components.joined(separator: "/")) == components else {
+        throw AttachmentError.invalid
+      }
+    }
     var current = dup(rootDescriptor)
     guard current >= 0 else { throw AttachmentError.posix() }
-    for name in components.dropLast() {
+    for name in components {
       let next = openat(current, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
       let failure = errno
       close(current)
@@ -505,7 +548,7 @@ final class AttachmentScope {
     return current
   }
 
-  private func verifyRootLocation() throws {
+  func verifyRootLocation() throws {
     let descriptor = open(rootURL.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
     guard descriptor >= 0 else { throw AttachmentError.posix() }
     defer { close(descriptor) }
@@ -514,6 +557,104 @@ final class AttachmentScope {
     guard current.st_dev == identity.st_dev, current.st_ino == identity.st_ino else {
       throw AttachmentError.invalid
     }
+  }
+
+  func isPlaceholder(_ components: [String]) throws -> Bool {
+    let parent = try parentDescriptor(components)
+    defer { close(parent) }
+    let name = components.last!
+    var attributes = stat()
+    if fstatat(parent, name, &attributes, AT_SYMLINK_NOFOLLOW) == 0 {
+      guard attributes.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG) else { throw AttachmentError.invalid }
+      return attributes.st_flags & UInt32(SF_DATALESS) != 0
+    }
+    guard errno == ENOENT else { throw AttachmentError.posix() }
+    guard fstatat(parent, ".\(name).icloud", &attributes, AT_SYMLINK_NOFOLLOW) == 0 else {
+      throw AttachmentError.posix()
+    }
+    guard attributes.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG) else { throw AttachmentError.invalid }
+    return true
+  }
+
+  static func revision(_ attributes: stat) -> String {
+    "\(attributes.st_dev):\(attributes.st_ino):\(attributes.st_size):" +
+      "\(attributes.st_mtimespec.tv_sec):\(attributes.st_mtimespec.tv_nsec):" +
+      "\(attributes.st_ctimespec.tv_sec):\(attributes.st_ctimespec.tv_nsec)"
+  }
+
+  /// Both consumers use this descriptor-only byte reader. The image policy can
+  /// request materialization before it gets here; search must never do so.
+  func readLocalBytes(components: [String], maximumBytes: Int, verifyRevision: Bool) throws -> WorkspaceTextBytes {
+    guard maximumBytes > 0, !components.isEmpty else { throw AttachmentError.invalid }
+    try verifyRootLocation()
+    let parent = try parentDescriptor(components)
+    defer { close(parent) }
+    let descriptor = openat(parent, components.last!, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
+    guard descriptor >= 0 else { throw AttachmentError.posix() }
+    defer { close(descriptor) }
+    var attributes = stat()
+    guard fstat(descriptor, &attributes) == 0 else { throw AttachmentError.posix() }
+    guard attributes.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG) else { throw AttachmentError.invalid }
+    guard attributes.st_flags & UInt32(SF_DATALESS) == 0 else { throw AttachmentError.offline }
+    guard attributes.st_size >= 0, attributes.st_size <= Int64(maximumBytes) else { throw AttachmentError.tooLarge }
+    let deadline = DispatchTime.now().uptimeNanoseconds + UInt64(Self.readTimeout * 1_000_000_000)
+    var bytes = Data()
+    var chunk = [UInt8](repeating: 0, count: 64 * 1024)
+    while true {
+      guard DispatchTime.now().uptimeNanoseconds < deadline else { throw AttachmentError.unavailable }
+      let requested = min(chunk.count, maximumBytes - bytes.count + 1)
+      let count = chunk.withUnsafeMutableBytes { Darwin.read(descriptor, $0.baseAddress!, requested) }
+      if count < 0 {
+        if errno == EINTR { continue }
+        throw AttachmentError.posix()
+      }
+      if count == 0 { break }
+      guard bytes.count + count <= maximumBytes else { throw AttachmentError.tooLarge }
+      bytes.append(contentsOf: chunk.prefix(count))
+    }
+    if verifyRevision {
+      try verifyReadRevision(descriptor: descriptor, components: components, original: attributes, byteCount: bytes.count)
+    }
+    return WorkspaceTextBytes(bytes: bytes, revision: Self.revision(attributes))
+  }
+
+  /// Check the opened file AND a fresh walk from the pinned root. fstat alone
+  /// would miss an atomic replacement of the leaf or one of its parents.
+  func verifyReadRevision(descriptor: Int32, components: [String], original: stat, byteCount: Int) throws {
+    try verifyRootLocation()
+    var after = stat()
+    guard fstat(descriptor, &after) == 0 else { throw AttachmentError.posix() }
+    let parent = try parentDescriptor(components)
+    defer { close(parent) }
+    var current = stat()
+    guard fstatat(parent, components.last!, &current, AT_SYMLINK_NOFOLLOW) == 0 else { throw AttachmentError.posix() }
+    guard current.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG) else { throw AttachmentError.invalid }
+    guard after.st_flags & UInt32(SF_DATALESS) == 0, current.st_flags & UInt32(SF_DATALESS) == 0 else {
+      throw AttachmentError.offline
+    }
+    guard Self.revision(original) == Self.revision(after), Self.revision(original) == Self.revision(current),
+          Int64(byteCount) == original.st_size else { throw AttachmentError.unavailable }
+  }
+}
+
+/// Internal to the native bridge, also exercised by the synthetic macOS tests.
+final class AttachmentScope: WorkspaceFileScope {
+  static let imageExtensions: Set<String> = ["png", "jpg", "jpeg", "gif", "webp", "bmp"]
+  static let maximumImageBytes = 32 * 1024 * 1024
+  static let maximumSettingsBytes = 64 * 1024
+  static let maximumEntries = 10_000
+  static let maximumVisitedEntries = 50_000
+  static let maximumDepth = 64
+  static let coordinationTimeout: TimeInterval = 5
+
+  static func components(_ path: String) throws -> [String] {
+    let components = try relativeComponents(path)
+    if path == ".obsidian/app.json" { return components }
+    guard !components.contains(where: { $0.hasPrefix(".") }),
+          imageExtensions.contains((path as NSString).pathExtension.lowercased()) else {
+      throw AttachmentError.invalid
+    }
+    return components
   }
 
   /// Descriptor-based, metadata-only enumeration: no image/config bytes, file
@@ -590,9 +731,7 @@ final class AttachmentScope {
           relativePath: relativePath,
           size: placeholder ? 0 : Int64(attributes.st_size),
           modified: Int64(attributes.st_mtimespec.tv_sec) * 1000 + Int64(attributes.st_mtimespec.tv_nsec) / 1_000_000,
-          revision: "\(attributes.st_dev):\(attributes.st_ino):\(attributes.st_size):" +
-            "\(attributes.st_mtimespec.tv_sec):\(attributes.st_mtimespec.tv_nsec):" +
-            "\(attributes.st_ctimespec.tv_sec):\(attributes.st_ctimespec.tv_nsec)",
+          revision: Self.revision(attributes),
           placeholder: placeholder
         )
         guard entries.count <= Self.maximumEntries else { throw AttachmentError.indexLimit }
@@ -610,23 +749,6 @@ final class AttachmentScope {
         "revision": entry.revision,
       ]
     }
-  }
-
-  private func isPlaceholder(_ components: [String]) throws -> Bool {
-    let parent = try parentDescriptor(components)
-    defer { close(parent) }
-    let name = components.last!
-    var attributes = stat()
-    if fstatat(parent, name, &attributes, AT_SYMLINK_NOFOLLOW) == 0 {
-      guard attributes.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG) else { throw AttachmentError.invalid }
-      return attributes.st_flags & UInt32(SF_DATALESS) != 0
-    }
-    guard errno == ENOENT else { throw AttachmentError.posix() }
-    guard fstatat(parent, ".\(name).icloud", &attributes, AT_SYMLINK_NOFOLLOW) == 0 else {
-      throw AttachmentError.posix()
-    }
-    guard attributes.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG) else { throw AttachmentError.invalid }
-    return true
   }
 
   func read(relativePath: String, maximumBytes: Int) throws -> Data {
@@ -681,31 +803,150 @@ final class AttachmentScope {
     let limit = min(maximumBytes, hardLimit)
     let expected = rootURL.appendingPathComponent(relativePath)
     guard coordinated.isFileURL, Data(coordinated.path.utf8) == Data(expected.path.utf8) else { throw AttachmentError.invalid }
-    try verifyRootLocation()
-    let parent = try parentDescriptor(components)
-    defer { close(parent) }
-    let descriptor = openat(parent, components.last!, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
-    guard descriptor >= 0 else { throw AttachmentError.posix() }
-    defer { close(descriptor) }
-    var attributes = stat()
-    guard fstat(descriptor, &attributes) == 0 else { throw AttachmentError.posix() }
-    guard attributes.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG) else { throw AttachmentError.invalid }
-    guard attributes.st_flags & UInt32(SF_DATALESS) == 0 else { throw AttachmentError.offline }
-    guard attributes.st_size <= Int64(limit) else { throw AttachmentError.tooLarge }
-    let deadline = DispatchTime.now().uptimeNanoseconds + UInt64(Self.coordinationTimeout * 1_000_000_000)
-    var bytes = Data()
-    var chunk = [UInt8](repeating: 0, count: 64 * 1024)
-    while true {
-      guard DispatchTime.now().uptimeNanoseconds < deadline else { throw AttachmentError.unavailable }
-      let requested = min(chunk.count, limit - bytes.count + 1)
-      let count = chunk.withUnsafeMutableBytes { Darwin.read(descriptor, $0.baseAddress!, requested) }
-      if count < 0 {
-        if errno == EINTR { continue }
-        throw AttachmentError.posix()
-      }
-      if count == 0 { return bytes }
-      guard bytes.count + count <= limit else { throw AttachmentError.tooLarge }
-      bytes.append(contentsOf: chunk.prefix(count))
+    return try readLocalBytes(components: components, maximumBytes: limit, verifyRevision: false).bytes
+  }
+}
+
+/// Search has a separate allow-list and never requests iCloud materialization.
+/// It shares authority and byte IO with images, not their download/config policy.
+final class WorkspaceTextScope: WorkspaceFileScope {
+  static let maximumTextBytes = 5 * 1024 * 1024
+  static let maximumDirectoryEntries = 50_000
+  static let maximumVisitedDirectoryEntries = 100_000
+  static let directoryTimeout: TimeInterval = 1
+
+  static func textComponents(_ path: String, directory: Bool) throws -> [String] {
+    if directory && path.isEmpty { return [] }
+    let components = try relativeComponents(path)
+    guard !components.contains(where: { $0.hasPrefix(".") }),
+          !directory || components.count <= maximumPathDepth,
+          directory || CloudWorkspace.extensions.contains((path as NSString).pathExtension.lowercased()) else {
+      throw AttachmentError.invalid
     }
+    return components
+  }
+
+  /// Metadata only, one directory, bounded on every call. A partial catalog must
+  /// be visibly incomplete; it must never become evidence that a file is absent.
+  /// Smaller test budgets exercise real bounds without huge temporary fixtures.
+  func listDirectory(
+    relativePath: String,
+    entryLimit: Int = WorkspaceTextScope.maximumDirectoryEntries,
+    visitedLimit: Int = WorkspaceTextScope.maximumVisitedDirectoryEntries,
+    deadline: DispatchTime? = nil
+  ) throws -> [String: Any] {
+    let components = try Self.textComponents(relativePath, directory: true)
+    guard entryLimit > 0, visitedLimit > 0 else { throw AttachmentError.invalid }
+    let entryLimit = min(entryLimit, Self.maximumDirectoryEntries)
+    let visitedLimit = min(visitedLimit, Self.maximumVisitedDirectoryEntries)
+    let end = deadline?.uptimeNanoseconds ??
+      (DispatchTime.now().uptimeNanoseconds + UInt64(Self.directoryTimeout * 1_000_000_000))
+    try verifyRootLocation()
+    let descriptor = try directoryDescriptor(components)
+    defer { close(descriptor) }
+    var before = stat()
+    guard fstat(descriptor, &before) == 0 else { throw AttachmentError.posix() }
+    guard before.st_flags & UInt32(SF_DATALESS) == 0 else { throw AttachmentError.offline }
+    // A distinct open file description avoids sharing an exhausted readdir offset.
+    let duplicate = openat(descriptor, ".", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+    guard duplicate >= 0 else { throw AttachmentError.posix() }
+    guard let directory = fdopendir(duplicate) else {
+      let error = AttachmentError.posix()
+      close(duplicate)
+      throw error
+    }
+    defer { closedir(directory) }
+    struct Entry {
+      let relativePath: String
+      let name: String
+      let directory: Bool
+      let attributes: stat
+      let placeholder: Bool
+    }
+    var entries: [Data: Entry] = [:]
+    var visited = 0
+    var reason: AttachmentError?
+    let prefix = relativePath.isEmpty ? "" : relativePath + "/"
+    while true {
+      guard DispatchTime.now().uptimeNanoseconds < end else { reason = .indexLimit; break }
+      errno = 0
+      guard let entry = readdir(directory) else {
+        if errno != 0 { reason = AttachmentError.posix() }
+        break
+      }
+      let capacity = Int(entry.pointee.d_namlen) + 1
+      let name = withUnsafePointer(to: &entry.pointee.d_name) {
+        $0.withMemoryRebound(to: CChar.self, capacity: capacity) { String(validatingUTF8: $0) }
+      }
+      guard let name else { reason = .invalid; break }
+      if name == "." || name == ".." { continue }
+      visited += 1
+      guard visited <= visitedLimit else { reason = .indexLimit; break }
+      let placeholder = name.hasPrefix(".") && name.hasSuffix(".icloud")
+      if name.hasPrefix(".") && !placeholder { continue }
+      if name.unicodeScalars.contains(where: { $0.value < 32 }) ||
+         name.contains("\\") || name.contains(":") { continue }
+      var attributes = stat()
+      guard fstatat(descriptor, name, &attributes, AT_SYMLINK_NOFOLLOW) == 0 else {
+        reason = AttachmentError.posix()
+        break
+      }
+      let type = attributes.st_mode & mode_t(S_IFMT)
+      let isDirectory = type == mode_t(S_IFDIR)
+      guard isDirectory || type == mode_t(S_IFREG) else { continue }
+      // A stub-looking directory is not a logical, visible folder.
+      if isDirectory && name.hasPrefix(".") { continue }
+      let logicalName = placeholder ? String(name.dropFirst().dropLast(7)) : name
+      guard !logicalName.isEmpty, !logicalName.hasPrefix("."),
+            isDirectory || CloudWorkspace.extensions.contains((logicalName as NSString).pathExtension.lowercased()) else {
+        continue
+      }
+      let path = prefix + logicalName
+      guard path.utf16.count <= 4096 else { reason = .indexLimit; break }
+      if isDirectory && components.count >= Self.maximumPathDepth { reason = .indexLimit; break }
+      let identity = Data(path.utf8)
+      // If a provider leaves both forms behind, prefer the actual file.
+      if entries[identity]?.placeholder == false && placeholder { continue }
+      if entries[identity] == nil && entries.count >= entryLimit { reason = .indexLimit; break }
+      entries[identity] = Entry(
+        relativePath: path, name: logicalName, directory: isDirectory,
+        attributes: attributes, placeholder: placeholder
+      )
+    }
+    try verifyRootLocation()
+    let current = try directoryDescriptor(components)
+    defer { close(current) }
+    var after = stat()
+    guard fstat(current, &after) == 0 else { throw AttachmentError.posix() }
+    if Self.revision(before) != Self.revision(after) { reason = reason ?? .unavailable }
+    let rows: [[String: Any]] = entries.values.sorted {
+      $0.relativePath.utf8.lexicographicallyPrecedes($1.relativePath.utf8)
+    }.map { entry in
+      let attributes = entry.attributes
+      return [
+        "relativePath": entry.relativePath,
+        "name": entry.name,
+        "isDirectory": entry.directory,
+        "size": entry.placeholder ? Int64(0) : Int64(attributes.st_size),
+        "modified": Int64(attributes.st_mtimespec.tv_sec) * 1000 + Int64(attributes.st_mtimespec.tv_nsec) / 1_000_000,
+        "revision": Self.revision(attributes),
+        "local": !entry.placeholder && attributes.st_flags & UInt32(SF_DATALESS) == 0,
+      ]
+    }
+    var result: [String: Any] = ["entries": rows, "complete": reason == nil]
+    if let reason { result["reason"] = reason.code }
+    return result
+  }
+
+  func readText(relativePath: String, maximumBytes: Int = WorkspaceTextScope.maximumTextBytes) throws -> WorkspaceTextBytes {
+    let components = try Self.textComponents(relativePath, directory: false)
+    guard maximumBytes > 0 else { throw AttachmentError.invalid }
+    try verifyRootLocation()
+    guard try !isPlaceholder(components) else { throw AttachmentError.offline }
+    // No file coordination or download request: preserve bytes exactly, then
+    // let Dart validate UTF-8 and match this revision against catalog metadata.
+    return try readLocalBytes(
+      components: components, maximumBytes: min(maximumBytes, Self.maximumTextBytes), verifyRevision: true
+    )
   }
 }

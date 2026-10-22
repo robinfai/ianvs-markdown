@@ -154,6 +154,7 @@ struct AttachmentTests {
     try Data(source.utf8).write(to: document)
     let documentRead = try CloudWorkspace.read(document)
     precondition(Data(documentRead.utf8) == Data(source.utf8))
+    try verifyWorkspaceText(fixture: fixture)
     print("PASS: scoped binary reads, metadata index, Unicode, iCloud stubs, config scope, symlinks, limits, permissions and replacement checks")
   }
 
@@ -244,4 +245,179 @@ struct AttachmentTests {
     do { _ = try CloudWorkspace.listAttachments(deep); preconditionFailure("Must bound traversal depth") }
     catch let error as AttachmentError { precondition(error == .indexLimit) }
   }
+
+  static func verifyWorkspaceText(fixture: URL) throws {
+    let manager = FileManager.default
+    let root = fixture.appendingPathComponent("workspace-text")
+    let outside = fixture.appendingPathComponent("text-outside")
+    try manager.createDirectory(at: root, withIntermediateDirectories: true)
+    try manager.createDirectory(at: outside, withIntermediateDirectories: true)
+    func write(_ relative: String, _ data: Data = Data("note".utf8)) throws {
+      let target = root.appendingPathComponent(relative)
+      try manager.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+      try data.write(to: target)
+    }
+    func rejects(_ expected: AttachmentError, _ body: () throws -> Void) {
+      do { try body(); preconditionFailure("Expected text error \(expected.code)") }
+      catch let error as AttachmentError { precondition(error == expected, "Expected \(expected.code), got \(error.code)") }
+      catch { preconditionFailure("Unmapped text error: \(error)") }
+    }
+    func read(_ relative: String, maximum: Int = WorkspaceTextScope.maximumTextBytes) throws -> WorkspaceTextBytes {
+      try CloudWorkspace.readWorkspaceTextBytes(root, relativePath: relative, maximumBytes: maximum)
+    }
+    let source = Data("\u{FEFF}# 中文 👩🏽‍💻\r\nExact source.\r\n".utf8)
+    try write("中文.md", source)
+    try write("empty.md", Data())
+    try write("invalid-utf8.md", Data([0xff, 0, 0xc0]))
+    for name in ["UPPER.MARKDOWN", "plain.txt", "short.mkd", "down.mdown", "nested/child.md", "image.png",
+                 ".private/secret.md", ".obsidian/app.json", "newline\n.md", "tab\t.md"] { try write(name) }
+    try write(".remote.md.icloud", Data("synthetic stub".utf8))
+    try write(".中文.md.icloud", Data("redundant stub".utf8))
+    try manager.createDirectory(at: root.appendingPathComponent("directory.md"), withIntermediateDirectories: true)
+    try Data("outside secret".utf8).write(to: outside.appendingPathComponent("secret.md"))
+    try manager.createSymbolicLink(at: root.appendingPathComponent("linked.md"), withDestinationURL: outside.appendingPathComponent("secret.md"))
+    try manager.createSymbolicLink(at: root.appendingPathComponent("linked-dir"), withDestinationURL: outside)
+    try manager.createSymbolicLink(at: root.appendingPathComponent("dangling.md"), withDestinationURL: outside.appendingPathComponent("missing.md"))
+    precondition(mkfifo(root.appendingPathComponent("pipe.md").path, 0o600) == 0)
+    let catalog = try CloudWorkspace.listWorkspaceDirectory(root, relativePath: "")
+    precondition(catalog["complete"] as? Bool == true && catalog["reason"] == nil)
+    let rows = catalog["entries"] as! [[String: Any]]
+    let paths = rows.map { $0["relativePath"] as! String }
+    precondition(Set(paths) == Set(["中文.md", "empty.md", "invalid-utf8.md", "UPPER.MARKDOWN", "plain.txt", "short.mkd", "down.mdown", "nested", "directory.md", "remote.md"]))
+    precondition(paths == paths.sorted { $0.utf8.lexicographicallyPrecedes($1.utf8) })
+    precondition(!paths.contains("nested/child.md"), "Catalog must only enumerate the requested directory")
+    let nested = try CloudWorkspace.listWorkspaceDirectory(root, relativePath: "nested")["entries"] as! [[String: Any]]
+    precondition(nested.count == 1 && nested[0]["relativePath"] as? String == "nested/child.md")
+    let scope = try WorkspaceTextScope(root)
+    // The shared descriptor core also rejects malformed components directly;
+    // policy callers cannot accidentally turn a component into an extra path.
+    rejects(.invalid) { _ = try scope.directoryDescriptor([".."]) }
+    rejects(.invalid) { _ = try scope.directoryDescriptor(["nested/.."]) }
+    rejects(.invalid) { _ = try scope.parentDescriptor(["../secret.md"]) }
+    rejects(.invalid) { _ = try scope.readLocalBytes(components: ["nested/child.md"], maximumBytes: 10, verifyRevision: true) }
+    let first = try scope.listDirectory(relativePath: "")["entries"] as! [[String: Any]]
+    let again = try scope.listDirectory(relativePath: "")["entries"] as! [[String: Any]]
+    precondition(first.map { $0["relativePath"] as! String } == again.map { $0["relativePath"] as! String })
+    let local = rows.first { $0["relativePath"] as? String == "中文.md" }!
+    precondition(local["local"] as? Bool == true && local["size"] as? Int64 == Int64(source.count))
+    let bytes = try read("中文.md")
+    precondition(bytes.bytes == source && bytes.revision == local["revision"] as? String)
+    precondition(bytes.revision.split(separator: ":").count == 7)
+    let empty = try read("empty.md")
+    precondition(empty.bytes.isEmpty)
+    let invalidUTF8 = try read("invalid-utf8.md")
+    precondition(invalidUTF8.bytes == Data([0xff, 0, 0xc0]), "Dart owns UTF-8 validation; native must preserve bytes")
+    let remote = rows.first { $0["relativePath"] as? String == "remote.md" }!
+    precondition(remote["local"] as? Bool == false && remote["size"] as? Int64 == 0)
+    let policy = getiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD)
+    rejects(.offline) { _ = try read("remote.md") }
+    precondition(getiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD) == policy)
+    precondition(!manager.fileExists(atPath: root.appendingPathComponent("remote.md").path))
+    let stub = try Data(contentsOf: root.appendingPathComponent(".remote.md.icloud"))
+    precondition(stub == Data("synthetic stub".utf8), "Search must not materialize or modify an offline stub")
+    rejects(.missing) { _ = try read("missing.md") }
+    rejects(.tooLarge) { _ = try read("中文.md", maximum: 1) }
+    for maximum in [0, -1] { rejects(.invalid) { _ = try read("中文.md", maximum: maximum) } }
+    for path in ["", "/secret.md", "../text-outside/secret.md", "nested/../../secret.md", "nested/../中文.md", "./中文.md",
+                 "nested//child.md", "nested\\child.md", "file:///secret.md", "name.md\0", "newline\n.md", "tab\t.md",
+                 ".private/secret.md", ".obsidian/app.json", "image.png", "linked.md", "linked-dir/secret.md", "dangling.md", "directory.md", "pipe.md"] {
+      rejects(.invalid) { _ = try read(path) }
+    }
+    for path in ["/", "..", "nested/..", ".private", "linked-dir", "nested//child", "nested\\child", "nested/"] {
+      rejects(.invalid) { _ = try CloudWorkspace.listWorkspaceDirectory(root, relativePath: path) }
+    }
+    rejects(.invalid) { _ = try WorkspaceTextScope.textComponents(Array(repeating: "d", count: 65).joined(separator: "/"), directory: true) }
+    rejects(.invalid) { _ = try WorkspaceTextScope.textComponents(Array(repeating: "d", count: 65).joined(separator: "/") + "/note.md", directory: false) }
+    rejects(.invalid) { _ = try WorkspaceTextScope.textComponents(String(repeating: "x", count: 4097) + ".md", directory: false) }
+    let alias = fixture.appendingPathComponent("text-parent-alias")
+    try manager.createSymbolicLink(at: alias, withDestinationURL: fixture)
+    let aliasRead = try CloudWorkspace.readWorkspaceTextBytes(alias.appendingPathComponent("workspace-text"), relativePath: "中文.md")
+    precondition(aliasRead.bytes == source)
+    let rootLink = fixture.appendingPathComponent("text-root-link")
+    try manager.createSymbolicLink(at: rootLink, withDestinationURL: root)
+    rejects(.invalid) { _ = try CloudWorkspace.listWorkspaceDirectory(rootLink, relativePath: "") }
+    rejects(.invalid) { _ = try CloudWorkspace.readWorkspaceTextBytes(rootLink, relativePath: "中文.md") }
+    if getuid() != 0 {
+      try write("denied.md")
+      let denied = root.appendingPathComponent("denied.md")
+      try manager.setAttributes([.posixPermissions: 0], ofItemAtPath: denied.path)
+      rejects(.denied) { _ = try read("denied.md") }
+      try manager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: denied.path)
+      let deniedDirectory = root.appendingPathComponent("denied-directory")
+      try manager.createDirectory(at: deniedDirectory, withIntermediateDirectories: true)
+      try manager.setAttributes([.posixPermissions: 0], ofItemAtPath: deniedDirectory.path)
+      let parentCatalog = try CloudWorkspace.listWorkspaceDirectory(root, relativePath: "")
+      precondition(parentCatalog["complete"] as? Bool == true, "Parent catalog must not descend into unreadable folders")
+      rejects(.denied) { _ = try CloudWorkspace.listWorkspaceDirectory(root, relativePath: "denied-directory") }
+      try manager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: deniedDirectory.path)
+    }
+    try write("limit.md")
+    let limitHandle = try FileHandle(forWritingTo: root.appendingPathComponent("limit.md"))
+    try limitHandle.truncate(atOffset: UInt64(WorkspaceTextScope.maximumTextBytes))
+    let exactLimit = try read("limit.md", maximum: Int.max)
+    precondition(exactLimit.bytes.count == WorkspaceTextScope.maximumTextBytes)
+    try limitHandle.truncate(atOffset: UInt64(WorkspaceTextScope.maximumTextBytes + 1))
+    try limitHandle.close()
+    rejects(.tooLarge) { _ = try read("limit.md", maximum: Int.max) }
+    let limited = try scope.listDirectory(relativePath: "", entryLimit: 1)
+    precondition(limited["complete"] as? Bool == false && limited["reason"] as? String == AttachmentError.indexLimit.code)
+    precondition((limited["entries"] as! [[String: Any]]).count <= 1)
+    let visited = try scope.listDirectory(relativePath: "", visitedLimit: 1)
+    precondition(visited["complete"] as? Bool == false && visited["reason"] as? String == AttachmentError.indexLimit.code)
+    let expired = try scope.listDirectory(relativePath: "", deadline: DispatchTime(uptimeNanoseconds: 1))
+    precondition(expired["complete"] as? Bool == false && expired["reason"] as? String == AttachmentError.indexLimit.code)
+    precondition((expired["entries"] as! [[String: Any]]).isEmpty)
+
+    // Exercise the exact post-read validator deterministically, not a lucky race.
+    let target = root.appendingPathComponent("changing.md")
+    try write("changing.md", Data("old".utf8))
+    let descriptor = open(target.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+    precondition(descriptor >= 0)
+    defer { close(descriptor) }
+    var original = stat()
+    precondition(fstat(descriptor, &original) == 0)
+    try scope.verifyReadRevision(descriptor: descriptor, components: ["changing.md"], original: original, byteCount: 3)
+    rejects(.unavailable) { try scope.verifyReadRevision(descriptor: descriptor, components: ["changing.md"], original: original, byteCount: 2) }
+    try Data("new".utf8).write(to: target, options: .atomic)
+    let times = [original.st_atimespec, original.st_mtimespec]
+    precondition(times.withUnsafeBufferPointer { utimensat(AT_FDCWD, target.path, $0.baseAddress!, 0) } == 0)
+    rejects(.unavailable) { try scope.verifyReadRevision(descriptor: descriptor, components: ["changing.md"], original: original, byteCount: 3) }
+    let replacement = try read("changing.md")
+    precondition(replacement.bytes == Data("new".utf8) && replacement.revision != WorkspaceFileScope.revision(original))
+    let inPlace = try FileHandle(forUpdating: target)
+    defer { try? inPlace.close() }
+    var inPlaceBefore = stat()
+    precondition(fstat(inPlace.fileDescriptor, &inPlaceBefore) == 0)
+    try inPlace.truncate(atOffset: 1)
+    rejects(.unavailable) { try scope.verifyReadRevision(descriptor: inPlace.fileDescriptor, components: ["changing.md"], original: inPlaceBefore, byteCount: 3) }
+    let child = root.appendingPathComponent("nested/child.md")
+    let childDescriptor = open(child.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+    precondition(childDescriptor >= 0)
+    defer { close(childDescriptor) }
+    var childBefore = stat()
+    precondition(fstat(childDescriptor, &childBefore) == 0)
+    let nestedBefore = root.appendingPathComponent("nested-before")
+    try manager.moveItem(at: root.appendingPathComponent("nested"), to: nestedBefore)
+    try write("nested/child.md")
+    rejects(.unavailable) {
+      try scope.verifyReadRevision(descriptor: childDescriptor, components: ["nested", "child.md"], original: childBefore, byteCount: 4)
+    }
+    try manager.removeItem(at: root.appendingPathComponent("nested"))
+    try manager.moveItem(at: nestedBefore, to: root.appendingPathComponent("nested"))
+    try manager.moveItem(at: root.appendingPathComponent("nested"), to: nestedBefore)
+    try manager.createSymbolicLink(at: root.appendingPathComponent("nested"), withDestinationURL: outside)
+    rejects(.invalid) { _ = try scope.readText(relativePath: "nested/secret.md") }
+    rejects(.invalid) { _ = try scope.listDirectory(relativePath: "nested") }
+    try manager.removeItem(at: root.appendingPathComponent("nested"))
+    try manager.moveItem(at: nestedBefore, to: root.appendingPathComponent("nested"))
+    let oldRoot = fixture.appendingPathComponent("text-root-before")
+    try manager.moveItem(at: root, to: oldRoot)
+    try manager.createSymbolicLink(at: root, withDestinationURL: outside)
+    rejects(.invalid) { _ = try scope.readText(relativePath: "secret.md") }
+    rejects(.invalid) { _ = try scope.listDirectory(relativePath: "") }
+    try manager.removeItem(at: root)
+    try manager.moveItem(at: oldRoot, to: root)
+    print("PASS: local-only text metadata, exact bytes/revisions, offline stubs, no-follow scope, partial limits and replacement checks")
+  }
+
 }

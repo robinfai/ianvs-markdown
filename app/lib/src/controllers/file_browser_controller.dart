@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
 import '../services/markdown_file_service.dart';
+import '../services/workspace_index.dart';
+import '../services/workspace_index_source.dart';
 
 enum FileSort { name, modified }
 
@@ -74,11 +76,93 @@ class BrowserRow {
   final String? statusPath;
 }
 
-/// Session-owned tree/index state. Cached directories are also the search index;
-/// refresh invalidates only changed directories, never the current tree position.
+/// Tree view state. Metadata comes from the shared session catalog, not a
+/// second filesystem scan. Refresh never resets the current tree position.
 class FileBrowserController extends ChangeNotifier {
-  FileBrowserController(this.service);
+  FileBrowserController(this.service, {required this.index}) {
+    index.addListener(_catalogChanged);
+  }
   final MarkdownFileService service;
+  final WorkspaceIndex index;
+  int _catalogRevision = -1;
+
+  void _catalogChanged() {
+    if (disposed ||
+        root == null ||
+        index.root != root ||
+        _catalogRevision == index.catalogRevision) {
+      return;
+    }
+    _catalogRevision = index.catalogRevision;
+    var changed = false;
+    final paths =
+        index.changedDirectories
+            .map(
+              (relative) => relative.isEmpty ? root! : p.join(root!, relative),
+            )
+            .where(
+              (path) =>
+                  path == root ||
+                  _children.containsKey(path) ||
+                  _loading.containsKey(path) ||
+                  _errors.containsKey(path) ||
+                  preferences.expanded.contains(path),
+            )
+            .toList()
+          ..sort((a, b) => a.length.compareTo(b.length));
+    for (final path in paths) {
+      final snapshot = index.cachedDirectory(index.relativeDirectory(path));
+      if (snapshot != null) {
+        // Hydrate only changed shared snapshots, not every cached directory on
+        // every completed search listing. Collapsed sibling scans stay linear.
+        changed = _applySnapshot(path, snapshot) || changed;
+      } else if (_children.containsKey(path)) {
+        _evict(path);
+        changed = true;
+      }
+    }
+    if (query.isNotEmpty) {
+      if (searching) {
+        _catalogSearchPending = true;
+      } else {
+        search(query);
+      }
+    }
+    if (changed) _emit();
+  }
+
+  bool _applySnapshot(String path, WorkspaceDirectorySnapshot snapshot) {
+    if (identical(_appliedSnapshots[path], snapshot)) return false;
+    _appliedSnapshots[path] = snapshot;
+    final entries = snapshot.entries.map((e) => e.entry(root!)).toList();
+    _children[path] = entries;
+    if (snapshot.complete) {
+      _errors.remove(path);
+    } else {
+      _errors[path] = StateError(
+        snapshot.reason ?? 'Partial directory listing',
+      );
+    }
+    if (!snapshot.complete) return true;
+    final directories = entries
+        .where((e) => e.isDirectory)
+        .map((e) => e.path)
+        .toSet();
+    final obsolete = {..._children.keys, ..._loading.keys, ..._errors.keys}
+        .where(
+          (key) =>
+              key != path &&
+              p.dirname(key) == path &&
+              !directories.contains(key),
+        )
+        .toList();
+    for (final removed in obsolete) {
+      _evict(removed);
+    }
+    return true;
+  }
+
+  final _appliedSnapshots = <String, WorkspaceDirectorySnapshot>{};
   final _preferences = <String, BrowserPreferences>{};
   final _children = <String, List<WorkspaceEntry>>{};
   final _errors = <String, Object>{};
@@ -98,6 +182,7 @@ class FileBrowserController extends ChangeNotifier {
   List<WorkspaceEntry> results = [];
   int matchCount = 0;
   bool searching = false;
+  bool _catalogSearchPending = false;
   bool disposed = false;
   int _generation = 0;
   int _rootEpoch = 0;
@@ -139,6 +224,7 @@ class FileBrowserController extends ChangeNotifier {
       }
       _refreshTimers.clear();
       _children.clear();
+      _appliedSnapshots.clear();
       _errors.clear();
       _loading.clear();
       _versions.clear();
@@ -182,28 +268,21 @@ class FileBrowserController extends ChangeNotifier {
     late final Future<void> task;
     task = () async {
       try {
-        final entries = await service.listDirectory(path);
+        if (refresh) index.invalidateDirectory(index.relativeDirectory(path));
+        final snapshot = await index.directory(
+          index.relativeDirectory(path),
+          refresh: refresh,
+        );
+        final entries = snapshot.entries
+            .map((e) => e.entry(currentRoot!))
+            .toList();
         if (disposed ||
             root != currentRoot ||
             epoch != _rootEpoch ||
             _versions[path] != version) {
           return;
         }
-        _children[path] = entries;
-        _errors.remove(path);
-        // Remove deleted subtrees from the index and release their watchers.
-        final directories = entries
-            .where((e) => e.isDirectory)
-            .map((e) => e.path)
-            .toSet();
-        final obsolete = {..._children.keys, ..._loading.keys}
-            .where(
-              (key) => p.dirname(key) == path && !directories.contains(key),
-            )
-            .toList();
-        for (final removed in obsolete) {
-          _evict(removed);
-        }
+        _applySnapshot(path, snapshot);
         if (!_watchers.containsKey(path)) {
           try {
             _watchers[path] = service
@@ -264,9 +343,14 @@ class FileBrowserController extends ChangeNotifier {
       ..._children.keys,
       ..._watchers.keys,
       ..._loading.keys,
+      ..._errors.keys,
+      ..._refreshTimers.keys,
     }.where((key) => key == path || p.isWithin(path, key)).toList()) {
       _children.remove(key);
+      _appliedSnapshots.remove(key);
       _errors.remove(key);
+      _loading.remove(key);
+      _refreshTimers.remove(key)?.cancel();
       _versions[key] = (_versions[key] ?? 0) + 1;
       final watcher = _watchers.remove(key);
       if (watcher != null) unawaited(watcher.cancel());
@@ -513,6 +597,8 @@ class FileBrowserController extends ChangeNotifier {
   }
 
   Future<void> _search(int generation) async {
+    if (disposed || generation != _generation) return;
+    _catalogSearchPending = false;
     final currentQuery = query;
     bool current() => !disposed && generation == _generation;
     final matches = <String, WorkspaceEntry>{};
@@ -548,6 +634,13 @@ class FileBrowserController extends ChangeNotifier {
       if (visited.length % 32 == 0) await Future<void>.delayed(Duration.zero);
     }
     if (!current()) return;
+    if (_catalogSearchPending) {
+      // Reconcile once from the now-shared cache. Own first-time catalog loads
+      // must not keep cancelling their filename-search consumer.
+      await Future<void>.delayed(Duration.zero);
+      if (current()) await _search(generation);
+      return;
+    }
     int rank(WorkspaceEntry e) {
       final name = e.name.toLowerCase();
       if (name == currentQuery ||
@@ -602,6 +695,7 @@ class FileBrowserController extends ChangeNotifier {
   @override
   void dispose() {
     disposed = true;
+    index.removeListener(_catalogChanged);
     _generation++;
     _searchTimer?.cancel();
     for (final timer in _refreshTimers.values) {

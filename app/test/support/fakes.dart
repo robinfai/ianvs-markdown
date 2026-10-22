@@ -7,8 +7,37 @@ import 'package:linefold/src/services/file_association_service.dart';
 import 'package:linefold/src/services/incoming_files_service.dart';
 import 'package:linefold/src/services/markdown_file_service.dart';
 import 'package:linefold/src/services/workspace_session_store.dart';
+import 'package:linefold/src/services/workspace_index_source.dart';
 
-class MemoryMarkdownFileService implements MarkdownFileService {
+class MemoryMarkdownFileService
+    implements MarkdownFileService, WorkspaceIndexSource {
+  @override
+  Future<WorkspaceDirectorySnapshot> listWorkspaceDirectory(
+    String root,
+    String relativePath,
+  ) async => WorkspaceDirectorySnapshot([
+    for (final entry in await listDirectory(p.join(root, relativePath)))
+      WorkspaceMetadata(
+        relativePath: p.relative(entry.path, from: root),
+        isDirectory: entry.isDirectory,
+        modified: entry.modified?.millisecondsSinceEpoch ?? 0,
+        revision: files[entry.path] ?? entry.path,
+        size: files[entry.path]?.length ?? 0,
+      ),
+  ]);
+  @override
+  Future<WorkspaceTextRead> readWorkspaceText(
+    String root,
+    String relativePath,
+    int maximumBytes,
+  ) async {
+    final text = files[p.join(root, relativePath)];
+    if (text == null) {
+      throw const WorkspaceIndexFailure(WorkspaceReadIssue.missing);
+    }
+    return WorkspaceTextRead(text, text);
+  }
+
   final Map<String, String> files = <String, String>{};
   final modifiedTimes = <String, DateTime>{};
   @override

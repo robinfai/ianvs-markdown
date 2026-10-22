@@ -11,6 +11,8 @@ import 'package:path/path.dart' as p;
 
 import '../controllers/workspace_controller.dart';
 import '../controllers/document_find_controller.dart';
+import '../controllers/workspace_search_controller.dart';
+import 'workspace_search_dialog.dart';
 import '../editor_commands.dart';
 import '../models/document_session.dart';
 import '../models/workspace_layout.dart';
@@ -114,7 +116,12 @@ class _EditorShellState extends State<EditorShell> {
     if (!_enablingFindEditing) _closeFind(restoreScroll: false);
   }
 
-  void _openFind({bool seedSelection = true, bool? navigateBackwards}) {
+  void _openFind({
+    bool seedSelection = true,
+    bool? navigateBackwards,
+    int? sourceAnchor,
+    String? expectedSource,
+  }) {
     if (!(ModalRoute.of(context)?.isCurrent ?? true)) return;
     final document = widget.workspace.activeDocument;
     if (document == null || hasEditorComposition(widget.workspace)) return;
@@ -164,12 +171,73 @@ class _EditorShellState extends State<EditorShell> {
       _restoreDocumentScroll(document, _beforeFindScroll);
       // The old Live editor must be detached before moving the shared source
       // selection: it otherwise redirects matches inside hidden front matter.
+      if (sourceAnchor != null && controller.text == expectedSource) {
+        controller.selection = TextSelection.collapsed(offset: sourceAnchor);
+      }
       find.next(
         backwards: navigateBackwards ?? false,
         skipCurrentSelection: navigateBackwards == false,
       );
       _findFocus.requestFocus();
     });
+  }
+
+  Future<void> _openWorkspaceSearch() async {
+    if (!(ModalRoute.of(context)?.isCurrent ?? true) ||
+        hasEditorComposition(widget.workspace)) {
+      return;
+    }
+    final search = WorkspaceSearchController(widget.workspace.index);
+    try {
+      final match = await showDialog<WorkspaceSourceMatch>(
+        context: context,
+        builder: (_) => WorkspaceSearchDialog(controller: search),
+      );
+      if (!mounted || match == null) return;
+      search.cancel();
+      final snapshot = await search.resolve(match);
+      if (!mounted) return;
+      if (snapshot == null) {
+        _showError(
+          'Source changed since this result. Search again to use current offsets.',
+        );
+        return;
+      }
+      _closeFind(restoreFocus: false, restoreScroll: false);
+      DocumentSession? document;
+      if (snapshot.sessionId != null) {
+        final documents = widget.workspace.documents;
+        final position = documents.indexWhere(
+          (d) => d.id == snapshot.sessionId,
+        );
+        if (position >= 0) {
+          widget.workspace.selectDocument(position);
+          document = documents[position];
+        }
+      } else if (snapshot.path != null) {
+        document = await widget.workspace.openPath(snapshot.path!);
+      }
+      if (!mounted) return;
+      if (document == null ||
+          document.controller.text != snapshot.text ||
+          widget.workspace.index.epoch != match.scopeEpoch) {
+        _showError(
+          'Source changed while opening. Search again to use current offsets.',
+        );
+        return;
+      }
+      _lastFindQuery = match.query;
+      _lastMatchCase = match.matchCase;
+      _openFind(
+        seedSelection: false,
+        sourceAnchor: match.range.start,
+        expectedSource: snapshot.text,
+      );
+    } on Object catch (error) {
+      if (mounted) _showError('Unable to open search result: $error');
+    } finally {
+      search.dispose();
+    }
   }
 
   void _findNext({bool backwards = false}) {
@@ -371,6 +439,16 @@ class _EditorShellState extends State<EditorShell> {
           onFindPrevious: () => _findNext(backwards: true),
           child: CallbackShortcuts(
             bindings: <ShortcutActivator, VoidCallback>{
+              const SingleActivator(
+                LogicalKeyboardKey.keyF,
+                meta: true,
+                shift: true,
+              ): _openWorkspaceSearch,
+              const SingleActivator(
+                LogicalKeyboardKey.keyF,
+                control: true,
+                shift: true,
+              ): _openWorkspaceSearch,
               const SingleActivator(LogicalKeyboardKey.keyF, meta: true):
                   _openFind,
               const SingleActivator(LogicalKeyboardKey.keyF, control: true):
@@ -489,6 +567,7 @@ class _EditorShellState extends State<EditorShell> {
                                 key: ValueKey(workspace.workspaceRoot),
                                 workspace: workspace,
                                 onSave: _saveDocument,
+                                onSearchSource: _openWorkspaceSearch,
                                 width: sidebarWidth,
                                 onError: _showError,
                               ),
