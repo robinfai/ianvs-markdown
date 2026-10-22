@@ -12,8 +12,14 @@ struct ScopedNoteSaveTests {
     try manager.createDirectory(at: outside, withIntermediateDirectories: false)
     defer { try? manager.removeItem(at: sandbox) }
     let target = root.appendingPathComponent("设计.md")
+    // The channel contract exposes the descriptor-derived native root. System
+    // volume aliases need not equal Foundation's symlink-normalized URL spelling.
+    let selection = try WorkspaceWriteAuthority().activate(root)
+    let selectedTarget = URL(fileURLWithPath: selection["path"]!).appendingPathComponent("设计.md").path
     func bytes(_ url: URL) throws -> Data { try Data(contentsOf: url) }
-    func check(_ value: Bool) { precondition(value) }
+    func check(_ value: Bool, file: StaticString = #filePath, line: UInt = #line) {
+      precondition(value, file: file, line: line)
+    }
     func save(_ text: String, _ expected: String?) throws {
       try CloudWorkspace.writeWorkspaceNoteGuarded(root, relativePath: "设计.md", contents: text, expectedContents: expected)
     }
@@ -25,8 +31,30 @@ struct ScopedNoteSaveTests {
         try save("my draft", expected)
         preconditionFailure("Expected scoped save conflict")
       } catch let failure as WorkspaceSaveConflict {
-        precondition(failure.path == root.resolvingSymlinksInPath().appendingPathComponent("设计.md").path)
-        precondition(failure.currentContents.map { Data($0.utf8) } == current.map { Data($0.utf8) })
+        let foundationTarget = root.resolvingSymlinksInPath().appendingPathComponent("设计.md").path
+        let observedBytesMatch = failure.currentContents.map { Data($0.utf8) } == current.map { Data($0.utf8) }
+        var paths = [root.path, root.resolvingSymlinksInPath().path, selection["path"]!,
+                     target.path, foundationTarget, selectedTarget, failure.path]
+        paths += paths.compactMap { path -> String? in
+          if path.hasPrefix("/private/var/") { return String(path.dropFirst("/private".count)) }
+          if path.hasPrefix("/var/") { return "/private" + path }
+          return nil
+        }
+        var evidence = "Synthetic conflict paths: origin=\(target.path), actual=\(failure.path), foundation=\(foundationTarget), nativeSelected=\(selectedTarget), observedBytesMatch=\(observedBytesMatch)\n"
+        for path in Set(paths).sorted() {
+          do {
+            let attributes = try manager.attributesOfItem(atPath: path)
+            evidence += "path=\(path) device=\(String(describing: attributes[.systemNumber])) inode=\(String(describing: attributes[.systemFileNumber])) type=\(String(describing: attributes[.type])) size=\(String(describing: attributes[.size]))\n"
+          } catch {
+            evidence += "path=\(path) metadataError=\(error)\n"
+          }
+        }
+        // stderr is flushed before a trapping assertion; stdout may be buffered.
+        FileHandle.standardError.write(Data(evidence.utf8))
+        precondition(observedBytesMatch)
+        // Keep the existing expectation until Apple evidence identifies the
+        // actual spelling/identity difference; do not relax production checks.
+        precondition(failure.path == foundationTarget)
       }
     }
 
