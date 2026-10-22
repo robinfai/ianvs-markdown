@@ -38,7 +38,28 @@ void main() {
           'current.st_dev == attributes.st_dev && current.st_ino == attributes.st_ino',
         ),
       );
-      expect(text, contains('listing["complete"] as? Bool == true'));
+      expect(
+        text,
+        contains('try requireVacantName(parent: parent, name: name)'),
+      );
+      final vacancy = core.substring(core.indexOf('func requireVacantName('));
+      expect(vacancy, contains('readdir(directory)'));
+      expect(
+        vacancy,
+        contains('DispatchTime.now().uptimeNanoseconds < deadline'),
+      );
+      expect(
+        vacancy,
+        contains('count <= WorkspaceTextScope.maximumVisitedDirectoryEntries'),
+      );
+      expect(
+        vacancy,
+        contains('Self.revision(before) == Self.revision(after)'),
+      );
+      expect(vacancy, contains('normalized == comparison'));
+      expect(vacancy, contains('normalized == placeholder'));
+      expect(vacancy, isNot(contains('S_IFLNK')));
+      expect(vacancy, isNot(contains('S_IFREG')));
       expect(text, contains('comparisonPath'));
       expect(
         text,

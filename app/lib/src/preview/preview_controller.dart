@@ -32,6 +32,9 @@ class PreviewController extends ChangeNotifier {
   String? error;
   bool busy = false;
   bool initialized = false;
+  // Host-owned editing lock. It guards native deliveries as well as buttons.
+  bool Function()? blocksNavigation;
+  bool get _editing => blocksNavigation?.call() == true;
   bool _disposed = false;
   bool _navigating = false;
   int _request = 0;
@@ -42,6 +45,7 @@ class PreviewController extends ChangeNotifier {
   bool _cloudRefreshPending = false;
 
   String get title => activePath == null ? 'Linefold' : p.basename(activePath!);
+  bool get navigating => _navigating;
   bool get canRetry => _retry != null && !busy;
 
   void _notify() {
@@ -100,6 +104,7 @@ class PreviewController extends ChangeNotifier {
   }
 
   Future<void> open(String path) async {
+    if (_editing) return;
     final request = _beginIntent();
     await _open(path, request);
   }
@@ -115,7 +120,7 @@ class PreviewController extends ChangeNotifier {
     _notify();
     try {
       final text = await _bounded(library.read(path));
-      if (!_current(request, scope)) return;
+      if (!_current(request, scope) || _editing) return;
       activePath = path;
       activeRoot = root;
       activeWorkspaceGeneration = scope;
@@ -147,6 +152,10 @@ class PreviewController extends ChangeNotifier {
 
   Future<void> receive(List<String> paths) async {
     if (paths.isEmpty || _disposed) return;
+    if (_editing) {
+      reportError('已接收导入副本。请先保存或取消编辑，再从默认文件夹打开。');
+      return;
+    }
     final request = _beginIntent();
     _navigating = true;
     busy = true;
@@ -186,6 +195,7 @@ class PreviewController extends ChangeNotifier {
   }
 
   Future<void> changeWorkspace({bool useCloud = false}) async {
+    if (_editing) return;
     final request = _beginIntent();
     _navigating = true;
     _notify();
@@ -271,7 +281,7 @@ class PreviewController extends ChangeNotifier {
     try {
       // A fallback root may recover only while displaying the library. Changing
       // roots under an active reader must not reinterpret its existing path.
-      if (path == null && library.workspace?.notice != null) {
+      if (path == null && !_editing && library.workspace?.notice != null) {
         await _bounded(library.useDefaultWorkspace());
         if (!_current(request) || !identical(_refreshToken, token)) return;
         scope = library.workspaceGeneration;
@@ -294,7 +304,7 @@ class PreviewController extends ChangeNotifier {
         try {
           final text = await _bounded(library.refreshContent(path!));
           if (!current()) return;
-          contents = text;
+          if (!_editing) contents = text;
           _notify();
         } on Object catch (failure) {
           failed('正文', failure);
@@ -315,7 +325,10 @@ class PreviewController extends ChangeNotifier {
       // A missing/offline active note must not hide new library entries, and a
       // slow folder listing must not delay a readable active note. Each result
       // has the same scope fence but its own deadline and failure boundary.
-      await Future.wait([if (path != null) refreshBody(), refreshList()]);
+      await Future.wait([
+        if (path != null && !_editing) refreshBody(),
+        refreshList(),
+      ]);
     } on Object catch (failure) {
       if (!current()) return;
       library.invalidateWorkspaceRequests();
@@ -340,17 +353,30 @@ class PreviewController extends ChangeNotifier {
 
   /// Invalidates Dart results, not native reads or picker side effects.
   void cancelPendingOperation() {
+    if (_editing) return;
     sync.invalidate();
     _beginIntent();
     _notify();
   }
 
   void showLibrary() {
+    if (_editing) return;
     _beginIntent();
     activePath = null;
     activeRoot = null;
     activeWorkspaceGeneration = null;
     contents = null;
+    error = null;
+    _notify();
+  }
+
+  void showEditorResult(String path, String text, int generation) {
+    if (generation != library.workspaceGeneration) return;
+    _beginIntent();
+    activePath = path;
+    activeRoot = library.workspace?.path;
+    activeWorkspaceGeneration = generation;
+    contents = text.startsWith('\uFEFF') ? text.substring(1) : text;
     error = null;
     _notify();
   }

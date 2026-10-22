@@ -1,10 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../services/apple_workspace_service.dart';
+import '../services/markdown_file_service.dart';
+import '../services/markdown_text_codec.dart';
+import '../services/workspace_index_source.dart';
 import '../models/document_sync_status.dart';
 import 'preview_platform.dart';
 
@@ -29,6 +33,7 @@ class PreviewWorkspace {
     required this.name,
     required this.isCloud,
     this.notice,
+    this.workspaceToken,
   });
   factory PreviewWorkspace.fromMap(Map<String, dynamic> map) =>
       PreviewWorkspace(
@@ -36,11 +41,13 @@ class PreviewWorkspace {
         name: map['name'] as String,
         isCloud: map['isCloud'] as bool,
         notice: map['notice'] as String?,
+        workspaceToken: map['workspaceToken'] as String?,
       );
   final String path;
   final String name;
   final bool isCloud;
   final String? notice;
+  final String? workspaceToken;
 }
 
 class PreviewLibrary {
@@ -219,12 +226,104 @@ class PreviewLibrary {
     return workspaceService!.readSyncMetadata(file.path);
   }
 
+  bool get canWrite =>
+      workspaceService != null && workspace?.workspaceToken != null;
+
+  /// Source is never normalized: BOM, CRLF and Unicode are save baselines.
+  Future<String> readSource(String path) =>
+      _read(path, recordOpen: false, preserveBom: true);
+
+  String _writeRelative(String path, int generation) {
+    final root = workspace?.path;
+    if (!canWrite ||
+        generation != workspaceGeneration ||
+        root == null ||
+        !p.isWithin(root, path)) {
+      throw const FormatException('文件夹权限已改变，请重新选择；草稿仍保留。');
+    }
+    final relative = p.relative(path, from: root);
+    if (!safeWorkspaceRelativePath(relative) ||
+        !previewExtensions.contains(p.extension(relative).toLowerCase())) {
+      throw const FormatException('只能编辑当前文件夹内的 Markdown 文档。');
+    }
+    return relative;
+  }
+
+  Future<void> writeSource(
+    String path,
+    String text, {
+    required String? expectedContents,
+    required int generation,
+  }) async {
+    final relative = _writeRelative(path, generation);
+    if (utf8.encode(text).length > previewMaximumBytes) {
+      throw const FormatException('文档超过 5 MB，草稿未写入原文件。');
+    }
+    try {
+      final success = await AppleWorkspaceService.channel
+          .invokeMethod<bool>('writeWorkspaceNoteGuarded', {
+            'path': workspace!.path,
+            'workspaceToken': workspace!.workspaceToken,
+            'relativePath': relative,
+            'contentsBytes': Uint8List.fromList(utf8.encode(text)),
+            'expectedContentsBytes': expectedContents == null
+                ? null
+                : Uint8List.fromList(utf8.encode(expectedContents)),
+          });
+      if (success != true) {
+        throw StateError('The native write outcome is unknown.');
+      }
+    } on PlatformException catch (error) {
+      final details = error.details;
+      if (error.code == 'workspace_save_conflict' &&
+          details is Map &&
+          details['path'] == path &&
+          details.containsKey('currentContentsBytes') &&
+          (details['currentContentsBytes'] == null ||
+              details['currentContentsBytes'] is Uint8List)) {
+        final bytes = details['currentContentsBytes'] as Uint8List?;
+        throw MarkdownSaveConflict(
+          path: path,
+          expectedContents: expectedContents,
+          currentContents: bytes == null ? null : decodeMarkdownUtf8(bytes),
+        );
+      }
+      rethrow;
+    }
+  }
+
+  /// No parent creation and no replacement. The native boundary uses O_EXCL.
+  Future<String> createNote(String relative, {required int generation}) async {
+    final root = workspace?.path;
+    if (root == null ||
+        !safeWorkspaceRelativePath(relative) ||
+        !relative.toLowerCase().endsWith('.md')) {
+      throw const FormatException('请输入有效的 Markdown 文件名。');
+    }
+    final path = p.join(root, relative);
+    _writeRelative(path, generation);
+    final success = await AppleWorkspaceService.channel
+        .invokeMethod<bool>('createWorkspaceNote', {
+          'path': root,
+          'workspaceToken': workspace!.workspaceToken,
+          'relativePath': relative,
+        });
+    if (success != true) {
+      throw StateError('The native create outcome is unknown.');
+    }
+    return path;
+  }
+
   Future<String> read(String path) => _read(path, recordOpen: true);
 
   /// Refreshes only the selected body, without changing recent-open history.
   Future<String> refreshContent(String path) => _read(path, recordOpen: false);
 
-  Future<String> _read(String path, {required bool recordOpen}) async {
+  Future<String> _read(
+    String path, {
+    required bool recordOpen,
+    bool preserveBom = false,
+  }) async {
     final scope = workspaceGeneration;
     final isCloud = workspace?.isCloud == true;
     final root = await _root();
@@ -238,7 +337,9 @@ class PreviewLibrary {
         maximumBytes: previewMaximumBytes,
       );
       if (recordOpen) await _recordOpen(file, root, scope, isCloud);
-      return text.startsWith('\uFEFF') ? text.substring(1) : text;
+      return !preserveBom && text.startsWith('\uFEFF')
+          ? text.substring(1)
+          : text;
     }
     // Limit the actual read as well as the metadata, including files changed
     // through Files while they are being opened.
@@ -248,9 +349,11 @@ class PreviewLibrary {
       if (bytes.length > previewMaximumBytes) {
         throw const FormatException('文档超过 5 MB，暂时无法预览。');
       }
-      final text = utf8.decode(bytes);
+      final text = decodeMarkdownUtf8(bytes);
       if (recordOpen) await _recordOpen(file, root, scope, isCloud);
-      return text.startsWith('\uFEFF') ? text.substring(1) : text;
+      return !preserveBom && text.startsWith('\uFEFF')
+          ? text.substring(1)
+          : text;
     } on FormatException catch (error) {
       if (error.message.contains('5 MB')) rethrow;
       throw const FormatException('无法读取文档，请使用 UTF-8 编码的 Markdown 文件。');
