@@ -310,8 +310,21 @@ struct AttachmentImportTests {
     try expect(try CloudWorkspace.readPickedAttachmentImage(selected) == png)
     let canonical = selected.resolvingSymlinksInPath()
     let bookmark = try canonical.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil)
+    // Diagnose only this synthetic temporary fixture. Foundation can rewrite
+    // macOS /private paths; never log user-selected paths in production.
+    var bookmarkIsStale = false
+    do {
+      let resolved = try URL(resolvingBookmarkData: bookmark,
+        options: [.withSecurityScope, .withoutUI, .withoutMounting],
+        relativeTo: nil, bookmarkDataIsStale: &bookmarkIsStale)
+      let diagnostic = "Drop fixture: canonical=\(canonical.path), standardized=\(canonical.standardizedFileURL.path), resolved=\(resolved.path), stale=\(bookmarkIsStale)\n"
+      FileHandle.standardError.write(Data(diagnostic.utf8))
+    } catch {
+      FileHandle.standardError.write(Data("Drop fixture bookmark resolution failed: \(error)\n".utf8))
+      throw error
+    }
     let dropped = try CloudWorkspace.droppedAttachmentURL(path: canonical.path, bookmark: bookmark)
-    try expect(dropped.path == canonical.path)
+    expect(dropped.path == canonical.path)
     try expect(try CloudWorkspace.readPickedAttachmentImage(dropped) == png)
     rejects(.invalid) { _ = try CloudWorkspace.droppedAttachmentURL(path: canonical.path, bookmark: nil) }
     rejects(.invalid) { _ = try CloudWorkspace.droppedAttachmentURL(path: canonical.path, bookmark: Data()) }
