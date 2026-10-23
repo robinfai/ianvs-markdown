@@ -7,7 +7,7 @@ import Flutter
 import FlutterMacOS
 #endif
 
-/// Single-note move with a bounded, durable, app-private recovery journal.
+/// Versioned note/directory/batch moves with a bounded, durable, app-private recovery journal.
 /// Coordination is advisory. The executor must keep per-file body replacement
 /// atomic, with displaced versions retained and originals synced first.
 /// There is deliberately no rollback, unlink, or overwrite-recovery operation.
@@ -15,7 +15,7 @@ final class WorkspaceNoteTransaction {
   static let shared = WorkspaceNoteTransaction()
   static let methods: Set<String> = ["prepareWorkspaceNoteMove", "executeWorkspaceNoteMove",
     "listWorkspaceNoteMoves", "reconcileWorkspaceNoteMove", "recoverWorkspaceNoteMove",
-    "cancelPreparedWorkspaceNoteMove", "inspectWorkspaceNoteMoveStorage", "prepareWorkspaceDirectoryMove"]
+    "cancelPreparedWorkspaceNoteMove", "inspectWorkspaceNoteMoveStorage", "prepareWorkspaceDirectoryMove", "prepareWorkspaceBatchMove"]
   static let maximumFiles = 128
   static let maximumPayloadBytes = 32 * 1024 * 1024
   static let maximumJournalBytes = 192 * 1024 * 1024
@@ -123,9 +123,24 @@ final class WorkspaceNoteTransaction {
     var observedPath: String?
     var verified = false
   }
+  private struct BatchNamespace: Codable {
+    let sourcePath: String
+    let destinationPath: String
+    let kind: String
+    let identity: String
+    let sourceParentIdentity: String
+    let destinationParentIdentity: String
+    let members: [TreeMember]
+    var intent = false
+    var moved = false
+    var synced = false
+    var observedPath: String?
+    var verified = false
+  }
   private final class Record: Codable {
     var version = 1
     var namespace: DirectoryNamespace?
+    var namespaces: [BatchNamespace]?
     let transactionId: String
     let rootPath: String
     let rootIdentity: String
@@ -209,6 +224,7 @@ final class WorkspaceNoteTransaction {
         switch method {
         case "prepareWorkspaceNoteMove": return try prepare(root: root, id: id, arguments: arguments)
         case "prepareWorkspaceDirectoryMove": return try prepareDirectory(root: root, id: id, arguments: arguments)
+        case "prepareWorkspaceBatchMove": return try prepareBatch(root: root, id: id, arguments: arguments)
         case "cancelPreparedWorkspaceNoteMove":
           let record = try load(id)
           guard let session = sessions[id], arguments["token"] as? String == session.token,
@@ -389,7 +405,9 @@ final class WorkspaceNoteTransaction {
         guard kind == mode_t(S_IFDIR) || kind == mode_t(S_IFREG) else { throw Failure("dependency_unavailable") }
         if kind == mode_t(S_IFDIR) { pending.append(child) }
         let logicalPath: String
-        if let record = directoryRecord, record.namespace?.moved == true {
+        if let record = directoryRecord, record.version == 3 {
+          logicalPath = batchPath(path, record: record, inverse: true)
+        } else if let record = directoryRecord, record.namespace?.moved == true {
           logicalPath = mapDirectoryPath(path, source: record.destinationPath, destination: record.sourcePath)
         } else { logicalPath = path }
         if excluding.contains(logicalPath) { continue }
@@ -447,6 +465,7 @@ final class WorkspaceNoteTransaction {
   }
 
   private func validateReadSet(_ record: Record, session: Session) throws {
+    if record.version == 3 { try validateBatchReadSet(record, scope: session.scope, session: session); return }
     if record.version == 2 { try validateDirectoryReadSet(record, scope: session.scope, session: session); return }
     do {
       try point("beforeSemanticScan")
@@ -672,6 +691,7 @@ final class WorkspaceNoteTransaction {
 
   private func execute(root: URL, id: String, token: String?) throws -> [String: Any] {
     let record = try load(id)
+    if record.version == 3 { return try executeBatch(root: root, record: record, token: token) }
     if record.version == 2 { return try executeDirectory(root: root, record: record, token: token) }
     guard !record.cancelled else { return result(record) }
     guard let session = sessions[id], token == session.token else {
@@ -1054,11 +1074,14 @@ final class WorkspaceNoteTransaction {
   }
 
   private func hasEvidenceOfMutation(_ record: Record) -> Bool {
-    record.namespace?.intent == true || record.namespace?.moved == true || record.entries.contains { $0.intent != nil || $0.stagedIdentity != nil || $0.writeRevision != nil || $0.moveRevision != nil || $0.state == "uncertain" }
+    record.namespaces?.contains(where: { $0.intent || $0.moved }) == true || record.namespace?.intent == true || record.namespace?.moved == true || record.entries.contains { $0.intent != nil || $0.stagedIdentity != nil || $0.writeRevision != nil || $0.moveRevision != nil || $0.state == "uncertain" }
   }
   private func markUnverifiable(_ record: Record) {
     revokeUnpersisted(record)
     if record.namespace != nil { record.namespace?.verified = false; record.namespace?.observedPath = nil }
+    if let roots = record.namespaces {
+      for index in roots.indices { record.namespaces?[index].verified = false; record.namespaces?[index].observedPath = nil }
+    }
     for index in record.entries.indices { record.entries[index].state = "uncertain"; record.entries[index].actualPath = nil; record.entries[index].actualRevision = nil; record.entries[index].artifactState = "uncertain" }
     for index in record.recoveries.indices where record.recoveries[index].state == "applied" {
       record.recoveries[index].state = "uncertain"
@@ -1066,6 +1089,7 @@ final class WorkspaceNoteTransaction {
     record.phase = "uncertain"
   }
   private func reconcile(_ record: Record, scope: WorkspaceTextScope) throws {
+    if record.version == 3 { try reconcileBatch(record, scope: scope); return }
     if record.version == 2 { try reconcileDirectory(record, scope: scope); return }
     guard try scopeIdentity(scope) == record.rootIdentity else { markUnverifiable(record); throw Failure("scope_changed") }
     if record.cancelled {
@@ -1320,7 +1344,8 @@ final class WorkspaceNoteTransaction {
   private func retryEligible(_ record: Record) -> Bool {
     // This describes the last durable observation, not a new grant. Rendering
     // must not discover and then lose an unpersisted dependency conflict.
-    (record.version == 1 || (record.namespace?.intent == false && record.namespace?.moved == false)) &&
+    (record.version == 1 || (record.version == 2 && record.namespace?.intent == false && record.namespace?.moved == false) ||
+      (record.version == 3 && record.namespaces?.allSatisfy({ !$0.intent && !$0.moved }) == true)) &&
     !record.cancelled && !record.consistencyConflict && record.phase != "completed" &&
       sessions[record.transactionId] != nil &&
       record.entries.allSatisfy { ($0.state == "pending" || $0.state == "applied") && $0.intent == nil }
@@ -1339,7 +1364,7 @@ final class WorkspaceNoteTransaction {
       },
       "retainedArtifacts": record.entries.compactMap { entry -> [String: Any]? in
         guard let path = entry.artifactPath, entry.artifactState != "pending" else { return nil }
-        return ["path": record.namespace?.moved == true ? mapDirectoryPath(path, source: record.sourcePath, destination: record.destinationPath) : path, "state": entry.artifactState,
+        return ["path": artifactLocation(path, record: record), "state": entry.artifactState,
                 "verified": entry.artifactState == "retained" || entry.artifactState == "staged"]
       },
       "recoveryPaths": record.recoveries.filter { $0.state == "applied" }.map(\.path),
@@ -1356,6 +1381,15 @@ final class WorkspaceNoteTransaction {
         "verified": namespace.verified, "memberCount": namespace.members.count]
       if let path = namespace.observedPath { receipt["actualPath"] = path }
       value["namespace"] = receipt
+    }
+    if let roots = record.namespaces {
+      value["namespaces"] = roots.map { root -> [String: Any] in
+        var row: [String: Any] = ["sourcePath": root.sourcePath, "destinationPath": root.destinationPath,
+          "kind": root.kind, "identity": root.identity, "moved": root.moved, "synced": root.synced,
+          "verified": root.verified, "memberCount": root.members.count]
+        if let path = root.observedPath { row["actualPath"] = path }
+        return row
+      }
     }
     if let code = record.code { value["code"] = code }
     if let session = sessions[record.transactionId], value["retryAllowed"] as? Bool == true { value["token"] = session.token }
@@ -1396,10 +1430,11 @@ final class WorkspaceNoteTransaction {
     try checkCapacityNeeds(reservations.map { try capacityNeed($0.0, count: $0.1, context: context) })
   }
   private func parentCapacity(_ scope: WorkspaceTextScope, path: String, identity: String,
-                              count: Int, context: String) throws -> CapacityNeed {
+                              count: Int, context: String, directory: Bool = false) throws -> CapacityNeed {
     // Extract bounded volume metadata and close this temporary descriptor now;
     // do not hold 2 * 128 extra descriptors alongside the pinned live session.
-    let parent = try Parent(scope: scope, components: components(path))
+    let parts = try WorkspaceTextScope.textComponents(path, directory: directory)
+    let parent = try Parent(scope: scope, components: parts)
     guard parent.identity == identity else { throw Failure("parent_changed") }
     try verifyParent(scope: scope, path: path, parent: parent)
     let need = try capacityNeed(parent.descriptor, count: count, context: context)
@@ -1408,6 +1443,7 @@ final class WorkspaceNoteTransaction {
   }
 
   private func checkMutationParents(_ record: Record, scope: WorkspaceTextScope) throws {
+    if record.version == 3 { try checkBatchParents(record, scope: scope); return }
     if record.version == 2 { try checkDirectoryParents(record, scope: scope); return }
     var devices: [String: Int32] = [:]
     for entry in record.entries {
@@ -1442,6 +1478,20 @@ final class WorkspaceNoteTransaction {
         guard let entry = record.entries.first(where: { $0.path == item.sourcePath }) else { throw Failure("journal_invalid") }
         needs.append(try parentCapacity(scope, path: item.path, identity: item.parentIdentity,
                                         count: entry.original.count, context: context))
+      }
+    } else if record.version == 3 {
+      guard let roots = record.namespaces else { throw Failure("journal_invalid") }
+      for root in roots {
+        for (path, identity) in [(root.sourcePath, root.sourceParentIdentity), (root.destinationPath, root.destinationParentIdentity)] {
+          needs.append(try parentCapacity(scope, path: path, identity: identity, count: 0, context: context,
+                                          directory: root.kind == "directory"))
+        }
+      }
+      for entry in record.entries {
+        let path = batchPath(entry.path, record: record)
+        let parentIdentity = path == entry.path ? entry.parentIdentity : entry.destinationParentIdentity
+        let bytes = entry.artifactPath != nil && entry.stagedIdentity == nil ? entry.replacement.count : 0
+        needs.append(try parentCapacity(scope, path: path, identity: parentIdentity, count: bytes, context: context))
       }
     } else if record.version == 2 {
       guard let namespace = record.namespace else { throw Failure("journal_invalid") }
@@ -1682,14 +1732,15 @@ final class WorkspaceNoteTransaction {
   /// reopen paths, reconcile, save, or initialize any directory.
   private func decodeRecord(_ data: Data, id: String) throws -> Record {
     let record = try JSONDecoder().decode(Record.self, from: data)
-    guard (record.version == 1 || record.version == 2), record.transactionId == id, (record.version == 2 || record.entries.count > 0),
+    guard (1...3).contains(record.version), record.transactionId == id, (record.version != 1 || record.entries.count > 0),
           record.entries.count <= Self.maximumFiles, record.recoveries.count <= Self.maximumFiles,
           record.entries.reduce(0, { $0 + $1.original.count + $1.replacement.count }) <= Self.maximumPayloadBytes,
           Set(record.entries.map(\.path)).count == record.entries.count,
-          (record.version == 2 || record.entries.filter({ $0.path == record.sourcePath }).count == 1) else { throw Failure("journal_invalid") }
-    if record.version == 2 { try validateDirectoryManifest(record) }
+          (record.version != 1 || record.entries.filter({ $0.path == record.sourcePath }).count == 1) else { throw Failure("journal_invalid") }
+    if record.version == 3 { try validateBatchManifest(record) }
+    else if record.version == 2 { guard record.namespaces == nil else { throw Failure("journal_invalid") }; try validateDirectoryManifest(record) }
     else {
-      guard record.namespace == nil else { throw Failure("journal_invalid") }
+      guard record.namespace == nil, record.namespaces == nil else { throw Failure("journal_invalid") }
       _ = try components(record.sourcePath); _ = try components(record.destinationPath)
     }
     for entry in record.entries {
@@ -2178,6 +2229,409 @@ final class WorkspaceNoteTransaction {
     try save(record)
   }
 
+  // MARK: - v3 bounded batch, one global text plan and per-root move receipts
+
+  /// Each path is projected once against the immutable original root list. A
+  /// partial batch uses only durable/in-flight moved bits, never a chained map.
+  private func batchPath(_ path: String, record: Record, inverse: Bool = false, final: Bool = false) -> String {
+    for root in record.namespaces ?? [] where final || root.moved {
+      let source = inverse ? root.destinationPath : root.sourcePath
+      let destination = inverse ? root.sourcePath : root.destinationPath
+      if path.utf8.elementsEqual(source.utf8) { return destination }
+      if root.kind == "directory", path.utf8.starts(with: (source + "/").utf8) {
+        return destination + String(decoding: path.utf8.dropFirst(source.utf8.count), as: UTF8.self)
+      }
+    }
+    return path
+  }
+
+  private func artifactLocation(_ path: String, record: Record) -> String {
+    if record.version == 3 { return batchPath(path, record: record) }
+    return record.namespace?.moved == true ? mapDirectoryPath(path, source: record.sourcePath, destination: record.destinationPath) : path
+  }
+
+  private func validateBatchManifest(_ record: Record) throws {
+    guard record.namespace == nil, let roots = record.namespaces, (2...8).contains(roots.count),
+          record.sourcePath == roots[0].sourcePath, record.destinationPath == roots[0].destinationPath,
+          roots.map(\.sourcePath) == roots.map(\.sourcePath).sorted(by: { $0.utf8.lexicographicallyPrecedes($1.utf8) }),
+          roots.reduce(0, { $0 + $1.members.count }) <= 256,
+          roots.flatMap(\.members).filter({ $0.kind == "directory" }).count <= 64 else { throw Failure("invalid_batch_plan") }
+    func folded(_ path: String) -> String { path.precomposedStringWithCanonicalMapping.lowercased() }
+    let targetParents = try roots.map { try WorkspaceFileScope.relativeComponents($0.destinationPath).dropLast().joined(separator: "/") }
+    guard Set(targetParents).count == 1 else { throw Failure("batch_target_mismatch") }
+    var sources = Set<String>(); var targets = Set<String>(); var allMembers = Set<String>(); var notes = Set<String>()
+    for root in roots {
+      try directoryPaths(root.sourcePath, root.destinationPath)
+      let sourceParts = try WorkspaceFileScope.relativeComponents(root.sourcePath)
+      let targetParts = try WorkspaceFileScope.relativeComponents(root.destinationPath)
+      guard ["note", "directory"].contains(root.kind), !sourceParts.contains(where: { $0.hasPrefix(".") }),
+            !targetParts.contains(where: { $0.hasPrefix(".") }),
+            sourceParts.last!.utf8.elementsEqual(targetParts.last!.utf8),
+            sources.insert(folded(root.sourcePath)).inserted, targets.insert(folded(root.destinationPath)).inserted,
+            !root.members.isEmpty, !root.synced || root.moved,
+            let first = root.members.first(where: { $0.path.utf8.elementsEqual(root.sourcePath.utf8) }),
+            first.kind == root.kind, first.identity == root.identity,
+            root.kind == "directory" || root.members.count == 1 else { throw Failure("invalid_batch_plan") }
+      for member in root.members {
+        let parts = try WorkspaceFileScope.relativeComponents(member.path)
+        guard !parts.contains(where: { $0.hasPrefix(".") }), allMembers.insert(member.path).inserted,
+              member.path == root.sourcePath || (root.kind == "directory" && member.path.hasPrefix(root.sourcePath + "/")),
+              ["directory", "note", "image"].contains(member.kind), member.identity == Self.identity(member.revision),
+              member.revision.utf8.count <= 200 else { throw Failure("invalid_batch_plan") }
+        _ = try WorkspaceFileScope.relativeComponents(batchPath(member.path, record: record, final: true))
+        if member.kind == "note" { notes.insert(member.path) }
+      }
+    }
+    for (index, root) in roots.enumerated() {
+      let source = folded(root.sourcePath)
+      for (otherIndex, other) in roots.enumerated() {
+        let otherSource = folded(other.sourcePath); let target = folded(other.destinationPath)
+        guard index == otherIndex || (!source.hasPrefix(otherSource + "/") && !otherSource.hasPrefix(source + "/")),
+              target != source, !target.hasPrefix(source + "/"), !source.hasPrefix(target + "/") else {
+          throw Failure("overlapping_batch_move")
+        }
+      }
+    }
+    let paths = Set(record.entries.map(\.path))
+    guard notes.isSubset(of: paths), record.entries.count <= Self.maximumFiles else { throw Failure("batch_note_missing") }
+    for entry in record.entries {
+      let rootNote = roots.first { $0.kind == "note" && $0.sourcePath == entry.path }
+      guard entry.destinationPath.utf8.elementsEqual(batchPath(entry.path, record: record, final: true).utf8),
+            notes.contains(entry.path) || entry.original != entry.replacement,
+            rootNote != nil || entry.parentIdentity == entry.destinationParentIdentity,
+            rootNote != nil || entry.moveRevision == nil else { throw Failure("invalid_batch_plan") }
+      if let rootNote {
+        guard entry.expectedIdentity == rootNote.identity, entry.parentIdentity == rootNote.sourceParentIdentity,
+              entry.destinationParentIdentity == rootNote.destinationParentIdentity else { throw Failure("invalid_batch_plan") }
+      }
+    }
+    let insideArtifacts = record.entries.compactMap(\.artifactPath).filter { path in
+      roots.contains { $0.kind == "directory" && path.hasPrefix($0.sourcePath + "/") }
+    }
+    guard allMembers.count + insideArtifacts.count <= 256,
+          try JSONEncoder().encode(roots).count + insideArtifacts.reduce(0, { $0 + 3 * $1.utf8.count + 1024 }) + 16_384 <= 1024 * 1024 else {
+      throw Failure("batch_tree_budget")
+    }
+  }
+
+  private func prepareBatch(root: URL, id: String, arguments: [String: Any]) throws -> [String: Any] {
+    guard try !exists(id) else { throw Failure("transaction_id_reused") }
+    guard let rows = arguments["roots"] as? [[String: Any]], (2...8).contains(rows.count),
+          let files = arguments["files"] as? [[String: Any]], files.count <= Self.maximumFiles else { throw Failure("invalid_batch_plan") }
+    let scope = try WorkspaceTextScope(root); let rootIdentity = try scopeIdentity(scope)
+    let journalPath = journalURL.resolvingSymlinksInPath().standardizedFileURL.path
+    guard journalPath != scope.rootURL.path, !journalPath.hasPrefix(scope.rootURL.path + "/"),
+          !scope.rootURL.path.hasPrefix(journalPath + "/") else { throw Failure("journal_scope_overlap") }
+    var parents: [String: Parent] = [:]; var directories: [String: Parent] = [:]
+    func pin(_ path: String) throws -> Parent {
+      if let value = parents[path] { return value }
+      let parts = try WorkspaceFileScope.relativeComponents(path); let key = parts.dropLast().joined(separator: "/")
+      let value = try directories[key] ?? Parent(scope: scope, components: parts)
+      directories[key] = value; parents[path] = value; return value
+    }
+    var roots: [BatchNamespace] = []
+    for row in rows {
+      guard let source = row["sourcePath"] as? String, let destination = row["destinationPath"] as? String,
+            let kind = row["kind"] as? String, ["note", "directory"].contains(kind) else { throw Failure("invalid_batch_plan") }
+      try directoryPaths(source, destination)
+      let members: [TreeMember]
+      if kind == "directory" {
+        guard let tree = row["tree"] as? [String: Any], tree["complete"] as? Bool == true,
+              tree["sourcePath"] as? String == source, tree["rootIdentity"] as? String == rootIdentity,
+              let issues = tree["issues"] as? [[String: Any]], issues.isEmpty else { throw Failure("invalid_tree") }
+        let expected = try treeMembers(tree["members"])
+        members = try inspectDirectory(scope, source: source)
+        guard members == expected, tree["sourceIdentity"] as? String == members.first(where: { $0.path == source })?.identity else {
+          throw Failure("directory_tree_changed")
+        }
+      } else {
+        guard row["tree"] == nil else { throw Failure("invalid_batch_plan") }
+        _ = try components(source); _ = try components(destination)
+        let snapshot = try read(scope, path: source)
+        members = [TreeMember(path: source, kind: "note", revision: snapshot.revision, identity: snapshot.identity)]
+      }
+      guard let member = members.first(where: { $0.path == source }) else { throw Failure("invalid_tree") }
+      try directoryDestinationAbsent(scope, path: destination)
+      let sourceParent = try pin(source); let targetParent = try pin(destination)
+      roots.append(BatchNamespace(sourcePath: source, destinationPath: destination, kind: kind, identity: member.identity,
+        sourceParentIdentity: sourceParent.identity, destinationParentIdentity: targetParent.identity,
+        members: members, observedPath: source, verified: true))
+    }
+    roots.sort { $0.sourcePath.utf8.lexicographicallyPrecedes($1.sourcePath.utf8) }
+    let expectedCatalog = try metadata(arguments["catalog"]); let actualCatalog = try catalog(scope)
+    func catalogRows(_ values: [Metadata]) -> [String] { values.map { "\($0.path)|\($0.revision)|\($0.isDirectory)|\($0.local)" }.sorted() }
+    guard catalogRows(expectedCatalog) == catalogRows(actualCatalog) else { throw Failure("catalog_changed") }
+    let assets = try metadata(arguments["assets"] ?? [[String: Any]](), assets: true)
+    let record = Record(id: id, scope: scope, rootIdentity: rootIdentity, source: roots[0].sourcePath,
+      destination: roots[0].destinationPath, digest: "", entries: [])
+    record.version = 3; record.namespaces = roots
+    let movedNotes = Set(roots.flatMap(\.members).filter { $0.kind == "note" }.map(\.path))
+    var entries: [Entry] = []; var seen = Set<String>(); var bytes = 0
+    for file in files {
+      guard let path = file["path"] as? String, let to = file["destinationPath"] as? String,
+            let revision = file["expectedRevision"] as? String,
+            let original = file["expectedBytes"] as? FlutterStandardTypedData, original.elementSize == 1,
+            let replacement = file["replacementBytes"] as? FlutterStandardTypedData, replacement.elementSize == 1,
+            seen.insert(path).inserted, to.utf8.elementsEqual(batchPath(path, record: record, final: true).utf8),
+            movedNotes.contains(path) || original.data != replacement.data,
+            String(data: original.data, encoding: .utf8) != nil, String(data: replacement.data, encoding: .utf8) != nil else { throw Failure("invalid_batch_plan") }
+      _ = try components(path); _ = try components(to)
+      bytes += original.data.count + replacement.data.count
+      guard bytes <= Self.maximumPayloadBytes else { throw Failure("payload_limit") }
+      let parent = try pin(path)
+      let noteRoot = roots.first { $0.kind == "note" && $0.sourcePath == path }
+      let destinationParent: Parent
+      if noteRoot != nil { destinationParent = try pin(to) }
+      else { destinationParent = parent; parents[to] = parent }
+      let snapshot = try read(scope, path: path)
+      guard snapshot.revision == revision, snapshot.bytes == original.data,
+            actualCatalog.contains(where: { $0.path == path && !$0.isDirectory && $0.revision == revision }) else { throw Failure("file_conflict") }
+      let artifact = original.data == replacement.data ? nil :
+        (Array(try components(path).dropLast()) + [".linefold-note-move-\(id)-\(entries.count).md"]).joined(separator: "/")
+      entries.append(Entry(path: path, destinationPath: to, expectedRevision: revision, expectedIdentity: snapshot.identity,
+        parentIdentity: parent.identity, destinationParentIdentity: destinationParent.identity,
+        original: original.data, replacement: replacement.data, originalHash: Self.hash(original.data), replacementHash: Self.hash(replacement.data),
+        permissions: snapshot.permissions, owner: snapshot.owner, group: snapshot.group, protectionClass: snapshot.protectionClass,
+        artifactPath: artifact, actualPath: path, actualRevision: revision))
+    }
+    // Construct the immutable digest only after the complete shared entry set is known.
+    let fingerprint = try digest(actualCatalog, excluding: Set(entries.map(\.path)), assets: assets, scope: scope)
+    let prepared = Record(id: id, scope: scope, rootIdentity: rootIdentity, source: roots[0].sourcePath,
+      destination: roots[0].destinationPath, digest: fingerprint, entries: entries)
+    prepared.version = 3; prepared.namespaces = roots
+    try validateBatchManifest(prepared)
+    for entry in entries {
+      if let artifact = entry.artifactPath, try !pathAbsent(scope, path: artifact, artifact: true) { throw Failure("artifact_exists") }
+    }
+    let session = Session(scope: scope, parents: parents, assets: assets)
+    try validateBatchReadSet(prepared, scope: scope, session: session)
+    try checkPlanCapacity(prepared, scope: scope, context: "prepare")
+    try point("beforePreparedJournal"); try save(prepared); sessions[id] = session
+    try point("afterPreparedJournal")
+    return result(prepared)
+  }
+
+  private func checkBatchParents(_ record: Record, scope: WorkspaceTextScope) throws {
+    guard let roots = record.namespaces else { throw Failure("journal_invalid") }
+    var paths: [(String, String)] = roots.flatMap { [($0.sourcePath, $0.sourceParentIdentity), ($0.destinationPath, $0.destinationParentIdentity)] }
+    paths += record.entries.map { entry in
+      let path = batchPath(entry.path, record: record)
+      return (path, path == entry.path ? entry.parentIdentity : entry.destinationParentIdentity)
+    }
+    var devices = Set<Int32>()
+    for (path, identity) in paths {
+      let parent = try Parent(scope: scope, components: WorkspaceFileScope.relativeComponents(path))
+      guard parent.identity == identity else { throw Failure("parent_changed") }
+      try verifyParent(scope: scope, path: path, parent: parent)
+      var info = stat(); guard fstat(parent.descriptor, &info) == 0 else { throw Failure("parent_unavailable") }
+      let access = faccessat(parent.descriptor, ".", W_OK | X_OK, AT_EACCESS) == 0
+      guard access && (parentAccessOverride?(path, access) ?? access) else { throw Failure("parent_not_writable") }
+      devices.insert(parentDeviceOverride?(path, info.st_dev) ?? info.st_dev)
+    }
+    guard devices.count == 1 else { throw Failure("cross_volume_move") }
+  }
+
+  private func validateBatchReadSet(_ record: Record, scope: WorkspaceTextScope, session: Session? = nil) throws {
+    do {
+      try point("beforeSemanticScan")
+      guard !record.consistencyConflict, let roots = record.namespaces,
+            try scopeIdentity(scope) == record.rootIdentity else { throw Failure("dependency_conflict") }
+      var artifactRevisions: [String: String] = [:]
+      for entry in record.entries {
+        let path = batchPath(entry.path, record: record)
+        let parent = try Parent(scope: scope, components: components(path))
+        let expectedParent = path == entry.path ? entry.parentIdentity : entry.destinationParentIdentity
+        guard parent.identity == expectedParent else { throw Failure("parent_changed") }
+        if let session { _ = try verifyParent(session, path: path) }
+        let snapshot = try read(scope, path: path)
+        let revision = entry.moveRevision ?? entry.writeRevision ?? entry.expectedRevision
+        guard snapshot.revision == revision, snapshot.identity == Self.identity(revision),
+              snapshot.bytes == (entry.writeRevision == nil ? entry.original : entry.replacement),
+              matchesMetadata(snapshot, entry: entry) else { throw Failure("file_conflict") }
+        if let originalArtifact = entry.artifactPath {
+          let artifactPath = batchPath(originalArtifact, record: record)
+          if let revision = entry.displacedRevision ?? entry.stagedRevision {
+            let artifact = try read(scope, path: artifactPath, artifact: true)
+            guard artifact.revision == revision, artifact.identity == Self.identity(revision),
+                  artifact.bytes == (entry.displacedRevision == nil ? entry.replacement : entry.original),
+                  matchesMetadata(artifact, entry: entry) else { throw Failure("artifact_changed") }
+            artifactRevisions[artifactPath] = artifact.revision
+          } else { guard try pathAbsent(scope, path: artifactPath, artifact: true) else { throw Failure("artifact_changed") } }
+        }
+      }
+      for root in roots {
+        if root.moved {
+          guard try pathAbsent(scope, path: root.sourcePath, directory: root.kind == "directory") else { throw Failure("source_reappeared") }
+        } else { try directoryDestinationAbsent(scope, path: root.destinationPath) }
+        for (path, identity) in [(root.sourcePath, root.sourceParentIdentity), (root.destinationPath, root.destinationParentIdentity)] {
+          let parent = try Parent(scope: scope, components: WorkspaceFileScope.relativeComponents(path))
+          guard parent.identity == identity else { throw Failure("parent_changed") }
+          if let session { _ = try verifyParent(session, path: path) }
+        }
+        if root.kind == "directory" {
+          let actual = try inspectDirectory(scope, source: root.moved ? root.destinationPath : root.sourcePath, artifacts: artifactRevisions)
+          guard actual.count == root.members.count else { throw Failure("directory_tree_changed") }
+          let byPath = Dictionary(uniqueKeysWithValues: actual.map { ($0.path, $0) })
+          for member in root.members {
+            guard let current = byPath[batchPath(member.path, record: record)], current.kind == member.kind else { throw Failure("directory_tree_changed") }
+            if member.kind == "directory" {
+              guard current.identity == member.identity else { throw Failure("directory_tree_changed") }
+            } else {
+              let entry = record.entries.first { $0.path == member.path }
+              let revision = entry?.moveRevision ?? entry?.writeRevision ?? member.revision
+              guard current.revision == revision, current.identity == Self.identity(revision) else { throw Failure("directory_tree_changed") }
+            }
+          }
+        }
+      }
+      _ = try catalog(scope)
+      let copies = record.recoveries.filter { $0.state == "applied" }.map(\.path)
+      guard try dependencyDigest(scope, excluding: Set(record.entries.map(\.path) + copies), directoryRecord: record) == record.catalogDigest else { throw Failure("catalog_changed") }
+      if let session {
+        for asset in session.assets {
+          let path = batchPath(asset.path, record: record); let parts = try WorkspaceFileScope.relativeComponents(path)
+          let parent = try scope.parentDescriptor(parts); defer { close(parent) }; var info = stat()
+          guard fstatat(parent, parts.last!, &info, AT_SYMLINK_NOFOLLOW) == 0,
+                WorkspaceFileScope.revision(info) == asset.revision else { throw Failure("asset_changed") }
+        }
+      }
+      try scope.verifyRootLocation()
+    } catch { observeConsistencyConflict(record); throw error }
+  }
+
+  private func executeBatch(root: URL, record: Record, token: String?) throws -> [String: Any] {
+    guard !record.cancelled else { return result(record) }
+    guard let session = sessions[record.transactionId], token == session.token else {
+      try reconcileBatch(record, scope: try authorizedScope(root, record: record)); record.code = "new_preview_required"; return result(record)
+    }
+    do {
+      _ = try authorizedScope(root, record: record)
+      guard record.namespaces?.allSatisfy({ !$0.intent && !$0.moved }) == true,
+            record.entries.allSatisfy({ $0.intent == nil && $0.state == "pending" }) else { throw Failure("new_preview_required") }
+      try validateBatchReadSet(record, scope: session.scope, session: session)
+      try checkPlanCapacity(record, scope: session.scope, context: "execute")
+      for index in record.entries.indices where record.entries[index].original != record.entries[index].replacement {
+        try writeEntry(record, index: index, session: session)
+      }
+      for index in (record.namespaces ?? []).indices { try moveBatchRoot(record, index: index, session: session) }
+      try validateBatchReadSet(record, scope: session.scope, session: session)
+      for index in record.entries.indices {
+        record.entries[index].actualPath = record.entries[index].destinationPath
+        record.entries[index].actualRevision = record.entries[index].moveRevision ?? record.entries[index].writeRevision ?? record.entries[index].expectedRevision
+        record.entries[index].state = "applied"
+      }
+      record.completionVerified = true; record.phase = "completed"; record.code = nil
+      try point("beforeBatchCompletion"); try save(record); sessions.removeValue(forKey: record.transactionId)
+    } catch {
+      let failure = code(error); revokeUnpersisted(record)
+      if let durable = try? load(record.transactionId) {
+        do { try reconcileBatch(durable, scope: session.scope) } catch { markUnverifiable(durable) }
+        durable.code = failure; try? save(durable); return result(durable)
+      }
+      markUnverifiable(record); record.code = failure
+    }
+    return result(record)
+  }
+
+  private func moveBatchRoot(_ record: Record, index: Int, session: Session) throws {
+    guard let root = record.namespaces?[index] else { throw Failure("journal_invalid") }
+    let scope = session.scope; let coordinator = NSFileCoordinator()
+    try coordinate(scope, path: root.sourcePath, destination: root.destinationPath,
+                   coordinator: coordinator, directory: root.kind == "directory") {
+      try validateBatchReadSet(record, scope: scope, session: session)
+      let sourceParent = try verifyParent(session, path: root.sourcePath)
+      let targetParent = try verifyParent(session, path: root.destinationPath)
+      let source = try WorkspaceFileScope.relativeComponents(root.sourcePath).last!
+      let destination = try WorkspaceFileScope.relativeComponents(root.destinationPath).last!
+      try point("beforeBatchMoveIntent:\(index)")
+      record.phase = "moving"; record.namespaces?[index].intent = true; record.namespaces?[index].verified = false
+      try save(record); try point("afterBatchMoveIntent:\(index)")
+      try checkPlanCapacity(record, scope: scope, context: "batchMove")
+      try validateBatchReadSet(record, scope: scope, session: session)
+      try directoryDestinationAbsent(scope, path: root.destinationPath)
+      _ = try verifyParent(session, path: root.sourcePath); _ = try verifyParent(session, path: root.destinationPath)
+      let sourceURL = scope.rootURL.appendingPathComponent(root.sourcePath, isDirectory: root.kind == "directory")
+      let targetURL = scope.rootURL.appendingPathComponent(root.destinationPath, isDirectory: root.kind == "directory")
+      coordinator.item(at: sourceURL, willMoveTo: targetURL)
+      try point("beforeBatchExclusiveRename:\(index)")
+      guard renameatx_np(sourceParent.descriptor, source, targetParent.descriptor, destination, UInt32(RENAME_EXCL)) == 0 else { throw Failure("exclusive_batch_move_failed") }
+      coordinator.item(at: sourceURL, didMoveTo: targetURL)
+      record.namespaces?[index].moved = true; record.namespaces?[index].observedPath = root.destinationPath
+      try point("afterBatchRename:\(index)")
+      if root.kind == "note" {
+        guard let entryIndex = record.entries.firstIndex(where: { $0.path == root.sourcePath }) else { throw Failure("journal_invalid") }
+        let entry = record.entries[entryIndex]; let observed = try read(scope, path: root.destinationPath)
+        guard observed.identity == Self.identity(entry.writeRevision ?? entry.expectedRevision),
+              observed.bytes == (entry.writeRevision == nil ? entry.original : entry.replacement), matchesMetadata(observed, entry: entry) else { throw Failure("move_uncertain") }
+        record.entries[entryIndex].moveRevision = observed.revision
+        try syncObserved(scope, files: [(root.destinationPath, observed, false, targetParent)],
+          parents: [(root.sourcePath, sourceParent), (root.destinationPath, targetParent)], absent: root.sourcePath, operation: "BatchNoteMove\(index)")
+      } else {
+        let fd = try scope.directoryDescriptor(WorkspaceTextScope.textComponents(root.destinationPath, directory: true)); defer { close(fd) }
+        try syncDescriptor(fd, operation: "BatchDirectoryMoveRootSync\(index)")
+        try syncDescriptor(sourceParent.descriptor, operation: "BatchDirectoryMoveSourceParentSync\(index)")
+        try syncDescriptor(targetParent.descriptor, operation: "BatchDirectoryMoveDestinationParentSync\(index)")
+      }
+      try validateBatchReadSet(record, scope: scope, session: session)
+      record.namespaces?[index].synced = true; record.namespaces?[index].intent = false; record.namespaces?[index].verified = true
+      try point("beforeBatchMoveReceipt:\(index)"); try save(record); try point("afterBatchMoveReceipt:\(index)")
+    }
+  }
+
+  private func reconcileBatch(_ record: Record, scope: WorkspaceTextScope) throws {
+    guard try scopeIdentity(scope) == record.rootIdentity else { markUnverifiable(record); throw Failure("scope_changed") }
+    guard let roots = record.namespaces else { throw Failure("journal_invalid") }
+    if record.cancelled { record.phase = "cancelled"; try save(record); return }
+    var ambiguous = record.entries.contains { $0.intent != nil }
+    for (index, root) in roots.enumerated() {
+      record.namespaces?[index].verified = false; record.namespaces?[index].observedPath = nil
+      var locations: [String] = []
+      for path in [root.sourcePath, root.destinationPath] {
+        if root.kind == "directory" {
+          if let fd = try? scope.directoryDescriptor(WorkspaceTextScope.textComponents(path, directory: true)) {
+            var info = stat(); if fstat(fd, &info) == 0, Self.identity(info) == root.identity { locations.append(path) }; close(fd)
+          }
+        } else if let entry = record.entries.first(where: { $0.path == root.sourcePath }),
+                  let snapshot = try? read(scope, path: path),
+                  snapshot.identity == Self.identity(entry.writeRevision ?? entry.expectedRevision),
+                  snapshot.bytes == (entry.writeRevision == nil ? entry.original : entry.replacement), matchesMetadata(snapshot, entry: entry) {
+          locations.append(path)
+        }
+      }
+      if locations.count == 1 { record.namespaces?[index].observedPath = locations[0] }
+      if root.intent || locations != [root.moved ? root.destinationPath : root.sourcePath] { ambiguous = true }
+    }
+    if ambiguous {
+      revokeUnpersisted(record)
+      for index in record.entries.indices {
+        record.entries[index].state = "uncertain"; record.entries[index].actualPath = nil
+        record.entries[index].actualRevision = nil; record.entries[index].artifactState = "uncertain"
+      }
+      record.phase = hasEvidenceOfMutation(record) ? "partial" : "blocked"; record.code = "batch_reconciliation_required"
+      reconcileRecoveries(record, scope: scope); try save(record); return
+    }
+    do {
+      reconcileRecoveries(record, scope: scope); try validateBatchReadSet(record, scope: scope)
+      for index in roots.indices { record.namespaces?[index].verified = true }
+      for index in record.entries.indices {
+        let entry = record.entries[index]; let path = batchPath(entry.path, record: record)
+        record.entries[index].actualPath = path; record.entries[index].actualRevision = entry.moveRevision ?? entry.writeRevision ?? entry.expectedRevision
+        record.entries[index].state = path != entry.path || entry.writeRevision != nil ? "applied" : "pending"
+      }
+      if roots.allSatisfy({ $0.moved && $0.synced }), record.completionVerified { record.phase = "completed" }
+      else { record.phase = hasEvidenceOfMutation(record) ? "partial" : "prepared" }
+    } catch {
+      revokeUnpersisted(record)
+      for index in record.entries.indices {
+        record.entries[index].state = "uncertain"; record.entries[index].actualPath = nil
+        record.entries[index].actualRevision = nil; record.entries[index].artifactState = "uncertain"
+      }
+      for index in roots.indices { record.namespaces?[index].verified = false }
+      record.phase = hasEvidenceOfMutation(record) ? "partial" : "blocked"; record.code = code(error)
+    }
+    try save(record)
+  }
+
   // MARK: - Bounded, observation-only storage inventory
 
   private static var cleanupUnavailableCode: String {
@@ -2366,7 +2820,7 @@ final class WorkspaceNoteTransaction {
     var result = ArtifactStorage()
     for entry in record.entries {
       guard let originalPath = entry.artifactPath else { continue }
-      let path = record.namespace?.moved == true ? mapDirectoryPath(originalPath, source: record.sourcePath, destination: record.destinationPath) : originalPath
+      let path = artifactLocation(originalPath, record: record)
       result.count += 1
       do {
         guard DispatchTime.now().uptimeNanoseconds < deadline else { throw Failure("artifact_unavailable") }
@@ -2509,6 +2963,13 @@ final class WorkspaceNoteTransaction {
         "artifactCount": artifacts.count, "artifactMissingCount": artifacts.missing,
         "artifactUnknownCount": artifacts.unknown, "blockers": reasons.sorted()
       ]
+      if record.version == 2 || record.version == 3 {
+        row["version"] = record.version
+        // Historical receipts only; inspection must never reconcile, save, or
+        // turn these recorded flags into current namespace evidence.
+        if record.version == 2 { row["namespace"] = result(record)["namespace"] }
+        else { row["namespaces"] = result(record)["namespaces"] }
+      }
       row["storedCode"] = record.code.map { $0 as Any } ?? NSNull()
       row["artifactBytes"] = artifacts.unknown == 0 ? artifacts.bytes as Any : NSNull()
       row["allocatedBytes"] = artifacts.unknown == 0 ? artifacts.allocated as Any : NSNull()

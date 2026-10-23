@@ -11,7 +11,7 @@ import 'package:linefold/src/widgets/workspace_note_move_preview.dart';
 
 void main() {
   testWidgets(
-    'folder and multi-item move requires an explicit unmaintained choice',
+    'selection without a complete preview requires an explicit unmaintained choice',
     (tester) async {
       WorkspaceNoteMoveDecision? result;
       await tester.pumpWidget(
@@ -34,7 +34,7 @@ void main() {
       expect(find.textContaining('will NOT be updated'), findsOneWidget);
       expect(
         find.textContaining(
-          'Multi-item reference maintenance is not supported',
+          'No complete reference preview is available for this selection',
         ),
         findsOneWidget,
       );

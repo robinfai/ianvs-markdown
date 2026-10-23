@@ -1165,6 +1165,95 @@ class WorkspaceController extends ChangeNotifier {
     }
   }
 
+  /// A single read-only global proposal. Never invokes per-root move executors.
+  Future<WorkspaceNoteMovePlan> previewBatchNoteMove(
+    List<String> sources,
+    List<String> destinations, {
+    WorkspaceMovePreviewCancellation? cancellation,
+  }) async {
+    final root = _workspaceRoot;
+    final epoch = index.epoch;
+    if (root == null ||
+        sources.length < 2 ||
+        sources.length > 8 ||
+        sources.length != destinations.length ||
+        [...sources, ...destinations].any((path) => !p.isWithin(root, path))) {
+      throw StateError('Choose 2–8 roots inside the selected workspace.');
+    }
+    final cancelled = cancellation ?? WorkspaceMovePreviewCancellation();
+    _movePreviewCancellations.add(cancelled);
+    final elapsed = Stopwatch()..start();
+    void checkCurrent() {
+      cancelled.throwIfCancelled();
+      if (_disposed ||
+          _workspaceRoot != root ||
+          index.epoch != epoch ||
+          elapsed.elapsed > const Duration(seconds: 20)) {
+        throw StateError('The batch preview expired or its workspace changed.');
+      }
+    }
+
+    try {
+      final snapshot = await references.refresh(refreshMetadata: true);
+      checkCurrent();
+      final roots = <WorkspaceBatchMoveRoot>[];
+      var members = 0;
+      for (var i = 0; i < sources.length; i++) {
+        final from = p.posix.relative(sources[i], from: root);
+        final to = p.posix.relative(destinations[i], from: root);
+        final directory = snapshot.catalog.entries.any(
+          (entry) => entry.relativePath == from && entry.isDirectory,
+        );
+        if (!directory) {
+          members++;
+          roots.add(WorkspaceBatchMoveRoot(source: from, destination: to));
+          continue;
+        }
+        final id = newWorkspaceNoteTransactionId();
+        final pending = moveTreeInspector.inspect(root, from, id);
+        final detach = cancelled.listen(() {
+          unawaited(moveTreeInspector.cancel(id).catchError((Object _) {}));
+        });
+        try {
+          final tree = await pending;
+          checkCurrent();
+          members += tree.members.length;
+          if (members > 256) {
+            throw StateError('The batch exceeds the shared 256-member limit.');
+          }
+          roots.add(
+            WorkspaceBatchMoveRoot(source: from, destination: to, tree: tree),
+          );
+        } finally {
+          detach();
+        }
+      }
+      AttachmentIndex? attachments;
+      try {
+        attachments = AttachmentIndex(await movePreviewAttachments.list(root));
+      } on Object {
+        /* Unknown attachment coverage remains a planner blocker. */
+      }
+      checkCurrent();
+      final result = await WorkspaceNoteMovePlanner(references).buildBatch(
+        snapshot: snapshot,
+        roots: roots,
+        dirtySessionIds: {
+          for (final document in _documents)
+            if (document.controller.isDirty) document.id,
+        },
+        attachments: attachments,
+        isCancelled: () =>
+            cancelled.isCancelled ||
+            elapsed.elapsed > const Duration(seconds: 20),
+      );
+      checkCurrent();
+      return result;
+    } finally {
+      _movePreviewCancellations.remove(cancelled);
+    }
+  }
+
   /// Called only after the user approves this exact, displayed proposal.
   /// No automatic fallback to the unmaintained file operation is permitted.
   Future<WorkspaceNoteMoveRecord> executeNoteMove(
@@ -1211,6 +1300,8 @@ class WorkspaceController extends ChangeNotifier {
               (record.namespace?.verified != true ||
                   record.namespace?.moved != false ||
                   record.namespace?.actualPath != plan.sourcePath)) ||
+          (plan.kind == WorkspaceNoteMovePlanKind.batch &&
+              record.namespaces.any((root) => !root.atSource)) ||
           record.entries.any(
             (entry) =>
                 !entry.unchanged || entry.revision != baseline[entry.path],
@@ -1250,8 +1341,12 @@ class WorkspaceController extends ChangeNotifier {
             }
           }
         }
-        if (plan.kind == WorkspaceNoteMovePlanKind.directory) {
-          final from = p.posix.join(root, plan.sourcePath);
+        for (final source in [
+          if (plan.kind == WorkspaceNoteMovePlanKind.directory) plan.sourcePath,
+          if (plan.kind == WorkspaceNoteMovePlanKind.batch)
+            ...plan.batchRoots.map((root) => root.source),
+        ]) {
+          final from = p.posix.join(root, source);
           // Directory bookmarks follow their inode too. Invalidate every moved
           // favorite, not only notes whose text will be rewritten.
           for (final path
@@ -1335,6 +1430,10 @@ class WorkspaceController extends ChangeNotifier {
         }
         await _afterFileOperation([
           p.posix.dirname(p.posix.join(root, plan.sourcePath)),
+          for (final move in plan.batchRoots) ...[
+            p.posix.dirname(p.posix.join(root, move.source)),
+            p.posix.dirname(p.posix.join(root, move.destination)),
+          ],
           for (final file in plan.files)
             p.posix.dirname(
               p.posix.join(
@@ -1345,6 +1444,8 @@ class WorkspaceController extends ChangeNotifier {
                     : file.path,
               ),
             ),
+          for (final file in plan.files)
+            p.posix.dirname(p.posix.join(root, file.destination)),
           p.posix.dirname(p.posix.join(root, plan.destinationPath)),
         ]);
         if (_workspaceRoot == root &&
@@ -1379,14 +1480,33 @@ class WorkspaceController extends ChangeNotifier {
     final receipts = {for (final entry in record.entries) entry.path: entry};
     final directory = plan.kind == WorkspaceNoteMovePlanKind.directory;
     final namespace = record.namespace;
-    if ((directory &&
+    final batch = plan.kind == WorkspaceNoteMovePlanKind.batch;
+    final roots = {for (final root in record.namespaces) root.sourcePath: root};
+    final batchMismatch =
+        batch &&
+        (record.version != 3 ||
+            namespace != null ||
+            roots.length != record.namespaces.length ||
+            roots.length != plan.batchRoots.length ||
+            plan.batchRoots.any((root) {
+              final receipt = roots[root.source];
+              return receipt == null ||
+                  receipt.destinationPath != root.destination ||
+                  receipt.kind != (root.isDirectory ? 'directory' : 'note') ||
+                  receipt.memberCount != (root.tree?.members.length ?? 1) ||
+                  (root.isDirectory &&
+                      receipt.identity != root.tree!.sourceIdentity);
+            }));
+    if (batchMismatch ||
+        (directory &&
             (record.version != 2 ||
                 namespace == null ||
                 namespace.sourcePath != plan.sourcePath ||
                 namespace.destinationPath != plan.destinationPath ||
                 namespace.identity != plan.treeSnapshot?.sourceIdentity ||
                 namespace.memberCount != plan.treeSnapshot?.members.length)) ||
-        (!directory && (record.version != 1 || namespace != null)) ||
+        (!batch && record.namespaces.isNotEmpty) ||
+        (!directory && !batch && (record.version != 1 || namespace != null)) ||
         record.transactionId != id ||
         receipts.length != record.entries.length ||
         receipts.length != plan.files.length ||
@@ -1443,6 +1563,7 @@ class WorkspaceController extends ChangeNotifier {
     phase: 'partial',
     version: record.version,
     namespace: record.namespace,
+    namespaces: record.namespaces,
     code: 'client_verification_failed',
     message: message,
     entries: [
@@ -1481,9 +1602,14 @@ class WorkspaceController extends ChangeNotifier {
     final directory = plan.kind == WorkspaceNoteMovePlanKind.directory;
     final namespace = record.namespace;
     final movedFavorites = <String>[];
-    if (directory && namespace?.completed == true) {
-      final oldPath = p.posix.join(root, plan.sourcePath);
-      final newPath = p.posix.join(root, plan.destinationPath);
+    final completedRoots = <WorkspaceDirectoryMoveReceipt>[
+      if (directory && namespace?.completed == true) namespace!,
+      if (plan.kind == WorkspaceNoteMovePlanKind.batch)
+        ...record.namespaces.where((root) => root.completed),
+    ];
+    for (final movedRoot in completedRoots) {
+      final oldPath = p.posix.join(root, movedRoot.sourcePath);
+      final newPath = p.posix.join(root, movedRoot.destinationPath);
       movedFavorites.addAll(
         browser.favoritePaths
             .where((path) => path == oldPath || p.posix.isWithin(oldPath, path))
@@ -1524,10 +1650,21 @@ class WorkspaceController extends ChangeNotifier {
         continue;
       }
       final actual = receipt.actualPath!;
-      if (directory &&
-          file.path != file.destination &&
+      final owningRoot = plan.kind == WorkspaceNoteMovePlanKind.batch
+          ? record.namespaces
+                .where(
+                  (root) =>
+                      file.path == root.sourcePath ||
+                      (root.kind == 'directory' &&
+                          p.posix.isWithin(root.sourcePath, file.path)),
+                )
+                .singleOrNull
+          : null;
+      if (file.path != file.destination &&
           actual == file.destination &&
-          namespace?.completed != true) {
+          ((directory && namespace?.completed != true) ||
+              (plan.kind == WorkspaceNoteMovePlanKind.batch &&
+                  owningRoot?.completed != true))) {
         failed.add(file.path);
         for (final document in matching) {
           document.hasExternalChanges = true;
@@ -1583,7 +1720,7 @@ class WorkspaceController extends ChangeNotifier {
         }
         _watch(document);
       }
-      if (!directory &&
+      if (plan.kind == WorkspaceNoteMovePlanKind.singleNote &&
           file.path == plan.sourcePath &&
           actual == plan.destinationPath) {
         browser.remap(p.posix.join(root, file.path), newPath);
@@ -1642,6 +1779,7 @@ class WorkspaceController extends ChangeNotifier {
         phase: record.phase,
         version: record.version,
         namespace: record.namespace,
+        namespaces: record.namespaces,
         entries: record.entries,
         code: record.code ?? 'persistent_access_unavailable',
         message: [

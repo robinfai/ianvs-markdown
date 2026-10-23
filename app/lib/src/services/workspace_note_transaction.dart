@@ -7,8 +7,10 @@ import 'apple_workspace_service.dart';
 import 'workspace_index_source.dart';
 import 'workspace_note_move_plan.dart';
 import 'workspace_note_move_storage.dart';
+import 'workspace_move_receipt.dart';
 
 export 'workspace_note_move_storage.dart';
+export 'workspace_move_receipt.dart';
 
 /// A receipt is evidence about one native observation, not an ACID guarantee.
 class WorkspaceNoteMoveReceipt {
@@ -76,64 +78,6 @@ class WorkspaceNoteRecoveryReceipt {
   final String state;
 }
 
-/// Independent evidence that the directory itself moved, including empty trees.
-class WorkspaceDirectoryMoveReceipt {
-  const WorkspaceDirectoryMoveReceipt({
-    required this.sourcePath,
-    required this.destinationPath,
-    required this.identity,
-    required this.memberCount,
-    this.actualPath,
-    this.moved = false,
-    this.synced = false,
-    this.verified = false,
-  });
-  final String sourcePath;
-  final String destinationPath;
-  final String identity;
-  final int memberCount;
-  final String? actualPath;
-  final bool moved;
-  final bool synced;
-  final bool verified;
-  bool get completed =>
-      moved && synced && verified && actualPath == destinationPath;
-
-  factory WorkspaceDirectoryMoveReceipt.fromMap(Map<Object?, Object?> value) {
-    final source = value['sourcePath'];
-    final destination = value['destinationPath'];
-    final identity = value['identity'];
-    final count = value['memberCount'];
-    final actual = value['actualPath'];
-    if (source is! String ||
-        destination is! String ||
-        !safeWorkspaceRelativePath(source) ||
-        !safeWorkspaceRelativePath(destination) ||
-        identity is! String ||
-        !RegExp(r'^\d+:\d+$').hasMatch(identity) ||
-        count is! int ||
-        count < 1 ||
-        count > 256 ||
-        (actual != null && actual != source && actual != destination) ||
-        value['moved'] is! bool ||
-        value['synced'] is! bool ||
-        value['verified'] is! bool ||
-        (value['synced'] == true && value['moved'] != true)) {
-      throw const FormatException('Invalid directory namespace receipt.');
-    }
-    return WorkspaceDirectoryMoveReceipt(
-      sourcePath: source,
-      destinationPath: destination,
-      identity: identity,
-      memberCount: count,
-      actualPath: actual as String?,
-      moved: value['moved'] == true,
-      synced: value['synced'] == true,
-      verified: value['verified'] == true,
-    );
-  }
-}
-
 class WorkspaceNoteMoveRecord {
   WorkspaceNoteMoveRecord({
     required this.transactionId,
@@ -142,13 +86,15 @@ class WorkspaceNoteMoveRecord {
     this.token,
     this.version = 1,
     this.namespace,
+    List<WorkspaceBatchMoveReceipt> namespaces = const [],
     this.code,
     this.message,
     this.retryAllowed = false,
     List<String> recoveryPaths = const [],
     List<WorkspaceNoteMoveArtifact> retainedArtifacts = const [],
     List<WorkspaceNoteRecoveryReceipt> recoveryEntries = const [],
-  }) : entries = List.unmodifiable(entries),
+  }) : namespaces = List.unmodifiable(namespaces),
+       entries = List.unmodifiable(entries),
        recoveryPaths = List.unmodifiable(recoveryPaths),
        retainedArtifacts = List.unmodifiable(retainedArtifacts),
        recoveryEntries = List.unmodifiable(recoveryEntries);
@@ -156,6 +102,7 @@ class WorkspaceNoteMoveRecord {
   final String transactionId;
   final int version;
   final WorkspaceDirectoryMoveReceipt? namespace;
+  final List<WorkspaceBatchMoveReceipt> namespaces;
   final String phase;
   final String? token;
   final String? code;
@@ -167,8 +114,22 @@ class WorkspaceNoteMoveRecord {
   final List<WorkspaceNoteRecoveryReceipt> recoveryEntries;
   bool get completed =>
       phase == 'completed' &&
-      ((version == 1 && namespace == null && entries.isNotEmpty) ||
-          (version == 2 && namespace?.completed == true)) &&
+      ((version == 1 &&
+              namespace == null &&
+              namespaces.isEmpty &&
+              entries.isNotEmpty) ||
+          (version == 2 &&
+              namespaces.isEmpty &&
+              namespace?.completed == true) ||
+          (version == 3 &&
+              namespace == null &&
+              namespaces.length >= 2 &&
+              namespaces.length <= 8 &&
+              namespaces.map((r) => r.sourcePath).toSet().length ==
+                  namespaces.length &&
+              namespaces.map((r) => r.destinationPath).toSet().length ==
+                  namespaces.length &&
+              namespaces.every((r) => r.completed))) &&
       entries.map((entry) => entry.path).toSet().length == entries.length &&
       entries.every(
         (entry) =>
@@ -183,12 +144,15 @@ class WorkspaceNoteMoveRecord {
     final id = value['transactionId'];
     final version = value['version'] ?? 1;
     final namespace = value['namespace'];
+    final namespaces = value['namespaces'];
     final phase = value['phase'];
     final entries = value['entries'];
     final copies = value['recoveryPaths'] ?? const <Object?>[];
     final artifacts = value['retainedArtifacts'] ?? const <Object?>[];
     final recoveryEntries = value['recoveryEntries'] ?? const <Object?>[];
-    if ((version != 1 && version != 2) ||
+    if ((version != 1 && version != 2 && version != 3) ||
+        (version != 3 && namespaces != null) ||
+        (version == 3 && (namespace != null || namespaces is! List)) ||
         (version == 1 && namespace != null) ||
         (version == 2 && namespace is! Map) ||
         id is! String ||
@@ -215,6 +179,9 @@ class WorkspaceNoteMoveRecord {
       namespace: namespace is Map
           ? WorkspaceDirectoryMoveReceipt.fromMap(namespace)
           : null,
+      namespaces: version == 3
+          ? parseWorkspaceBatchReceipts(namespaces)
+          : const [],
       phase: phase,
       entries: [
         for (final entry in entries)
@@ -369,10 +336,27 @@ class AppleWorkspaceNoteTransactionStore
       });
     }
     final directory = plan.kind == WorkspaceNoteMovePlanKind.directory;
+    final batch = plan.kind == WorkspaceNoteMovePlanKind.batch;
+    final roots = [...plan.batchRoots]
+      ..sort((a, b) => a.source.compareTo(b.source));
     return _call(
-      directory ? 'prepareWorkspaceDirectoryMove' : 'prepareWorkspaceNoteMove',
+      batch
+          ? 'prepareWorkspaceBatchMove'
+          : directory
+          ? 'prepareWorkspaceDirectoryMove'
+          : 'prepareWorkspaceNoteMove',
       {
         if (directory) 'tree': plan.treeSnapshot!.toNative(),
+        if (batch)
+          'roots': [
+            for (final root in roots)
+              {
+                'sourcePath': root.source,
+                'destinationPath': root.destination,
+                'kind': root.isDirectory ? 'directory' : 'note',
+                if (root.tree != null) 'tree': root.tree!.toNative(),
+              },
+          ],
         'path': plan.root!,
         'transactionId': transactionId,
         'sourcePath': plan.sourcePath,

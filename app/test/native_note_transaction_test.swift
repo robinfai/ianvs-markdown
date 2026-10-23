@@ -244,6 +244,14 @@ struct NativeNoteTransactionAcceptance {
     try run("directoryDependencyRaces", directoryDependencyRaces)
     try run("directoryMixedJournalCapacity", directoryMixedJournalCapacity)
     try run("directoryPresenterNotifications", directoryPresenterNotifications)
+    try run("batchSuccessAndRestart", batchSuccessAndRestart)
+    try run("batchTwoNotesAndGlobalRewrite", batchTwoNotesAndGlobalRewrite)
+    try run("batchEmptyAndImageDirectories", batchEmptyAndImageDirectories)
+    try run("batchPreflight", batchPreflight)
+    try run("batchFaultReceipts", batchFaultReceipts)
+    try run("batchPartialAndRaces", batchPartialAndRaces)
+    try run("batchSharedQuotaAndPresenters", batchSharedQuotaAndPresenters)
+
     print("PASS: synthetic atomic note transactions, receipts, recovery, races, bounds and privacy")
   }
   private static func run(_ name: String, _ body: () throws -> Void) throws {
@@ -1651,6 +1659,227 @@ struct NativeNoteTransactionAcceptance {
         if scenario == "success" { try require(result["phase"] as? String == "completed", "Presenter directory success: \(result)") }
         else { try require(result["phase"] as? String != "completed", "Presenter notification is not durability") }
       }
+    }
+  }
+
+
+  private static func batchRequest(_ f: Fixture,
+      roots: [(String, String)] = [("notes", "directory"), ("unrelated.md", "note")],
+      replacements: [String: Data]? = nil) throws -> [String: Any] {
+    let values = replacements ?? [f.source: directorySource(f), f.incoming:
+      Data("# Index\r\n[Old](archive/notes/Old.md#section \"title\")\r\n".utf8)]
+    var rootRows: [[String: Any]] = []; var destinations: [String: String] = [:]
+    for (source, kind) in roots {
+      let target = "archive/" + String(source.split(separator: "/").last!)
+      var row: [String: Any] = ["sourcePath": source, "destinationPath": target, "kind": kind]
+      if kind == "directory" {
+        let tree = CloudWorkspace.inspectWorkspaceDirectoryMoveTree(f.root, relativePath: source, requestId: UUID().uuidString)
+        row["tree"] = tree
+        for member in tree["members"] as? [[String: Any]] ?? [] where member["kind"] as? String == "note" {
+          let path = member["path"] as! String
+          destinations[path] = target + String(path.dropFirst(source.count))
+        }
+      } else { destinations[source] = target }
+      rootRows.append(row)
+    }
+    for path in values.keys where destinations[path] == nil { destinations[path] = path }
+    let files: [[String: Any]] = try destinations.keys.sorted().map { path in
+      ["path": path, "destinationPath": destinations[path]!, "expectedRevision": try f.revision(path),
+       "expectedBytes": FlutterStandardTypedData(bytes: try f.bytes(path)),
+       "replacementBytes": FlutterStandardTypedData(bytes: try values[path] ?? f.bytes(path))]
+    }
+    return ["path": f.root.path, "transactionId": UUID().uuidString, "roots": rootRows,
+            "files": files, "catalog": try f.catalogRows(),
+            "assets": [["path": "assets/image.png", "revision": try f.revision("assets/image.png")]]]
+  }
+
+  private static func batchSuccessAndRestart() throws {
+    let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+    try f.write("notes/nested/image.png", Data([1, 2, 3]))
+    let imageIdentity = try f.identity("notes/nested/image.png")
+    let request = try batchRequest(f)
+    let prepared = try f.invoke(executor, "prepareWorkspaceBatchMove", request)
+    try require(prepared["phase"] as? String == "prepared" && prepared["version"] as? Int == 3, "Batch prepare: \(prepared)")
+    let result = try f.invoke(executor, "executeWorkspaceNoteMove", f.command(request, token: prepared["token"]))
+    try require(result["phase"] as? String == "completed", "Batch completion: \(result)")
+    let roots = result["namespaces"] as! [[String: Any]]
+    try require(roots.count == 2 && roots.allSatisfy { $0["moved"] as? Bool == true && $0["synced"] as? Bool == true && $0["verified"] as? Bool == true }, "Every root needs its own receipt")
+    try require(!f.exists("notes") && !f.exists("unrelated.md"), "Both old roots absent")
+    try require(try f.identity("archive/notes/nested/image.png") == imageIdentity, "Image identity retained")
+    try require(try f.bytes("archive/notes/Old.md") == directorySource(f), "Moved note relative image path")
+    try require(try f.bytes("archive/unrelated.md") == f.originalUnrelated, "Unchanged root note still moved")
+    let restarted = WorkspaceNoteTransaction(journalDirectory: f.journal)
+    let observed = try f.invoke(restarted, "reconcileWorkspaceNoteMove", f.command(request))
+    try require(observed["phase"] as? String == "completed", "Durable vector survives restart: \(observed)")
+    let journal = f.journal.appendingPathComponent((request["transactionId"] as! String).lowercased() + ".json")
+    let before = try Data(contentsOf: journal)
+    let inventory = try f.invoke(restarted, "inspectWorkspaceNoteMoveStorage", ["path": f.root.path])
+    try require(inventory["observedComplete"] as? Bool == true && inventory["artifactUnknownCount"] as? Int == 0, "Relocated artifacts inventoried: \(inventory)")
+    let stored = (inventory["records"] as! [[String: Any]])[0]
+    try require(stored["version"] as? Int == 3 && (stored["namespaces"] as? [Any])?.count == 2 && stored["historicalObservation"] as? Bool == true, "Readonly historical vector")
+    try require(try Data(contentsOf: journal) == before, "Inventory cannot rewrite journal")
+    var recovery = f.command(request); recovery["relativeDirectory"] = "archive"
+    let recovered = try f.invoke(restarted, "recoverWorkspaceNoteMove", recovery)
+    let copies = recovered["recoveryPaths"] as! [String]
+    try require(copies.count == 3 && (try copies.map(f.bytes)).contains(f.originalSource), "All original text recoverable without old root paths")
+  }
+
+  private static func batchTwoNotesAndGlobalRewrite() throws {
+    let f = try Fixture()
+    let a = Data("\u{FEFF}[peer](../unrelated.md#h \"title\")\r\n".utf8)
+    let b = Data("[peer](notes/Old.md)\n".utf8)
+    let incoming = Data("[A](notes/Old.md) [B](unrelated.md)\n".utf8)
+    try f.write(f.source, a); try f.write(f.unrelated, b); try f.write(f.incoming, incoming)
+    let replacements = [f.source: Data("\u{FEFF}[peer](unrelated.md#h \"title\")\r\n".utf8),
+      f.unrelated: Data("[peer](Old.md)\n".utf8), f.incoming: Data("[A](archive/Old.md) [B](archive/unrelated.md)\n".utf8)]
+    let request = try batchRequest(f, roots: [(f.source, "note"), (f.unrelated, "note")], replacements: replacements)
+    let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+    let prepared = try f.invoke(executor, "prepareWorkspaceBatchMove", request)
+    try require(prepared["phase"] as? String == "prepared", "Two notes prepare: \(prepared)")
+    var incomingWrites = 0
+    executor.fault = { point in if point == "afterWriteReceipt" { incomingWrites += 1 } }
+    let result = try f.invoke(executor, "executeWorkspaceNoteMove", f.command(request, token: prepared["token"]))
+    try require(result["phase"] as? String == "completed" && incomingWrites == 3, "Each of three text entries writes exactly once: \(result)")
+    try require(try f.bytes("archive/Old.md") == replacements[f.source] && f.bytes("archive/unrelated.md") == replacements[f.unrelated] && f.bytes(f.incoming) == replacements[f.incoming], "Global final mutual links")
+    try require((result["retainedArtifacts"] as? [Any])?.count == 3, "One retained original per shared entry")
+  }
+
+  private static func batchEmptyAndImageDirectories() throws {
+    let f = try Fixture()
+    try f.manager.createDirectory(at: f.url("empty"), withIntermediateDirectories: true)
+    try f.write("pictures/photo.png", Data([8, 9]))
+    let request = try batchRequest(f, roots: [("empty", "directory"), ("pictures", "directory")], replacements: [:])
+    let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+    let prepared = try f.invoke(executor, "prepareWorkspaceBatchMove", request)
+    try require(prepared["phase"] as? String == "prepared", "Zero-entry batch prepare: \(prepared)")
+    let result = try f.invoke(executor, "executeWorkspaceNoteMove", f.command(request, token: prepared["token"]))
+    try require(result["phase"] as? String == "completed" && (result["entries"] as? [Any])?.isEmpty == true, "No fake text required: \(result)")
+    try require(f.exists("archive/empty") && (try f.bytes("archive/pictures/photo.png")) == Data([8, 9]), "Both real namespaces moved")
+    let restarted = WorkspaceNoteTransaction(journalDirectory: f.journal)
+    let inventory = try f.invoke(restarted, "inspectWorkspaceNoteMoveStorage", ["path": f.root.path])
+    let row = (inventory["records"] as! [[String: Any]])[0]
+    try require(row["entryCount"] as? Int == 0 && (row["namespaces"] as? [Any])?.count == 2, "Zero-entry storage protocol")
+    let observed = try f.invoke(restarted, "reconcileWorkspaceNoteMove", f.command(request))
+    try require(observed["phase"] as? String == "completed", "Zero-entry durable vector")
+  }
+
+  private static func batchPreflight() throws {
+    for scenario in ["oneRoot", "nineRoots", "overlap", "duplicate", "targetInside", "differentTarget", "rename", "missingNote", "opaqueTarget", "caseTarget", "oldArtifact", "symlink", "crossVolume", "capacity", "sharedMembers"] {
+      let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      if scenario == "oldArtifact" { try f.write("notes/.linefold-note-move-old.md", Data([1])) }
+      if scenario == "symlink" { try f.manager.createSymbolicLink(atPath: f.url("notes/link.png").path, withDestinationPath: f.url("assets/image.png").path) }
+      if scenario == "opaqueTarget" { try f.write("archive/notes", Data([1])) }
+      if scenario == "caseTarget" { try f.write("archive/NoTeS", Data([1])) }
+      var request = try batchRequest(f); var roots = request["roots"] as! [[String: Any]]
+      switch scenario {
+      case "oneRoot": roots.removeLast()
+      case "nineRoots": roots = Array(repeating: roots[0], count: 9)
+      case "overlap": roots[1] = ["sourcePath": f.source, "destinationPath": "archive/Old.md", "kind": "note"]
+      case "duplicate": roots[1] = roots[0]
+      case "targetInside": roots[1]["destinationPath"] = "notes/unrelated.md"
+      case "differentTarget": roots[1]["destinationPath"] = "assets/unrelated.md"
+      case "rename": roots[1]["destinationPath"] = "archive/Renamed.md"
+      case "missingNote": request["files"] = (request["files"] as! [[String: Any]]).filter { $0["path"] as? String != f.unrelated }
+      case "crossVolume": executor.parentDeviceOverride = { path, device in path.hasPrefix("archive/") ? device + 1 : device }
+      case "capacity": executor.availableBytesOverride = { _, _, _ in 0 }
+      case "sharedMembers":
+        for index in 0..<254 { try f.write("notes/p\(index).png", Data([1])) }
+        request = try batchRequest(f); roots = request["roots"] as! [[String: Any]]
+      default: break
+      }
+      request["roots"] = roots
+      let result = try f.invoke(executor, "prepareWorkspaceBatchMove", request)
+      try require(result["phase"] as? String == "blocked", "Invalid batch must fail before write: \(scenario), \(result)")
+      try require(try f.bytes(f.source) == f.originalSource && f.bytes(f.incoming) == f.originalIncoming && f.bytes(f.unrelated) == f.originalUnrelated, "Preflight preserved all text: \(scenario)")
+    }
+  }
+
+  private static func batchFaultReceipts() throws {
+    let points = ["beforeStageIntent", "afterStageCreate", "beforeStageSync", "beforeStageReceipt", "afterStageReceipt",
+      "beforeWriteIntent", "afterWrite", "beforeWriteReceipt", "afterWriteReceipt",
+      "beforeBatchMoveIntent:0", "afterBatchMoveIntent:0", "beforeBatchExclusiveRename:0", "afterBatchRename:0",
+      "beforeBatchDirectoryMoveSourceParentSync0", "beforeBatchMoveReceipt:0", "afterBatchMoveReceipt:0",
+      "beforeBatchMoveIntent:1", "afterBatchMoveIntent:1", "beforeBatchExclusiveRename:1", "afterBatchRename:1",
+      "beforeBatchNoteMove1FileSync", "beforeBatchMoveReceipt:1", "afterBatchMoveReceipt:1", "beforeBatchCompletion"]
+    for boundary in points {
+      let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let request = try batchRequest(f); let prepared = try f.invoke(executor, "prepareWorkspaceBatchMove", request)
+      try require(prepared["phase"] as? String == "prepared", "Fault prepare: \(prepared)")
+      var reached = false
+      executor.fault = { point in if point == boundary { reached = true; throw InjectedFailure(boundary: point) } }
+      let result = try f.invoke(executor, "executeWorkspaceNoteMove", f.command(request, token: prepared["token"]))
+      try require(reached && result["phase"] as? String != "completed" && result["retryAllowed"] as? Bool == false, "Fault exact boundary and no completion/replay: \(boundary), \(result)")
+      let locations = [f.source, "archive/notes/Old.md"].filter(f.exists)
+      try require(locations.count == 1, "One preserved directory namespace at \(boundary)")
+      let bytes = try f.bytes(locations[0]); try require(bytes == f.originalSource || bytes == directorySource(f), "No torn body at \(boundary)")
+      try require([f.unrelated, "archive/unrelated.md"].filter(f.exists).count == 1, "One preserved root note at \(boundary)")
+      let journal = f.journal.appendingPathComponent((request["transactionId"] as! String).lowercased() + ".json")
+      let json = try JSONSerialization.jsonObject(with: Data(contentsOf: journal)) as! [String: Any]
+      let originals = (json["entries"] as! [[String: Any]]).compactMap { row -> Data? in
+        guard let encoded = row["original"] as? String else { return nil }; return Data(base64Encoded: encoded)
+      }
+      try require(originals.contains(f.originalSource) && originals.contains(f.originalIncoming), "Durable original text preserved")
+      let restarted = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let observed = try f.invoke(restarted, "reconcileWorkspaceNoteMove", f.command(request))
+      try require(observed["phase"] as? String != "completed", "Restart cannot invent final all-roots completion: \(boundary)")
+      let before = try f.relativeFiles(under: f.root)
+      _ = try f.invoke(restarted, "executeWorkspaceNoteMove", f.command(request, token: prepared["token"]))
+      try require(try f.relativeFiles(under: f.root) == before, "Old token cannot continue next root: \(boundary)")
+    }
+  }
+
+  private static func batchPartialAndRaces() throws {
+    for scenario in ["stopBeforeSecond", "occupiedSecond", "outsideEdit", "newMember", "oldRootReappears", "artifactChange"] {
+      let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let request = try batchRequest(f); let prepared = try f.invoke(executor, "prepareWorkspaceBatchMove", request)
+      var reached = false
+      executor.fault = { point in
+        guard !reached, point == "beforeBatchMoveIntent:1" else { return }; reached = true
+        switch scenario {
+        case "stopBeforeSecond": throw InjectedFailure(boundary: point)
+        case "occupiedSecond": try f.write("archive/unrelated.md", Data("Another writer".utf8))
+        case "outsideEdit": try f.overwriteSameInode(f.incoming, Data("Concurrent text".utf8))
+        case "newMember": try f.write("archive/notes/new.png", Data([1]))
+        case "oldRootReappears": try f.write("notes/new.md", Data("New directory".utf8))
+        default:
+          let artifacts = try f.relativeFiles(under: f.root).filter { $0.hasPrefix("archive/notes/.linefold-note-move-") }
+          try require(artifacts.count == 1, "Moved artifact fixture")
+          try f.overwriteSameInode(artifacts[0], Data("Changed original".utf8))
+        }
+      }
+      let result = try f.invoke(executor, "executeWorkspaceNoteMove", f.command(request, token: prepared["token"]))
+      try require(reached && result["phase"] as? String != "completed", "Second-root race stops batch: \(scenario), \(result)")
+      try require(f.exists("archive/notes/Old.md") && f.exists(f.unrelated), "First stays moved, second remains in source")
+      if scenario == "stopBeforeSecond" {
+        let rows = result["namespaces"] as! [[String: Any]]
+        try require(rows[0]["moved"] as? Bool == true && rows[0]["verified"] as? Bool == true && rows[1]["moved"] as? Bool == false && rows[1]["verified"] as? Bool == true, "Verified partial vector is not all-or-nothing")
+        let restarted = WorkspaceNoteTransaction(journalDirectory: f.journal)
+        let observed = try f.invoke(restarted, "reconcileWorkspaceNoteMove", f.command(request))
+        try require(observed["phase"] as? String == "partial", "Partial vector persists")
+      }
+      if scenario == "occupiedSecond" { try require(try f.bytes("archive/unrelated.md") == Data("Another writer".utf8), "No overwrite of late destination") }
+    }
+  }
+
+  private static func batchSharedQuotaAndPresenters() throws {
+    do {
+      let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal, maximumStoredRecords: 1)
+      let first = try f.request(); _ = try f.prepare(executor, first)
+      let result = try f.invoke(executor, "prepareWorkspaceBatchMove", batchRequest(f))
+      try require(result["phase"] as? String == "blocked" && result["code"] as? String == "journal_full", "v1/v3 share global slots")
+    }
+    for failSecond in [false, true] {
+      let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let request = try batchRequest(f); let prepared = try f.invoke(executor, "prepareWorkspaceBatchMove", request)
+      let directory = MovePresenter(url: f.url("notes")); let note = MovePresenter(url: f.url(f.unrelated))
+      NSFileCoordinator.addFilePresenter(directory); NSFileCoordinator.addFilePresenter(note)
+      defer { NSFileCoordinator.removeFilePresenter(directory); NSFileCoordinator.removeFilePresenter(note) }
+      if failSecond { executor.fault = { point in if point == "beforeBatchExclusiveRename:1" { try f.write("archive/unrelated.md", Data([8])) } } }
+      let result = try f.invoke(executor, "executeWorkspaceNoteMove", f.command(request, token: prepared["token"]))
+      try require(directory.moved.wait(timeout: .now() + 3) == .success, "Actually moved first root notifies presenter")
+      let noteMoved = note.moved.wait(timeout: .now() + (failSecond ? 0.2 : 3)) == .success
+      try require(noteMoved != failSecond, "Failed second rename must not announce success: \(result)")
+      try require((result["phase"] as? String == "completed") != failSecond, "Partial failure is not batch success")
     }
   }
 

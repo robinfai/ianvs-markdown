@@ -223,6 +223,12 @@ class _NoteMoveRecoveryState extends State<_NoteMoveRecovery> {
                 ),
                 Text('Journal: ${record.transactionId}'),
                 Text('Saved state: ${record.storedPhase} (historical)'),
+                for (final root in record.namespaces)
+                  Text(workspaceBatchRootStatus(root, historical: true)),
+                if (record.namespace case final root?)
+                  Text(
+                    'Last recorded directory: ${root.sourcePath} → ${root.destinationPath}; ${root.actualPath ?? 'unknown location'} (historical, not a current observation).',
+                  ),
                 if (record.storedCode != null) Text(record.storedCode!),
                 Text(
                   'Journal ${_bytes(record.journalBytes)}; artifacts ${_bytes(record.artifactBytes)}; reported allocation ${_bytes(record.allocatedBytes)}',
@@ -251,6 +257,8 @@ class _NoteMoveRecoveryState extends State<_NoteMoveRecovery> {
             if (_recoveryResult case final result?) ...[
               const SizedBox(height: 16),
               const Text('Last explicit recovery result'),
+              for (final root in result.namespaces)
+                Text(workspaceBatchRootStatus(root)),
               if (result.code != null) Text(result.code!),
               if (result.message != null) Text(result.message!),
               for (final copy in result.recoveryEntries)
@@ -320,3 +328,16 @@ String _reason(String code) => switch (code) {
     'A new move still needs its own complete preflight, including journal rewrite headroom and actual free disk space.',
   _ => 'Additional storage constraint: $code',
 };
+
+/// A root may be independently completed even when another root is uncertain.
+String workspaceBatchRootStatus(
+  WorkspaceBatchMoveReceipt root, {
+  bool historical = false,
+}) {
+  final state = root.completed
+      ? 'verified destination'
+      : root.atSource
+      ? 'verified source'
+      : 'uncertain';
+  return '${historical ? 'Last recorded: ' : ''}${root.sourcePath} → ${root.destinationPath}: $state at ${root.actualPath ?? 'unknown location'}${historical ? ' (historical, not a current observation)' : ''}.';
+}

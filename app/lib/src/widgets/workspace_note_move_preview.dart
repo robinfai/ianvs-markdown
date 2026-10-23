@@ -205,6 +205,15 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                   const SizedBox(height: 8),
                   const Text('Preparing a read-only reference preview…'),
                 ] else if (plan != null) ...[
+                  if (plan.kind == WorkspaceNoteMovePlanKind.batch) ...[
+                    const Text(
+                      'Batch reference maintenance maps all selected roots simultaneously and rewrites each affected note once. Destination vacancy and all root identities are rechecked by native preflight before any user file changes. Root moves are not all-or-nothing: a failure can leave some roots at their old locations after references have changed. Review each root receipt; never repeat a partial move blindly.',
+                    ),
+                    Text(
+                      'Selected roots: ${plan.batchRoots.length}. Shared limits: 256 members, 64 folders, 128 notes and 32 MiB recovery text.',
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   if (plan.kind == WorkspaceNoteMovePlanKind.directory) ...[
                     const Text(
                       'Directory reference maintenance moves one folder and updates affected notes. Native preflight rechecks the complete tree and destination vacancy. No merging, overwriting or automatic rollback.',
@@ -254,7 +263,7 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                     Text(
                       plan.executionSupported
                           ? 'Supported-source coverage is complete. Execution rechecks local identities and exact bytes. Files change independently; a failure can leave a partial result.'
-                          : 'Supported-source impact coverage is complete for this preview. No directory move transaction is available.',
+                          : 'Supported-source impact coverage is complete for this preview. No executor is available for this proposal.',
                     )
                   else
                     const Text(
@@ -328,7 +337,7 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                     (state.data?.$2 == true
                             ? 'The reference preview is unavailable. No complete maintenance plan could be verified.'
                             : widget.unavailable) ??
-                        'No complete reference preview is available. Multi-item reference maintenance is not supported.',
+                        'No complete reference preview is available for this selection.',
                   ),
                 if (_busy && !_confirmingRecovery) ...[
                   const SizedBox(height: 12),
@@ -351,6 +360,8 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                     Text(
                       'Directory: ${namespace.sourcePath} → ${namespace.destinationPath}; ${namespace.verified ? 'verified' : 'unverified'} at ${namespace.actualPath ?? 'unknown location'}.',
                     ),
+                  for (final root in record.namespaces)
+                    Text(workspaceBatchRootStatus(root)),
                   for (final entry in record.entries)
                     Text(
                       '${entry.path}: ${entry.state}${entry.verified ? ' (verified)' : ' (not verified)'}${entry.actualPath == null ? '' : ' at ${entry.actualPath}'}',

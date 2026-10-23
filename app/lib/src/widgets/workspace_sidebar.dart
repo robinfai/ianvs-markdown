@@ -1548,6 +1548,21 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
           destinations.single,
           cancellation: cancellation,
         );
+      } else if (sources.length > 1 &&
+          sources.length <= 8 &&
+          root != null &&
+          [
+            ...sources,
+            ...destinations,
+          ].every((path) => p.isWithin(root, path))) {
+        preview = widget.workspace.previewBatchNoteMove(
+          sources,
+          destinations,
+          cancellation: cancellation,
+        );
+      } else if (sources.length > 1) {
+        unavailable =
+            'Batch impact preview supports 2–8 roots in the selected workspace. Automatic batch execution is not available.';
       } else if (sources.length == 1) {
         unavailable =
             'This item is outside the selected workspace. Complete incoming reference coverage is unavailable.';
