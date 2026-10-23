@@ -23,6 +23,10 @@ class AttachmentImportPayload {
 abstract class AttachmentImportPlatform {
   Future<AttachmentImportPayload?> pickImage();
   Future<AttachmentImportPayload?> readClipboardImage();
+  Future<AttachmentImportPayload?> readDroppedImage(
+    String path, {
+    Uint8List? bookmark,
+  });
   Future<String> create({
     required String root,
     required String relativeDirectory,
@@ -36,9 +40,12 @@ abstract class AttachmentImportPlatform {
 class AppleAttachmentImportPlatform implements AttachmentImportPlatform {
   const AppleAttachmentImportPlatform();
 
-  Future<AttachmentImportPayload?> _read(String method) async {
+  Future<AttachmentImportPayload?> _read(
+    String method, [
+    Map<String, Object?>? arguments,
+  ]) async {
     final value = await AppleWorkspaceService.channel
-        .invokeMapMethod<String, dynamic>(method);
+        .invokeMapMethod<String, dynamic>(method, arguments);
     if (value == null) return null;
     final bytes = value['bytes'];
     if (bytes is! Uint8List || bytes.isEmpty) {
@@ -55,6 +62,14 @@ class AppleAttachmentImportPlatform implements AttachmentImportPlatform {
   @override
   Future<AttachmentImportPayload?> readClipboardImage() =>
       _read('readClipboardAttachmentImage');
+  @override
+  Future<AttachmentImportPayload?> readDroppedImage(
+    String path, {
+    Uint8List? bookmark,
+  }) => _read('readDroppedAttachmentImage', {
+    'path': path,
+    'bookmark': ?bookmark,
+  });
   @override
   Future<String> create({
     required String root,

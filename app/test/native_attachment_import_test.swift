@@ -308,6 +308,20 @@ struct AttachmentImportTests {
     let selected = source.appendingPathComponent("source.png")
     try png.write(to: selected)
     try expect(try CloudWorkspace.readPickedAttachmentImage(selected) == png)
+    let canonical = selected.resolvingSymlinksInPath()
+    let bookmark = try canonical.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil)
+    let dropped = try CloudWorkspace.droppedAttachmentURL(path: canonical.path, bookmark: bookmark)
+    try expect(dropped.path == canonical.path)
+    try expect(try CloudWorkspace.readPickedAttachmentImage(dropped) == png)
+    rejects(.invalid) { _ = try CloudWorkspace.droppedAttachmentURL(path: canonical.path, bookmark: nil) }
+    rejects(.invalid) { _ = try CloudWorkspace.droppedAttachmentURL(path: canonical.path, bookmark: Data()) }
+    rejects(.invalid) { _ = try CloudWorkspace.droppedAttachmentURL(path: canonical.path, bookmark: Data(repeating: 1, count: 1024 * 1024 + 1)) }
+    rejects(.invalid) { _ = try CloudWorkspace.droppedAttachmentURL(path: canonical.path, bookmark: Data([1, 2, 3])) }
+    rejects(.invalid) { _ = try CloudWorkspace.droppedAttachmentURL(path: canonical.path + "-different.png", bookmark: bookmark) }
+    rejects(.invalid) { _ = try CloudWorkspace.droppedAttachmentURL(path: "relative.png", bookmark: bookmark) }
+    rejects(.invalid) { _ = try CloudWorkspace.droppedAttachmentURL(path: canonical.path + "/../source.png", bookmark: bookmark) }
+    rejects(.invalid) { _ = try CloudWorkspace.droppedAttachmentURL(path: canonical.path + "\0", bookmark: bookmark) }
+
     try expect(try Data(contentsOf: selected) == png, "Picking must not move, delete, or rewrite the source")
     let link = source.appendingPathComponent("link.png")
     try manager.createSymbolicLink(at: link, withDestinationURL: selected)

@@ -25,10 +25,13 @@ class ImportSource extends FakeAttachmentSource {
 class FakeImportPlatform implements AttachmentImportPlatform {
   AttachmentImportPayload? payload = AttachmentImportPayload(tinyPng);
   int picks = 0;
+  final droppedPaths = <String>[];
+  final droppedBookmarks = <Uint8List?>[];
   int clipboardReads = 0;
   int attempts = 0;
   int collisions = 0;
   Object? writeError;
+  Object? dropReadError;
   Future<void>? beforeRead;
   Future<void>? beforeWrite;
   final files = <String, Uint8List>{};
@@ -45,6 +48,18 @@ class FakeImportPlatform implements AttachmentImportPlatform {
   Future<AttachmentImportPayload?> readClipboardImage() async {
     clipboardReads++;
     await beforeRead;
+    return payload;
+  }
+
+  @override
+  Future<AttachmentImportPayload?> readDroppedImage(
+    String path, {
+    Uint8List? bookmark,
+  }) async {
+    droppedPaths.add(path);
+    droppedBookmarks.add(bookmark);
+    await beforeRead;
+    if (dropReadError != null) throw dropReadError!;
     return payload;
   }
 
@@ -408,6 +423,13 @@ void main() {
       expect((await platform.pickImage())!.bytes, tinyPng);
       expect((await platform.readClipboardImage())!.bytes, tinyPng);
       expect(
+        (await platform.readDroppedImage(
+          '/outside/drop.png',
+          bookmark: Uint8List.fromList([1, 2]),
+        ))!.bytes,
+        tinyPng,
+      );
+      expect(
         await platform.create(
           root: '/vault',
           relativeDirectory: 'assets',
@@ -419,8 +441,13 @@ void main() {
       expect(calls.map((c) => c.method), [
         'pickAttachmentImage',
         'readClipboardAttachmentImage',
+        'readDroppedAttachmentImage',
         'createWorkspaceAttachment',
       ]);
+      expect(calls[2].arguments, {
+        'path': '/outside/drop.png',
+        'bookmark': Uint8List.fromList([1, 2]),
+      });
       expect(calls.last.arguments['bytes'], isA<Uint8List>());
     },
   );

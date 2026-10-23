@@ -104,14 +104,30 @@ final class CloudWorkspace {
         return
       }
       #if os(macOS)
-      // No clipboard observation/polling. These two entry points are called only
-      // from the editor's explicit Insert Image and Paste actions.
+      // No clipboard observation/polling. These entry points are called only
+      // from the editor's explicit Insert Image, Paste and image-drop actions.
       if method == "pickAttachmentImage" {
         self.pickAttachmentImage(result: result)
         return
       }
       if method == "readClipboardAttachmentImage" {
         self.readClipboardAttachmentImage(result: result)
+        return
+      }
+      if method == "readDroppedAttachmentImage" {
+        guard let path = arguments["path"] as? String,
+              arguments["bookmark"] == nil || arguments["bookmark"] is FlutterStandardTypedData else {
+          result(FlutterError(code: "attachment_invalid", message: "Invalid dropped image.", details: nil))
+          return
+        }
+        let bookmark = (arguments["bookmark"] as? FlutterStandardTypedData)?.data
+        self.completeAttachmentImport(result) {
+          let selected = try Self.droppedAttachmentURL(path: path, bookmark: bookmark)
+          let accessing = selected.startAccessingSecurityScopedResource()
+          defer { if accessing { selected.stopAccessingSecurityScopedResource() } }
+          return try AttachmentImportImage.prepare(
+            Self.readPickedAttachmentImage(selected), suggestedName: selected.lastPathComponent)
+        }
         return
       }
       #endif
@@ -2222,6 +2238,33 @@ extension CloudWorkspace {
         return try AttachmentImportImage.prepare(bytes, suggestedName: selected.lastPathComponent)
       }
     }
+  }
+
+  /// Resolves only this drop's temporary file capability. It is never stored,
+  /// used to enumerate a parent, or retained after the bounded source read.
+  static func droppedAttachmentURL(path: String, bookmark: Data?) throws -> URL {
+    guard path.hasPrefix("/"), !path.contains("\0"), path.utf8.count <= 4096 else {
+      throw AttachmentError.invalid
+    }
+    let supplied = URL(fileURLWithPath: path)
+    guard Data(supplied.standardizedFileURL.path.utf8) == Data(path.utf8) else {
+      throw AttachmentError.invalid
+    }
+    // No path-only fallback: promises or drag sources that omit a file grant
+    // must use explicit Import Image instead. Do not widen to a parent scope.
+    guard let bookmark, !bookmark.isEmpty, bookmark.count <= 1024 * 1024 else {
+      throw AttachmentError.invalid
+    }
+    var stale = false
+    let selected: URL
+    do {
+      selected = try URL(resolvingBookmarkData: bookmark,
+        options: [.withSecurityScope, .withoutUI, .withoutMounting],
+        relativeTo: nil, bookmarkDataIsStale: &stale)
+    } catch { throw AttachmentError.invalid }
+    guard !stale, selected.isFileURL,
+          Data(selected.path.utf8) == Data(path.utf8) else { throw AttachmentError.invalid }
+    return selected
   }
 
   static func readPickedAttachmentImage(_ selected: URL) throws -> Data {
