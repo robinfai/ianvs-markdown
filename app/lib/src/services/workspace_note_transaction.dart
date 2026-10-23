@@ -76,12 +76,72 @@ class WorkspaceNoteRecoveryReceipt {
   final String state;
 }
 
+/// Independent evidence that the directory itself moved, including empty trees.
+class WorkspaceDirectoryMoveReceipt {
+  const WorkspaceDirectoryMoveReceipt({
+    required this.sourcePath,
+    required this.destinationPath,
+    required this.identity,
+    required this.memberCount,
+    this.actualPath,
+    this.moved = false,
+    this.synced = false,
+    this.verified = false,
+  });
+  final String sourcePath;
+  final String destinationPath;
+  final String identity;
+  final int memberCount;
+  final String? actualPath;
+  final bool moved;
+  final bool synced;
+  final bool verified;
+  bool get completed =>
+      moved && synced && verified && actualPath == destinationPath;
+
+  factory WorkspaceDirectoryMoveReceipt.fromMap(Map<Object?, Object?> value) {
+    final source = value['sourcePath'];
+    final destination = value['destinationPath'];
+    final identity = value['identity'];
+    final count = value['memberCount'];
+    final actual = value['actualPath'];
+    if (source is! String ||
+        destination is! String ||
+        !safeWorkspaceRelativePath(source) ||
+        !safeWorkspaceRelativePath(destination) ||
+        identity is! String ||
+        !RegExp(r'^\d+:\d+$').hasMatch(identity) ||
+        count is! int ||
+        count < 1 ||
+        count > 256 ||
+        (actual != null && actual != source && actual != destination) ||
+        value['moved'] is! bool ||
+        value['synced'] is! bool ||
+        value['verified'] is! bool ||
+        (value['synced'] == true && value['moved'] != true)) {
+      throw const FormatException('Invalid directory namespace receipt.');
+    }
+    return WorkspaceDirectoryMoveReceipt(
+      sourcePath: source,
+      destinationPath: destination,
+      identity: identity,
+      memberCount: count,
+      actualPath: actual as String?,
+      moved: value['moved'] == true,
+      synced: value['synced'] == true,
+      verified: value['verified'] == true,
+    );
+  }
+}
+
 class WorkspaceNoteMoveRecord {
   WorkspaceNoteMoveRecord({
     required this.transactionId,
     required this.phase,
     required List<WorkspaceNoteMoveReceipt> entries,
     this.token,
+    this.version = 1,
+    this.namespace,
     this.code,
     this.message,
     this.retryAllowed = false,
@@ -94,6 +154,8 @@ class WorkspaceNoteMoveRecord {
        recoveryEntries = List.unmodifiable(recoveryEntries);
 
   final String transactionId;
+  final int version;
+  final WorkspaceDirectoryMoveReceipt? namespace;
   final String phase;
   final String? token;
   final String? code;
@@ -105,7 +167,8 @@ class WorkspaceNoteMoveRecord {
   final List<WorkspaceNoteRecoveryReceipt> recoveryEntries;
   bool get completed =>
       phase == 'completed' &&
-      entries.isNotEmpty &&
+      ((version == 1 && namespace == null && entries.isNotEmpty) ||
+          (version == 2 && namespace?.completed == true)) &&
       entries.map((entry) => entry.path).toSet().length == entries.length &&
       entries.every(
         (entry) =>
@@ -118,12 +181,17 @@ class WorkspaceNoteMoveRecord {
 
   factory WorkspaceNoteMoveRecord.fromMap(Map<Object?, Object?> value) {
     final id = value['transactionId'];
+    final version = value['version'] ?? 1;
+    final namespace = value['namespace'];
     final phase = value['phase'];
     final entries = value['entries'];
     final copies = value['recoveryPaths'] ?? const <Object?>[];
     final artifacts = value['retainedArtifacts'] ?? const <Object?>[];
     final recoveryEntries = value['recoveryEntries'] ?? const <Object?>[];
-    if (id is! String ||
+    if ((version != 1 && version != 2) ||
+        (version == 1 && namespace != null) ||
+        (version == 2 && namespace is! Map) ||
+        id is! String ||
         !_validId(id) ||
         phase is! String ||
         entries is! List ||
@@ -143,6 +211,10 @@ class WorkspaceNoteMoveRecord {
     }
     return WorkspaceNoteMoveRecord(
       transactionId: id,
+      version: version as int,
+      namespace: namespace is Map
+          ? WorkspaceDirectoryMoveReceipt.fromMap(namespace)
+          : null,
       phase: phase,
       entries: [
         for (final entry in entries)
@@ -262,7 +334,8 @@ class AppleWorkspaceNoteTransactionStore
       for (final entry in plan.snapshot.catalog.entries)
         entry.relativePath: entry,
     };
-    if (plan.files.isEmpty ||
+    if ((plan.files.isEmpty &&
+            plan.kind == WorkspaceNoteMovePlanKind.singleNote) ||
         plan.files.length > 128 ||
         metadata.length > 50000) {
       throw StateError('The note move exceeds its bounded journal limits.');
@@ -295,26 +368,31 @@ class AppleWorkspaceNoteTransactionStore
         'replacementBytes': after,
       });
     }
-    return _call('prepareWorkspaceNoteMove', {
-      'path': plan.root!,
-      'transactionId': transactionId,
-      'sourcePath': plan.sourcePath,
-      'destinationPath': plan.destinationPath,
-      'files': files,
-      'assets': [
-        for (final asset in plan.attachmentRequirements)
-          {'path': asset.relativePath, 'revision': asset.revision},
-      ],
-      'catalog': [
-        for (final entry in metadata.values)
-          {
-            'path': entry.relativePath,
-            'revision': entry.revision,
-            'isDirectory': entry.isDirectory,
-            'local': entry.local,
-          },
-      ],
-    });
+    final directory = plan.kind == WorkspaceNoteMovePlanKind.directory;
+    return _call(
+      directory ? 'prepareWorkspaceDirectoryMove' : 'prepareWorkspaceNoteMove',
+      {
+        if (directory) 'tree': plan.treeSnapshot!.toNative(),
+        'path': plan.root!,
+        'transactionId': transactionId,
+        'sourcePath': plan.sourcePath,
+        'destinationPath': plan.destinationPath,
+        'files': files,
+        'assets': [
+          for (final asset in plan.attachmentRequirements)
+            {'path': asset.relativePath, 'revision': asset.revision},
+        ],
+        'catalog': [
+          for (final entry in metadata.values)
+            {
+              'path': entry.relativePath,
+              'revision': entry.revision,
+              'isDirectory': entry.isDirectory,
+              'local': entry.local,
+            },
+        ],
+      },
+    );
   }
 
   @override

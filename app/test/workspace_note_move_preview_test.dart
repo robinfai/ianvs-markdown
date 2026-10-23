@@ -34,7 +34,7 @@ void main() {
       expect(find.textContaining('will NOT be updated'), findsOneWidget);
       expect(
         find.textContaining(
-          'Folder and multi-item reference maintenance is not supported',
+          'Multi-item reference maintenance is not supported',
         ),
         findsOneWidget,
       );

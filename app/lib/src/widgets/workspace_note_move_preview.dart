@@ -137,7 +137,52 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
             widget.pending != null &&
             state.connectionState != ConnectionState.done;
         final plan = state.data?.$1;
+        final media = MediaQuery.of(context);
+        // An oversized fixed action footer can consume the entire compact
+        // dialog at accessibility text sizes. Keep it scrollable in that case.
+        final scrollActions =
+            media.textScaler.scale(14) > 28 || media.size.height < 480;
+        final actions = <Widget>[
+          TextButton(
+            onPressed: _busy
+                ? null
+                : () => Navigator.pop(
+                    context,
+                    WorkspaceNoteMoveDecision(automatic: _record),
+                  ),
+            child: Text(_attempted ? 'Close' : 'Cancel'),
+          ),
+          if (!_attempted)
+            TextButton(
+              key: const ValueKey('move-without-updating-links'),
+              onPressed: waiting
+                  ? null
+                  : () => Navigator.pop(
+                      context,
+                      const WorkspaceNoteMoveDecision(manual: true),
+                    ),
+              child: const Text('Move without updating links'),
+            ),
+          if (!_attempted &&
+              plan?.complete == true &&
+              plan?.executionSupported == true &&
+              widget.onMaintain != null)
+            FilledButton(
+              key: const ValueKey('move-and-update-links'),
+              onPressed: waiting ? null : () => _maintain(plan!),
+              child: const Text('Move and update links'),
+            ),
+          if (_record != null &&
+              _record!.entries.isNotEmpty &&
+              widget.onRecoverCopies != null)
+            TextButton(
+              key: const ValueKey('recover-note-move-copies'),
+              onPressed: _busy ? null : _recover,
+              child: const Text('Recover originals as new copies'),
+            ),
+        ];
         return AlertDialog(
+          actions: scrollActions ? null : actions,
           scrollable: true,
           title: const Text('Preview rename / move'),
           content: SizedBox(
@@ -160,9 +205,9 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                   const SizedBox(height: 8),
                   const Text('Preparing a read-only reference preview…'),
                 ] else if (plan != null) ...[
-                  if (!plan.executionSupported) ...[
+                  if (plan.kind == WorkspaceNoteMovePlanKind.directory) ...[
                     const Text(
-                      'Directory impact preview only. Automatic folder reference maintenance is not enabled. The manual action below will not apply any proposed edits.',
+                      'Directory reference maintenance moves one folder and updates affected notes. Native preflight rechecks the complete tree and destination vacancy. No merging, overwriting or automatic rollback.',
                     ),
                     if (plan.treeSnapshot case final tree?) ...[
                       Text(
@@ -202,7 +247,7 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                     const SizedBox(height: 8),
                   ],
                   Text(
-                    'Proposed reference maintenance: ${plan.editCount} source replacement(s) across ${plan.files.length} affected note(s)${plan.executionSupported ? ', including the moved note' : ', including moved notes with unchanged text'}.',
+                    'Proposed reference maintenance: ${plan.editCount} source replacement(s) across ${plan.files.length} affected note(s)${plan.kind == WorkspaceNoteMovePlanKind.singleNote ? ', including the moved note' : ', including moved notes with unchanged text'}.',
                   ),
                   const SizedBox(height: 8),
                   if (plan.complete)
@@ -283,7 +328,7 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                     (state.data?.$2 == true
                             ? 'The reference preview is unavailable. No complete maintenance plan could be verified.'
                             : widget.unavailable) ??
-                        'Folder and multi-item reference maintenance is not supported. No complete reference preview is available.',
+                        'No complete reference preview is available. Multi-item reference maintenance is not supported.',
                   ),
                 if (_busy && !_confirmingRecovery) ...[
                   const SizedBox(height: 12),
@@ -302,6 +347,10 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                   ),
                   if (record.message != null) Text(record.message!),
                   if (record.code != null) Text(record.code!),
+                  if (record.namespace case final namespace?)
+                    Text(
+                      'Directory: ${namespace.sourcePath} → ${namespace.destinationPath}; ${namespace.verified ? 'verified' : 'unverified'} at ${namespace.actualPath ?? 'unknown location'}.',
+                    ),
                   for (final entry in record.entries)
                     Text(
                       '${entry.path}: ${entry.state}${entry.verified ? ' (verified)' : ' (not verified)'}${entry.actualPath == null ? '' : ' at ${entry.actualPath}'}',
@@ -316,48 +365,18 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                     Text('Recovered original copy: $path'),
                   Text('Recovery journal: ${record.transactionId}'),
                 ],
+                if (scrollActions) ...[
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.end,
+                    children: actions,
+                  ),
+                ],
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: _busy
-                  ? null
-                  : () => Navigator.pop(
-                      context,
-                      WorkspaceNoteMoveDecision(automatic: _record),
-                    ),
-              child: Text(_attempted ? 'Close' : 'Cancel'),
-            ),
-            if (!_attempted)
-              TextButton(
-                key: const ValueKey('move-without-updating-links'),
-                onPressed: waiting
-                    ? null
-                    : () => Navigator.pop(
-                        context,
-                        const WorkspaceNoteMoveDecision(manual: true),
-                      ),
-                child: const Text('Move without updating links'),
-              ),
-            if (!_attempted &&
-                plan?.complete == true &&
-                plan?.executionSupported == true &&
-                widget.onMaintain != null)
-              FilledButton(
-                key: const ValueKey('move-and-update-links'),
-                onPressed: waiting ? null : () => _maintain(plan!),
-                child: const Text('Move and update links'),
-              ),
-            if (_record != null &&
-                _record!.entries.isNotEmpty &&
-                widget.onRecoverCopies != null)
-              TextButton(
-                key: const ValueKey('recover-note-move-copies'),
-                onPressed: _busy ? null : _recover,
-                child: const Text('Recover originals as new copies'),
-              ),
-          ],
         );
       },
     ),

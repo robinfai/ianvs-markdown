@@ -125,7 +125,7 @@ void main() {
           .join('\n'),
     );
     expect(value.kind, WorkspaceNoteMovePlanKind.directory);
-    expect(value.executionSupported, isFalse);
+    expect(value.executionSupported, isTrue);
   }
 
   test(

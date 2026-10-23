@@ -124,6 +124,34 @@ class WorkspaceMoveTreeSnapshot {
   final List<WorkspaceMoveTreeIssue> issues;
   final int observedEntryCount;
 
+  /// Exact bounded inspection evidence, revalidated natively before mutation.
+  Map<String, Object?> toNative() => {
+    'root': root,
+    'canonicalRoot': canonicalRoot,
+    'sourcePath': sourcePath,
+    'requestId': requestId,
+    'sourceState': sourceState.name,
+    'rootIdentity': rootIdentity,
+    'sourceIdentity': sourceIdentity,
+    'complete': complete,
+    'observedEntryCount': observedEntryCount,
+    'members': [
+      for (final member in members)
+        {
+          'path': member.path,
+          'kind': member.kind.name,
+          'revision': member.revision,
+          'identity': member.identity,
+          'local': member.local,
+          'size': member.size,
+        },
+    ],
+    'issues': [
+      for (final issue in issues)
+        {'code': issue.code, if (issue.path != null) 'path': issue.path},
+    ],
+  };
+
   factory WorkspaceMoveTreeSnapshot.fromNative(Object? value) {
     Never invalid() =>
         throw const FormatException('Invalid directory tree evidence.');
