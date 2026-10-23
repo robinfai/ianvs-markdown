@@ -308,10 +308,65 @@ struct AttachmentImportTests {
     let selected = source.appendingPathComponent("source.png")
     try png.write(to: selected)
     try expect(try CloudWorkspace.readPickedAttachmentImage(selected) == png)
+    let canonical = selected.resolvingSymlinksInPath()
+    let bookmark = try canonical.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil)
+    // Diagnose only this synthetic temporary fixture. Foundation can rewrite
+    // macOS /private paths; never log user-selected paths in production.
+    var bookmarkIsStale = false
+    do {
+      let resolved = try URL(resolvingBookmarkData: bookmark,
+        options: [.withSecurityScope, .withoutUI, .withoutMounting],
+        relativeTo: nil, bookmarkDataIsStale: &bookmarkIsStale)
+      let diagnostic = "Drop fixture: canonical=\(canonical.path), standardized=\(canonical.standardizedFileURL.path), resolved=\(resolved.path), stale=\(bookmarkIsStale)\n"
+      FileHandle.standardError.write(Data(diagnostic.utf8))
+    } catch {
+      FileHandle.standardError.write(Data("Drop fixture bookmark resolution failed: \(error)\n".utf8))
+      throw error
+    }
+    let dropped = try CloudWorkspace.droppedAttachmentURL(path: canonical.path, bookmark: bookmark)
+    expect(CloudWorkspace.droppedAttachmentPathsMatch(canonical.path, dropped.path))
+    let imported = try CloudWorkspace.readDroppedAttachmentImage(path: canonical.path, bookmark: bookmark)
+    expect((imported["bytes"] as? FlutterStandardTypedData)?.data == png)
+    if canonical.path.hasPrefix("/var/") {
+      let expanded = "/private" + canonical.path
+      let expandedImport = try CloudWorkspace.readDroppedAttachmentImage(path: expanded, bookmark: bookmark)
+      expect((expandedImport["bytes"] as? FlutterStandardTypedData)?.data == png)
+    }
+    expect(CloudWorkspace.droppedAttachmentPathsMatch("/var/folder/image.png", "/private/var/folder/image.png"))
+    expect(CloudWorkspace.droppedAttachmentPathsMatch("/private/var/folder/image.png", "/var/folder/image.png"))
+    expect(!CloudWorkspace.droppedAttachmentPathsMatch("/var/folder/image.png", "/private/var/other/image.png"))
+    expect(!CloudWorkspace.droppedAttachmentPathsMatch("/tmp/image.png", "/private/tmp/image.png"))
+    expect(!CloudWorkspace.droppedAttachmentPathsMatch("/var/folder/image.png", "/private/var/folder/Image.png"))
+    expect(!CloudWorkspace.droppedAttachmentPathsMatch("/var/folder/caf\u{00e9}.png", "/private/var/folder/cafe\u{0301}.png"))
+    rejects(.invalid) { _ = try CloudWorkspace.droppedAttachmentURL(path: canonical.path, bookmark: nil) }
+    rejects(.invalid) { _ = try CloudWorkspace.droppedAttachmentURL(path: canonical.path, bookmark: Data()) }
+    rejects(.invalid) { _ = try CloudWorkspace.droppedAttachmentURL(path: canonical.path, bookmark: Data(repeating: 1, count: 1024 * 1024 + 1)) }
+    rejects(.invalid) { _ = try CloudWorkspace.droppedAttachmentURL(path: canonical.path, bookmark: Data([1, 2, 3])) }
+    rejects(.invalid) { _ = try CloudWorkspace.droppedAttachmentURL(path: canonical.path + "-different.png", bookmark: bookmark) }
+    rejects(.invalid) { _ = try CloudWorkspace.droppedAttachmentURL(path: "relative.png", bookmark: bookmark) }
+    rejects(.invalid) { _ = try CloudWorkspace.droppedAttachmentURL(path: canonical.path + "/../source.png", bookmark: bookmark) }
+    rejects(.invalid) { _ = try CloudWorkspace.droppedAttachmentURL(path: canonical.path + "\0", bookmark: bookmark) }
+    rejects(.invalid) { _ = try CloudWorkspace.droppedAttachmentURL(path: canonical.path + "/", bookmark: bookmark) }
+    rejects(.invalid) { _ = try CloudWorkspace.droppedAttachmentURL(path: canonical.path.replacingOccurrences(of: "/source.png", with: "//source.png"), bookmark: bookmark) }
+    rejects(.invalid) { _ = try CloudWorkspace.droppedAttachmentURL(path: canonical.path.replacingOccurrences(of: "/source.png", with: "/./source.png"), bookmark: bookmark) }
+    let different = source.appendingPathComponent("different.png")
+    try png.write(to: different)
+    rejects(.invalid) { _ = try CloudWorkspace.readDroppedAttachmentImage(path: different.path, bookmark: bookmark) }
+    rejects(.invalid) { _ = try CloudWorkspace.droppedAttachmentRevision(path: different.path, selected: dropped) }
+    let originalRevision = try CloudWorkspace.droppedAttachmentRevision(path: canonical.path, selected: dropped)
+    try png.write(to: canonical, options: .atomic)
+    rejects(.unavailable) { _ = try CloudWorkspace.readPickedAttachmentImage(dropped, expectedRevision: originalRevision) }
+
+
     try expect(try Data(contentsOf: selected) == png, "Picking must not move, delete, or rewrite the source")
     let link = source.appendingPathComponent("link.png")
     try manager.createSymbolicLink(at: link, withDestinationURL: selected)
     rejects(.invalid) { _ = try CloudWorkspace.readPickedAttachmentImage(link) }
+    rejects(.invalid) { _ = try CloudWorkspace.readDroppedAttachmentImage(path: link.path, bookmark: bookmark) }
+    rejects(.invalid) { _ = try CloudWorkspace.droppedAttachmentRevision(path: link.path, selected: dropped) }
+    let linkedParent = fixture.appendingPathComponent("linked-source")
+    try manager.createSymbolicLink(at: linkedParent, withDestinationURL: source)
+    rejects(.invalid) { _ = try CloudWorkspace.readDroppedAttachmentImage(path: linkedParent.appendingPathComponent("source.png").path, bookmark: bookmark) }
     try png.write(to: source.appendingPathComponent(".offline.png.icloud"))
     rejects(.offline) { _ = try CloudWorkspace.readPickedAttachmentImage(source.appendingPathComponent("offline.png")) }
     let oversized = source.appendingPathComponent("huge.png")

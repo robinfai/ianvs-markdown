@@ -104,14 +104,26 @@ final class CloudWorkspace {
         return
       }
       #if os(macOS)
-      // No clipboard observation/polling. These two entry points are called only
-      // from the editor's explicit Insert Image and Paste actions.
+      // No clipboard observation/polling. These entry points are called only
+      // from the editor's explicit Insert Image, Paste and image-drop actions.
       if method == "pickAttachmentImage" {
         self.pickAttachmentImage(result: result)
         return
       }
       if method == "readClipboardAttachmentImage" {
         self.readClipboardAttachmentImage(result: result)
+        return
+      }
+      if method == "readDroppedAttachmentImage" {
+        guard let path = arguments["path"] as? String,
+              arguments["bookmark"] == nil || arguments["bookmark"] is FlutterStandardTypedData else {
+          result(FlutterError(code: "attachment_invalid", message: "Invalid dropped image.", details: nil))
+          return
+        }
+        let bookmark = (arguments["bookmark"] as? FlutterStandardTypedData)?.data
+        self.completeAttachmentImport(result) {
+          try Self.readDroppedAttachmentImage(path: path, bookmark: bookmark)
+        }
         return
       }
       #endif
@@ -2224,7 +2236,78 @@ extension CloudWorkspace {
     }
   }
 
-  static func readPickedAttachmentImage(_ selected: URL) throws -> Data {
+  /// Resolves only this drop's temporary file capability. It is never stored,
+  /// used to enumerate a parent, or retained after the bounded source read.
+  static func droppedAttachmentURL(path: String, bookmark: Data?) throws -> URL {
+    guard path.hasPrefix("/"), !path.contains("\0"), path.utf8.count <= 4096 else {
+      throw AttachmentError.invalid
+    }
+    // Syntax only: Foundation standardization consults the filesystem and
+    // rewrites /private aliases, so it is not an authorization comparison.
+    guard path.dropFirst().split(separator: "/", omittingEmptySubsequences: false)
+      .allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else {
+      throw AttachmentError.invalid
+    }
+    // No path-only fallback: promises or drag sources that omit a file grant
+    // must use explicit Import Image instead. Do not widen to a parent scope.
+    guard let bookmark, !bookmark.isEmpty, bookmark.count <= 1024 * 1024 else {
+      throw AttachmentError.invalid
+    }
+    var stale = false
+    let selected: URL
+    do {
+      selected = try URL(resolvingBookmarkData: bookmark,
+        options: [.withSecurityScope, .withoutUI, .withoutMounting],
+        relativeTo: nil, bookmarkDataIsStale: &stale)
+    } catch { throw AttachmentError.invalid }
+    guard !stale, selected.isFileURL,
+          droppedAttachmentPathsMatch(path, selected.path) else { throw AttachmentError.invalid }
+    return selected
+  }
+
+  static func droppedAttachmentPathsMatch(_ supplied: String, _ resolved: String) -> Bool {
+    if supplied.utf8.elementsEqual(resolved.utf8) { return true }
+    // The bookmark resolver expands this macOS system alias. Do not generalize
+    // to realpath or arbitrary symlinks, case folding, or Unicode normalization.
+    let short: String
+    let expanded: String
+    if supplied.hasPrefix("/var/") && resolved.hasPrefix("/private/var/") {
+      short = supplied; expanded = resolved
+    } else if resolved.hasPrefix("/var/") && supplied.hasPrefix("/private/var/") {
+      short = resolved; expanded = supplied
+    } else { return false }
+    return ("/private" + short).utf8.elementsEqual(expanded.utf8)
+  }
+
+  static func droppedAttachmentRevision(path: String, selected: URL) throws -> String {
+    // Call only while holding the resolved file's temporary bookmark scope.
+    // Even the bounded system-alias case must refer to the very same file.
+    var supplied = stat(), resolved = stat()
+    guard lstat(path, &supplied) == 0, lstat(selected.path, &resolved) == 0,
+          supplied.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+          resolved.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+          supplied.st_dev == resolved.st_dev, supplied.st_ino == resolved.st_ino,
+          WorkspaceFileScope.revision(supplied) == WorkspaceFileScope.revision(resolved) else {
+      throw AttachmentError.invalid
+    }
+    return WorkspaceFileScope.revision(resolved)
+  }
+
+  static func readDroppedAttachmentImage(path: String, bookmark: Data?) throws -> [String: Any] {
+    let selected = try droppedAttachmentURL(path: path, bookmark: bookmark)
+    let accessing = selected.startAccessingSecurityScopedResource()
+    defer { if accessing { selected.stopAccessingSecurityScopedResource() } }
+    return try WorkspaceFileScope.withoutMaterialization {
+      let revision = try droppedAttachmentRevision(path: path, selected: selected)
+      let bytes = try readPickedAttachmentImage(selected, expectedRevision: revision)
+      guard try droppedAttachmentRevision(path: path, selected: selected) == revision else {
+        throw AttachmentError.unavailable
+      }
+      return try AttachmentImportImage.prepare(bytes, suggestedName: selected.lastPathComponent)
+    }
+  }
+
+  static func readPickedAttachmentImage(_ selected: URL, expectedRevision: String? = nil) throws -> Data {
     try WorkspaceFileScope.withoutMaterialization {
       guard selected.isFileURL, selected.path.hasPrefix("/"), !selected.path.contains("\0"),
             !selected.lastPathComponent.hasPrefix(".") else { throw AttachmentError.invalid }
@@ -2242,6 +2325,9 @@ extension CloudWorkspace {
       }
       guard before.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
             before.st_flags & UInt32(UF_HIDDEN) == 0 else { throw AttachmentError.invalid }
+      if let expectedRevision, WorkspaceFileScope.revision(before) != expectedRevision {
+        throw AttachmentError.unavailable
+      }
       guard before.st_flags & UInt32(SF_DATALESS) == 0 else { throw AttachmentError.offline }
       guard before.st_size >= 0, before.st_size <= Int64(AttachmentScope.maximumImageBytes) else { throw AttachmentError.tooLarge }
       var coordinationError: NSError?

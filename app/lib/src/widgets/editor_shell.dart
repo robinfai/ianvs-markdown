@@ -228,7 +228,70 @@ class _EditorShellState extends State<EditorShell> {
     });
   }
 
-  Future<bool> _importImage({bool fromClipboard = false}) async {
+  Future<void> _handleFileDrop(List<DropItem> files) async {
+    if (!(ModalRoute.of(context)?.isCurrent ?? true) || files.isEmpty) return;
+    const imageExtensions = {
+      '.png',
+      '.jpg',
+      '.jpeg',
+      '.gif',
+      '.webp',
+      '.bmp',
+      '.tif',
+      '.tiff',
+      '.svg',
+      '.avif',
+      '.heic',
+      '.heif',
+      '.ico',
+    };
+    final images = files
+        .where(
+          (file) =>
+              file is! DropItemDirectory &&
+              (imageExtensions.contains(p.extension(file.path).toLowerCase()) ||
+                  (file.mimeType?.startsWith('image/') ?? false)),
+        )
+        .toList();
+    if (images.isEmpty) {
+      await widget.workspace.openPaths(files.map((file) => file.path));
+      return;
+    }
+    if (files.length != 1) {
+      _showError(
+        'Drop one image at a time. Mixed image/file drops are not imported or opened.',
+      );
+      return;
+    }
+    final image = images.single;
+    if (!{
+      '.png',
+      '.jpg',
+      '.jpeg',
+      '.gif',
+      '.webp',
+      '.bmp',
+      '.tif',
+      '.tiff',
+    }.contains(p.extension(image.path).toLowerCase())) {
+      _showError(
+        'Drop a PNG, JPEG, GIF, WebP, BMP or TIFF image. Other image formats are not imported.',
+      );
+      return;
+    }
+    if (_attachmentPending) {
+      _showError(
+        'Wait for the current image import to finish, then drop the image again.',
+      );
+      return;
+    }
+    await _importImage(droppedImage: image);
+  }
+
+  Future<bool> _importImage({
+    bool fromClipboard = false,
+    DropItem? droppedImage,
+  }) async {
     if (!(ModalRoute.of(context)?.isCurrent ?? true) ||
         hasEditorComposition(widget.workspace)) {
       return true;
@@ -293,6 +356,11 @@ class _EditorShellState extends State<EditorShell> {
       }
       final payload = fromClipboard
           ? await widget.attachmentImportPlatform.readClipboardImage()
+          : droppedImage != null
+          ? await widget.attachmentImportPlatform.readDroppedImage(
+              droppedImage.path,
+              bookmark: droppedImage.extraAppleBookmark,
+            )
           : await widget.attachmentImportPlatform.pickImage();
       if (payload == null) return !fromClipboard;
       if (!current()) return true;
@@ -330,7 +398,7 @@ class _EditorShellState extends State<EditorShell> {
             ? details['relativePath'] as String
             : null;
         _showError(
-          'Image import failed: $message${retainedPath == null ? '' : ' A file may remain at $root/$retainedPath. It was not deleted or linked; inspect it before retrying.'}',
+          'Image import failed: $message${droppedImage == null ? '' : ' If the drag source does not provide a file grant, use Import Image instead.'}${retainedPath == null ? '' : ' A file may remain at $root/$retainedPath. It was not deleted or linked; inspect it before retrying.'}',
         );
       }
       return true;
@@ -1199,11 +1267,7 @@ class _EditorShellState extends State<EditorShell> {
                                     setState(() => _draggingFiles = false),
                                 onDragDone: (details) {
                                   setState(() => _draggingFiles = false);
-                                  _guard(
-                                    () => workspace.openPaths(
-                                      details.files.map((file) => file.path),
-                                    ),
-                                  );
+                                  _guard(() => _handleFileDrop(details.files));
                                 },
                                 child: Stack(
                                   fit: StackFit.expand,
@@ -1588,15 +1652,16 @@ class _DropOverlay extends StatelessWidget {
               const Icon(AppIcons.document, size: 42),
               const SizedBox(height: 12),
               Text(
-                'Open Markdown Files',
+                'Open Notes or Import an Image',
                 style: DesktopTypography.title3.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 6),
               const Text(
-                'Drop files here to open them in tabs.',
+                'Drop one image to insert at the current caret.\nDrop Markdown files to open them in tabs.',
                 style: DesktopTypography.body,
+                textAlign: TextAlign.center,
               ),
             ],
           ),

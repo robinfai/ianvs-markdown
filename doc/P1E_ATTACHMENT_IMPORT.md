@@ -1,4 +1,4 @@
-# P1e: explicit desktop image import and Paste
+# P1e: explicit desktop image import, Paste and single-image drop
 
 ## User workflow
 
@@ -8,6 +8,23 @@ it, never moves or rewrites the source. TIFF screenshots are converted to PNG.
 For screenshots, use the editor's normal **Paste**, Command-V or Control-V.
 An image-only clipboard also has a Paste item in the source/live context menu.
 No image clipboard read occurs on startup, focus change or a timer.
+
+Drop one local PNG/JPEG/GIF/WebP/BMP/TIFF file onto the document to copy it to the
+same configured attachment directory and insert a link at the **current caret**
+(not the pointer's drop coordinates). The note must be in Live or Source mode
+with a main-body edit target. TIFF is normalized to PNG, as with File Import.
+Multiple images and mixed image/other-file drops are rejected as a whole; nothing
+is imported or opened. Unsupported image formats are rejected. Markdown-only or
+directory drops keep the existing open workflow. These decisions use the filename
+only for routing; actual image bytes are validated before any destination write.
+
+A drag must supply a temporary security-scoped file bookmark from the native
+`desktop_drop` event. Its resolved path must exactly match the dropped path (except for the
+identity-verified `/var` system alias described below), and it must not be stale. The capability is held only for the bounded source read,
+then released; it is not saved or widened to a directory. File promises and
+other sources without a bookmark must use **Import Image** instead. There is no
+path-only fallback. This first iteration intentionally imports only one image
+per drop and does not collect image data from remote URLs or HTML drag content.
 
 The note must already be saved inside the currently opened workspace. An unnamed
 draft, individually opened note or note outside the workspace must first be saved
@@ -60,8 +77,8 @@ not a claim that a current Obsidian application has been exercised side by side.
   and properties retain their own local text Paste; switch to Source mode to
   paste an image there. File/toolbar import also requires a main-body/Source
   target, not a local table/property field whose caret may not map to source. No
-  drag/drop behavior was changed: dropped Markdown files still follow the
-  existing open-file workflow.
+  image is inserted into a table/property-local caret. Markdown-only drops
+  retain the existing open-file workflow.
 
 ## Security and resource boundary
 
@@ -97,5 +114,8 @@ Synthetic fixtures only; no user vault or real clipboard contents are used.
 
 Still requiring device acceptance: native picker cancellation and file-only
 security scope, screenshot interoperability with other apps, signed sandbox,
-real iCloud/offline providers, macOS/iOS deployment behavior. iOS continues to be
-a reader; this phase does not expose an iOS editor, image import or clipboard UI.
+real iCloud/offline providers, sandboxed Finder drop/bookmark interoperability,
+macOS/iOS deployment behavior. iOS already has a quick-note editor; this phase adds desktop-only image drop,
+not iOS image import or image clipboard UI.
+
+Dropped-image bookmark paths are compared byte-for-byte. The only alternate spelling accepted is macOS `/var/…` ↔ `/private/var/…` with an identical suffix, and only when both leaf paths are regular files with the same device, inode, and revision under the temporary bookmark scope. Arbitrary symlink aliases, dot/empty path components, case/Unicode variants, stale bookmarks, and source replacement are rejected. No persistent or parent-directory grant is created.
