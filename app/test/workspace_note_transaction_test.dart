@@ -118,6 +118,72 @@ void main() {
       );
     });
 
+    test('v2 empty namespace needs independent complete proof', () {
+      final namespace = <String, Object?>{
+        'sourcePath': 'Old',
+        'destinationPath': 'New',
+        'identity': '1:2',
+        'memberCount': 1,
+        'moved': true,
+        'synced': true,
+        'verified': true,
+        'actualPath': 'New',
+      };
+      Map<String, Object?> envelope(Map<String, Object?> n) => {
+        ..._record(entries: []),
+        'version': 2,
+        'namespace': n,
+      };
+      expect(
+        WorkspaceNoteMoveRecord.fromMap(envelope(namespace)).completed,
+        isTrue,
+      );
+      for (final patch in <Map<String, Object?>>[
+        {'verified': false},
+        {'synced': false},
+        {'actualPath': 'Old'},
+        {'actualPath': null},
+      ]) {
+        expect(
+          WorkspaceNoteMoveRecord.fromMap(
+            envelope({...namespace, ...patch}),
+          ).completed,
+          isFalse,
+        );
+      }
+      for (final patch in <Map<String, Object?>>[
+        {'memberCount': 0},
+        {'memberCount': 257},
+        {'identity': 'unknown'},
+        {'actualPath': 'Other'},
+        {'moved': false},
+        {'verified': 'true'},
+        {'sourcePath': '../Old'},
+      ]) {
+        expect(
+          () => WorkspaceNoteMoveRecord.fromMap(
+            envelope({...namespace, ...patch}),
+          ),
+          throwsFormatException,
+        );
+      }
+      expect(
+        () => WorkspaceNoteMoveRecord.fromMap({..._record(), 'version': 2}),
+        throwsFormatException,
+      );
+      expect(
+        () => WorkspaceNoteMoveRecord.fromMap({
+          ...envelope(namespace),
+          'version': 1,
+        }),
+        throwsFormatException,
+      );
+      expect(
+        () => WorkspaceNoteMoveRecord.fromMap({..._record(), 'version': 3}),
+        throwsFormatException,
+      );
+    });
+
     test('duplicate receipts cannot claim a completed manifest', () {
       expect(
         WorkspaceNoteMoveRecord.fromMap(

@@ -69,8 +69,10 @@ class WorkspaceNoteMovePlan {
   final WorkspaceMoveTreeSnapshot? treeSnapshot;
   final WorkspaceMoveNamespace? namespace;
 
-  /// Directory evidence is preview-only and must never enter the v1 executor.
-  bool get executionSupported => kind == WorkspaceNoteMovePlanKind.singleNote;
+  /// Directory plans use the dedicated v2 namespace executor, never v1.
+  bool get executionSupported =>
+      kind == WorkspaceNoteMovePlanKind.singleNote ||
+      (complete && treeSnapshot?.complete == true && namespace != null);
   final String? root;
   final WorkspaceReferenceSnapshot snapshot;
   final String sourcePath;
