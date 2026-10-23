@@ -13,6 +13,7 @@ import '../desktop_theme.dart';
 import '../desktop_typography.dart';
 import '../services/markdown_file_service.dart';
 import '../services/workspace_note_move_plan.dart';
+import '../services/workspace_move_tree_inspector.dart';
 import 'file_context_menu.dart';
 import 'middle_ellipsis_text.dart';
 import 'window_app_title.dart';
@@ -1532,6 +1533,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
   ) async {
     if (_previewingMove) return const WorkspaceNoteMoveDecision();
     _previewingMove = true;
+    final cancellation = WorkspaceMovePreviewCancellation();
     try {
       Future<WorkspaceNoteMovePlan>? preview;
       String? unavailable;
@@ -1544,6 +1546,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
         preview = widget.workspace.previewNoteMove(
           sources.single,
           destinations.single,
+          cancellation: cancellation,
         );
       } else if (sources.length == 1) {
         unavailable =
@@ -1557,6 +1560,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
         preview: preview,
         unavailable: unavailable,
         onMaintain: widget.workspace.executeNoteMove,
+        onCancelPreview: cancellation.cancel,
         onRecoverCopies: (id) {
           if (!mounted ||
               root != widget.workspace.workspaceRoot ||
@@ -1574,6 +1578,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
           ? accepted
           : const WorkspaceNoteMoveDecision();
     } finally {
+      cancellation.cancel();
       _previewingMove = false;
     }
   }

@@ -10,6 +10,12 @@ import 'wiki_note_resolver.dart';
 import 'workspace_index.dart';
 import 'workspace_index_source.dart';
 import 'workspace_reference_index.dart';
+import 'workspace_move_namespace.dart';
+import 'workspace_move_tree.dart';
+
+part 'workspace_directory_move_plan.dart';
+
+enum WorkspaceNoteMovePlanKind { singleNote, directory }
 
 /// One exact UTF-16 source replacement, never a rendered-label replacement.
 class WorkspaceReferenceEdit {
@@ -46,6 +52,9 @@ class WorkspaceNoteMoveBlocker {
 /// explicit user approval of this exact proposal before a future executor runs.
 class WorkspaceNoteMovePlan {
   WorkspaceNoteMovePlan({
+    this.kind = WorkspaceNoteMovePlanKind.singleNote,
+    this.treeSnapshot,
+    this.namespace,
     required this.root,
     required this.snapshot,
     required this.sourcePath,
@@ -56,6 +65,12 @@ class WorkspaceNoteMovePlan {
   }) : files = List.unmodifiable(files),
        blockers = List.unmodifiable(blockers),
        attachmentRequirements = List.unmodifiable(attachmentRequirements);
+  final WorkspaceNoteMovePlanKind kind;
+  final WorkspaceMoveTreeSnapshot? treeSnapshot;
+  final WorkspaceMoveNamespace? namespace;
+
+  /// Directory evidence is preview-only and must never enter the v1 executor.
+  bool get executionSupported => kind == WorkspaceNoteMovePlanKind.singleNote;
   final String? root;
   final WorkspaceReferenceSnapshot snapshot;
   final String sourcePath;
@@ -84,10 +99,44 @@ class WorkspaceNoteMovePlanner {
     this.references, {
     this.maximumFiles = 128,
     this.maximumBackupBytes = 32 * 1024 * 1024,
+    this.maximumDirectoryOperations = 200000,
+    this.directoryPreviewTimeout = const Duration(seconds: 20),
+    this.maximumDirectoryReparseCodeUnits = 16 * 1024,
+    this.maximumDirectoryReparseReferences = 128,
+    this.maximumDirectoryReparseLineCodeUnits = 512,
   });
   final WorkspaceReferenceIndex references;
   final int maximumFiles;
   final int maximumBackupBytes;
+
+  /// Directory-only cooperative limits; these do not alter the v1 planner.
+  final int maximumDirectoryOperations;
+  final Duration directoryPreviewTimeout;
+
+  /// Conservative synchronous reparse input bounds, not latency guarantees.
+  /// Unedited notes still receive full before/after semantic identity checks.
+  final int maximumDirectoryReparseCodeUnits;
+  final int maximumDirectoryReparseReferences;
+  final int maximumDirectoryReparseLineCodeUnits;
+
+  Future<WorkspaceNoteMovePlan> buildDirectory({
+    required WorkspaceReferenceSnapshot snapshot,
+    required String sourcePath,
+    required String destinationPath,
+    required Set<String> dirtySessionIds,
+    required WorkspaceMoveTreeSnapshot tree,
+    AttachmentIndex? attachments,
+    bool Function()? isCancelled,
+  }) => _buildDirectoryMovePlan(
+    this,
+    snapshot: snapshot,
+    sourcePath: sourcePath,
+    destinationPath: destinationPath,
+    dirtySessionIds: dirtySessionIds,
+    tree: tree,
+    attachments: attachments,
+    isCancelled: isCancelled,
+  );
 
   Future<WorkspaceNoteMovePlan> build({
     required WorkspaceReferenceSnapshot snapshot,
@@ -656,7 +705,18 @@ bool _verifyReparse(
                   : Uri.decodeComponent(
                       'x${matchingEdit.after}',
                     ).substring(1)));
+    final beforeDefinition = before.definitionRange;
+    final expectedDefinition = beforeDefinition == null
+        ? null
+        : range(beforeDefinition);
+    final beforeDefinitionIdentity = before.definitionIdentity;
+    final expectedDefinitionIdentity =
+        beforeDefinitionIdentity == null || beforeDefinition == null
+        ? null
+        : '${beforeDefinitionIdentity.substring(0, beforeDefinitionIdentity.lastIndexOf('@'))}@${expectedDefinition!.start}:${expectedDefinition.end}';
     if (after == null ||
+        after.definitionRange != expectedDefinition ||
+        after.definitionIdentity != expectedDefinitionIdentity ||
         after.target != expectedTarget ||
         after.fragment != before.fragment ||
         after.query != before.query ||

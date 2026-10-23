@@ -199,7 +199,14 @@ class WikiNoteResolver {
     List<WikiNoteCandidate>? knownCandidates,
     WikiAliasSnapshot? aliases,
     WikiCandidateLookup? lookup,
+    // Read-only callers do not need a missing-note creation proposal. Defaults
+    // preserve navigation behavior, including the existing createPath contract.
+    bool includeCreatePath = true,
+    // A bounded preview may charge/check each query and alias normalization at
+    // its own async boundary. Ordinary navigation keeps the native normalizer.
+    WikiPathNormalizer? resolutionKeys,
   }) async {
+    final keys = resolutionKeys ?? _keys;
     final epoch = index.epoch;
     WikiNoteResolution unavailable(String message) => WikiNoteResolution(
       WikiNoteStatus.unavailable,
@@ -260,13 +267,13 @@ class WikiNoteResolver {
         return unavailable('The workspace changed. Follow the link again.');
       }
       final notes = knownCandidates ?? await candidates(catalog);
-      final key = (await _keys([proposed])).single;
+      final key = (await keys([proposed])).single;
       if (epoch != index.epoch) {
         return unavailable('The workspace changed. Follow the link again.');
       }
       final byPath = relative || anchored || target.contains('/');
       final aliasKey = !byPath && aliases != null
-          ? (await _keys([target])).single
+          ? (await keys([target])).single
           : null;
       if (epoch != index.epoch) {
         return unavailable('The workspace changed. Follow the link again.');
@@ -304,10 +311,17 @@ class WikiNoteResolver {
           candidates: matches,
         );
       }
+      if (!includeCreatePath) {
+        return WikiNoteResolution(
+          WikiNoteStatus.missing,
+          epoch: epoch,
+          message: 'No matching .md note or alias.',
+        );
+      }
       final parent = p.posix.dirname(proposed);
       final parentKey = p.posix.dirname(key);
       final parents = catalog.entries.where((e) => e.isDirectory).toList();
-      final parentKeys = await _keys(
+      final parentKeys = await keys(
         parents.map((e) => e.relativePath).toList(),
       );
       final parentMatches = <String>[
