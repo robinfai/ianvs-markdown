@@ -16,7 +16,7 @@ The historical branch's 552-file diagnostic payload is not imported. The results
 
 ## Performance status: NOT PASSED
 
-The unchanged real-main protocol and merge criteria are in PLAN.md. No complete valid baseline or paired candidate result exists yet. Do not merge or claim measured improvement from these attempts.
+The unchanged real-main protocol and merge criteria are in PLAN.md. One complete validated example baseline exists; the second example baseline, both app baselines and all paired candidate runs remain pending. Do not merge or claim measured improvement from these attempts.
 
 1. `small-main-before-20261023`: initial example build failed because its generated package configuration referenced a removed temporary SDK. App built successfully. Refreshed example dependencies with `flutter pub get --enforce-lockfile`; no tracked lockfile change.
 2. `small-main-before-fixed-20261023`: both actual Profile mains built with the clean installed SDK.
@@ -37,3 +37,14 @@ If the input-position failure repeats while the foreground is stable, diagnose i
 `make check-core` passed (API, format, analysis, 1,144 core tests, 35 example tests, 30 Python tests and all killable-process budget checks). API checker tests: 8 passed. Targeted cache/reference/pixel tests: 4 passed. App: 993 passed, 1 pre-existing optional LLM-fixture test skipped; app analysis passed. Logs are in `checks/`. These do not substitute for paired performance acceptance.
 
 Candidate Profile builds for both actual mains passed; the clean SDK and binary/input hashes are recorded in `builds/small-candidate-20261023/freeze.json`.
+
+## Resumed foreground sampling
+
+- `small-main-resume-20261023`: both main Profile builds passed; source remains `72eefd5`.
+- `before-example-resume-invalid-focus`: lost foreground approximately 39 seconds after start; rejected in full.
+- `small-before-example-1`: **valid complete example baseline**, 2026-10-23 07:27:55–07:32:28 UTC; 540 formal samples and 135 warmups across all 27 scenes. Collector and `read_run` passed. Single-run 10 KiB next-frame P95: sourceToRead 100.229 ms, liveType 33.232 ms, livePaste 36.582 ms. These are baseline observations, not optimization results or final acceptance thresholds.
+- `before-example-resume-invalid-focus-late`: second independent process lost foreground after approximately four minutes during the 1 MiB phase; rejected in full. Do not splice its completed cases into the baseline.
+
+The user authorized foreground time and remote push/PR creation. After recurring foreground loss, asked whether another desktop automation/task is competing for focus. Further timed runs require exclusive foreground availability. PR #43 remains draft and must not merge without the full pair.
+
+Remote CI observed on 2026-10-23: Core on Flutter 3.44.0 and 3.47.6 plus iOS simulator build passed; macOS native integrations still running at this update.
