@@ -3,15 +3,23 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import resource
+import stat
 import sys
 import time
 
 ORDERS = {"forward": "文⽂长⻓", "reverse": "⽂文⻓长", "mixed": "文文⽂⽂长长⻓⻓"}
 CANDIDATES = {"pingfang": "PingFang SC", "heiti": "Heiti SC", "songti": "Songti SC"}
+CONFIGURATIONS = {"pingfang": "PingFang SC", "heiti": "Heiti SC",
+                  "songti-heiti": "Songti SC + Heiti SC"}
+COVERAGE_TEXT = "文⽂长⻓中文文档代码ABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789 "
+COVERAGE_SCALARS = tuple(f"U+{value:04X}" for value in sorted(set(map(ord, COVERAGE_TEXT))))
+MANIFEST_NAME = "songti-heiti-manifest.json"
 MAX_JSON = 2 * 1024 * 1024
 MAX_EVIDENCE = 128 * 1024 * 1024
 MAX_NATIVE_FILE = 8 * 1024 * 1024
@@ -26,13 +34,107 @@ MAX_MATRIX_SECONDS = 18 * 60
 WATCHDOG_REAP_SECONDS = 5
 
 
+def unique_object(pairs: list[tuple[str, object]]) -> dict:
+    value = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError(f"Duplicate JSON field: {key}")
+        value[key] = item
+    return value
+
+
 def read_json(path: Path) -> dict:
-    if not path.is_file() or path.is_symlink() or path.stat().st_size > MAX_JSON:
-        raise ValueError(f"Missing or oversized JSON evidence: {path.name}")
-    value = json.loads(path.read_text(encoding="utf-8"))
+    # Bound the actual read, not just a prior path stat. Never follow the final
+    # component, and avoid blocking on a FIFO masquerading as JSON evidence.
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except OSError as error:
+        raise ValueError(f"Missing or unsafe JSON evidence: {path.name}") from error
+    try:
+        details = os.fstat(fd)
+        if not stat.S_ISREG(details.st_mode) or details.st_size > MAX_JSON:
+            raise ValueError(f"Missing or oversized JSON evidence: {path.name}")
+        stream = os.fdopen(fd, "rb")
+    except BaseException:
+        os.close(fd)
+        raise
+    with stream:
+        encoded = stream.read(MAX_JSON + 1)
+    if len(encoded) > MAX_JSON:
+        raise ValueError(f"Oversized JSON evidence: {path.name}")
+    value = json.loads(encoded.decode("utf-8"), object_pairs_hook=unique_object)
     if not isinstance(value, dict):
         raise ValueError("Expected JSON object")
     return value
+
+
+def validate_candidate(candidate: dict, identity: str) -> dict[str, set[str]]:
+    """Check coverage semantics; native code owns full file/face identity audit."""
+    if (identity not in CANDIDATES or candidate.get("id") != identity or
+            candidate.get("family") != CANDIDATES[identity]):
+        raise ValueError("Census returned an unknown or wrong family")
+    if candidate.get("status") not in ("selected", "partial-coverage"):
+        raise ValueError("Census did not select or audit partial coverage for the requested family")
+    if any(key in candidate for key in ("error", "reason", "problems")):
+        raise ValueError("Coverage candidate contains a non-coverage preflight error")
+    covered = {}
+    for role in ("regular", "bold"):
+        face = candidate.get(role)
+        if not isinstance(face, dict) or face.get("referenceRole") != role:
+            raise ValueError(f"Missing or wrong {role} reference role")
+        if any(key in face for key in ("error", "reason", "problems")):
+            raise ValueError(f"{role} face contains a non-coverage preflight error")
+        entries = face.get("coverage")
+        if not isinstance(entries, list) or len(entries) != len(COVERAGE_SCALARS):
+            raise ValueError(f"{role} coverage must contain the complete fixed scalar universe")
+        role_covered = set()
+        for expected, entry in zip(COVERAGE_SCALARS, entries):
+            if (not isinstance(entry, dict) or set(entry) != {"scalar", "glyphs"} or
+                    entry.get("scalar") != expected):
+                raise ValueError(f"{role} coverage has duplicate, unknown, or unordered scalar metadata")
+            glyphs = entry.get("glyphs")
+            # The fixed universe is entirely BMP, hence one glyph per scalar.
+            if (not isinstance(glyphs, list) or len(glyphs) != 1 or
+                    type(glyphs[0]) is not int or not 0 <= glyphs[0] <= 65535):
+                raise ValueError(f"{role} coverage has invalid glyph metadata")
+            if glyphs[0] != 0:
+                role_covered.add(expected)
+        complete = len(role_covered) == len(COVERAGE_SCALARS)
+        if type(face.get("coverageComplete")) is not bool or face["coverageComplete"] != complete:
+            raise ValueError(f"{role} coverageComplete disagrees with actual nonzero glyphs")
+        covered[role] = role_covered
+    complete = all(len(values) == len(COVERAGE_SCALARS) for values in covered.values())
+    if (candidate["status"] == "selected") != complete:
+        raise ValueError("Candidate status disagrees with audited regular/bold coverage")
+    return covered
+
+
+def composite_configuration(primary: dict, fallback: dict) -> dict:
+    primary_coverage = validate_candidate(primary, "songti")
+    fallback_coverage = validate_candidate(fallback, "heiti")
+    if fallback["status"] != "selected":
+        raise ValueError("Composition requires a complete audited Heiti SC fallback")
+    required = set(COVERAGE_SCALARS)
+    for role in ("regular", "bold"):
+        if primary_coverage[role] | fallback_coverage[role] != required:
+            raise ValueError(f"Composite {role} coverage is incomplete")
+    return {"id": "songti-heiti", "family": CONFIGURATIONS["songti-heiti"],
+            "status": "combination-only", "primary": primary, "fallback": fallback}
+
+
+def write_composite_manifest(root: Path, primary: dict, fallback: dict) -> tuple[dict, dict]:
+    # The caller reserves the full manifest allowance before this new-only write.
+    # Hash the very bytes written, not a census-provided/self-reported hash.
+    configuration = composite_configuration(primary, fallback)
+    payload = {"schema": 1, "matrixDirectory": str(root.resolve()),
+               "configuration": configuration}
+    encoded = (json.dumps(payload, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    if len(encoded) > MAX_JSON:
+        raise ValueError("Composite manifest exceeded its 2 MiB reservation")
+    with (root / MANIFEST_NAME).open("xb") as stream:
+        stream.write(encoded)
+    return configuration, {"name": MANIFEST_NAME, "bytes": len(encoded),
+                           "sha256": hashlib.sha256(encoded).hexdigest()}
 
 
 def expected_probes(order: str) -> dict[str, str]:
@@ -121,7 +223,10 @@ def run_case_command(executable: Path, arguments: list[str], log: Path,
 
 
 def run(executable: Path, root: Path, watchdog: Path, artifact_root: Path | None = None) -> int:
-    artifact_root = artifact_root or root
+    # Resolve existing parents (including macOS /var aliases), but never follow
+    # a pre-existing matrix leaf symlink instead of rejecting the new-only root.
+    root = root.parent.resolve() / root.name
+    artifact_root = artifact_root.resolve() if artifact_root else root
     if artifact_root != root and root.parent != artifact_root:
         raise ValueError("Matrix must be a direct child of its complete artifact root")
     # New-only evidence root: never clean or replace a prior diagnostic artifact.
@@ -130,20 +235,26 @@ def run(executable: Path, root: Path, watchdog: Path, artifact_root: Path | None
     summary = {"schema": 2, "cases": [], "status": "failed",
                "families": [{"id": identity, "family": family, "status": "not-started"}
                             for identity, family in CANDIDATES.items()],
+               "configurations": [{"id": identity, "family": family, "status": "not-started",
+                                   "mode": "combination-only" if identity == "songti-heiti" else "single-family"}
+                                  for identity, family in CONFIGURATIONS.items()],
                "productionAcceptance": False, "visualReview": "pending",
                "independentExtractor": "pending"}
+
+    def reserve_artifact(bytes_required: int) -> None:
+        reserved = bytes_required + MAX_ACCEPTANCE_LOG + MAX_SUMMARY
+        if evidence_bytes(artifact_root) > MAX_EVIDENCE - reserved:
+            raise ValueError("Aggregate artifact budget cannot reserve another bounded phase")
 
     def reserve_phase(bytes_required: int, seconds: int) -> None:
         # Keep one global deadline and artifact allowance across all families.
         # Do not start a process whose full watchdog + bounded reap cannot fit.
         if time.monotonic() + seconds + WATCHDOG_REAP_SECONDS >= deadline:
             raise ValueError("Global matrix time budget cannot reserve another bounded process")
-        reserved = bytes_required + MAX_ACCEPTANCE_LOG + MAX_SUMMARY
-        if evidence_bytes(artifact_root) > MAX_EVIDENCE - reserved:
-            raise ValueError("Aggregate artifact budget cannot reserve another bounded process")
+        reserve_artifact(bytes_required)
 
     try:
-        candidates = []
+        candidates = {}
         all_passed = True
         for record in summary["families"]:
             identity = record["id"]
@@ -180,25 +291,64 @@ def run(executable: Path, root: Path, watchdog: Path, artifact_root: Path | None
                     continue
                 if code != 0:
                     raise ValueError(f"Census process exit {code}; no render is authorized for this family")
-                if candidate.get("status") != "selected":
-                    raise ValueError("Census did not select the requested family")
+                validate_candidate(candidate, identity)
                 if input_bytes == 0 or input_files == 0:
-                    raise ValueError("Selected census has no bounded local input evidence")
-                record["status"] = "selected"
-                candidates.append(candidate)
+                    raise ValueError("Audited census has no bounded local input evidence")
+                record["status"] = candidate["status"]
+                candidates[identity] = candidate
+                if candidate["status"] == "partial-coverage":
+                    record["problems"] = ["Family has partial coverage; combination evidence is not a standalone pass"]
+                    all_passed = False
             except (OSError, ValueError, KeyError, TypeError) as error:
                 record["problems"] = [str(error)]
                 all_passed = False
             evidence_bytes(artifact_root)
-        for candidate in candidates:
+
+        configurations = {}
+        for record in summary["configurations"]:
+            identity = record["id"]
+            if identity != "songti-heiti":
+                candidate = candidates.get(identity)
+                if candidate and candidate["status"] == "selected":
+                    configurations[identity] = candidate
+                    record["status"] = "ready"
+                else:
+                    record["status"] = "unavailable"
+                    record["problems"] = ["No complete audited family; standalone configuration was not tested"]
+                continue
+            primary, fallback = candidates.get("songti"), candidates.get("heiti")
+            if not primary or not fallback or fallback["status"] != "selected":
+                record["status"] = "unavailable"
+                record["problems"] = ["Composition requires audited Songti SC and complete audited Heiti SC"]
+                continue
+            # One shared manifest, reserved against the complete attempt before
+            # writing or launching any render. It is counted separately thereafter.
+            reserve_artifact(MAX_JSON)
+            configuration, manifest = write_composite_manifest(root, primary, fallback)
+            configurations[identity] = configuration
+            summary["manifest"] = manifest
+            record["status"] = "ready"
+
+        for record in summary["configurations"]:
+            identity = record["id"]
+            if identity not in configurations:
+                all_passed = False
+                continue
+            candidate = configurations[identity]
+            configuration_passed = True
+            record["status"] = "incomplete"
             for order in ORDERS:
-                label = f"{candidate['id']}-{order}"
+                label = f"{identity}-{order}"
                 reserve_phase(MAX_CASE_RESERVE, 100)
                 case_root = root / label
                 print(f"PHASE: bounded case {label}", flush=True)
-                code = run_case_command(executable,
-                    ["--case", candidate["id"], order, str(case_root)],
-                    root / f"{label}.log", watchdog, 100)
+                if identity == "songti-heiti":
+                    arguments = ["--composite-case", order, str(case_root),
+                                 str(root / MANIFEST_NAME), summary["manifest"]["sha256"]]
+                else:
+                    arguments = ["--case", identity, order, str(case_root)]
+                code = run_case_command(executable, arguments,
+                                        root / f"{label}.log", watchdog, 100)
                 problems = []
                 try:
                     problems = validate_result(case_root, candidate, order)
@@ -208,12 +358,16 @@ def run(executable: Path, root: Path, watchdog: Path, artifact_root: Path | None
                     problems.insert(0, f"native process exit {code}")
                 passed = not problems
                 all_passed = all_passed and passed
-                summary["cases"].append({"id": label, "exitCode": code,
-                    "strictTextAndGeometryPassed": passed, "problems": problems})
+                configuration_passed = configuration_passed and passed
+                summary["cases"].append({"id": label, "configurationID": identity,
+                    "exitCode": code, "strictTextAndGeometryPassed": passed, "problems": problems})
                 summary["evidenceBytesBeforeFinalSummary"] = evidence_bytes(artifact_root)
-                # A failed case remains a failed job, but later independent cases
-                # still collect evidence. No persistent process/print lease is reused.
-        complete = len(candidates) == len(CANDIDATES) and len(summary["cases"]) == len(CANDIDATES) * len(ORDERS)
+                # Failed cases and partial families remain failed overall, even
+                # if later independent controls or combination-only cases pass.
+            record["status"] = "diagnostic-text-geometry-passed" if configuration_passed else "failed"
+        complete = (len(candidates) == len(CANDIDATES) and
+                    len(configurations) == len(CONFIGURATIONS) and
+                    len(summary["cases"]) == len(CONFIGURATIONS) * len(ORDERS))
         summary["status"] = "diagnostic-text-geometry-passed" if all_passed and complete else "failed"
     except (OSError, ValueError, KeyError, TypeError) as error:
         summary["error"] = str(error)

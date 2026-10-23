@@ -6,9 +6,11 @@ on:
     paths:
       - 'app/test/native_pdf_font_diagnostic.swift'
       - 'app/test/native_pdf_font_evidence_test.swift'
+      - 'app/test/native_font_preflight_manifest_test.swift'
       - 'app/test/document_export_service_test.dart'
       - 'app/test/support/offline_pdf_diagnostic_job.swift'
       - 'app/test/support/pdf_font_evidence.swift'
+      - 'app/test/support/font_preflight_manifest.swift'
       - 'app/tool/run_pdf_font_diagnostic.py'
       - 'app/tool/test_pdf_font_diagnostic.py'
       - 'app/tool/test_native_pdf_font_diagnostic.sh'

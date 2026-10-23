@@ -1,6 +1,9 @@
 import contextlib
+import copy
+import hashlib
 import io
 import json
+import os
 from pathlib import Path
 import tempfile
 import resource
@@ -13,8 +16,40 @@ from unittest.mock import patch
 import run_pdf_font_diagnostic as diagnostic
 
 
+def candidate_for(identity, *, missing=None):
+    missing = missing or {}
+    faces = {}
+    inventory = []
+    for role in ("regular", "bold"):
+        postscript = f"Synthetic-{identity}-{role}"
+        face = {
+            "referenceRole": role, "postScriptName": postscript,
+            "systemFile": f"{identity}.ttc", "systemRelativePath": f"{identity}.ttc",
+            "fileSHA256": "a" * 64, "fileBytes": 64,
+            "fileIdentity": {"device": 1, "inode": 2, "size": 64,
+                             "mtimeSeconds": 3, "mtimeNanoseconds": 4,
+                             "ctimeSeconds": 5, "ctimeNanoseconds": 6},
+            "inventoryEnabled": True, "inventoryDownloadable": False,
+            "dataDescriptorRegistered": False,
+            "options": ["preventAutoActivation", "preventAutoDownload"],
+            "weight": 0.4 if role == "bold" else 0.0,
+            "symbolicTraits": 2 if role == "bold" else 0,
+            "coverage": [{"scalar": scalar, "glyphs": [0 if scalar in missing.get(role, ()) else 1]}
+                         for scalar in diagnostic.COVERAGE_SCALARS],
+            "coverageComplete": not missing.get(role),
+        }
+        faces[role] = face
+        inventory.append({"postScriptName": postscript, "enabled": True,
+                          "downloadable": False, "italic": False, "bold": role == "bold",
+                          "fileName": face["systemFile"], "weight": face["weight"],
+                          "symbolicTraits": face["symbolicTraits"]})
+    return {"id": identity, "family": diagnostic.CANDIDATES[identity],
+            "status": "selected" if all(face["coverageComplete"] for face in faces.values()) else "partial-coverage",
+            "availableFaces": 2, "inventoryFaces": inventory, **faces}
+
+
 class PDFFontDiagnosticTests(unittest.TestCase):
-    candidate = {"id": "pingfang", "family": "PingFang SC", "status": "selected"}
+    candidate = candidate_for("pingfang")
 
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -118,7 +153,9 @@ class PDFFontDiagnosticTests(unittest.TestCase):
     def execute_matrix(self, *, failed_order=None, inventory=None, budget=None,
                        outer_bytes=0, unavailable=None, failed_census=None,
                        missing_census=None, wrong_request=None, elapsed=None,
-                       matrix_seconds=None, census_metadata=None):
+                       matrix_seconds=None, census_metadata=None, candidates=None,
+                       failed_configuration=None, unicode_failure=None,
+                       case_bytes=0, last_census_padding=0, manifest_collision=False):
         calls = []
         artifact = self.root / "attempt"
         artifact.mkdir()
@@ -132,10 +169,9 @@ class PDFFontDiagnosticTests(unittest.TestCase):
             calls.append((arguments[:], seconds))
             now += elapsed[len(calls) - 1] if elapsed else 0
             log.write_text("phase evidence\n", encoding="utf-8")
-            directory = Path(arguments[-1])
-            identity = arguments[1]
-            candidate = dict(self.candidate, id=identity, family=diagnostic.CANDIDATES[identity])
             if arguments[0] == "--inventory":
+                directory, identity = Path(arguments[2]), arguments[1]
+                candidate = copy.deepcopy((candidates or {}).get(identity, candidate_for(identity)))
                 directory.mkdir()
                 if identity == unavailable:
                     candidate["status"] = "unavailable"
@@ -149,11 +185,29 @@ class PDFFontDiagnosticTests(unittest.TestCase):
                         "uniqueInputFiles": 1,
                     }
                     data.update(census_metadata or {})
+                    if identity == "songti" and last_census_padding:
+                        data["syntheticPadding"] = "x" * last_census_padding
+                        log.write_bytes(b"x" * diagnostic.MAX_NATIVE_FILE)
                     (directory / "inventory.json").write_text(json.dumps(data), encoding="utf-8")
-                return 124 if identity == failed_census else (1 if identity == unavailable else 0)
-            order = arguments[2]
-            self.case(directory, order, candidate=candidate)
-            return 124 if order == failed_order else 0
+                if identity == "songti" and manifest_collision:
+                    (output / diagnostic.MANIFEST_NAME).write_bytes(b"prior evidence")
+                return 124 if identity == failed_census else (2 if identity == unavailable else 0)
+            if arguments[0] == "--composite-case":
+                self.assertEqual(len(arguments), 5)
+                order, directory = arguments[1], Path(arguments[2])
+                manifest = Path(arguments[3]).read_bytes()
+                self.assertEqual(arguments[4], hashlib.sha256(manifest).hexdigest())
+                candidate = json.loads(manifest)["configuration"]
+                identity = "songti-heiti"
+            else:
+                self.assertEqual(arguments[0], "--case")
+                identity, order, directory = arguments[1], arguments[2], Path(arguments[3])
+                candidate = copy.deepcopy((candidates or {}).get(identity, candidate_for(identity)))
+            mutation = (lambda text: text.replace("⽂", "文")) if identity == unicode_failure else (lambda text: text)
+            self.case(directory, order, mutate=mutation, candidate=candidate)
+            if case_bytes:
+                (directory / "synthetic.pdf").write_bytes(b"x" * case_bytes)
+            return 124 if order == failed_order or identity == failed_configuration else 0
 
         with patch.object(diagnostic, "run_case_command", side_effect=fake_command), \
              patch.object(diagnostic, "MAX_EVIDENCE", budget or diagnostic.MAX_EVIDENCE), \
@@ -168,9 +222,16 @@ class PDFFontDiagnosticTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(len(calls), 12)
         self.assertEqual([call[1] for call in calls], [30] * 3 + [100] * 9)
-        self.assertEqual(len({call[0][-1] for call in calls}), 12)
+        roots = [call[0][2] if call[0][0] in ("--inventory", "--composite-case") else call[0][3]
+                 for call in calls]
+        self.assertEqual(len(set(roots)), 12)
+        self.assertEqual(sum(call[0][0] == "--composite-case" for call in calls), 3)
+        self.assertFalse(any(call[0][:2] == ["--case", "songti"] for call in calls))
         self.assertEqual([call[0][1] for call in calls[:3]], list(diagnostic.CANDIDATES))
         self.assertEqual([item["status"] for item in summary["families"]], ["selected"] * 3)
+        self.assertEqual([item["id"] for item in summary["configurations"]], list(diagnostic.CONFIGURATIONS))
+        self.assertEqual([item["id"] for item in summary["cases"]],
+                         [f"{identity}-{order}" for identity in diagnostic.CONFIGURATIONS for order in diagnostic.ORDERS])
         self.assertEqual(len(summary["cases"]), 9)
         self.assertIs(summary["productionAcceptance"], False)
         self.assertEqual(summary["visualReview"], "pending")
@@ -217,14 +278,15 @@ class PDFFontDiagnosticTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertEqual(summary["families"][1]["exitCode"], 124)
         self.assertFalse(any(call[0][:2] == ["--case", "heiti"] for call in calls))
-        self.assertEqual(len(summary["cases"]), 6)
+        self.assertEqual(len(summary["cases"]), 3)
+        self.assertFalse(any(call[0][0] == "--composite-case" for call in calls))
 
     def test_missing_manifest_is_not_a_pass_or_authorization(self):
         code, calls, summary = self.execute_matrix(missing_census="songti")
         self.assertEqual(code, 1)
         self.assertEqual(summary["families"][2]["status"], "failed")
         self.assertIn("Missing", summary["families"][2]["problems"][0])
-        self.assertFalse(any(call[0][:2] == ["--case", "songti"] for call in calls))
+        self.assertFalse(any(call[0][0] == "--composite-case" for call in calls))
 
     def test_requested_family_mismatch_is_not_authorization(self):
         code, calls, summary = self.execute_matrix(wrong_request="heiti")
@@ -249,14 +311,14 @@ class PDFFontDiagnosticTests(unittest.TestCase):
                 self.assertEqual(summary["cases"], [])
 
     def test_output_budget_stops_before_next_render(self):
-        code, calls, summary = self.execute_matrix(budget=diagnostic.MAX_CASE_RESERVE + diagnostic.MAX_ACCEPTANCE_LOG + diagnostic.MAX_SUMMARY + 1024)
+        code, calls, summary = self.execute_matrix(budget=diagnostic.MAX_CASE_RESERVE + diagnostic.MAX_ACCEPTANCE_LOG + diagnostic.MAX_SUMMARY + 64 * 1024, case_bytes=64 * 1024)
         self.assertEqual(code, 1)
         self.assertEqual(len(calls), 4)
         self.assertIn("budget", summary["error"])
 
     def test_outer_acceptance_log_is_counted_before_another_case(self):
-        cap = diagnostic.MAX_CASE_RESERVE + diagnostic.MAX_ACCEPTANCE_LOG + diagnostic.MAX_SUMMARY + 1024
-        code, calls, summary = self.execute_matrix(budget=cap, outer_bytes=2048)
+        cap = diagnostic.MAX_CASE_RESERVE + diagnostic.MAX_ACCEPTANCE_LOG + diagnostic.MAX_SUMMARY + 64 * 1024
+        code, calls, summary = self.execute_matrix(budget=cap, outer_bytes=64 * 1024)
         self.assertEqual(code, 1)
         self.assertEqual(len(calls), 3)
         self.assertIn("artifact budget", summary["error"])
@@ -296,8 +358,7 @@ class PDFFontDiagnosticTests(unittest.TestCase):
             diagnostic.capture_log(path, io.BytesIO(b"new"), io.BytesIO())
 
     def test_final_summary_uses_its_reserved_cap(self):
-        with patch.dict(self.candidate, {"extraSyntheticMetadata": "x" * 2048}), \
-             patch.object(diagnostic, "MAX_SUMMARY", 512):
+        with patch.object(diagnostic, "MAX_SUMMARY", 512):
             code, _, summary = self.execute_matrix()
         self.assertEqual(code, 1)
         self.assertIn("summary exceeded", summary["error"])
@@ -334,6 +395,304 @@ class PDFFontDiagnosticTests(unittest.TestCase):
         with self.assertRaises(FileExistsError):
             diagnostic.run(Path("/synthetic"), root, Path("/watchdog"))
         self.assertEqual(marker.read_text(encoding="utf-8"), "original")
+
+    def test_partial_songti_can_only_pass_as_a_distinct_combination(self):
+        songti = candidate_for("songti", missing={"regular": {"U+2ED3"}, "bold": {"U+2ED3", "U+2F42"}})
+        code, calls, summary = self.execute_matrix(candidates={"songti": songti})
+        self.assertEqual(code, 1)
+        self.assertEqual(len(calls), 12)
+        self.assertEqual(len(summary["cases"]), 9)
+        self.assertEqual(summary["status"], "failed")
+        self.assertEqual(summary["families"][2]["status"], "partial-coverage")
+        self.assertEqual(summary["configurations"][2]["id"], "songti-heiti")
+        self.assertEqual(summary["configurations"][2]["mode"], "combination-only")
+        self.assertTrue(all(item["status"] == "diagnostic-text-geometry-passed"
+                            for item in summary["configurations"]))
+        self.assertFalse(any(call[0][:2] == ["--case", "songti"] for call in calls))
+        self.assertTrue(all(item["strictTextAndGeometryPassed"] for item in summary["cases"]))
+
+    def test_fixed_coverage_universe_matches_native_and_is_not_reduced(self):
+        self.assertEqual(diagnostic.COVERAGE_TEXT,
+                         "文⽂长⻓中文文档代码ABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789 ")
+        self.assertEqual(len(diagnostic.COVERAGE_SCALARS), 46)
+        self.assertEqual(tuple(sorted(set(diagnostic.COVERAGE_SCALARS))), diagnostic.COVERAGE_SCALARS)
+        native = (Path(__file__).resolve().parents[1] / "test/native_pdf_font_diagnostic.swift").read_text(encoding="utf-8")
+        self.assertIn('static let coverage = "' + diagnostic.COVERAGE_TEXT + '"', native)
+
+    def test_rolewise_union_preserves_exact_audited_candidates(self):
+        primary = candidate_for("songti", missing={"regular": {"U+2ED3"}, "bold": {"U+2F42"}})
+        fallback = candidate_for("heiti")
+        configuration = diagnostic.composite_configuration(primary, fallback)
+        self.assertEqual(set(configuration), {"id", "family", "status", "primary", "fallback"})
+        self.assertIs(configuration["primary"], primary)
+        self.assertIs(configuration["fallback"], fallback)
+        self.assertEqual(configuration["status"], "combination-only")
+        for role in ("regular", "bold"):
+            primary_set = diagnostic.validate_candidate(primary, "songti")[role]
+            fallback_set = diagnostic.validate_candidate(fallback, "heiti")[role]
+            self.assertEqual(primary_set | fallback_set, set(diagnostic.COVERAGE_SCALARS))
+
+    def test_partial_fallback_cannot_fill_from_the_other_role(self):
+        primary = candidate_for("songti", missing={"regular": {"U+2ED3"}})
+        fallback = candidate_for("heiti", missing={"regular": {"U+2ED3"}})
+        self.assertIn("U+2ED3", diagnostic.validate_candidate(fallback, "heiti")["bold"])
+        with self.assertRaisesRegex(ValueError, "complete audited Heiti"):
+            diagnostic.composite_configuration(primary, fallback)
+        # Even full union from a complete primary cannot authorize partial Heiti.
+        with self.assertRaisesRegex(ValueError, "complete audited Heiti"):
+            diagnostic.composite_configuration(candidate_for("songti"), fallback)
+
+    def test_missing_or_wrong_role_coverage_cannot_authorize_composition(self):
+        for mutation in (lambda c: c["regular"]["coverage"].pop(),
+                         lambda c: c["bold"].update(referenceRole="regular"),
+                         lambda c: c.pop("bold")):
+            primary = candidate_for("songti")
+            mutation(primary)
+            with self.assertRaises(ValueError):
+                diagnostic.composite_configuration(primary, candidate_for("heiti"))
+
+    def test_duplicate_unknown_or_unordered_coverage_is_rejected(self):
+        for mutation in (lambda rows: rows.__setitem__(1, copy.deepcopy(rows[0])),
+                         lambda rows: rows[0].update(scalar="U+FFFF"),
+                         lambda rows: rows.reverse(),
+                         lambda rows: rows[0].update(untrusted=True)):
+            primary = candidate_for("songti")
+            mutation(primary["regular"]["coverage"])
+            with self.assertRaisesRegex(ValueError, "duplicate, unknown, or unordered"):
+                diagnostic.composite_configuration(primary, candidate_for("heiti"))
+
+    def test_unknown_family_or_status_is_never_a_composition(self):
+        for changes in ({"id": "heiti"}, {"family": "Unknown CSS Font"},
+                        {"status": "unavailable"}, {"status": "combination-only"}):
+            primary = candidate_for("songti")
+            primary.update(changes)
+            with self.assertRaises(ValueError):
+                diagnostic.composite_configuration(primary, candidate_for("heiti"))
+
+    def test_zero_glyph_and_false_completion_cannot_be_reported_selected(self):
+        for glyphs in ([0], [True], [-1], [65536], [1.0], [], [1, 2]):
+            primary = candidate_for("songti")
+            primary["regular"]["coverage"][0]["glyphs"] = glyphs
+            with self.assertRaises(ValueError):
+                diagnostic.composite_configuration(primary, candidate_for("heiti"))
+        primary = candidate_for("songti")
+        primary["regular"]["coverageComplete"] = 1
+        with self.assertRaises(ValueError):
+            diagnostic.composite_configuration(primary, candidate_for("heiti"))
+        primary = candidate_for("songti")
+        primary["status"] = "partial-coverage"
+        with self.assertRaisesRegex(ValueError, "status disagrees"):
+            diagnostic.composite_configuration(primary, candidate_for("heiti"))
+
+    def test_partial_noncoverage_error_cannot_render_or_write_manifest(self):
+        songti = candidate_for("songti", missing={"regular": {"U+2ED3"}})
+        songti["reason"] = "Synthetic identity audit failed"
+        code, calls, summary = self.execute_matrix(candidates={"songti": songti})
+        self.assertEqual(code, 1)
+        self.assertEqual(summary["families"][2]["status"], "failed")
+        self.assertEqual(len(summary["cases"]), 6)
+        self.assertFalse(any(call[0][0] == "--composite-case" for call in calls))
+        self.assertFalse((self.root / "attempt/matrix" / diagnostic.MANIFEST_NAME).exists())
+
+    def test_face_errors_cannot_be_reclassified_as_partial_coverage(self):
+        for key in ("reason", "error", "problems"):
+            for target in ("candidate", "regular", "bold"):
+                with self.subTest(key=key, target=target):
+                    candidate = candidate_for("songti", missing={"regular": {"U+2ED3"}})
+                    destination = candidate if target == "candidate" else candidate[target]
+                    destination[key] = None
+                    with self.assertRaisesRegex(ValueError, "non-coverage preflight error"):
+                        diagnostic.composite_configuration(candidate, candidate_for("heiti"))
+
+    def test_missing_fallback_prevents_composition_and_does_not_run_songti_solo(self):
+        code, calls, summary = self.execute_matrix(unavailable="heiti")
+        self.assertEqual(code, 1)
+        self.assertEqual(len(calls), 6)
+        self.assertEqual(len(summary["cases"]), 3)
+        self.assertEqual(summary["configurations"][1]["status"], "unavailable")
+        self.assertEqual(summary["configurations"][2]["status"], "unavailable")
+        self.assertFalse(any(call[0][0] == "--composite-case" or call[0][:2] == ["--case", "songti"]
+                             for call in calls))
+
+    def test_partial_control_is_not_rendered_or_made_green_by_combination(self):
+        pingfang = candidate_for("pingfang", missing={"bold": {"U+2ED3"}})
+        code, calls, summary = self.execute_matrix(candidates={"pingfang": pingfang})
+        self.assertEqual(code, 1)
+        self.assertEqual(len(summary["cases"]), 6)
+        self.assertEqual(summary["families"][0]["status"], "partial-coverage")
+        self.assertEqual(summary["configurations"][0]["status"], "unavailable")
+        self.assertFalse(any(call[0][:2] == ["--case", "pingfang"] for call in calls))
+
+    def test_combination_or_heiti_control_failure_always_fails_job(self):
+        for index, configuration in enumerate(("songti-heiti", "heiti")):
+            with self.subTest(configuration=configuration):
+                self.root = Path(self.temporary.name) / f"failed-{index}"
+                self.root.mkdir()
+                code, calls, summary = self.execute_matrix(failed_configuration=configuration)
+                self.assertEqual(code, 1)
+                self.assertEqual(len(calls), 12)
+                self.assertEqual(summary["status"], "failed")
+                actual = {item["id"]: item["status"] for item in summary["configurations"]}
+                self.assertEqual(actual[configuration], "failed")
+                self.assertTrue(all(status == "diagnostic-text-geometry-passed"
+                                    for identity, status in actual.items() if identity != configuration))
+
+    def test_native_pass_cannot_hide_unicode_failure_in_combination(self):
+        code, _, summary = self.execute_matrix(unicode_failure="songti-heiti")
+        self.assertEqual(code, 1)
+        failures = [item for item in summary["cases"] if item["configurationID"] == "songti-heiti"]
+        self.assertEqual(len(failures), 3)
+        self.assertTrue(all("BODY: original Unicode scalars changed" in item["problems"] for item in failures))
+
+    def test_one_manifest_has_exact_bytes_hash_and_attempt_provenance(self):
+        code, calls, summary = self.execute_matrix()
+        self.assertEqual(code, 0)
+        matrix = self.root / "attempt/matrix"
+        files = list(matrix.rglob("*manifest*.json"))
+        self.assertEqual(files, [matrix / diagnostic.MANIFEST_NAME])
+        encoded = files[0].read_bytes()
+        payload = json.loads(encoded)
+        self.assertEqual(set(payload), {"schema", "matrixDirectory", "configuration"})
+        self.assertEqual(payload["schema"], 1)
+        self.assertEqual(payload["matrixDirectory"], str(matrix.resolve()))
+        self.assertEqual(payload["configuration"]["primary"], summary["families"][2]["census"]["candidates"][0])
+        self.assertEqual(payload["configuration"]["fallback"], summary["families"][1]["census"]["candidates"][0])
+        self.assertEqual(summary["manifest"], {"name": diagnostic.MANIFEST_NAME, "bytes": len(encoded),
+                                             "sha256": hashlib.sha256(encoded).hexdigest()})
+        composite_calls = [call for call, _ in calls if call[0] == "--composite-case"]
+        self.assertEqual(len(composite_calls), 3)
+        self.assertEqual({call[3] for call in composite_calls}, {str(files[0].resolve())})
+        self.assertEqual({call[4] for call in composite_calls}, {summary["manifest"]["sha256"]})
+        self.assertTrue(all(Path(call[2]).parent == matrix.resolve() for call in composite_calls))
+        self.assertGreaterEqual(summary["evidenceBytesBeforeFinalSummary"], len(encoded))
+        self.assertNotIn("primary", json.dumps(summary["configurations"]))
+
+    def test_manifest_hash_does_not_trust_candidate_self_report(self):
+        primary = candidate_for("songti")
+        primary["sha256"] = "0" * 64
+        configuration, evidence = diagnostic.write_composite_manifest(self.root, primary, candidate_for("heiti"))
+        encoded = (self.root / diagnostic.MANIFEST_NAME).read_bytes()
+        self.assertEqual(evidence["sha256"], hashlib.sha256(encoded).hexdigest())
+        self.assertNotEqual(evidence["sha256"], primary["sha256"])
+        self.assertEqual(json.loads(encoded)["configuration"], configuration)
+
+    def test_existing_manifest_is_never_overwritten_or_authorization(self):
+        code, calls, summary = self.execute_matrix(manifest_collision=True)
+        self.assertEqual(code, 1)
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(summary["cases"], [])
+        self.assertEqual((self.root / "attempt/matrix" / diagnostic.MANIFEST_NAME).read_bytes(), b"prior evidence")
+        self.assertNotIn("manifest", summary)
+
+    def test_oversized_manifest_is_not_written(self):
+        with patch.object(diagnostic, "MAX_JSON", 128):
+            with self.assertRaisesRegex(ValueError, "manifest exceeded"):
+                diagnostic.write_composite_manifest(self.root, candidate_for("songti"), candidate_for("heiti"))
+        self.assertFalse((self.root / diagnostic.MANIFEST_NAME).exists())
+
+    def test_manifest_reserves_full_artifact_budget_before_write_or_render(self):
+        cap = diagnostic.MAX_CENSUS_RESERVE + diagnostic.MAX_ACCEPTANCE_LOG + diagnostic.MAX_SUMMARY + 64 * 1024
+        code, calls, summary = self.execute_matrix(budget=cap, last_census_padding=128 * 1024)
+        self.assertEqual(code, 1)
+        self.assertEqual(len(calls), 3)
+        self.assertIn("artifact budget", summary["error"])
+        self.assertFalse((self.root / "attempt/matrix" / diagnostic.MANIFEST_NAME).exists())
+        self.assertEqual(summary["cases"], [])
+        self.assertNotIn("manifest", summary)
+
+    def test_shared_manifest_counts_against_case_admission_budget(self):
+        real_write = diagnostic.write_composite_manifest
+        observed = {}
+        def write_manifest(root, primary, fallback):
+            result = real_write(root, primary, fallback)
+            observed["manifest_bytes"] = result[1]["bytes"]
+            observed["before"] = diagnostic.evidence_bytes(root.parent)
+            # Enough for every other byte plus a case, but one byte short once
+            # this already-persisted shared manifest is correctly included.
+            diagnostic.MAX_EVIDENCE = (observed["before"] - observed["manifest_bytes"] +
+                diagnostic.MAX_CASE_RESERVE + diagnostic.MAX_ACCEPTANCE_LOG + diagnostic.MAX_SUMMARY)
+            return result
+        with patch.object(diagnostic, "write_composite_manifest", side_effect=write_manifest):
+            code, calls, summary = self.execute_matrix()
+        self.assertEqual(code, 1)
+        self.assertEqual(len(calls), 3)
+        self.assertIn("artifact budget", summary["error"])
+        self.assertGreater(observed["manifest_bytes"], 0)
+        self.assertEqual(summary["cases"], [])
+
+    def test_manifest_does_not_reset_global_deadline_before_combination(self):
+        code, calls, summary = self.execute_matrix(matrix_seconds=300, elapsed=[0, 0, 0, 35, 35, 35, 35, 35, 35])
+        self.assertEqual(code, 1)
+        self.assertEqual(len(calls), 9)
+        self.assertEqual(len(summary["cases"]), 6)
+        self.assertIn("Global matrix time budget", summary["error"])
+        self.assertEqual(summary["configurations"][2]["status"], "incomplete")
+        self.assertFalse(any(call[0][0] == "--composite-case" for call in calls))
+
+    def test_json_reader_rejects_duplicate_fields_and_oversized_bytes(self):
+        path = self.root / "evidence.json"
+        path.write_text('{"status":"unavailable","status":"selected"}', encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "Duplicate JSON"):
+            diagnostic.read_json(path)
+        path.write_bytes(b" " * 33)
+        with patch.object(diagnostic, "MAX_JSON", 32):
+            with self.assertRaisesRegex(ValueError, "oversized"):
+                diagnostic.read_json(path)
+
+    def test_json_reader_rejects_final_symlink_directory_and_fifo(self):
+        target = self.root / "target.json"
+        target.write_text("{}", encoding="utf-8")
+        link = self.root / "link.json"
+        link.symlink_to(target)
+        fifo = self.root / "fifo.json"
+        os.mkfifo(fifo)
+        for path in (link, self.root, fifo):
+            with self.subTest(path=path):
+                with self.assertRaises(ValueError):
+                    diagnostic.read_json(path)
+        self.assertEqual(diagnostic.read_json(target), {})
+
+    def test_json_reader_bounds_actual_read_if_file_grows_after_stat(self):
+        path = self.root / "evidence.json"
+        path.write_bytes(b"{}")
+        actual_fstat = os.fstat
+        def grow_after_stat(fd):
+            value = actual_fstat(fd)
+            path.write_bytes(b" " * 65)
+            return value
+        with patch.object(diagnostic, "MAX_JSON", 64), patch.object(diagnostic.os, "fstat", side_effect=grow_after_stat):
+            with self.assertRaisesRegex(ValueError, "Oversized"):
+                diagnostic.read_json(path)
+
+    def test_canonical_parent_alias_keeps_new_only_matrix_and_manifest(self):
+        real = self.root / "real"
+        real.mkdir()
+        alias = self.root / "alias"
+        alias.symlink_to(real, target_is_directory=True)
+        self.root = alias
+        code, calls, summary = self.execute_matrix()
+        self.assertEqual(code, 0)
+        payload = json.loads((real / "attempt/matrix" / diagnostic.MANIFEST_NAME).read_bytes())
+        self.assertEqual(payload["matrixDirectory"], str(real / "attempt/matrix"))
+        for arguments, _ in calls:
+            case_path = arguments[2] if arguments[0] in ("--inventory", "--composite-case") else arguments[3]
+            self.assertEqual(Path(case_path).parent, real / "attempt/matrix")
+        existing = alias / "existing-matrix"
+        existing.symlink_to(real / "new-target", target_is_directory=True)
+        with self.assertRaises((FileExistsError, ValueError)):
+            diagnostic.run(Path("/synthetic"), existing, Path("/watchdog"))
+        self.assertFalse((real / "new-target").exists())
+
+    def test_wrong_artifact_parent_cannot_create_a_manifest_or_launch(self):
+        outer = self.root / "outer"
+        outer.mkdir()
+        nested = outer / "nested"
+        nested.mkdir()
+        with patch.object(diagnostic, "run_case_command") as command:
+            with self.assertRaisesRegex(ValueError, "direct child"):
+                diagnostic.run(Path("/synthetic"), nested / "matrix", Path("/watchdog"), outer)
+        command.assert_not_called()
+        self.assertFalse((nested / "matrix").exists())
 
 
 if __name__ == "__main__":

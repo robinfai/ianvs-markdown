@@ -32,6 +32,7 @@ struct NativePDFFontEvidenceTests {
 
   @MainActor
   static func main() throws {
+    try FontPreflightManifestTests.run()
     let fm = FileManager.default
     let root = fm.temporaryDirectory.appendingPathComponent("linefold-font-evidence-unit-\(UUID().uuidString)")
     try fm.createDirectory(at: root, withIntermediateDirectories: false)
