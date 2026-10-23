@@ -128,9 +128,19 @@ struct NativePDFFontDiagnostic {
         data = cached
       } else {
         let values = try local.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
-        guard values.isRegularFile == true, let size = values.fileSize,
-              size > 0, size <= 64 * 1024 * 1024, readBytes + size <= 128 * 1024 * 1024 else {
-          throw Failure(message: "Local font file exceeds diagnostic input budget")
+        let measuredSize = values.fileSize.map(String.init) ?? "unknown"
+        let inputMetadata = "file=\(local.lastPathComponent), bytes=\(measuredSize), previouslyReadBytes=\(readBytes)"
+        guard values.isRegularFile == true else {
+          throw Failure(message: "System-font file is not known regular (\(inputMetadata))")
+        }
+        guard let size = values.fileSize, size > 0 else {
+          throw Failure(message: "System-font file has missing or nonpositive size (\(inputMetadata))")
+        }
+        guard size <= 64 * 1024 * 1024 else {
+          throw Failure(message: "System-font file exceeds 67108864-byte per-file input cap (\(inputMetadata))")
+        }
+        guard readBytes + size <= 128 * 1024 * 1024 else {
+          throw Failure(message: "System-font file would exceed 134217728-byte aggregate input cap (\(inputMetadata))")
         }
         data = try Data(contentsOf: local)
         guard data.count == size else { throw Failure(message: "System font changed while reading") }

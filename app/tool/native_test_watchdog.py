@@ -31,16 +31,29 @@ def run_bounded(command: list[str], timeout_seconds: float) -> int:
         if not finished:
             # Only synthetic fixtures run here. Kill the entire isolated group
             # immediately so a child ignoring SIGTERM cannot remain behind.
+            kill_error = None
             try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            try:
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                # Even cleanup must not wait indefinitely on an OS-level stall.
-                print("FAIL: native test process did not exit after SIGKILL", file=sys.stderr, flush=True)
-                raise
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                except BaseException as error:
+                    kill_error = error
+                    print(f"FAIL: cleanup killpg({process.pid}) failed: {error!r}",
+                          file=sys.stderr, flush=True)
+            finally:
+                # Reap even if group signalling failed. EPERM is never success,
+                # and an un-reaped Popen is not evidence that its leader lives.
+                try:
+                    process.wait(timeout=5)
+                except BaseException as wait_error:
+                    print(f"FAIL: cleanup wait({process.pid}) failed: {wait_error!r}",
+                          file=sys.stderr, flush=True)
+                    if kill_error is not None:
+                        raise wait_error from kill_error
+                    raise
+            if kill_error is not None:
+                raise kill_error
 
 
 def main() -> int:
