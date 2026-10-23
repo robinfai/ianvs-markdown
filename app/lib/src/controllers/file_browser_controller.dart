@@ -663,6 +663,10 @@ class FileBrowserController extends ChangeNotifier {
     _emit();
   }
 
+  Set<String> get favoritePaths => {
+    for (final value in _preferences.values) ...value.favorites.keys,
+  };
+
   /// Favorites retain their file access across workspace switches.
   bool hasFavorite(String path) => _preferences.values.any(
     (preferences) => preferences.favorites.containsKey(path),

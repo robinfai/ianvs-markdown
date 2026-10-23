@@ -237,6 +237,13 @@ struct NativeNoteTransactionAcceptance {
     try run("storageInventoryCountsAndBounds", storageInventoryCountsAndBounds)
     try run("storageInventoryScopeAndArtifacts", storageInventoryScopeAndArtifacts)
     try run("storageInventoryRaces", storageInventoryRaces)
+    try run("directorySuccessAndRestart", directorySuccessAndRestart)
+    try run("directoryEmptyAndImageOnly", directoryEmptyAndImageOnly)
+    try run("directoryPreflight", directoryPreflight)
+    try run("directoryFaultReceipts", directoryFaultReceipts)
+    try run("directoryDependencyRaces", directoryDependencyRaces)
+    try run("directoryMixedJournalCapacity", directoryMixedJournalCapacity)
+    try run("directoryPresenterNotifications", directoryPresenterNotifications)
     print("PASS: synthetic atomic note transactions, receipts, recovery, races, bounds and privacy")
   }
   private static func run(_ name: String, _ body: () throws -> Void) throws {
@@ -1427,5 +1434,225 @@ struct NativeNoteTransactionAcceptance {
       }
     }
   }
+
+  private static func directorySource(_ f: Fixture) -> Data {
+    Data(String(decoding: f.originalSource, as: UTF8.self)
+      .replacingOccurrences(of: "../assets/image.png", with: "../../assets/image.png").utf8)
+  }
+
+  private static func directoryRequest(_ f: Fixture, source: String = "notes",
+                                       destination: String = "archive/Moved", empty: Bool = false) throws -> [String: Any] {
+    let tree = CloudWorkspace.inspectWorkspaceDirectoryMoveTree(f.root, relativePath: source,
+                                                                requestId: UUID().uuidString)
+    var files: [[String: Any]] = []
+    if !empty {
+      files = [
+        ["path": f.source, "destinationPath": destination + "/Old.md", "expectedRevision": try f.revision(f.source),
+         "expectedBytes": FlutterStandardTypedData(bytes: f.originalSource),
+         "replacementBytes": FlutterStandardTypedData(bytes: directorySource(f))],
+        ["path": f.incoming, "destinationPath": f.incoming, "expectedRevision": try f.revision(f.incoming),
+         "expectedBytes": FlutterStandardTypedData(bytes: f.originalIncoming),
+         "replacementBytes": FlutterStandardTypedData(bytes: Data("# Index\r\n[Old](archive/Moved/Old.md#section \"title\")\r\n".utf8))],
+      ]
+    }
+    return ["path": f.root.path, "transactionId": UUID().uuidString, "sourcePath": source,
+            "destinationPath": destination, "files": files, "tree": tree,
+            "catalog": try f.catalogRows(), "assets": [["path": "assets/image.png", "revision": try f.revision("assets/image.png")]]]
+  }
+
+  private static func directorySuccessAndRestart() throws {
+    let f = try Fixture()
+    try f.write("notes/nested/image.png", Data([1, 2, 3, 4]))
+    let directoryIdentity = try f.identity("notes")
+    let imageIdentity = try f.identity("notes/nested/image.png")
+    let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+    let request = try directoryRequest(f)
+    let prepared = try f.invoke(executor, "prepareWorkspaceDirectoryMove", request)
+    try require(prepared["phase"] as? String == "prepared", "Directory preparation failed: \(prepared)")
+    try require(prepared["version"] as? Int == 2, "Directory must have v2 journal")
+    let result = try f.invoke(executor, "executeWorkspaceNoteMove", f.command(request, token: prepared["token"]))
+    try require(result["phase"] as? String == "completed", "Directory execution failed: \(result)")
+    let namespace = result["namespace"] as! [String: Any]
+    try require(namespace["moved"] as? Bool == true && namespace["synced"] as? Bool == true && namespace["verified"] as? Bool == true,
+                "Completion needs a real namespace/durability receipt")
+    try require(!f.exists("notes"), "Old namespace must be absent")
+    try require(try f.identity("archive/Moved") == directoryIdentity, "Directory must be renamed once, not recreated")
+    try require(try f.identity("archive/Moved/nested/image.png") == imageIdentity, "Images retain their inode")
+    try require(try f.bytes("archive/Moved/Old.md") == directorySource(f), "Moved text must contain rewritten links")
+    let artifacts = result["retainedArtifacts"] as! [[String: Any]]
+    let sourceArtifact = artifacts.first { ($0["path"] as? String)?.hasPrefix("archive/Moved/") == true }!["path"] as! String
+    try require(try f.bytes(sourceArtifact) == f.originalSource, "Retained original follows its parent directory")
+    let restarted = WorkspaceNoteTransaction(journalDirectory: f.journal)
+    let observed = try f.invoke(restarted, "reconcileWorkspaceNoteMove", f.command(request))
+    try require(observed["phase"] as? String == "completed", "Restart must validate durable complete record: \(observed)")
+    let beforeJournal = try Data(contentsOf: f.journal.appendingPathComponent((request["transactionId"] as! String).lowercased() + ".json"))
+    let inventory = try f.invoke(restarted, "inspectWorkspaceNoteMoveStorage", ["path": f.root.path])
+    try require(inventory["observedComplete"] as? Bool == true && inventory["artifactUnknownCount"] as? Int == 0,
+                "v2 inventory must find relocated owned artifacts: \(inventory)")
+    try require(try Data(contentsOf: f.journal.appendingPathComponent((request["transactionId"] as! String).lowercased() + ".json")) == beforeJournal,
+                "Inventory must not reconcile/write v2 journals")
+    var recovery = f.command(request); recovery["relativeDirectory"] = "archive"
+    let recovered = try f.invoke(restarted, "recoverWorkspaceNoteMove", recovery)
+    let copies = recovered["recoveryPaths"] as! [String]
+    try require(copies.count == 2, "Original text recovery must work without old parent paths: \(recovered)")
+    try require(try copies.map(f.bytes).contains(f.originalSource), "Original moved note must be recoverable as copy")
+    try f.overwriteSameInode(sourceArtifact, Data("Concurrent artifact replacement".utf8))
+    let changed = try f.invoke(WorkspaceNoteTransaction(journalDirectory: f.journal),
+                              "reconcileWorkspaceNoteMove", f.command(request))
+    try require(changed["phase"] as? String != "completed", "Changed artifact invalidates completion")
+    let changedArtifacts = changed["retainedArtifacts"] as! [[String: Any]]
+    try require(changedArtifacts.allSatisfy { $0["verified"] as? Bool == false },
+                "Reconcile cannot keep stale verified artifact receipts after artifact_changed: \(changed)")
+  }
+
+  private static func directoryEmptyAndImageOnly() throws {
+    for image in [false, true] {
+      let f = try Fixture()
+      try f.manager.createDirectory(at: f.url("empty"), withIntermediateDirectories: true)
+      if image { try f.write("empty/picture.png", Data([9, 8, 7])) }
+      let identity = try f.identity("empty")
+      let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let request = try directoryRequest(f, source: "empty", empty: true)
+      let prepared = try f.invoke(executor, "prepareWorkspaceDirectoryMove", request)
+      try require(prepared["phase"] as? String == "prepared", "Zero-note preparation failed: \(prepared)")
+      let result = try f.invoke(executor, "executeWorkspaceNoteMove", f.command(request, token: prepared["token"]))
+      try require(result["phase"] as? String == "completed", "Zero-note move failed: \(result)")
+      try require((result["entries"] as? [Any])?.isEmpty == true, "No fabricated note entry")
+      try require(try f.identity("archive/Moved") == identity, "Zero-note directory must actually move")
+      let restarted = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let observed = try f.invoke(restarted, "reconcileWorkspaceNoteMove", f.command(request))
+      try require(observed["phase"] as? String == "completed", "Zero-note receipt survives restart")
+      if image { try require(try f.bytes("archive/Moved/picture.png") == Data([9, 8, 7]), "Image bytes unchanged") }
+    }
+  }
+
+  private static func directoryPreflight() throws {
+    for scenario in ["missingNote", "forgedTree", "unsupported", "hiddenArtifact", "symlink", "occupiedOpaque", "caseCollision", "overlap", "changedTree", "crossVolume", "capacity"] {
+      let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      if scenario == "unsupported" { try f.write("notes/file.pdf", Data([1])) }
+      if scenario == "hiddenArtifact" { try f.write("notes/.linefold-note-move-old.md", Data([1])) }
+      if scenario == "symlink" { try f.manager.createSymbolicLink(atPath: f.url("notes/link.png").path, withDestinationPath: f.url("assets/image.png").path) }
+      if scenario == "occupiedOpaque" { try f.write("archive/Moved", Data([1])) }
+      if scenario == "caseCollision" { try f.write("archive/mOvEd", Data([1])) }
+      var request = try directoryRequest(f)
+      if scenario == "missingNote" { request["files"] = Array((request["files"] as! [[String: Any]]).dropFirst()) }
+      if scenario == "forgedTree" {
+        var tree = request["tree"] as! [String: Any]
+        tree["members"] = Array((tree["members"] as! [[String: Any]]).dropLast())
+        request["tree"] = tree
+      }
+      if scenario == "overlap" { request["destinationPath"] = "notes/inside" }
+      if scenario == "changedTree" { try f.write("notes/new.png", Data([2])) }
+      if scenario == "crossVolume" { executor.parentDeviceOverride = { path, device in path == "archive/Moved" ? device &+ 1 : device } }
+      if scenario == "capacity" { executor.availableBytesOverride = { _, _, _ in 0 } }
+      let result = try f.invoke(executor, "prepareWorkspaceDirectoryMove", request)
+      try require(result["phase"] as? String == "blocked", "\(scenario) must reject: \(result)")
+      try require(try f.bytes(f.source) == f.originalSource && f.bytes(f.incoming) == f.originalIncoming,
+                  "\(scenario) must not mutate notes")
+      try require(f.exists("notes"), "\(scenario) must not move directory")
+    }
+  }
+
+  private static func directoryFaultReceipts() throws {
+    let points = ["beforeStageIntent", "afterStageIntent", "afterStageCreate", "beforeStageSync", "beforeStageReceipt",
+                  "beforeWriteIntent", "afterWriteIntent", "beforeWrite", "afterWrite", "beforeWriteReceipt",
+                  "beforeDirectoryMoveIntent", "afterDirectoryMoveIntent", "beforeDirectoryExclusiveRename",
+                  "afterDirectoryRename", "beforeDirectoryMoveRootSync", "beforeDirectoryMoveSourceParentSync",
+                  "beforeDirectoryMoveDestinationParentSync", "beforeDirectoryMoveReceipt", "afterDirectoryMoveReceipt",
+                  "beforeDirectoryCompletion"]
+    for boundary in points {
+      let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let request = try directoryRequest(f)
+      let prepared = try f.invoke(executor, "prepareWorkspaceDirectoryMove", request)
+      try require(prepared["phase"] as? String == "prepared", "Fault fixture prepare: \(prepared)")
+      var reached = false
+      executor.fault = { point in if point == boundary { reached = true; throw InjectedFailure(boundary: point) } }
+      let result = try f.invoke(executor, "executeWorkspaceNoteMove", f.command(request, token: prepared["token"]))
+      try require(reached, "Directory fault point not exercised: \(boundary), \(result)")
+      try require(result["phase"] as? String != "completed", "Fault must not claim completion: \(boundary)")
+      try require(result["retryAllowed"] as? Bool == false, "Fault revokes write token: \(boundary)")
+      let locations = ["notes/Old.md", "archive/Moved/Old.md"].filter(f.exists)
+      try require(locations.count == 1, "Exactly one live namespace retained: \(boundary)")
+      let current = try f.bytes(locations[0])
+      try require(current == f.originalSource || current == directorySource(f), "No torn body: \(boundary)")
+      let journal = f.journal.appendingPathComponent((request["transactionId"] as! String).lowercased() + ".json")
+      let json = try JSONSerialization.jsonObject(with: Data(contentsOf: journal)) as! [String: Any]
+      let originals = (json["entries"] as! [[String: Any]]).compactMap { row -> Data? in
+        guard let encoded = row["original"] as? String else { return nil }; return Data(base64Encoded: encoded)
+      }
+      try require(originals.contains(f.originalSource) && originals.contains(f.originalIncoming), "Originals remain in durable journal")
+      let restarted = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let observed = try f.invoke(restarted, "reconcileWorkspaceNoteMove", f.command(request))
+      try require(observed["phase"] as? String != "completed", "Restart cannot invent completion: \(boundary)")
+      let before = try f.relativeFiles(under: f.root)
+      _ = try f.invoke(restarted, "executeWorkspaceNoteMove", f.command(request, token: prepared["token"]))
+      try require(try f.relativeFiles(under: f.root) == before, "Old token must not replay: \(boundary)")
+    }
+  }
+
+  private static func directoryDependencyRaces() throws {
+    for scenario in ["newMember", "outsideEdit", "destinationRace", "oldSourceReappears", "artifactChange"] {
+      let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let request = try directoryRequest(f)
+      let prepared = try f.invoke(executor, "prepareWorkspaceDirectoryMove", request)
+      var reached = false
+      executor.fault = { point in
+        let trigger = scenario == "oldSourceReappears" ? "afterDirectoryRename" : "beforeDirectoryMoveIntent"
+        guard !reached, point == trigger else { return }; reached = true
+        switch scenario {
+        case "newMember": try f.write("notes/late.png", Data([8]))
+        case "outsideEdit": try f.overwriteSameInode(f.unrelated, Data("Concurrent writer".utf8))
+        case "destinationRace": try f.write("archive/Moved", Data("Do not overwrite".utf8))
+        case "oldSourceReappears": try f.write("notes/Other.md", Data("New source namespace".utf8))
+        default:
+          let artifacts = try f.relativeFiles(under: f.root).filter { $0.hasPrefix("notes/.linefold-note-move-") }
+          try require(artifacts.count == 1, "Fixture retained source artifact")
+          try f.overwriteSameInode(artifacts[0], Data("External retained-artifact edit".utf8))
+        }
+      }
+      let result = try f.invoke(executor, "executeWorkspaceNoteMove", f.command(request, token: prepared["token"]))
+      try require(reached && result["phase"] as? String != "completed", "Race must invalidate semantic completion: \(scenario), \(result)")
+      if scenario == "destinationRace" { try require(try f.bytes("archive/Moved") == Data("Do not overwrite".utf8), "Occupied destination must survive") }
+      if scenario == "oldSourceReappears" { try require(try f.bytes("notes/Other.md") == Data("New source namespace".utf8), "No source cleanup after race") }
+    }
+  }
+
+  private static func directoryMixedJournalCapacity() throws {
+    let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal, maximumStoredRecords: 1)
+    let first = try f.request()
+    let prepared = try f.prepare(executor, first)
+    try require(prepared["phase"] as? String == "prepared", "v1 fixture")
+    let second = try directoryRequest(f)
+    let result = try f.invoke(executor, "prepareWorkspaceDirectoryMove", second)
+    try require(result["phase"] as? String == "blocked" && result["code"] as? String == "journal_full", "v2 shares v1 global quota: \(result)")
+    let listed = try f.invoke(executor, "listWorkspaceNoteMoves", ["path": f.root.path])
+    try require((listed["transactions"] as? [Any])?.count == 1, "Failed v2 must not displace v1 journal")
+    try f.expectOriginals()
+  }
+
+  private static func directoryPresenterNotifications() throws {
+    for scenario in ["success", "renameFailure", "syncFailure"] {
+      let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let request = try directoryRequest(f)
+      let prepared = try f.invoke(executor, "prepareWorkspaceDirectoryMove", request)
+      let directory = MovePresenter(url: f.url("notes")); let child = MovePresenter(url: f.url(f.source))
+      NSFileCoordinator.addFilePresenter(directory); NSFileCoordinator.addFilePresenter(child)
+      defer { NSFileCoordinator.removeFilePresenter(directory); NSFileCoordinator.removeFilePresenter(child) }
+      executor.fault = { point in
+        if scenario == "renameFailure" && point == "beforeDirectoryExclusiveRename" { try f.write("archive/Moved", Data([8])) }
+        if scenario == "syncFailure" && point == "beforeDirectoryMoveSourceParentSync" { throw InjectedFailure(boundary: point) }
+      }
+      let result = try f.invoke(executor, "executeWorkspaceNoteMove", f.command(request, token: prepared["token"]))
+      let directoryMoved = directory.moved.wait(timeout: .now() + (scenario == "renameFailure" ? 0.2 : 3)) == .success
+      let childMoved = child.moved.wait(timeout: .now() + (scenario == "renameFailure" ? 0.2 : 3)) == .success
+      if scenario == "renameFailure" { try require(!directoryMoved && !childMoved, "Rejected directory rename must not announce success") }
+      else {
+        try require(directoryMoved && childMoved, "Directory and child presenters must learn actual namespace move: \(scenario), \(result)")
+        if scenario == "success" { try require(result["phase"] as? String == "completed", "Presenter directory success: \(result)") }
+        else { try require(result["phase"] as? String != "completed", "Presenter notification is not durability") }
+      }
+    }
+  }
+
 
 }

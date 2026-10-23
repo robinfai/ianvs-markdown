@@ -15,7 +15,7 @@ final class WorkspaceNoteTransaction {
   static let shared = WorkspaceNoteTransaction()
   static let methods: Set<String> = ["prepareWorkspaceNoteMove", "executeWorkspaceNoteMove",
     "listWorkspaceNoteMoves", "reconcileWorkspaceNoteMove", "recoverWorkspaceNoteMove",
-    "cancelPreparedWorkspaceNoteMove", "inspectWorkspaceNoteMoveStorage"]
+    "cancelPreparedWorkspaceNoteMove", "inspectWorkspaceNoteMoveStorage", "prepareWorkspaceDirectoryMove"]
   static let maximumFiles = 128
   static let maximumPayloadBytes = 32 * 1024 * 1024
   static let maximumJournalBytes = 192 * 1024 * 1024
@@ -104,8 +104,28 @@ final class WorkspaceNoteTransaction {
     var revision: String?
     var state = "pending"
   }
+  /// v2 separates the namespace receipt from text entries: an empty directory
+  /// is a real operation, not a fabricated text file. Paths remain immutable.
+  private struct TreeMember: Codable, Equatable {
+    let path: String
+    let kind: String
+    let revision: String
+    let identity: String
+  }
+  private struct DirectoryNamespace: Codable {
+    let identity: String
+    let sourceParentIdentity: String
+    let destinationParentIdentity: String
+    let members: [TreeMember]
+    var intent = false
+    var moved = false
+    var synced = false
+    var observedPath: String?
+    var verified = false
+  }
   private final class Record: Codable {
     var version = 1
+    var namespace: DirectoryNamespace?
     let transactionId: String
     let rootPath: String
     let rootIdentity: String
@@ -188,6 +208,7 @@ final class WorkspaceNoteTransaction {
         let id = try transactionId(arguments["transactionId"])
         switch method {
         case "prepareWorkspaceNoteMove": return try prepare(root: root, id: id, arguments: arguments)
+        case "prepareWorkspaceDirectoryMove": return try prepareDirectory(root: root, id: id, arguments: arguments)
         case "cancelPreparedWorkspaceNoteMove":
           let record = try load(id)
           guard let session = sessions[id], arguments["token"] as? String == session.token,
@@ -269,7 +290,7 @@ final class WorkspaceNoteTransaction {
   }
   private func verifyParent(scope: WorkspaceFileScope, path: String, parent: Parent) throws {
     try scope.verifyRootLocation()
-    let current = try scope.parentDescriptor(try components(path)); defer { close(current) }
+    let current = try scope.parentDescriptor(try WorkspaceFileScope.relativeComponents(path)); defer { close(current) }
     var a = stat(); var b = stat()
     guard fstat(current, &a) == 0, fstat(parent.descriptor, &b) == 0,
           Self.identity(a) == parent.identity, Self.identity(b) == parent.identity,
@@ -319,7 +340,7 @@ final class WorkspaceNoteTransaction {
   /// Reconstructible metadata-only read-set fingerprint. No unrelated rows are
   /// persisted. Non-note files are included so image dependencies can also be
   /// verified after restart without retaining their paths in the journal.
-  private func dependencyDigest(_ scope: WorkspaceTextScope, excluding: Set<String>) throws -> String {
+  private func dependencyDigest(_ scope: WorkspaceTextScope, excluding: Set<String>, directoryRecord: Record? = nil) throws -> String {
     guard !forceDependencyTimeout else { throw Failure("dependency_timeout") }
     let deadline = DispatchTime.now().uptimeNanoseconds + 10_000_000_000
     var pending: [[String]] = [[]]
@@ -367,10 +388,14 @@ final class WorkspaceNoteTransaction {
         let kind = value.st_mode & mode_t(S_IFMT)
         guard kind == mode_t(S_IFDIR) || kind == mode_t(S_IFREG) else { throw Failure("dependency_unavailable") }
         if kind == mode_t(S_IFDIR) { pending.append(child) }
-        if excluding.contains(path) { continue }
+        let logicalPath: String
+        if let record = directoryRecord, record.namespace?.moved == true {
+          logicalPath = mapDirectoryPath(path, source: record.destinationPath, destination: record.sourcePath)
+        } else { logicalPath = path }
+        if excluding.contains(logicalPath) { continue }
         let revision = kind == mode_t(S_IFDIR) ? Self.identity(value) : WorkspaceFileScope.revision(value)
         let local = value.st_flags & UInt32(SF_DATALESS) == 0
-        lines.append(Data("\(path.utf8.count):\(path)|\(kind)|\(revision)|\(local)\n".utf8))
+        lines.append(Data("\(logicalPath.utf8.count):\(logicalPath)|\(kind)|\(revision)|\(local)\n".utf8))
       }
       var after = stat()
       guard fstat(descriptor, &after) == 0,
@@ -422,6 +447,7 @@ final class WorkspaceNoteTransaction {
   }
 
   private func validateReadSet(_ record: Record, session: Session) throws {
+    if record.version == 2 { try validateDirectoryReadSet(record, scope: session.scope, session: session); return }
     do {
       try point("beforeSemanticScan")
       guard !record.consistencyConflict else { throw Failure("dependency_conflict") }
@@ -556,7 +582,7 @@ final class WorkspaceNoteTransaction {
   private func prepare(root: URL, id: String, arguments: [String: Any]) throws -> [String: Any] {
     if try exists(id) {
       let record = try load(id)
-      guard arguments["sourcePath"] as? String == record.sourcePath,
+      guard record.version == 1, arguments["sourcePath"] as? String == record.sourcePath,
             arguments["destinationPath"] as? String == record.destinationPath,
             let files = arguments["files"] as? [[String: Any]], files.count == record.entries.count,
             zip(files, record.entries).allSatisfy({ pair in
@@ -646,6 +672,7 @@ final class WorkspaceNoteTransaction {
 
   private func execute(root: URL, id: String, token: String?) throws -> [String: Any] {
     let record = try load(id)
+    if record.version == 2 { return try executeDirectory(root: root, record: record, token: token) }
     guard !record.cancelled else { return result(record) }
     guard let session = sessions[id], token == session.token else {
       try reconcile(record, scope: try authorizedScope(root, record: record))
@@ -695,12 +722,12 @@ final class WorkspaceNoteTransaction {
   /// byte-identical planned components. Never resolve the leaf or descendants.
   /// Internal for synthetic tests; no Flutter arguments can call this helper.
   func verifyCoordinatedURL(_ observed: URL, scope: WorkspaceFileScope,
-                            relativePath: String, parentDescriptor: Int32) throws {
+                            relativePath: String, parentDescriptor: Int32, directory: Bool = false) throws {
     do {
       try WorkspaceFileScope.withoutMaterialization {
         guard observed.isFileURL, observed.host == nil || observed.host == "",
               observed.user == nil, observed.password == nil, observed.port == nil,
-              observed.query == nil, observed.fragment == nil, !observed.hasDirectoryPath,
+              observed.query == nil, observed.fragment == nil, directory || !observed.hasDirectoryPath,
               observed.path.hasPrefix("/"), observed.path.utf16.count <= 4096 else {
           throw Failure("coordinator_redirected")
         }
@@ -742,7 +769,7 @@ final class WorkspaceNoteTransaction {
         // for the old source after a move. A symlink is never a missing leaf.
         var leaf = stat()
         if fstatat(candidateParent, planned.last!, &leaf, AT_SYMLINK_NOFOLLOW) == 0 {
-          guard leaf.st_mode & mode_t(S_IFMT) != mode_t(S_IFLNK),
+          guard (directory ? leaf.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR) : leaf.st_mode & mode_t(S_IFMT) != mode_t(S_IFLNK)),
                 leaf.st_flags & UInt32(SF_DATALESS) == 0 else { throw Failure("coordinator_redirected") }
         } else if errno != ENOENT { throw Failure("coordinator_redirected") }
         try scope.verifyRootLocation(); try candidate.verifyRootLocation()
@@ -751,8 +778,8 @@ final class WorkspaceNoteTransaction {
   }
 
   private func coordinate(_ scope: WorkspaceFileScope, path: String, destination: String? = nil, moving: Bool = true,
-                          coordinator: NSFileCoordinator = NSFileCoordinator(), body: () throws -> Void) throws {
-    let url = scope.rootURL.appendingPathComponent(path)
+                          coordinator: NSFileCoordinator = NSFileCoordinator(), directory: Bool = false, body: () throws -> Void) throws {
+    let url = scope.rootURL.appendingPathComponent(path, isDirectory: directory)
     let sourceParent = try WorkspaceFileScope.withoutMaterialization {
       try Parent(scope: scope, components: WorkspaceFileScope.relativeComponents(path))
     }
@@ -764,7 +791,7 @@ final class WorkspaceNoteTransaction {
     // All callback validation I/O shares the no-materialization policy, even
     // when Foundation dispatches the callback to another worker thread.
     if let destination {
-      let target = scope.rootURL.appendingPathComponent(destination)
+      let target = scope.rootURL.appendingPathComponent(destination, isDirectory: directory)
       let targetParent = try WorkspaceFileScope.withoutMaterialization {
         try Parent(scope: scope, components: WorkspaceFileScope.relativeComponents(destination))
       }
@@ -776,12 +803,12 @@ final class WorkspaceNoteTransaction {
               expectedDestination: target, observedDestination: b, moving: moving,
               deadlineExpired: DispatchTime.now().uptimeNanoseconds >= deadline.uptimeNanoseconds))
             guard DispatchTime.now().uptimeNanoseconds < deadline.uptimeNanoseconds else { throw Failure("coordinator_redirected") }
-            try verifyCoordinatedURL(a, scope: scope, relativePath: path, parentDescriptor: sourceParent.descriptor)
-            try verifyCoordinatedURL(b, scope: scope, relativePath: destination, parentDescriptor: targetParent.descriptor)
+            try verifyCoordinatedURL(a, scope: scope, relativePath: path, parentDescriptor: sourceParent.descriptor, directory: directory)
+            try verifyCoordinatedURL(b, scope: scope, relativePath: destination, parentDescriptor: targetParent.descriptor, directory: directory)
             guard DispatchTime.now().uptimeNanoseconds < deadline.uptimeNanoseconds else { throw Failure("coordinator_redirected") }
             try body() // The body still uses only its original pinned authority.
-            try verifyCoordinatedURL(a, scope: scope, relativePath: path, parentDescriptor: sourceParent.descriptor)
-            try verifyCoordinatedURL(b, scope: scope, relativePath: destination, parentDescriptor: targetParent.descriptor)
+            try verifyCoordinatedURL(a, scope: scope, relativePath: path, parentDescriptor: sourceParent.descriptor, directory: directory)
+            try verifyCoordinatedURL(b, scope: scope, relativePath: destination, parentDescriptor: targetParent.descriptor, directory: directory)
           }
         }
       }
@@ -793,10 +820,10 @@ final class WorkspaceNoteTransaction {
               expectedDestination: nil, observedDestination: nil, moving: false,
               deadlineExpired: DispatchTime.now().uptimeNanoseconds >= deadline.uptimeNanoseconds))
             guard DispatchTime.now().uptimeNanoseconds < deadline.uptimeNanoseconds else { throw Failure("coordinator_redirected") }
-            try verifyCoordinatedURL(current, scope: scope, relativePath: path, parentDescriptor: sourceParent.descriptor)
+            try verifyCoordinatedURL(current, scope: scope, relativePath: path, parentDescriptor: sourceParent.descriptor, directory: directory)
             guard DispatchTime.now().uptimeNanoseconds < deadline.uptimeNanoseconds else { throw Failure("coordinator_redirected") }
             try body()
-            try verifyCoordinatedURL(current, scope: scope, relativePath: path, parentDescriptor: sourceParent.descriptor)
+            try verifyCoordinatedURL(current, scope: scope, relativePath: path, parentDescriptor: sourceParent.descriptor, directory: directory)
           }
         }
       }
@@ -1027,10 +1054,11 @@ final class WorkspaceNoteTransaction {
   }
 
   private func hasEvidenceOfMutation(_ record: Record) -> Bool {
-    record.entries.contains { $0.intent != nil || $0.stagedIdentity != nil || $0.writeRevision != nil || $0.moveRevision != nil || $0.state == "uncertain" }
+    record.namespace?.intent == true || record.namespace?.moved == true || record.entries.contains { $0.intent != nil || $0.stagedIdentity != nil || $0.writeRevision != nil || $0.moveRevision != nil || $0.state == "uncertain" }
   }
   private func markUnverifiable(_ record: Record) {
     revokeUnpersisted(record)
+    if record.namespace != nil { record.namespace?.verified = false; record.namespace?.observedPath = nil }
     for index in record.entries.indices { record.entries[index].state = "uncertain"; record.entries[index].actualPath = nil; record.entries[index].actualRevision = nil; record.entries[index].artifactState = "uncertain" }
     for index in record.recoveries.indices where record.recoveries[index].state == "applied" {
       record.recoveries[index].state = "uncertain"
@@ -1038,6 +1066,7 @@ final class WorkspaceNoteTransaction {
     record.phase = "uncertain"
   }
   private func reconcile(_ record: Record, scope: WorkspaceTextScope) throws {
+    if record.version == 2 { try reconcileDirectory(record, scope: scope); return }
     guard try scopeIdentity(scope) == record.rootIdentity else { markUnverifiable(record); throw Failure("scope_changed") }
     if record.cancelled {
       record.phase = "cancelled"; reconcileRecoveries(record, scope: scope); try save(record); return
@@ -1173,8 +1202,8 @@ final class WorkspaceNoteTransaction {
     } else { record.phase = hasEvidenceOfMutation(record) ? "partial" : "prepared" }
     try save(record)
   }
-  private func pathAbsent(_ scope: WorkspaceFileScope, path: String, artifact: Bool = false) throws -> Bool {
-    let parts = try (artifact ? artifactComponents(path) : components(path)); let parent = try scope.parentDescriptor(parts); defer { close(parent) }
+  private func pathAbsent(_ scope: WorkspaceFileScope, path: String, artifact: Bool = false, directory: Bool = false) throws -> Bool {
+    let parts = try (artifact ? artifactComponents(path) : (directory ? WorkspaceTextScope.textComponents(path, directory: true) : components(path))); let parent = try scope.parentDescriptor(parts); defer { close(parent) }
     var value = stat()
     if fstatat(parent, parts.last!, &value, AT_SYMLINK_NOFOLLOW) == 0 { return false }
     guard errno == ENOENT else { throw Failure("file_unavailable") }
@@ -1291,6 +1320,7 @@ final class WorkspaceNoteTransaction {
   private func retryEligible(_ record: Record) -> Bool {
     // This describes the last durable observation, not a new grant. Rendering
     // must not discover and then lose an unpersisted dependency conflict.
+    (record.version == 1 || (record.namespace?.intent == false && record.namespace?.moved == false)) &&
     !record.cancelled && !record.consistencyConflict && record.phase != "completed" &&
       sessions[record.transactionId] != nil &&
       record.entries.allSatisfy { ($0.state == "pending" || $0.state == "applied") && $0.intent == nil }
@@ -1309,7 +1339,7 @@ final class WorkspaceNoteTransaction {
       },
       "retainedArtifacts": record.entries.compactMap { entry -> [String: Any]? in
         guard let path = entry.artifactPath, entry.artifactState != "pending" else { return nil }
-        return ["path": path, "state": entry.artifactState,
+        return ["path": record.namespace?.moved == true ? mapDirectoryPath(path, source: record.sourcePath, destination: record.destinationPath) : path, "state": entry.artifactState,
                 "verified": entry.artifactState == "retained" || entry.artifactState == "staged"]
       },
       "recoveryPaths": record.recoveries.filter { $0.state == "applied" }.map(\.path),
@@ -1319,6 +1349,14 @@ final class WorkspaceNoteTransaction {
         if let revision = item.revision { row["revision"] = revision }
         return row
       }]
+    value["version"] = record.version
+    if let namespace = record.namespace {
+      var receipt: [String: Any] = ["sourcePath": record.sourcePath, "destinationPath": record.destinationPath,
+        "identity": namespace.identity, "moved": namespace.moved, "synced": namespace.synced,
+        "verified": namespace.verified, "memberCount": namespace.members.count]
+      if let path = namespace.observedPath { receipt["actualPath"] = path }
+      value["namespace"] = receipt
+    }
     if let code = record.code { value["code"] = code }
     if let session = sessions[record.transactionId], value["retryAllowed"] as? Bool == true { value["token"] = session.token }
     return value
@@ -1370,6 +1408,7 @@ final class WorkspaceNoteTransaction {
   }
 
   private func checkMutationParents(_ record: Record, scope: WorkspaceTextScope) throws {
+    if record.version == 2 { try checkDirectoryParents(record, scope: scope); return }
     var devices: [String: Int32] = [:]
     for entry in record.entries {
       for (path, identity) in [(entry.path, entry.parentIdentity), (entry.destinationPath, entry.destinationParentIdentity)] {
@@ -1403,6 +1442,19 @@ final class WorkspaceNoteTransaction {
         guard let entry = record.entries.first(where: { $0.path == item.sourcePath }) else { throw Failure("journal_invalid") }
         needs.append(try parentCapacity(scope, path: item.path, identity: item.parentIdentity,
                                         count: entry.original.count, context: context))
+      }
+    } else if record.version == 2 {
+      guard let namespace = record.namespace else { throw Failure("journal_invalid") }
+      for (path, identity) in [(record.sourcePath, namespace.sourceParentIdentity),
+                               (record.destinationPath, namespace.destinationParentIdentity)] {
+        let parent = try Parent(scope: scope, components: WorkspaceFileScope.relativeComponents(path))
+        guard parent.identity == identity else { throw Failure("parent_changed") }
+        needs.append(try capacityNeed(parent.descriptor, count: 0, context: context))
+      }
+      for entry in record.entries {
+        let path = namespace.moved ? entry.destinationPath : entry.path
+        let bytes = entry.artifactPath != nil && entry.stagedIdentity == nil ? entry.replacement.count : 0
+        needs.append(try parentCapacity(scope, path: path, identity: entry.parentIdentity, count: bytes, context: context))
       }
     } else {
       for entry in record.entries {
@@ -1630,12 +1682,16 @@ final class WorkspaceNoteTransaction {
   /// reopen paths, reconcile, save, or initialize any directory.
   private func decodeRecord(_ data: Data, id: String) throws -> Record {
     let record = try JSONDecoder().decode(Record.self, from: data)
-    guard record.version == 1, record.transactionId == id, record.entries.count > 0,
+    guard (record.version == 1 || record.version == 2), record.transactionId == id, (record.version == 2 || record.entries.count > 0),
           record.entries.count <= Self.maximumFiles, record.recoveries.count <= Self.maximumFiles,
           record.entries.reduce(0, { $0 + $1.original.count + $1.replacement.count }) <= Self.maximumPayloadBytes,
           Set(record.entries.map(\.path)).count == record.entries.count,
-          record.entries.filter({ $0.path == record.sourcePath }).count == 1 else { throw Failure("journal_invalid") }
-    _ = try components(record.sourcePath); _ = try components(record.destinationPath)
+          (record.version == 2 || record.entries.filter({ $0.path == record.sourcePath }).count == 1) else { throw Failure("journal_invalid") }
+    if record.version == 2 { try validateDirectoryManifest(record) }
+    else {
+      guard record.namespace == nil else { throw Failure("journal_invalid") }
+      _ = try components(record.sourcePath); _ = try components(record.destinationPath)
+    }
     for entry in record.entries {
       let parts = try components(entry.path); _ = try components(entry.destinationPath)
       if let artifact = entry.artifactPath {
@@ -1655,6 +1711,473 @@ final class WorkspaceNoteTransaction {
     }
     return record
   }
+  // MARK: - v2 single-directory namespace transaction
+
+  private func mapDirectoryPath(_ path: String, source: String, destination: String) -> String {
+    if path.utf8.elementsEqual(source.utf8) { return destination }
+    guard path.utf8.starts(with: (source + "/").utf8) else { return path }
+    return destination + String(decoding: path.utf8.dropFirst(source.utf8.count), as: UTF8.self)
+  }
+
+  private func directoryPaths(_ source: String, _ destination: String) throws {
+    for path in [source, destination] {
+      let parts = try WorkspaceTextScope.textComponents(path, directory: true)
+      guard !parts.isEmpty else { throw Failure("invalid_directory_plan") }
+    }
+    let a = source.precomposedStringWithCanonicalMapping.lowercased()
+    let b = destination.precomposedStringWithCanonicalMapping.lowercased()
+    guard a != b, !a.hasPrefix(b + "/"), !b.hasPrefix(a + "/") else {
+      throw Failure("overlapping_directory_move")
+    }
+  }
+
+  private func treeMembers(_ raw: Any?) throws -> [TreeMember] {
+    guard let rows = raw as? [[String: Any]], !rows.isEmpty, rows.count <= 256,
+          try JSONSerialization.data(withJSONObject: rows).count <= 1024 * 1024 else { throw Failure("invalid_tree") }
+    var seen = Set<String>()
+    let result = try rows.map { row -> TreeMember in
+      guard let path = row["path"] as? String, let kind = row["kind"] as? String,
+            ["directory", "note", "image"].contains(kind), row["local"] as? Bool == true,
+            let revision = row["revision"] as? String, revision.utf8.count <= 200,
+            let identity = row["identity"] as? String, !identity.isEmpty,
+            identity == Self.identity(revision), seen.insert(path).inserted else { throw Failure("invalid_tree") }
+      let parts = try WorkspaceFileScope.relativeComponents(path)
+      guard !parts.contains(where: { $0.hasPrefix(".") }) else { throw Failure("invalid_tree") }
+      return TreeMember(path: path, kind: kind, revision: revision, identity: identity)
+    }
+    return result.sorted { $0.path.utf8.lexicographicallyPrecedes($1.path.utf8) }
+  }
+
+  /// Reuse the complete bounded G4a scanner. The only permitted hidden members
+  /// during execution are this manifest's separately byte/identity-verified
+  /// stage files. A prefix or an arbitrary caller-provided allowlist is not used.
+  private func inspectDirectory(_ scope: WorkspaceTextScope, source: String,
+                                artifacts: [String: String] = [:]) throws -> [TreeMember] {
+    let result = CloudWorkspace.inspectWorkspaceDirectoryMoveTree(scope.rootURL, relativePath: source,
+      requestId: UUID().uuidString)
+    guard result["complete"] as? Bool == true,
+          result["rootIdentity"] as? String == (try scopeIdentity(scope)),
+          let issues = result["issues"] as? [[String: String]],
+          issues.allSatisfy({ issue in
+            guard let path = issue["path"], artifacts[path] != nil else { return false }
+            return issue["code"] == "recoveryArtifact" || issue["code"] == "hiddenMember"
+          }), let rows = result["members"] as? [[String: Any]] else { throw Failure("directory_tree_unavailable") }
+    let expectedArtifacts = artifacts.filter { $0.key.utf8.starts(with: (source + "/").utf8) }
+    let artifactRows = rows.filter { artifacts[$0["path"] as? String ?? ""] != nil }
+    guard artifactRows.count == expectedArtifacts.count,
+          artifactRows.allSatisfy({ row in
+            guard let path = row["path"] as? String, let revision = expectedArtifacts[path] else { return false }
+            return row["revision"] as? String == revision && row["identity"] as? String == Self.identity(revision) &&
+              row["kind"] as? String == "note" && row["local"] as? Bool == true
+          }) else { throw Failure("artifact_changed") }
+    return try treeMembers(rows.filter { artifacts[$0["path"] as? String ?? ""] == nil })
+  }
+
+  /// Inspect every directory entry, including unsupported files and provider
+  /// placeholders. The filtered note catalog cannot prove destination vacancy.
+  private func directoryDestinationAbsent(_ scope: WorkspaceTextScope, path: String) throws {
+    let parts = try WorkspaceTextScope.textComponents(path, directory: true)
+    let parent = try scope.parentDescriptor(parts); defer { close(parent) }
+    var before = stat()
+    guard fstat(parent, &before) == 0 else { throw Failure("destination_unavailable") }
+    let fd = openat(parent, ".", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+    guard fd >= 0, let stream = fdopendir(fd) else {
+      if fd >= 0 { close(fd) }; throw Failure("destination_unavailable")
+    }
+    defer { closedir(stream) }
+    let folded = parts.last!.precomposedStringWithCanonicalMapping.lowercased()
+    let deadline = DispatchTime.now().uptimeNanoseconds + 2_000_000_000
+    var count = 0
+    while true {
+      guard count < Self.maximumCatalogEntries, DispatchTime.now().uptimeNanoseconds < deadline else {
+        throw Failure("destination_scan_limit")
+      }
+      errno = 0
+      guard let entry = readdir(stream) else {
+        if errno != 0 { throw Failure("destination_unavailable") }; break
+      }
+      count += 1
+      let name = withUnsafePointer(to: &entry.pointee.d_name) {
+        $0.withMemoryRebound(to: CChar.self, capacity: Int(entry.pointee.d_namlen) + 1) { String(validatingUTF8: $0) }
+      }
+      guard let name else { throw Failure("destination_unavailable") }
+      let key = name.precomposedStringWithCanonicalMapping.lowercased()
+      guard key != folded, key != "." + folded + ".icloud" else { throw Failure("destination_exists") }
+    }
+    var after = stat(); var leaf = stat()
+    guard fstat(parent, &after) == 0,
+          WorkspaceFileScope.revision(before) == WorkspaceFileScope.revision(after),
+          fstatat(parent, parts.last!, &leaf, AT_SYMLINK_NOFOLLOW) == -1, errno == ENOENT else {
+      throw Failure("destination_exists")
+    }
+    try scope.verifyRootLocation()
+  }
+
+  private func validateDirectoryManifest(_ record: Record) throws {
+    try directoryPaths(record.sourcePath, record.destinationPath)
+    guard let namespace = record.namespace, !namespace.members.isEmpty, namespace.members.count <= 256,
+          namespace.members.filter({ $0.kind == "directory" }).count <= 64,
+          Set(namespace.members.map(\.path)).count == namespace.members.count,
+          namespace.members.first(where: { $0.path == record.sourcePath })?.identity == namespace.identity,
+          namespace.members.first(where: { $0.path == record.sourcePath })?.kind == "directory",
+          !namespace.synced || namespace.moved else { throw Failure("journal_invalid") }
+    for member in namespace.members {
+      let parts = try WorkspaceFileScope.relativeComponents(member.path)
+      guard !parts.contains(where: { $0.hasPrefix(".") }),
+            member.path == record.sourcePath || member.path.hasPrefix(record.sourcePath + "/"),
+            ["directory", "note", "image"].contains(member.kind),
+            member.identity == Self.identity(member.revision), member.revision.utf8.count <= 200 else {
+        throw Failure("journal_invalid")
+      }
+      _ = try WorkspaceFileScope.relativeComponents(mapDirectoryPath(member.path,
+        source: record.sourcePath, destination: record.destinationPath))
+    }
+    let notePaths = Set(namespace.members.filter { $0.kind == "note" }.map(\.path))
+    let entryPaths = Set(record.entries.map(\.path))
+    guard notePaths.isSubset(of: entryPaths) else { throw Failure("directory_note_missing") }
+    for entry in record.entries {
+      guard entry.path != record.sourcePath,
+            entry.destinationPath.utf8.elementsEqual(mapDirectoryPath(entry.path, source: record.sourcePath, destination: record.destinationPath).utf8),
+            !entry.path.hasPrefix(record.destinationPath + "/"), entry.path != record.destinationPath,
+            entry.parentIdentity == entry.destinationParentIdentity,
+            notePaths.contains(entry.path) || entry.original != entry.replacement,
+            entry.moveRevision == nil else { throw Failure("journal_invalid") }
+    }
+  }
+
+  private func prepareDirectory(root: URL, id: String, arguments: [String: Any]) throws -> [String: Any] {
+    // Directory requests never recreate live authority from an old ID, including
+    // a failed/uncertain previous prepare. A fresh preview must use a fresh ID.
+    guard try !exists(id) else { throw Failure("transaction_id_reused") }
+    guard let source = arguments["sourcePath"] as? String,
+          let destination = arguments["destinationPath"] as? String,
+          let files = arguments["files"] as? [[String: Any]], files.count <= Self.maximumFiles,
+          let tree = arguments["tree"] as? [String: Any], tree["complete"] as? Bool == true,
+          tree["sourcePath"] as? String == source,
+          let issues = tree["issues"] as? [[String: Any]], issues.isEmpty else { throw Failure("invalid_directory_plan") }
+    try directoryPaths(source, destination)
+    let expectedMembers = try treeMembers(tree["members"])
+    let scope = try WorkspaceTextScope(root)
+    let rootIdentity = try scopeIdentity(scope)
+    guard tree["rootIdentity"] as? String == rootIdentity else { throw Failure("scope_changed") }
+    let journalPath = journalURL.resolvingSymlinksInPath().standardizedFileURL.path
+    guard journalPath != scope.rootURL.path, !journalPath.hasPrefix(scope.rootURL.path + "/"),
+          !scope.rootURL.path.hasPrefix(journalPath + "/") else { throw Failure("journal_scope_overlap") }
+    let actualMembers = try inspectDirectory(scope, source: source)
+    guard actualMembers.count == expectedMembers.count,
+          zip(actualMembers, expectedMembers).allSatisfy({ a, b in
+            a.path.utf8.elementsEqual(b.path.utf8) && a.kind == b.kind && a.revision == b.revision && a.identity == b.identity
+          }),
+          let sourceMember = actualMembers.first(where: { $0.path == source }),
+          tree["sourceIdentity"] as? String == sourceMember.identity else { throw Failure("directory_tree_changed") }
+    let expectedCatalog = try metadata(arguments["catalog"])
+    let actualCatalog = try catalog(scope)
+    func rows(_ values: [Metadata]) -> [String] { values.map { "\($0.path)|\($0.revision)|\($0.isDirectory)|\($0.local)" }.sorted() }
+    guard rows(expectedCatalog) == rows(actualCatalog) else { throw Failure("catalog_changed") }
+    let assets = try metadata(arguments["assets"] ?? [[String: Any]](), assets: true)
+    try directoryDestinationAbsent(scope, path: destination)
+    var parents: [String: Parent] = [:]; var directories: [String: Parent] = [:]
+    func pin(_ path: String) throws -> Parent {
+      if let value = parents[path] { return value }
+      let parts = try WorkspaceFileScope.relativeComponents(path)
+      let key = parts.dropLast().joined(separator: "/")
+      let value = try directories[key] ?? Parent(scope: scope, components: parts)
+      directories[key] = value; parents[path] = value; return value
+    }
+    let sourceParent = try pin(source); let targetParent = try pin(destination)
+    var entries: [Entry] = []; var seen = Set<String>(); var byteCount = 0
+    let movedNotes = Set(actualMembers.filter { $0.kind == "note" }.map(\.path))
+    for file in files {
+      guard let path = file["path"] as? String, let to = file["destinationPath"] as? String,
+            let revision = file["expectedRevision"] as? String,
+            let original = file["expectedBytes"] as? FlutterStandardTypedData, original.elementSize == 1,
+            let replacement = file["replacementBytes"] as? FlutterStandardTypedData, replacement.elementSize == 1,
+            seen.insert(path).inserted, path != source, path != destination,
+            to.utf8.elementsEqual(mapDirectoryPath(path, source: source, destination: destination).utf8),
+            movedNotes.contains(path) || original.data != replacement.data,
+            String(data: original.data, encoding: .utf8) != nil, String(data: replacement.data, encoding: .utf8) != nil else {
+        throw Failure("invalid_directory_plan")
+      }
+      _ = try components(path); _ = try components(to)
+      byteCount += original.data.count + replacement.data.count
+      guard byteCount <= Self.maximumPayloadBytes else { throw Failure("payload_limit") }
+      let parent = try pin(path)
+      // The future parent is the same pinned directory object, not a path that
+      // must already exist. It is re-opened at its new address after the rename.
+      parents[to] = parent
+      let snapshot = try read(scope, path: path)
+      guard snapshot.revision == revision, snapshot.bytes == original.data,
+            actualCatalog.contains(where: { $0.path == path && !$0.isDirectory && $0.revision == revision }) else {
+        throw Failure("file_conflict")
+      }
+      let artifact = original.data == replacement.data ? nil :
+        (Array(try components(path).dropLast()) + [".linefold-note-move-\(id)-\(entries.count).md"]).joined(separator: "/")
+      entries.append(Entry(path: path, destinationPath: to, expectedRevision: revision, expectedIdentity: snapshot.identity,
+        parentIdentity: parent.identity, destinationParentIdentity: parent.identity,
+        original: original.data, replacement: replacement.data, originalHash: Self.hash(original.data),
+        replacementHash: Self.hash(replacement.data), permissions: snapshot.permissions, owner: snapshot.owner,
+        group: snapshot.group, protectionClass: snapshot.protectionClass, artifactPath: artifact,
+        actualPath: path, actualRevision: revision))
+    }
+    guard movedNotes.isSubset(of: seen), actualMembers.filter({ $0.kind == "note" }).allSatisfy({ member in
+      entries.contains { $0.path.utf8.elementsEqual(member.path.utf8) }
+    }) else { throw Failure("directory_note_missing") }
+    let insideArtifacts = entries.compactMap(\.artifactPath).filter { $0.hasPrefix(source + "/") }
+    // The complete scanner must also fit the artifacts created by this plan.
+    guard actualMembers.count + insideArtifacts.count <= 256,
+          try JSONEncoder().encode(actualMembers).count + insideArtifacts.reduce(0, { $0 + 3 * $1.utf8.count + 1024 }) + 16_384 <= 1024 * 1024 else {
+      throw Failure("directory_tree_budget")
+    }
+    for entry in entries {
+      if let path = entry.artifactPath, try !pathAbsent(scope, path: path, artifact: true) { throw Failure("artifact_exists") }
+    }
+    let fingerprint = try digest(actualCatalog, excluding: Set(entries.map(\.path)), assets: assets, scope: scope)
+    let record = Record(id: id, scope: scope, rootIdentity: rootIdentity, source: source,
+                        destination: destination, digest: fingerprint, entries: entries)
+    record.version = 2
+    record.namespace = DirectoryNamespace(identity: sourceMember.identity, sourceParentIdentity: sourceParent.identity,
+      destinationParentIdentity: targetParent.identity, members: actualMembers, observedPath: source, verified: true)
+    try validateDirectoryManifest(record)
+    let session = Session(scope: scope, parents: parents, assets: assets)
+    try validateDirectoryReadSet(record, scope: scope, session: session)
+    try checkPlanCapacity(record, scope: scope, context: "prepare")
+    try point("beforePreparedJournal"); try save(record)
+    sessions[id] = session
+    try point("afterPreparedJournal")
+    return result(record)
+  }
+
+  private func checkDirectoryParents(_ record: Record, scope: WorkspaceTextScope) throws {
+    guard let namespace = record.namespace else { throw Failure("journal_invalid") }
+    var devices: [Int32] = []
+    var paths: [(String, String)] = [(record.sourcePath, namespace.sourceParentIdentity),
+                                   (record.destinationPath, namespace.destinationParentIdentity)]
+    paths += record.entries.map { (namespace.moved ? $0.destinationPath : $0.path, $0.parentIdentity) }
+    for (path, identity) in paths {
+      let parent = try Parent(scope: scope, components: WorkspaceFileScope.relativeComponents(path))
+      guard parent.identity == identity else { throw Failure("parent_changed") }
+      try verifyParent(scope: scope, path: path, parent: parent)
+      var info = stat()
+      guard fstat(parent.descriptor, &info) == 0 else { throw Failure("parent_unavailable") }
+      let accessible = faccessat(parent.descriptor, ".", W_OK | X_OK, AT_EACCESS) == 0
+      guard accessible && (parentAccessOverride?(path, accessible) ?? accessible) else { throw Failure("parent_not_writable") }
+      devices.append(parentDeviceOverride?(path, info.st_dev) ?? info.st_dev)
+    }
+    guard Set(devices).count == 1 else { throw Failure("cross_volume_move") }
+  }
+
+  private func validateDirectoryReadSet(_ record: Record, scope: WorkspaceTextScope, session: Session? = nil) throws {
+    do {
+      try point("beforeSemanticScan")
+      guard !record.consistencyConflict, let namespace = record.namespace,
+            try scopeIdentity(scope) == record.rootIdentity else { throw Failure("dependency_conflict") }
+      let activeRoot = namespace.moved ? record.destinationPath : record.sourcePath
+      if namespace.moved {
+        guard try pathAbsent(scope, path: record.sourcePath, directory: true) else { throw Failure("source_reappeared") }
+      } else { try directoryDestinationAbsent(scope, path: record.destinationPath) }
+      for (path, identity) in [(record.sourcePath, namespace.sourceParentIdentity),
+                               (record.destinationPath, namespace.destinationParentIdentity)] {
+        let parent = try Parent(scope: scope, components: WorkspaceFileScope.relativeComponents(path))
+        guard parent.identity == identity else { throw Failure("parent_changed") }
+        if let session { _ = try verifyParent(session, path: path) }
+      }
+      var artifactRevisions: [String: String] = [:]
+      for entry in record.entries {
+        let path = namespace.moved ? entry.destinationPath : entry.path
+        let parent = try Parent(scope: scope, components: components(path))
+        guard parent.identity == entry.parentIdentity else { throw Failure("parent_changed") }
+        if let session { _ = try verifyParent(session, path: path) }
+        let snapshot = try read(scope, path: path)
+        let revision = entry.writeRevision ?? entry.expectedRevision
+        guard snapshot.revision == revision, snapshot.identity == Self.identity(revision),
+              snapshot.bytes == (entry.writeRevision == nil ? entry.original : entry.replacement),
+              matchesMetadata(snapshot, entry: entry) else { throw Failure("file_conflict") }
+        if let originalArtifact = entry.artifactPath {
+          let path = namespace.moved ? mapDirectoryPath(originalArtifact, source: record.sourcePath,
+                                                        destination: record.destinationPath) : originalArtifact
+          if let expected = entry.displacedRevision ?? entry.stagedRevision {
+            let artifact = try read(scope, path: path, artifact: true)
+            guard artifact.revision == expected, artifact.identity == Self.identity(expected),
+                  artifact.bytes == (entry.displacedRevision == nil ? entry.replacement : entry.original),
+                  matchesMetadata(artifact, entry: entry) else { throw Failure("artifact_changed") }
+            artifactRevisions[path] = artifact.revision
+          } else {
+            guard try pathAbsent(scope, path: path, artifact: true) else { throw Failure("artifact_changed") }
+          }
+        }
+      }
+      let actual = try inspectDirectory(scope, source: activeRoot, artifacts: artifactRevisions)
+      guard actual.count == namespace.members.count else { throw Failure("directory_tree_changed") }
+      let actualByPath = Dictionary(uniqueKeysWithValues: actual.map { ($0.path, $0) })
+      for member in namespace.members {
+        let path = namespace.moved ? mapDirectoryPath(member.path, source: record.sourcePath,
+                                                     destination: record.destinationPath) : member.path
+        guard let current = actualByPath[path], current.kind == member.kind else { throw Failure("directory_tree_changed") }
+        if member.kind == "directory" {
+          guard current.identity == member.identity else { throw Failure("directory_tree_changed") }
+        } else {
+          let entry = record.entries.first { $0.path == member.path }
+          let revision = entry?.writeRevision ?? member.revision
+          guard current.revision == revision, current.identity == Self.identity(revision) else { throw Failure("directory_tree_changed") }
+        }
+      }
+      // Project paths back to the original namespace, but retain every member
+      // and every outside dependency. Never exempt the whole moved subtree.
+      _ = try catalog(scope)
+      let copies = record.recoveries.filter { $0.state == "applied" }.map(\.path)
+      guard try dependencyDigest(scope, excluding: Set(record.entries.map(\.path) + copies),
+                                 directoryRecord: record) == record.catalogDigest else { throw Failure("catalog_changed") }
+      if let session {
+        for asset in session.assets {
+          let path = namespace.moved ? mapDirectoryPath(asset.path, source: record.sourcePath,
+                                                       destination: record.destinationPath) : asset.path
+          let parts = try WorkspaceFileScope.relativeComponents(path)
+          let parent = try scope.parentDescriptor(parts); defer { close(parent) }
+          var info = stat()
+          guard fstatat(parent, parts.last!, &info, AT_SYMLINK_NOFOLLOW) == 0,
+                WorkspaceFileScope.revision(info) == asset.revision else { throw Failure("asset_changed") }
+        }
+      }
+      try scope.verifyRootLocation()
+    } catch { observeConsistencyConflict(record); throw error }
+  }
+
+  private func executeDirectory(root: URL, record: Record, token: String?) throws -> [String: Any] {
+    guard !record.cancelled else { return result(record) }
+    guard let session = sessions[record.transactionId], token == session.token else {
+      try reconcileDirectory(record, scope: try authorizedScope(root, record: record))
+      record.code = "new_preview_required"; return result(record)
+    }
+    do {
+      _ = try authorizedScope(root, record: record)
+      guard let namespace = record.namespace, !namespace.intent, !namespace.moved,
+            record.entries.allSatisfy({ $0.intent == nil && $0.state == "pending" }) else {
+        throw Failure("new_preview_required")
+      }
+      try validateDirectoryReadSet(record, scope: session.scope, session: session)
+      try checkPlanCapacity(record, scope: session.scope, context: "execute")
+      for index in record.entries.indices where record.entries[index].original != record.entries[index].replacement {
+        try writeEntry(record, index: index, session: session)
+      }
+      try moveDirectory(record, session: session)
+      try validateDirectoryReadSet(record, scope: session.scope, session: session)
+      for index in record.entries.indices {
+        record.entries[index].actualPath = record.entries[index].destinationPath
+        record.entries[index].actualRevision = record.entries[index].writeRevision ?? record.entries[index].expectedRevision
+        record.entries[index].state = "applied"
+      }
+      record.namespace?.verified = true; record.namespace?.observedPath = record.destinationPath
+      record.completionVerified = true; record.phase = "completed"; record.code = nil
+      try point("beforeDirectoryCompletion"); try save(record)
+      sessions.removeValue(forKey: record.transactionId)
+    } catch {
+      let failure = code(error)
+      revokeUnpersisted(record)
+      if let durable = try? load(record.transactionId) {
+        do { try reconcileDirectory(durable, scope: session.scope) } catch { markUnverifiable(durable) }
+        durable.code = failure
+        try? save(durable)
+        return result(durable)
+      }
+      markUnverifiable(record); record.code = failure
+    }
+    return result(record)
+  }
+
+  private func moveDirectory(_ record: Record, session: Session) throws {
+    let scope = session.scope
+    let coordinator = NSFileCoordinator()
+    try coordinate(scope, path: record.sourcePath, destination: record.destinationPath,
+                   coordinator: coordinator, directory: true) {
+      try validateDirectoryReadSet(record, scope: scope, session: session)
+      let sourceParent = try verifyParent(session, path: record.sourcePath)
+      let targetParent = try verifyParent(session, path: record.destinationPath)
+      let source = try WorkspaceFileScope.relativeComponents(record.sourcePath).last!
+      let destination = try WorkspaceFileScope.relativeComponents(record.destinationPath).last!
+      try point("beforeDirectoryMoveIntent")
+      record.phase = "moving"; record.namespace?.intent = true; record.namespace?.verified = false
+      try save(record); try point("afterDirectoryMoveIntent")
+      try checkPlanCapacity(record, scope: scope, context: "directoryMove")
+      try validateDirectoryReadSet(record, scope: scope, session: session)
+      try directoryDestinationAbsent(scope, path: record.destinationPath)
+      _ = try verifyParent(session, path: record.sourcePath); _ = try verifyParent(session, path: record.destinationPath)
+      let sourceURL = scope.rootURL.appendingPathComponent(record.sourcePath, isDirectory: true)
+      let targetURL = scope.rootURL.appendingPathComponent(record.destinationPath, isDirectory: true)
+      coordinator.item(at: sourceURL, willMoveTo: targetURL)
+      try point("beforeDirectoryExclusiveRename")
+      guard renameatx_np(sourceParent.descriptor, source, targetParent.descriptor, destination, UInt32(RENAME_EXCL)) == 0 else {
+        throw Failure("exclusive_directory_move_failed")
+      }
+      coordinator.item(at: sourceURL, didMoveTo: targetURL)
+      record.namespace?.moved = true
+      record.namespace?.observedPath = record.destinationPath
+      try point("afterDirectoryRename")
+      try validateDirectoryReadSet(record, scope: scope, session: session)
+      let movedFD = try scope.directoryDescriptor(WorkspaceTextScope.textComponents(record.destinationPath, directory: true))
+      defer { close(movedFD) }
+      try syncDescriptor(movedFD, operation: "DirectoryMoveRootSync")
+      try syncDescriptor(sourceParent.descriptor, operation: "DirectoryMoveSourceParentSync")
+      try syncDescriptor(targetParent.descriptor, operation: "DirectoryMoveDestinationParentSync")
+      try validateDirectoryReadSet(record, scope: scope, session: session)
+      record.namespace?.synced = true; record.namespace?.intent = false
+      record.namespace?.verified = true
+      try point("beforeDirectoryMoveReceipt"); try save(record); try point("afterDirectoryMoveReceipt")
+    }
+  }
+
+  /// Observation only with respect to the workspace. Missing swap/move receipts
+  /// never grant replay or synthesize fsync/completion proof. Recovery remains
+  /// explicit original-text copies, not a reverse directory rename.
+  private func reconcileDirectory(_ record: Record, scope: WorkspaceTextScope) throws {
+    guard try scopeIdentity(scope) == record.rootIdentity else { markUnverifiable(record); throw Failure("scope_changed") }
+    if record.cancelled { record.phase = "cancelled"; try save(record); return }
+    guard let namespace = record.namespace else { throw Failure("journal_invalid") }
+    record.namespace?.verified = false; record.namespace?.observedPath = nil
+    var locations: [String] = []
+    for path in [record.sourcePath, record.destinationPath] {
+      if let fd = try? scope.directoryDescriptor(WorkspaceTextScope.textComponents(path, directory: true)) {
+        var info = stat()
+        if fstat(fd, &info) == 0, Self.identity(info) == namespace.identity { locations.append(path) }
+        close(fd)
+      }
+    }
+    if locations.count == 1 { record.namespace?.observedPath = locations[0] }
+    // A rename with an unflushed receipt may be observable, but is not durable
+    // completion evidence. Retain intent and require explicit recovery/new plan.
+    if namespace.intent || record.entries.contains(where: { $0.intent != nil }) ||
+       locations != [namespace.moved ? record.destinationPath : record.sourcePath] {
+      revokeUnpersisted(record)
+      for index in record.entries.indices { record.entries[index].state = "uncertain"; record.entries[index].actualPath = nil; record.entries[index].actualRevision = nil; record.entries[index].artifactState = "uncertain" }
+      record.phase = hasEvidenceOfMutation(record) ? "partial" : "blocked"
+      record.code = "directory_reconciliation_required"
+      reconcileRecoveries(record, scope: scope); try save(record); return
+    }
+    do {
+      reconcileRecoveries(record, scope: scope)
+      try validateDirectoryReadSet(record, scope: scope)
+      record.namespace?.verified = true
+      for index in record.entries.indices {
+        let entry = record.entries[index]
+        record.entries[index].actualPath = namespace.moved ? entry.destinationPath : entry.path
+        record.entries[index].actualRevision = entry.writeRevision ?? entry.expectedRevision
+        record.entries[index].state = namespace.moved || entry.writeRevision != nil ? "applied" : "pending"
+      }
+      if namespace.moved {
+        record.phase = namespace.synced && record.completionVerified ? "completed" : "partial"
+        if record.phase != "completed" { record.code = "completion_unverified" }
+      } else { record.phase = hasEvidenceOfMutation(record) ? "partial" : "prepared" }
+    } catch {
+      revokeUnpersisted(record)
+      for index in record.entries.indices {
+        record.entries[index].state = "uncertain"; record.entries[index].actualPath = nil
+        record.entries[index].actualRevision = nil; record.entries[index].artifactState = "uncertain"
+      }
+      record.namespace?.verified = false
+      record.phase = hasEvidenceOfMutation(record) ? "partial" : "blocked"; record.code = code(error)
+    }
+    try save(record)
+  }
+
   // MARK: - Bounded, observation-only storage inventory
 
   private static var cleanupUnavailableCode: String {
@@ -1842,7 +2365,8 @@ final class WorkspaceNoteTransaction {
   private func inspectArtifacts(_ record: Record, scope: WorkspaceTextScope, deadline: UInt64) -> ArtifactStorage {
     var result = ArtifactStorage()
     for entry in record.entries {
-      guard let path = entry.artifactPath else { continue }
+      guard let originalPath = entry.artifactPath else { continue }
+      let path = record.namespace?.moved == true ? mapDirectoryPath(originalPath, source: record.sourcePath, destination: record.destinationPath) : originalPath
       result.count += 1
       do {
         guard DispatchTime.now().uptimeNanoseconds < deadline else { throw Failure("artifact_unavailable") }

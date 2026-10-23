@@ -1064,8 +1064,7 @@ class WorkspaceController extends ChangeNotifier {
     await _afterFileOperation([p.dirname(source), p.dirname(destination)]);
   });
 
-  /// Read-only proposal. Directory plans describe impact only; they never enter
-  /// the single-note executor, even when their supported-source coverage is complete.
+  /// Read-only proposal. Directory plans require the dedicated v2 native preflight.
   Future<WorkspaceNoteMovePlan> previewNoteMove(
     String source,
     String destination, {
@@ -1208,9 +1207,14 @@ class WorkspaceController extends ChangeNotifier {
         for (final entry in plan.snapshot.catalog.entries)
           entry.relativePath: entry.revision,
       };
-      if (record.entries.any(
-        (entry) => !entry.unchanged || entry.revision != baseline[entry.path],
-      )) {
+      if ((plan.kind == WorkspaceNoteMovePlanKind.directory &&
+              (record.namespace?.verified != true ||
+                  record.namespace?.moved != false ||
+                  record.namespace?.actualPath != plan.sourcePath)) ||
+          record.entries.any(
+            (entry) =>
+                !entry.unchanged || entry.revision != baseline[entry.path],
+          )) {
         receiptValidated = false;
         throw WorkspaceNoteMoveUncertain(
           id,
@@ -1244,6 +1248,17 @@ class WorkspaceController extends ChangeNotifier {
             if (_favoriteAccessTokens.remove(favoritePath) case final token?) {
               oldFavoriteTokens[favoritePath] = token;
             }
+          }
+        }
+        if (plan.kind == WorkspaceNoteMovePlanKind.directory) {
+          final from = p.posix.join(root, plan.sourcePath);
+          // Directory bookmarks follow their inode too. Invalidate every moved
+          // favorite, not only notes whose text will be rewritten.
+          for (final path
+              in _favoriteAccessTokens.keys
+                  .where((path) => path == from || p.posix.isWithin(from, path))
+                  .toList()) {
+            oldFavoriteTokens[path] = _favoriteAccessTokens.remove(path)!;
           }
         }
         _schedulePersist();
@@ -1319,8 +1334,17 @@ class WorkspaceController extends ChangeNotifier {
           ]);
         }
         await _afterFileOperation([
+          p.posix.dirname(p.posix.join(root, plan.sourcePath)),
           for (final file in plan.files)
-            p.posix.dirname(p.posix.join(root, file.path)),
+            p.posix.dirname(
+              p.posix.join(
+                root,
+                plan.kind == WorkspaceNoteMovePlanKind.directory &&
+                        record?.namespace?.completed == true
+                    ? file.destination
+                    : file.path,
+              ),
+            ),
           p.posix.dirname(p.posix.join(root, plan.destinationPath)),
         ]);
         if (_workspaceRoot == root &&
@@ -1353,7 +1377,17 @@ class WorkspaceController extends ChangeNotifier {
     WorkspaceNoteMoveRecord record,
   ) {
     final receipts = {for (final entry in record.entries) entry.path: entry};
-    if (record.transactionId != id ||
+    final directory = plan.kind == WorkspaceNoteMovePlanKind.directory;
+    final namespace = record.namespace;
+    if ((directory &&
+            (record.version != 2 ||
+                namespace == null ||
+                namespace.sourcePath != plan.sourcePath ||
+                namespace.destinationPath != plan.destinationPath ||
+                namespace.identity != plan.treeSnapshot?.sourceIdentity ||
+                namespace.memberCount != plan.treeSnapshot?.members.length)) ||
+        (!directory && (record.version != 1 || namespace != null)) ||
+        record.transactionId != id ||
         receipts.length != record.entries.length ||
         receipts.length != plan.files.length ||
         plan.files.any(
@@ -1407,6 +1441,8 @@ class WorkspaceController extends ChangeNotifier {
   ) => WorkspaceNoteMoveRecord(
     transactionId: record.transactionId,
     phase: 'partial',
+    version: record.version,
+    namespace: record.namespace,
     code: 'client_verification_failed',
     message: message,
     entries: [
@@ -1442,6 +1478,26 @@ class WorkspaceController extends ChangeNotifier {
       plan.files.map((file) => file.path).toSet(),
       'The workspace changed while verifying the result. Review the original workspace journal; do not repeat the move.',
     );
+    final directory = plan.kind == WorkspaceNoteMovePlanKind.directory;
+    final namespace = record.namespace;
+    final movedFavorites = <String>[];
+    if (directory && namespace?.completed == true) {
+      final oldPath = p.posix.join(root, plan.sourcePath);
+      final newPath = p.posix.join(root, plan.destinationPath);
+      movedFavorites.addAll(
+        browser.favoritePaths
+            .where((path) => path == oldPath || p.posix.isWithin(oldPath, path))
+            .map(
+              (path) => path == oldPath
+                  ? newPath
+                  : p.posix.join(
+                      newPath,
+                      p.posix.relative(path, from: oldPath),
+                    ),
+            ),
+      );
+      browser.remap(oldPath, newPath);
+    }
     for (final file in plan.files) {
       if (!current()) return changedScope();
       final receipt = record.entries
@@ -1468,6 +1524,16 @@ class WorkspaceController extends ChangeNotifier {
         continue;
       }
       final actual = receipt.actualPath!;
+      if (directory &&
+          file.path != file.destination &&
+          actual == file.destination &&
+          namespace?.completed != true) {
+        failed.add(file.path);
+        for (final document in matching) {
+          document.hasExternalChanges = true;
+        }
+        continue;
+      }
       // Native may report a partial operation with updated contents still at
       // the old name. Accept only those two exact approved locations.
       if (actual != file.path && actual != file.destination) {
@@ -1517,7 +1583,9 @@ class WorkspaceController extends ChangeNotifier {
         }
         _watch(document);
       }
-      if (file.path == plan.sourcePath && actual == plan.destinationPath) {
+      if (!directory &&
+          file.path == plan.sourcePath &&
+          actual == plan.destinationPath) {
         browser.remap(p.posix.join(root, file.path), newPath);
       }
       if (matching.isNotEmpty || favorite) {
@@ -1540,6 +1608,27 @@ class WorkspaceController extends ChangeNotifier {
         }
       }
     }
+    for (final path in movedFavorites) {
+      if (!current()) return changedScope();
+      // Text entries already renew their own verified bookmarks above. Never
+      // create access to a note whose post-operation reread failed.
+      if (plan.files.any(
+        (file) => p.posix.join(root, file.destination) == path,
+      )) {
+        continue;
+      }
+      try {
+        final token = await fileService.createPersistentAccessToken(path);
+        if (!current()) return changedScope();
+        if (token != null && browser.hasFavorite(path)) {
+          _favoriteAccessTokens[path] = token;
+        } else if (persistentAccessExpected) {
+          bookmarkUnavailable = true;
+        }
+      } on Object {
+        bookmarkUnavailable = true;
+      }
+    }
     if (failed.isNotEmpty) {
       return _noteMoveObservationFailed(
         record,
@@ -1551,6 +1640,8 @@ class WorkspaceController extends ChangeNotifier {
       return WorkspaceNoteMoveRecord(
         transactionId: record.transactionId,
         phase: record.phase,
+        version: record.version,
+        namespace: record.namespace,
         entries: record.entries,
         code: record.code ?? 'persistent_access_unavailable',
         message: [

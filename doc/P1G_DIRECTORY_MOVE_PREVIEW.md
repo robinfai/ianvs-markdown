@@ -1,16 +1,18 @@
-# Directory reference-maintenance preview (G4a)
+# Directory reference-maintenance preview and execution (G4a/G4b)
 
 ## Scope
 
-G4a adds a **read-only** directory impact preview to the existing single-item
-rename/move dialog. It does not execute directory reference maintenance, change
-the single-note v1 transaction protocol, or add recovery cleanup/Trash. A complete
-proposal means supported-source coverage, not authority or a durable move proof.
+G4a provides a read-only directory impact preview. G4b adds an explicitly
+confirmed, single-directory transaction through the separate v2 namespace
+protocol. It does not change the v1 single-note protocol or add recovery cleanup.
+A complete proposal means supported-source coverage, not authority or durable
+move proof. Native prepare rechecks the tree, exact bytes and all-object target
+vacancy before any note mutation.
 
 The explicitly confirmed **Move without updating links** action remains. It does
 not apply proposed edits. Multi-selection still uses the warned manual flow.
-Opening, cancelling or dismissing a preview never moves anything. Directory plans
-are rejected by both the controller execution gate and platform transaction DTO.
+Opening, cancelling or dismissing a preview never moves anything. A maintained
+move requires **Move and update links** on the exact current proposal.
 A PDF, hidden entry or unsupported object does not make its directory nonexistent:
 the observed directory and specific blocking reasons remain visible.
 
@@ -94,8 +96,8 @@ stopwatch. Blocking provider calls cannot be forcibly interrupted either.
 
 ## Visible conservative blockers
 
-No directory execution is available, even for an otherwise complete preview.
-Coverage is additionally incomplete for unknown syntax or ambiguous targets;
+Execution requires a complete current preview and successful native preflight.
+Coverage is incomplete for unknown syntax or ambiguous targets;
 incomplete/changed catalogs, aliases or member evidence; unsupported files (PDFs
 included); hidden/recovery artifacts, recognized packages/bundles, symlinks, special objects, hard
 links or offline members; unsupported assets or missing stable image metadata;
@@ -108,28 +110,41 @@ of the item itself is categorically unsafe.
 The source manifest covers every observed object in the moved subtree. Destination
 collision checks cover only the note/directory catalog, image metadata and open
 buffers. They do not prove filesystem-wide destination vacancy: an unsupported
-regular file outside the source may be absent from those catalogs. The dialog
-explicitly identifies the result as hypothetical impact, not an all-object
-absence/conflict proof. Manual movement still uses its existing collision checks.
-Any future executor needs fresh complete destination evidence, not this preview.
+regular file outside the source may be absent from those catalogs. The preview is not an all-object absence/conflict proof. The v2 native prepare
+checks actual destination objects and same-volume parents; it never overwrites,
+merges folders or creates missing target parents. Manual movement still uses its
+existing collision checks.
 
-## Why future G4b needs a separate protocol
+## Separate v2 execution and receipts
 
-V1 assumes one note namespace move. Looping it over directory members cannot
-handle nonexistent future parents, internal resolution, member races or recovery
-artifact addresses. A future version needs a complete stable member manifest,
-subtree preflight, per-note coordinated atomic swaps with retained originals and
-one exclusive final directory move. New artifacts inside that directory need
-explicit old/new addresses; old artifacts cannot be silently moved away from
-older journals. Directory coordinator notifications and restart reconciliation
-need their own failure fixtures. Batch work additionally needs a global mapping
-and explicit overlap, cycle, chain and per-namespace receipt policies.
+V1 assumes one note namespace move. G4b does not loop that executor over members.
+It sends the complete inspected tree, every moved note (even unchanged), changed
+external notes, catalog and attachment dependencies to dedicated native prepare.
+Empty and image-only directories have a namespace receipt with zero text entries;
+no fake text record is used to represent a directory.
 
-Failures must expose actual partial state. No automatic rollback may overwrite
-other writers; uncertain operations cannot be replayed merely from journal phase.
+The result carries version 2 plus a directory namespace receipt. Successful UI
+completion requires phase `completed`, `moved`, `synced`, `verified`, the exact
+approved destination, source identity and member count, and verified destination
+receipts for all note entries. Prepared evidence must instead identify the
+original directory. Missing or mismatched evidence is uncertain, never success.
+A lost reply is reconciled read-only, not replayed. Verified namespace movement
+can remap the browser, selected paths and favorites. Each open note additionally
+requires a fresh exact content/revision read; typing during native work is kept
+as dirty text rather than replaced. Old affected bookmarks are invalidated and
+persisted before mutation; new bookmarks are only renewed for verified paths.
+
+Original text and displaced versions are retained for explicit recovery. New
+artifacts follow the namespace only with a corresponding move receipt. Existing
+recovery artifacts in the source remain blockers; no cleanup or relocation of
+older journals is performed. Shared capacity limits still apply.
+
+Failures expose actual partial state. No automatic rollback may overwrite other
+writers; uncertain operations cannot be replayed merely from journal phase.
 Text recovery copies are not an attachment backup. Per-file coordination and
 repeated dependency scans are not a global lock or cross-file ACID snapshot.
-These mutations, and G3b Trash cleanup, are not implemented in G4a.
+Cross-volume moves, merging, multiple selected roots and batch path chains/cycles
+remain unsupported. Recovery Trash cleanup remains a separate unfinished item.
 
 Apple reference contracts:
 - [WritingOptions.forMoving](https://developer.apple.com/documentation/foundation/nsfilecoordinator/writingoptions/formoving)
@@ -143,6 +158,7 @@ cancellation and observation races. Darwin execution and iOS compilation require
 actual Apple CI; Linux syntax checks do not substitute for them. Dart tests cover
 the unified graph and renderer image behavior, source-preserving edits, strict
 DTOs, dirty/ghost/collision blockers, budgets, cancellation and root changes.
-Compact enlarged-text UI tests use real taps and prohibit automatic execution.
-Existing v1 and mobile scope tests remain regression gates. Folder/batch reference
-maintenance and recovery garbage collection remain unfinished.
+Compact enlarged-text UI tests use real taps and require explicit execution approval.
+Existing v1 and mobile scope tests remain regression gates. Batch reference maintenance and recovery garbage collection remain unfinished.
+Native execution claims require actual macOS CI; these source contracts do not
+substitute for that acceptance.
