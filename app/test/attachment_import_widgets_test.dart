@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
@@ -98,6 +99,216 @@ void main() {
     }
     await tester.pump();
   }
+
+  Future<void> drop(WidgetTester tester, List<DropItem> items) async {
+    tester.widget<DropTarget>(find.byType(DropTarget)).onDragDone!(
+      DropDoneDetails(
+        files: items,
+        localPosition: Offset.zero,
+        globalPosition: Offset.zero,
+      ),
+    );
+    await tester.pump();
+  }
+
+  DropItemFile image([String path = '/outside/photo.PNG']) =>
+      DropItemFile(path, extraAppleBookmark: Uint8List.fromList([1, 2, 3]));
+
+  testWidgets(
+    'single dropped image reuses attachment policy and undo preserves copy',
+    (tester) async {
+      await open(tester);
+      final c = workspace.activeDocument!.controller;
+      await drop(tester, [image()]);
+      await waitFor(tester, () => c.text.contains('![]('));
+      expect(native.droppedPaths, ['/outside/photo.PNG']);
+      expect(native.droppedBookmarks.single, [1, 2, 3]);
+      expect(native.picks, 0);
+      expect(native.clipboardReads, 0);
+      expect(native.files.keys.single, startsWith('附件/image-'));
+      expect(c.text, startsWith('before ![](./%E9%99%84%E4%BB%B6/'));
+      c.undo();
+      expect(c.text, 'before after');
+      expect(native.files, hasLength(1));
+      await finish(tester);
+    },
+  );
+
+  for (final kind in [
+    'multiple',
+    'mixed',
+    'unsupported',
+    'preview',
+    'composition',
+    'unsaved',
+  ]) {
+    testWidgets('image drop rejects $kind before source read or write', (
+      tester,
+    ) async {
+      await open(tester);
+      final c = workspace.activeDocument!.controller;
+      var items = <DropItem>[image()];
+      switch (kind) {
+        case 'multiple':
+          items.add(image('/outside/second.png'));
+        case 'mixed':
+          items.add(DropItemFile('/vault/Target.md'));
+        case 'unsupported':
+          items = [image('/outside/vector.svg')];
+        case 'preview':
+          c.mode = IanvsMarkdownEditorMode.preview;
+        case 'composition':
+          c.value = c.value.copyWith(
+            composing: const TextRange(start: 0, end: 3),
+          );
+        case 'unsaved':
+          workspace.newDocument();
+      }
+      await tester.pump();
+      await drop(tester, items);
+      await tester.pumpAndSettle();
+      expect(native.droppedPaths, isEmpty);
+      expect(native.attempts, 0);
+      expect(c.text, 'before after');
+      expect(
+        workspace.documents.any((d) => d.path == '/vault/Target.md'),
+        isFalse,
+      );
+      await finish(tester);
+    });
+  }
+
+  testWidgets('Markdown-only drop retains ordinary open workflow', (
+    tester,
+  ) async {
+    await open(tester);
+    await drop(tester, [DropItemFile('/vault/Target.md')]);
+    await waitFor(
+      tester,
+      () => workspace.activeDocument?.path == '/vault/Target.md',
+    );
+    expect(native.droppedPaths, isEmpty);
+    expect(native.attempts, 0);
+    await finish(tester);
+  });
+
+  for (final duringWrite in [false, true]) {
+    testWidgets(
+      'drop invalidated ${duringWrite ? 'during write retains copy' : 'during read writes nothing'}',
+      (tester) async {
+        await open(tester);
+        final c = workspace.activeDocument!.controller;
+        final gate = Completer<void>();
+        if (duringWrite) {
+          native.beforeWrite = gate.future;
+        } else {
+          native.beforeRead = gate.future;
+        }
+        await drop(tester, [image()]);
+        await waitFor(
+          tester,
+          () => duringWrite
+              ? native.attempts == 1
+              : native.droppedPaths.isNotEmpty,
+        );
+        c.text = 'new content';
+        gate.complete();
+        if (duringWrite) {
+          await waitFor(
+            tester,
+            () => find.text('Show link').evaluate().isNotEmpty,
+          );
+          expect(native.files, hasLength(1));
+        } else {
+          await tester.pumpAndSettle();
+          expect(native.attempts, 0);
+        }
+        expect(c.text, 'new content');
+        await finish(tester);
+      },
+    );
+  }
+
+  testWidgets('second image drop while import pending is not queued', (
+    tester,
+  ) async {
+    await open(tester);
+    final gate = Completer<void>();
+    native.beforeRead = gate.future;
+    await drop(tester, [image()]);
+    await drop(tester, [image('/outside/second.png')]);
+    expect(native.droppedPaths, ['/outside/photo.PNG']);
+    expect(
+      find.textContaining('Wait for the current image import'),
+      findsOneWidget,
+    );
+    gate.complete();
+    await waitFor(tester, () => native.attempts == 1);
+    await waitFor(
+      tester,
+      () => workspace.activeDocument!.controller.text.contains('![]('),
+    );
+    expect(native.files, hasLength(1));
+    await finish(tester);
+  });
+
+  testWidgets('image drop cannot insert after switching away and back', (
+    tester,
+  ) async {
+    await open(tester);
+    final original = workspace.activeDocument!;
+    final gate = Completer<void>();
+    native.beforeWrite = gate.future;
+    await drop(tester, [image()]);
+    await waitFor(tester, () => native.attempts == 1);
+    await workspace.openPath('/vault/Target.md');
+    workspace.selectDocument(workspace.documents.indexOf(original));
+    gate.complete();
+    await waitFor(tester, () => find.text('Show link').evaluate().isNotEmpty);
+    expect(original.controller.text, 'before after');
+    expect(native.files, hasLength(1));
+    await finish(tester);
+  });
+
+  testWidgets('image drop from local table caret is rejected', (tester) async {
+    await open(tester);
+    final c = workspace.activeDocument!.controller;
+    const content = '| H | I |\n| --- | --- |\n| Alpha | Beta |\n\nBody';
+    c.text = content;
+    c.selection = const TextSelection.collapsed(offset: content.length);
+    workspace.setMode(IanvsMarkdownEditorMode.livePreview);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('ianvs-markdown-table-1-0')));
+    await tester.pumpAndSettle();
+    await drop(tester, [image()]);
+    await tester.pumpAndSettle();
+    expect(native.droppedPaths, isEmpty);
+    expect(native.attempts, 0);
+    expect(c.text, content);
+    expect(find.textContaining('Focus the note body'), findsOneWidget);
+    await finish(tester);
+  });
+
+  testWidgets(
+    'missing drop grant fails with explicit picker fallback and no write',
+    (tester) async {
+      await open(tester);
+      native.dropReadError = PlatformException(code: 'attachment_invalid');
+      await drop(tester, [DropItemFile('/outside/photo.png')]);
+      await waitFor(
+        tester,
+        () => find
+            .textContaining('use Import Image instead')
+            .evaluate()
+            .isNotEmpty,
+      );
+      expect(native.droppedBookmarks.single, isNull);
+      expect(native.attempts, 0);
+      expect(native.picks, 0);
+      expect(workspace.activeDocument!.controller.text, 'before after');
+      await finish(tester);
+    },
+  );
 
   testWidgets(
     'explicit import inserts relative Markdown and undo leaves image intact',
