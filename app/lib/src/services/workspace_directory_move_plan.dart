@@ -13,7 +13,8 @@ Future<WorkspaceNoteMovePlan> _buildDirectoryMovePlan(
   required String sourcePath,
   required String destinationPath,
   required Set<String> dirtySessionIds,
-  required WorkspaceMoveTreeSnapshot tree,
+  required WorkspaceMoveTreeSnapshot? tree,
+  List<WorkspaceBatchMoveRoot>? batchRoots,
   AttachmentIndex? attachments,
   bool Function()? isCancelled,
 }) async {
@@ -75,7 +76,10 @@ Future<WorkspaceNoteMovePlan> _buildDirectoryMovePlan(
   WorkspaceNoteMovePlan finish() {
     stopped();
     return WorkspaceNoteMovePlan(
-      kind: WorkspaceNoteMovePlanKind.directory,
+      kind: batchRoots == null
+          ? WorkspaceNoteMovePlanKind.directory
+          : WorkspaceNoteMovePlanKind.batch,
+      batchRoots: List.unmodifiable(batchRoots ?? const []),
       treeSnapshot: tree,
       namespace: namespace,
       root: root,
@@ -90,10 +94,22 @@ Future<WorkspaceNoteMovePlan> _buildDirectoryMovePlan(
 
   if (stopped()) return finish();
   try {
-    namespace = WorkspaceMoveNamespace(
-      source: sourcePath,
-      destination: destinationPath,
-    );
+    if (batchRoots != null &&
+        (batchRoots.length < 2 || batchRoots.length > 8)) {
+      throw const FormatException('A batch needs 2–8 roots.');
+    }
+    namespace = batchRoots == null
+        ? WorkspaceMoveNamespace(
+            source: sourcePath,
+            destination: destinationPath,
+          )
+        : WorkspaceBatchMoveNamespace([
+            for (final root in batchRoots)
+              WorkspaceMoveNamespace(
+                source: root.source,
+                destination: root.destination,
+              ),
+          ]);
   } on FormatException {
     block(
       'scope',
@@ -102,161 +118,242 @@ Future<WorkspaceNoteMovePlan> _buildDirectoryMovePlan(
     return finish();
   }
   final transform = namespace;
-  if (root == null || tree.root != root || tree.sourcePath != sourcePath) {
-    block(
-      'treeScope',
-      'Directory evidence does not match this workspace and source.',
-    );
+  if (root == null) {
+    block('scope', 'A selected workspace is required.');
     return finish();
   }
-  if (tree.sourceState != WorkspaceMoveTreeSourceState.directory) {
-    block(
-      switch (tree.sourceState) {
-        WorkspaceMoveTreeSourceState.missing => 'sourceMissing',
-        WorkspaceMoveTreeSourceState.notDirectory => 'sourceNotDirectory',
-        _ => 'sourceUnavailable',
-      },
-      'The selected directory could not be verified.',
-      sourcePath,
-    );
-    return finish();
-  }
-  if (!tree.complete) {
-    block(
-      'treeIncomplete',
-      'The directory member scan is incomplete.',
-      sourcePath,
-    );
-  }
-  for (final issue in tree.issues) {
-    block('tree:${issue.code}', issue.message, issue.path ?? sourcePath);
-  }
-  if (tree.rootIdentity == null || tree.sourceIdentity == null) {
-    block(
-      'treeIdentity',
-      'The workspace and directory need verified filesystem identities.',
-      sourcePath,
-    );
-  }
-  if (tree.members.length > workspaceMoveTreeMaximumMembers ||
-      tree.members
-              .where((m) => m.kind == WorkspaceMoveTreeMemberKind.directory)
-              .length >
-          workspaceMoveTreeMaximumDirectories ||
-      tree.observedEntryCount != tree.members.length) {
-    block(
-      'treeBudget',
-      'The complete directory exceeds the bounded inspection budget.',
-      sourcePath,
-    );
-  }
+  final roots =
+      batchRoots ??
+      [
+        WorkspaceBatchMoveRoot(
+          source: sourcePath,
+          destination: destinationPath,
+          tree: tree,
+        ),
+      ];
   final members = <String, WorkspaceMoveTreeMember>{};
-  for (final member in tree.members) {
-    if (!isSafeAttachmentRelativePath(member.path, allowHidden: true) ||
-        !transform.moves(member.path) ||
-        members.containsKey(member.path)) {
-      block(
-        'treePath',
-        'Directory evidence contains an invalid or duplicate member.',
-        member.path,
-      );
+  final noteRoots = <String>{};
+  String? targetParent;
+  String? rootIdentity;
+  for (final intent in roots) {
+    final sourcePath = intent.source;
+    final destinationPath = intent.destination;
+    if (batchRoots != null) {
+      final parent = p.posix.dirname(destinationPath);
+      if ((targetParent != null && targetParent != parent) ||
+          p.posix.basename(sourcePath) != p.posix.basename(destinationPath)) {
+        block(
+          'batchTarget',
+          'All batch roots must retain their names in one destination folder.',
+        );
+      }
+      targetParent = parent;
+    }
+    final tree = intent.tree;
+    if (tree == null) {
+      if (!isMarkdownName(sourcePath)) {
+        block(
+          'batchKind',
+          'Only notes or verified directories are supported.',
+          sourcePath,
+        );
+      }
+      noteRoots.add(sourcePath);
       continue;
     }
-    members[member.path] = member;
-    if (member.path
-        .split('/')
-        .any((part) => part.startsWith('.linefold-note-move-'))) {
+    if (tree.root != root || tree.sourcePath != sourcePath) {
       block(
-        'retainedArtifacts',
-        'Retained recovery evidence cannot be relocated by this preview.',
-        member.path,
+        'treeScope',
+        'Directory evidence does not match this workspace and source.',
       );
-    } else if (member.path.split('/').any((part) => part.startsWith('.'))) {
+      return finish();
+    }
+    if (tree.sourceState != WorkspaceMoveTreeSourceState.directory) {
       block(
-        'hiddenMember',
-        'Hidden directory members are not supported by maintained moves.',
-        member.path,
+        switch (tree.sourceState) {
+          WorkspaceMoveTreeSourceState.missing => 'sourceMissing',
+          WorkspaceMoveTreeSourceState.notDirectory => 'sourceNotDirectory',
+          _ => 'sourceUnavailable',
+        },
+        'The selected directory could not be verified.',
+        sourcePath,
+      );
+      return finish();
+    }
+    if (!tree.complete) {
+      block(
+        'treeIncomplete',
+        'The directory member scan is incomplete.',
+        sourcePath,
       );
     }
-    if (!const {
-      WorkspaceMoveTreeMemberKind.directory,
-      WorkspaceMoveTreeMemberKind.note,
-      WorkspaceMoveTreeMemberKind.image,
-    }.contains(member.kind)) {
-      block(
-        'unsupportedMember',
-        'This directory contains an unsupported ${member.kind.name} member.',
-        member.path,
-      );
+    for (final issue in tree.issues) {
+      block('tree:${issue.code}', issue.message, issue.path ?? sourcePath);
     }
-    if (member.local != true) {
-      block(
-        'offline',
-        'Every directory member must be verified locally available.',
-        member.path,
-      );
-    }
-    if (member.identity == null ||
-        member.revision == null ||
-        member.revision!.isEmpty) {
+    if (rootIdentity != null && rootIdentity != tree.rootIdentity) {
       block(
         'treeIdentity',
-        'A directory member has unknown identity or revision.',
-        member.path,
+        'Batch scans refer to different workspace identities.',
       );
     }
-    if (member.identity != null &&
-        tree.rootIdentity != null &&
-        member.identity!.split(':').first !=
-            tree.rootIdentity!.split(':').first) {
+    rootIdentity = tree.rootIdentity;
+    if (tree.rootIdentity == null || tree.sourceIdentity == null) {
       block(
-        'crossDevice',
-        'All moved members must be on the workspace filesystem.',
-        member.path,
+        'treeIdentity',
+        'The workspace and directory need verified filesystem identities.',
+        sourcePath,
       );
     }
-    if (member.kind == WorkspaceMoveTreeMemberKind.note &&
-            !isMarkdownName(member.path) ||
-        member.kind == WorkspaceMoveTreeMemberKind.image &&
-            !attachmentExtensions.contains(
-              p.posix.extension(member.path).toLowerCase(),
-            )) {
+    if (tree.members.length > workspaceMoveTreeMaximumMembers ||
+        tree.members
+                .where((m) => m.kind == WorkspaceMoveTreeMemberKind.directory)
+                .length >
+            workspaceMoveTreeMaximumDirectories ||
+        tree.observedEntryCount != tree.members.length) {
       block(
-        'treeKind',
-        'Directory member type does not match its supported extension.',
-        member.path,
+        'treeBudget',
+        'The complete directory exceeds the bounded inspection budget.',
+        sourcePath,
       );
+    }
+    for (final member in tree.members) {
+      if (!isSafeAttachmentRelativePath(member.path, allowHidden: true) ||
+          !WorkspaceMoveNamespace.contains(sourcePath, member.path) ||
+          members.containsKey(member.path)) {
+        block(
+          'treePath',
+          'Directory evidence contains an invalid or duplicate member.',
+          member.path,
+        );
+        continue;
+      }
+      members[member.path] = member;
+      if (member.path
+          .split('/')
+          .any((part) => part.startsWith('.linefold-note-move-'))) {
+        block(
+          'retainedArtifacts',
+          'Retained recovery evidence cannot be relocated by this preview.',
+          member.path,
+        );
+      } else if (member.path.split('/').any((part) => part.startsWith('.'))) {
+        block(
+          'hiddenMember',
+          'Hidden directory members are not supported by maintained moves.',
+          member.path,
+        );
+      }
+      if (!const {
+        WorkspaceMoveTreeMemberKind.directory,
+        WorkspaceMoveTreeMemberKind.note,
+        WorkspaceMoveTreeMemberKind.image,
+      }.contains(member.kind)) {
+        block(
+          'unsupportedMember',
+          'This directory contains an unsupported ${member.kind.name} member.',
+          member.path,
+        );
+      }
+      if (member.local != true) {
+        block(
+          'offline',
+          'Every directory member must be verified locally available.',
+          member.path,
+        );
+      }
+      if (member.identity == null ||
+          member.revision == null ||
+          member.revision!.isEmpty) {
+        block(
+          'treeIdentity',
+          'A directory member has unknown identity or revision.',
+          member.path,
+        );
+      }
+      if (member.identity != null &&
+          tree.rootIdentity != null &&
+          member.identity!.split(':').first !=
+              tree.rootIdentity!.split(':').first) {
+        block(
+          'crossDevice',
+          'All moved members must be on the workspace filesystem.',
+          member.path,
+        );
+      }
+      if (member.kind == WorkspaceMoveTreeMemberKind.note &&
+              !isMarkdownName(member.path) ||
+          member.kind == WorkspaceMoveTreeMemberKind.image &&
+              !attachmentExtensions.contains(
+                p.posix.extension(member.path).toLowerCase(),
+              )) {
+        block(
+          'treeKind',
+          'Directory member type does not match its supported extension.',
+          member.path,
+        );
+      }
+    }
+    final sourceMember = members[sourcePath];
+    if (sourceMember?.kind != WorkspaceMoveTreeMemberKind.directory ||
+        sourceMember?.identity != tree.sourceIdentity) {
+      block(
+        'treeIdentity',
+        'The source directory is not represented by the expected identity.',
+        sourcePath,
+      );
+    }
+    for (final member in members.values.where(
+      (m) => WorkspaceMoveNamespace.contains(sourcePath, m.path),
+    )) {
+      if (member.path != sourcePath &&
+          members[p.posix.dirname(member.path)]?.kind !=
+              WorkspaceMoveTreeMemberKind.directory) {
+        block(
+          'treeCoverage',
+          'The directory manifest omits a member parent.',
+          member.path,
+        );
+      }
     }
   }
-  final sourceMember = members[sourcePath];
-  if (sourceMember?.kind != WorkspaceMoveTreeMemberKind.directory ||
-      sourceMember?.identity != tree.sourceIdentity) {
-    block(
-      'treeIdentity',
-      'The source directory is not represented by the expected identity.',
-      sourcePath,
-    );
-  }
-  for (final member in members.values) {
-    if (member.path != sourcePath &&
-        members[p.posix.dirname(member.path)]?.kind !=
-            WorkspaceMoveTreeMemberKind.directory) {
-      block(
-        'treeCoverage',
-        'The directory manifest omits a member parent.',
-        member.path,
-      );
-    }
+  if (members.length + noteRoots.length > workspaceMoveTreeMaximumMembers ||
+      members.values
+              .where((m) => m.kind == WorkspaceMoveTreeMemberKind.directory)
+              .length >
+          workspaceMoveTreeMaximumDirectories) {
+    block('treeBudget', 'The entire batch exceeds the shared member budget.');
   }
   final metadata = {
     for (final e in snapshot.catalog.entries) e.relativePath: e,
   };
+  for (final path in noteRoots) {
+    final item = metadata[path];
+    if (item == null ||
+        item.isDirectory ||
+        item.local != true ||
+        item.revision.isEmpty) {
+      block(
+        'sourceUnavailable',
+        'The selected note requires a local disk baseline.',
+        path,
+      );
+    }
+  }
   final origins = <WorkspaceSemanticNote, String>{
     for (final e in snapshot.notes.entries)
       if (p.posix.isWithin(root, e.key))
         e.value: p.posix.relative(e.key, from: root),
   };
   final originNotes = {for (final e in origins.entries) e.value: e.key};
+  for (final path in noteRoots) {
+    if (originNotes[path] == null) {
+      block(
+        'sourceUnavailable',
+        'The selected note has no complete semantic source.',
+        path,
+      );
+    }
+  }
   final edgesByNote = <WorkspaceSemanticNote, List<WorkspaceReferenceEdge>>{};
   for (final edge in snapshot.edges) {
     edgesByNote.putIfAbsent(edge.note, () => []).add(edge);
@@ -343,7 +440,8 @@ Future<WorkspaceNoteMovePlan> _buildDirectoryMovePlan(
   for (final e in metadata.values.where(
     (e) => transform.moves(e.relativePath),
   )) {
-    if (!members.containsKey(e.relativePath)) {
+    if (!members.containsKey(e.relativePath) &&
+        !noteRoots.contains(e.relativePath)) {
       block(
         'treeCoverage',
         'The member scan omits a catalog item.',
@@ -371,14 +469,18 @@ Future<WorkspaceNoteMovePlan> _buildDirectoryMovePlan(
     ancestor = p.posix.dirname(ancestor);
   }
   for (final e in origins.entries) {
-    if (transform.moves(e.value) && !members.containsKey(e.value)) {
+    if (transform.moves(e.value) &&
+        !members.containsKey(e.value) &&
+        !noteRoots.contains(e.value)) {
       block(
         'sourceGhost',
         'An open source-subtree note has no verified disk member.',
         e.value,
       );
     }
-    if (WorkspaceMoveNamespace.contains(destinationPath, e.value)) {
+    if (roots.any(
+      (r) => WorkspaceMoveNamespace.contains(r.destination, e.value),
+    )) {
       block(
         'destinationGhost',
         'An open note reserves the destination subtree.',
@@ -429,8 +531,8 @@ Future<WorkspaceNoteMovePlan> _buildDirectoryMovePlan(
       }
     }
     final toNormalize = <String>{
-      sourcePath,
-      destinationPath,
+      for (final intent in roots) intent.source,
+      for (final intent in roots) intent.destination,
       ...allPaths,
       ...allPaths.map(transform.map),
     }.toList();
@@ -446,14 +548,31 @@ Future<WorkspaceNoteMovePlan> _buildDirectoryMovePlan(
       }
       await Future<void>.delayed(Duration.zero);
     }
-    final sourceKey = await key(sourcePath);
-    final destinationKey = await key(destinationPath);
-    if (WorkspaceMoveNamespace.contains(sourceKey, destinationKey) ||
-        WorkspaceMoveNamespace.contains(destinationKey, sourceKey)) {
-      block(
-        'sameIdentitySpelling',
-        'Equivalent or overlapping directory spellings require a separate protocol.',
-      );
+    final normalizedRoots = [
+      for (final intent in roots)
+        (
+          source: await key(intent.source),
+          destination: await key(intent.destination),
+        ),
+    ];
+    for (var i = 0; i < normalizedRoots.length; i++) {
+      final a = normalizedRoots[i];
+      for (var j = 0; j < normalizedRoots.length; j++) {
+        final b = normalizedRoots[j];
+        if (WorkspaceMoveNamespace.contains(a.source, b.destination) ||
+            WorkspaceMoveNamespace.contains(b.destination, a.source) ||
+            i != j &&
+                (WorkspaceMoveNamespace.contains(a.source, b.source) ||
+                    WorkspaceMoveNamespace.contains(
+                      a.destination,
+                      b.destination,
+                    ))) {
+          block(
+            'sameIdentitySpelling',
+            'Equivalent or overlapping batch paths are not supported.',
+          );
+        }
+      }
     }
     final beforeKeys = <String, String>{};
     final afterKeys = <String, String>{};
@@ -473,14 +592,18 @@ Future<WorkspaceNoteMovePlan> _buildDirectoryMovePlan(
       beforeKeys[beforeKey] = path;
       afterKeys[afterKey] = path;
       if (!transform.moves(path) &&
-          WorkspaceMoveNamespace.contains(destinationKey, beforeKey)) {
+          normalizedRoots.any(
+            (r) => WorkspaceMoveNamespace.contains(r.destination, beforeKey),
+          )) {
         block(
           'destinationExists',
           'The destination subtree already exists or is reserved.',
           path,
         );
       }
-      if (WorkspaceMoveNamespace.contains(sourceKey, beforeKey) &&
+      if (normalizedRoots.any(
+            (r) => WorkspaceMoveNamespace.contains(r.source, beforeKey),
+          ) &&
           !transform.moves(path)) {
         block(
           'sourceGhost',

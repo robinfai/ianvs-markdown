@@ -15,7 +15,21 @@ import 'workspace_move_tree.dart';
 
 part 'workspace_directory_move_plan.dart';
 
-enum WorkspaceNoteMovePlanKind { singleNote, directory }
+enum WorkspaceNoteMovePlanKind { singleNote, directory, batch }
+
+/// Batch intent. A directory must carry complete inspection evidence;
+/// a note uses the effective-source/catalog baseline, not a fabricated tree.
+class WorkspaceBatchMoveRoot {
+  const WorkspaceBatchMoveRoot({
+    required this.source,
+    required this.destination,
+    this.tree,
+  });
+  final String source;
+  final String destination;
+  final WorkspaceMoveTreeSnapshot? tree;
+  bool get isDirectory => tree != null;
+}
 
 /// One exact UTF-16 source replacement, never a rendered-label replacement.
 class WorkspaceReferenceEdit {
@@ -55,6 +69,7 @@ class WorkspaceNoteMovePlan {
     this.kind = WorkspaceNoteMovePlanKind.singleNote,
     this.treeSnapshot,
     this.namespace,
+    List<WorkspaceBatchMoveRoot> batchRoots = const [],
     required this.root,
     required this.snapshot,
     required this.sourcePath,
@@ -62,17 +77,28 @@ class WorkspaceNoteMovePlan {
     required List<WorkspaceNoteMoveFile> files,
     required List<WorkspaceNoteMoveBlocker> blockers,
     required List<AttachmentMetadata> attachmentRequirements,
-  }) : files = List.unmodifiable(files),
+  }) : batchRoots = List.unmodifiable(batchRoots),
+       files = List.unmodifiable(files),
        blockers = List.unmodifiable(blockers),
        attachmentRequirements = List.unmodifiable(attachmentRequirements);
   final WorkspaceNoteMovePlanKind kind;
   final WorkspaceMoveTreeSnapshot? treeSnapshot;
   final WorkspaceMoveNamespace? namespace;
+  final List<WorkspaceBatchMoveRoot> batchRoots;
 
-  /// Directory plans use the dedicated v2 namespace executor, never v1.
+  /// Namespace plans use dedicated v2/v3 executors, never a loop of v1 moves.
   bool get executionSupported =>
       kind == WorkspaceNoteMovePlanKind.singleNote ||
-      (complete && treeSnapshot?.complete == true && namespace != null);
+      (kind == WorkspaceNoteMovePlanKind.directory &&
+          complete &&
+          treeSnapshot?.complete == true &&
+          namespace != null) ||
+      (kind == WorkspaceNoteMovePlanKind.batch &&
+          complete &&
+          namespace is WorkspaceBatchMoveNamespace &&
+          batchRoots.length >= 2 &&
+          batchRoots.length <= 8 &&
+          batchRoots.every((root) => root.tree == null || root.tree!.complete));
   final String? root;
   final WorkspaceReferenceSnapshot snapshot;
   final String sourcePath;
@@ -120,6 +146,24 @@ class WorkspaceNoteMovePlanner {
   final int maximumDirectoryReparseCodeUnits;
   final int maximumDirectoryReparseReferences;
   final int maximumDirectoryReparseLineCodeUnits;
+
+  Future<WorkspaceNoteMovePlan> buildBatch({
+    required WorkspaceReferenceSnapshot snapshot,
+    required List<WorkspaceBatchMoveRoot> roots,
+    required Set<String> dirtySessionIds,
+    AttachmentIndex? attachments,
+    bool Function()? isCancelled,
+  }) => _buildDirectoryMovePlan(
+    this,
+    snapshot: snapshot,
+    sourcePath: roots.isEmpty ? '' : roots.first.source,
+    destinationPath: roots.isEmpty ? '' : roots.first.destination,
+    dirtySessionIds: dirtySessionIds,
+    tree: null,
+    batchRoots: roots,
+    attachments: attachments,
+    isCancelled: isCancelled,
+  );
 
   Future<WorkspaceNoteMovePlan> buildDirectory({
     required WorkspaceReferenceSnapshot snapshot,

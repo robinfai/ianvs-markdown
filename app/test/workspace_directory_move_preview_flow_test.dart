@@ -123,36 +123,65 @@ class _Transactions implements WorkspaceNoteTransactionStore {
   bool failReply = false;
   bool applied = false;
   String finalPhase = 'completed';
-  WorkspaceNoteMoveRecord result({bool prepared = false}) =>
-      WorkspaceNoteMoveRecord(
-        transactionId: id!,
-        version: 2,
-        phase: prepared ? 'prepared' : finalPhase,
-        token: prepared ? 'token' : null,
-        namespace: WorkspaceDirectoryMoveReceipt(
-          sourcePath: plan!.sourcePath,
-          destinationPath: plan!.destinationPath,
-          identity: wrongIdentity
-              ? '9:99'
-              : plan!.treeSnapshot!.sourceIdentity!,
-          memberCount: plan!.treeSnapshot!.members.length,
-          actualPath: prepared ? plan!.sourcePath : plan!.destinationPath,
-          moved: !prepared,
-          synced: !prepared && namespaceSynced,
+  String? unmovedRoot;
+  bool wrongBatchRoot = false;
+  WorkspaceNoteMoveRecord result({
+    bool prepared = false,
+  }) => WorkspaceNoteMoveRecord(
+    transactionId: id!,
+    version: plan!.kind == WorkspaceNoteMovePlanKind.batch ? 3 : 2,
+    phase: prepared ? 'prepared' : finalPhase,
+    token: prepared ? 'token' : null,
+    namespaces: [
+      for (final root in plan!.batchRoots)
+        WorkspaceBatchMoveReceipt(
+          sourcePath: wrongBatchRoot ? '${root.source}-wrong' : root.source,
+          destinationPath: root.destination,
+          identity: root.tree?.sourceIdentity ?? '1:90',
+          memberCount: root.tree?.members.length ?? 1,
+          kind: root.isDirectory ? 'directory' : 'note',
+          actualPath: prepared || root.source == unmovedRoot
+              ? root.source
+              : root.destination,
+          moved: !prepared && root.source != unmovedRoot,
+          synced: !prepared && root.source != unmovedRoot && namespaceSynced,
           verified: prepared || namespaceVerified,
         ),
-        entries: [
-          for (final file in plan!.files)
-            WorkspaceNoteMoveReceipt(
-              path: file.path,
-              destinationPath: file.destination,
-              state: prepared ? 'pending' : 'moved',
-              actualPath: prepared ? file.path : file.destination,
-              revision: 'r:${prepared ? file.path : file.destination}',
-              verified: true,
-            ),
-        ],
-      );
+    ],
+    namespace: plan!.kind == WorkspaceNoteMovePlanKind.batch
+        ? null
+        : WorkspaceDirectoryMoveReceipt(
+            sourcePath: plan!.sourcePath,
+            destinationPath: plan!.destinationPath,
+            identity: wrongIdentity
+                ? '9:99'
+                : plan!.treeSnapshot!.sourceIdentity!,
+            memberCount: plan!.treeSnapshot!.members.length,
+            actualPath: prepared ? plan!.sourcePath : plan!.destinationPath,
+            moved: !prepared,
+            synced: !prepared && namespaceSynced,
+            verified: prepared || namespaceVerified,
+          ),
+    entries: [
+      for (final file in plan!.files)
+        WorkspaceNoteMoveReceipt(
+          path: file.path,
+          destinationPath: file.destination,
+          state: prepared ? 'pending' : 'moved',
+          actualPath: prepared
+              ? file.path
+              : _actual(file.path, file.destination),
+          revision:
+              'r:${prepared ? file.path : _actual(file.path, file.destination)}',
+          verified: true,
+        ),
+    ],
+  );
+  String _actual(String source, String destination) =>
+      unmovedRoot != null &&
+          (source == unmovedRoot || source.startsWith('$unmovedRoot/'))
+      ? source
+      : destination;
   @override
   Future<WorkspaceNoteMoveRecord> prepare(
     WorkspaceNoteMovePlan plan,
@@ -174,11 +203,17 @@ class _Transactions implements WorkspaceNoteTransactionStore {
     if (gate case final pending?) await pending.future;
     for (final file in plan!.files) {
       source.files.remove(file.path);
-      source.note(file.destination, corruptRead ? 'unrelated' : file.contents);
+      source.note(
+        _actual(file.path, file.destination),
+        corruptRead ? 'unrelated' : file.contents,
+      );
       files.files.remove('$root/${file.path}');
-      files.files['$root/${file.destination}'] = file.contents;
+      files.files['$root/${_actual(file.path, file.destination)}'] =
+          file.contents;
     }
-    final mapped = source.folders.map(plan!.namespace!.map).toSet();
+    final mapped = source.folders
+        .map((path) => _actual(path, plan!.namespace!.map(path)))
+        .toSet();
     source.folders
       ..clear()
       ..addAll(mapped);
@@ -251,6 +286,243 @@ void main() {
     '/vault/Old',
     '/vault/New',
     cancellation: cancellation,
+  );
+
+  test(
+    'batch preview is global and read-only until explicit execution',
+    () async {
+      source.folders.add('dest');
+      final plan = await workspace.previewBatchNoteMove(
+        ['/vault/Old', '/vault/Incoming.md'],
+        ['/vault/dest/Old', '/vault/dest/Incoming.md'],
+      );
+      expect(
+        plan.complete,
+        isTrue,
+        reason: plan.blockers.map((b) => b.message).join('\n'),
+      );
+      expect(plan.kind, WorkspaceNoteMovePlanKind.batch);
+      expect(plan.executionSupported, isTrue);
+      expect(plan.batchRoots.length, 2);
+      expect(
+        plan.files.singleWhere((f) => f.path == 'Incoming.md').contents,
+        '[A](Old/A.md)',
+      );
+      expect(images.reads, 0);
+      expect(trees.calls.length, 1);
+      expect(transactions.executions, 0);
+    },
+  );
+
+  test(
+    'batch cancellation cancels the active tree read and discards late result',
+    () async {
+      source.folders.add('dest');
+      trees.gate = Completer<void>();
+      final cancellation = WorkspaceMovePreviewCancellation();
+      final pending = workspace.previewBatchNoteMove(
+        ['/vault/Old', '/vault/Incoming.md'],
+        ['/vault/dest/Old', '/vault/dest/Incoming.md'],
+        cancellation: cancellation,
+      );
+      await trees.started.future;
+      cancellation.cancel();
+      final check = expectLater(
+        pending,
+        throwsA(isA<WorkspaceMovePreviewCancelled>()),
+      );
+      trees.gate!.complete();
+      await check;
+      expect(trees.cancellations, isNotEmpty);
+      expect(transactions.executions, 0);
+    },
+  );
+
+  testWidgets(
+    'complete batch preview exposes explicit execution and cancellation stays read-only',
+    (tester) async {
+      source.folders.add('dest');
+      final plan = await tester.runAsync(
+        () => workspace.previewBatchNoteMove(
+          ['/vault/Old', '/vault/Incoming.md'],
+          ['/vault/dest/Old', '/vault/dest/Incoming.md'],
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => showWorkspaceNoteMovePreview(
+                context: context,
+                sources: ['/vault/Old', '/vault/Incoming.md'],
+                destinations: ['/vault/dest/Old', '/vault/dest/Incoming.md'],
+                preview: Future.value(plan!),
+                onMaintain: workspace.executeNoteMove,
+              ),
+              child: const Text('Open batch'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open batch'));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Root moves are not all-or-nothing'),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('move-and-update-links')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Destination vacancy'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(transactions.executions, 0);
+    },
+  );
+
+  test('batch execution reconciles every root and each note once', () async {
+    source.folders.add('dest');
+    final plan = await workspace.previewBatchNoteMove(
+      ['/vault/Old', '/vault/Incoming.md'],
+      ['/vault/dest/Old', '/vault/dest/Incoming.md'],
+    );
+    final result = await workspace.executeNoteMove(plan);
+    expect(result.completed, isTrue);
+    expect(result.version, 3);
+    expect(result.namespaces, hasLength(2));
+    expect(transactions.executions, 1);
+    expect(source.files['dest/Incoming.md'], '[A](Old/A.md)');
+    expect(source.files.containsKey('Old/A.md'), isFalse);
+  });
+
+  test(
+    'partial batch keeps root at source while another root completes',
+    () async {
+      source.folders.add('dest');
+      transactions
+        ..unmovedRoot = 'Old'
+        ..finalPhase = 'partial';
+      final plan = await workspace.previewBatchNoteMove(
+        ['/vault/Old', '/vault/Incoming.md'],
+        ['/vault/dest/Old', '/vault/dest/Incoming.md'],
+      );
+      final result = await workspace.executeNoteMove(plan);
+      expect(result.completed, isFalse);
+      expect(
+        result.namespaces.singleWhere((r) => r.sourcePath == 'Old').atSource,
+        isTrue,
+      );
+      expect(
+        result.namespaces
+            .singleWhere((r) => r.sourcePath == 'Incoming.md')
+            .completed,
+        isTrue,
+      );
+      expect(source.files.containsKey('Old/A.md'), isTrue);
+      expect(source.files['dest/Incoming.md'], '[A](Old/A.md)');
+      expect(transactions.executions, 1);
+    },
+  );
+
+  test('mismatched prepared batch roots never enter execute', () async {
+    source.folders.add('dest');
+    transactions.wrongBatchRoot = true;
+    final plan = await workspace.previewBatchNoteMove(
+      ['/vault/Old', '/vault/Incoming.md'],
+      ['/vault/dest/Old', '/vault/dest/Incoming.md'],
+    );
+    await expectLater(
+      workspace.executeNoteMove(plan),
+      throwsA(isA<WorkspaceNoteMoveUncertain>()),
+    );
+    expect(transactions.executions, 0);
+  });
+
+  test('lost batch execute response reconciles without replay', () async {
+    source.folders.add('dest');
+    transactions.failReply = true;
+    final plan = await workspace.previewBatchNoteMove(
+      ['/vault/Old', '/vault/Incoming.md'],
+      ['/vault/dest/Old', '/vault/dest/Incoming.md'],
+    );
+    final result = await workspace.executeNoteMove(plan);
+    expect(result.completed, isTrue);
+    expect(transactions.executions, 1);
+  });
+
+  test(
+    'mixed batch updates only verified root favorites and buffers',
+    () async {
+      source.folders.add('dest');
+      files.files['/vault/Old/A.md'] = '# A';
+      files.files['/vault/Incoming.md'] = '[A](Old/A.md)';
+      final a = (await workspace.openPath('/vault/Old/A.md'))!;
+      final incoming = (await workspace.openPath('/vault/Incoming.md'))!;
+      workspace.browser.preferences.favorites['/vault/Old'] = true;
+      workspace.browser.preferences.favorites['/vault/Incoming.md'] = false;
+      transactions
+        ..unmovedRoot = 'Old'
+        ..finalPhase = 'partial';
+      final plan = await workspace.previewBatchNoteMove(
+        ['/vault/Old', '/vault/Incoming.md'],
+        ['/vault/dest/Old', '/vault/dest/Incoming.md'],
+      );
+      final result = await workspace.executeNoteMove(plan);
+      expect(result.completed, isFalse);
+      expect(a.path, '/vault/Old/A.md');
+      expect(incoming.path, '/vault/dest/Incoming.md');
+      expect(workspace.browser.hasFavorite('/vault/Old'), isTrue);
+      expect(workspace.browser.hasFavorite('/vault/dest/Old'), isFalse);
+      expect(workspace.browser.hasFavorite('/vault/dest/Incoming.md'), isTrue);
+      expect(workspace.browser.hasFavorite('/vault/Incoming.md'), isFalse);
+    },
+  );
+
+  test(
+    'batch keystrokes during native work are preserved at verified new path',
+    () async {
+      source.folders.add('dest');
+      files.files['/vault/Incoming.md'] = '[A](Old/A.md)';
+      final document = (await workspace.openPath('/vault/Incoming.md'))!;
+      final plan = await workspace.previewBatchNoteMove(
+        ['/vault/Old', '/vault/Incoming.md'],
+        ['/vault/dest/Old', '/vault/dest/Incoming.md'],
+      );
+      transactions.gate = Completer<void>();
+      final pending = workspace.executeNoteMove(plan);
+      await transactions.started.future;
+      document.controller.text = 'unsaved keystrokes';
+      transactions.gate!.complete();
+      await pending;
+      expect(document.path, '/vault/dest/Incoming.md');
+      expect(document.controller.text, 'unsaved keystrokes');
+      expect(document.hasExternalChanges, isTrue);
+    },
+  );
+
+  test(
+    'batch missing sync proof cannot remap any affected buffer or favorite',
+    () async {
+      source.folders.add('dest');
+      files.files['/vault/Old/A.md'] = '# A';
+      final document = (await workspace.openPath('/vault/Old/A.md'))!;
+      workspace.browser.preferences.favorites['/vault/Old'] = true;
+      transactions
+        ..namespaceSynced = false
+        ..finalPhase = 'partial';
+      final plan = await workspace.previewBatchNoteMove(
+        ['/vault/Old', '/vault/Incoming.md'],
+        ['/vault/dest/Old', '/vault/dest/Incoming.md'],
+      );
+      final result = await workspace.executeNoteMove(plan);
+      expect(result.completed, isFalse);
+      expect(result.namespaces.every((r) => !r.completed), isTrue);
+      expect(document.path, '/vault/Old/A.md');
+      expect(document.hasExternalChanges, isTrue);
+      expect(workspace.browser.hasFavorite('/vault/Old'), isTrue);
+      expect(workspace.browser.hasFavorite('/vault/dest/Old'), isFalse);
+    },
   );
 
   test(

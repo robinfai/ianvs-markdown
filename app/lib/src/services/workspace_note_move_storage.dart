@@ -1,4 +1,5 @@
 import 'workspace_index_source.dart';
+import 'workspace_move_receipt.dart';
 
 /// Read-only observations of app-managed recovery storage, never a receipt or
 /// permission to clean up. Null metrics are unknown, not zero or partial sums.
@@ -138,6 +139,9 @@ class WorkspaceNoteMoveStorageRecord {
     required this.entryCount,
     required this.storedPhase,
     this.storedCode,
+    this.version = 1,
+    this.namespace,
+    List<WorkspaceBatchMoveReceipt> namespaces = const [],
     this.journalBytes,
     this.artifactBytes,
     this.allocatedBytes,
@@ -145,8 +149,12 @@ class WorkspaceNoteMoveStorageRecord {
     this.artifactMissingCount,
     this.artifactUnknownCount,
     List<String> blockers = const [],
-  }) : blockers = List.unmodifiable(blockers);
+  }) : namespaces = List.unmodifiable(namespaces),
+       blockers = List.unmodifiable(blockers);
 
+  final int version;
+  final WorkspaceDirectoryMoveReceipt? namespace;
+  final List<WorkspaceBatchMoveReceipt> namespaces;
   final String transactionId;
   final String sourcePath;
   final String destinationPath;
@@ -163,12 +171,20 @@ class WorkspaceNoteMoveStorageRecord {
 
   factory WorkspaceNoteMoveStorageRecord.fromMap(Map<Object?, Object?> value) {
     final id = value['transactionId'];
+    final version = value['version'] ?? 1;
+    final namespace = value['namespace'];
+    final namespaces = value['namespaces'];
     final source = value['sourcePath'];
     final destination = value['destinationPath'];
     final phase = value['storedPhase'];
     final code = value['storedCode'];
     final count = _count(value, 'entryCount', max: 128);
-    if (id is! String ||
+    if ((version != 1 && version != 2 && version != 3) ||
+        (version == 1 && namespace != null) ||
+        (version == 2 && namespace is! Map) ||
+        (version != 3 && namespaces != null) ||
+        (version == 3 && (namespace != null || namespaces is! List)) ||
+        id is! String ||
         !RegExp(
           r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
         ).hasMatch(id) ||
@@ -181,7 +197,7 @@ class WorkspaceNoteMoveStorageRecord {
         phase.length > 128 ||
         (code != null && (code is! String || code.length > 256)) ||
         count == null ||
-        count == 0 ||
+        (count == 0 && version == 1) ||
         value['historicalObservation'] != true ||
         value['cleanupSupported'] != false) {
       throw const FormatException(
@@ -190,6 +206,13 @@ class WorkspaceNoteMoveStorageRecord {
     }
     return WorkspaceNoteMoveStorageRecord(
       transactionId: id,
+      version: version as int,
+      namespace: namespace is Map
+          ? WorkspaceDirectoryMoveReceipt.fromMap(namespace)
+          : null,
+      namespaces: version == 3
+          ? parseWorkspaceBatchReceipts(namespaces)
+          : const [],
       sourcePath: source,
       destinationPath: destination,
       entryCount: count,

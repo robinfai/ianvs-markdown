@@ -38,3 +38,55 @@ bool isSupportedWorkspaceMovePath(String path, {required bool directory}) =>
     isScalarAttachmentPath(path) &&
     utf8.encode(path).length <= 4096 &&
     path.split('/').every((component) => utf8.encode(component).length <= 255);
+
+/// Simultaneous mapping from original paths, never a chain of moves.
+class WorkspaceBatchMoveNamespace extends WorkspaceMoveNamespace {
+  factory WorkspaceBatchMoveNamespace(List<WorkspaceMoveNamespace> roots) {
+    if (roots.length < 2 || roots.length > 8) {
+      throw const FormatException('A batch needs 2–8 roots.');
+    }
+    return WorkspaceBatchMoveNamespace._(roots);
+  }
+  WorkspaceBatchMoveNamespace._(List<WorkspaceMoveNamespace> roots)
+    : roots = List.unmodifiable(roots),
+      super(source: roots.first.source, destination: roots.first.destination) {
+    if (roots.length < 2 || roots.length > 8) {
+      throw const FormatException('A batch needs 2–8 roots.');
+    }
+    for (var i = 0; i < roots.length; i++) {
+      for (var j = 0; j < roots.length; j++) {
+        if (i != j &&
+            (WorkspaceMoveNamespace.contains(
+                  roots[i].source,
+                  roots[j].source,
+                ) ||
+                WorkspaceMoveNamespace.contains(
+                  roots[i].destination,
+                  roots[j].destination,
+                ))) {
+          throw const FormatException('Batch roots overlap.');
+        }
+        if (WorkspaceMoveNamespace.contains(
+              roots[i].source,
+              roots[j].destination,
+            ) ||
+            WorkspaceMoveNamespace.contains(
+              roots[j].destination,
+              roots[i].source,
+            )) {
+          throw const FormatException('Batch source and destination overlap.');
+        }
+      }
+    }
+  }
+  final List<WorkspaceMoveNamespace> roots;
+  @override
+  bool moves(String path) => roots.any((root) => root.moves(path));
+  @override
+  String map(String path) {
+    for (final root in roots) {
+      if (root.moves(path)) return root.map(path);
+    }
+    return path;
+  }
+}
