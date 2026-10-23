@@ -150,7 +150,7 @@ struct NativePDFFontDiagnostic {
       guard CTFontCopyPostScriptName(font) as String == ps,
             CTFontCopyFamilyName(font) as String == name(descriptor, kCTFontFamilyNameAttribute),
             let expectedTraits = symbolicTraits(descriptor),
-            CTFontCopySymbolicTraits(font).rawValue == expectedTraits else {
+            CTFontGetSymbolicTraits(font).rawValue == expectedTraits else {
         throw Failure(message: "CoreText substituted a different face or symbolic traits")
       }
       let createdTraits = CTFontCopyTraits(font) as NSDictionary
