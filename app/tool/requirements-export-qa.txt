@@ -1,0 +1,8 @@
+# Test-only PDF content acceptance. Python >=3.11 avoids optional typing_extensions.
+# Install with --require-hashes --only-binary=:all: in the isolated QA venv.
+# Official wheel metadata: https://pypi.org/pypi/pypdf/6.21.2/json
+# Wheel: pypdf-6.21.2-py3-none-any.whl (407766 bytes).
+# 6.10.0 was not selected: its official PyPI metadata lists parser resource-use
+# advisories; 6.21.2 metadata reported no known advisories when pinned.
+pypdf==6.21.2 \
+    --hash=sha256:1d44d1a3a200f25062adff0085b02040e4646431ac2ccac22e42679e91466084
