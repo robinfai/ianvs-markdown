@@ -186,3 +186,7 @@ test-native-document-export: ## Verify HTML/Markdown copies, cancellation and ex
 .PHONY: test-native-note-transactions
 test-native-note-transactions: ## Verify recoverable native note move transactions using synthetic fixtures
 	FLUTTER="$(FLUTTER)" PYTHON="$(PYTHON)" bash app/tool/test_native_note_transactions.sh
+
+.PHONY: test-native-pdf-font-diagnostic
+test-native-pdf-font-diagnostic: ## Isolated synthetic PDF font investigation; not product PDF acceptance
+	bash app/tool/test_native_pdf_font_diagnostic.sh
