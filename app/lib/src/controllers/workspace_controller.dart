@@ -19,6 +19,7 @@ import '../services/workspace_index_source.dart';
 import '../services/workspace_reference_index.dart';
 import '../services/workspace_note_move_plan.dart';
 import '../services/workspace_note_transaction.dart';
+import '../services/workspace_move_tree_inspector.dart';
 import '../services/attachment_repository.dart';
 import '../services/attachment_resolver.dart';
 
@@ -43,6 +44,8 @@ class WorkspaceController extends ChangeNotifier {
     WorkspaceIndexSource? indexSource,
     DocumentSyncSource? syncSource,
     this.noteTransactions = const AppleWorkspaceNoteTransactionStore(),
+    this.moveTreeInspector = const AppleWorkspaceMoveTreeInspector(),
+    this.movePreviewAttachments = const AppleAttachmentSource(),
   }) {
     final metadataSource =
         syncSource ??
@@ -77,6 +80,7 @@ class WorkspaceController extends ChangeNotifier {
   final _favoriteAccessTokens = <String, String>{};
   final _dirtyStates = <String, bool>{};
   Future<void>? _fileOperationTail;
+  final _movePreviewCancellations = <WorkspaceMovePreviewCancellation>{};
 
   @override
   void notifyListeners() {
@@ -87,6 +91,9 @@ class WorkspaceController extends ChangeNotifier {
     );
     index.configure(_workspaceRoot);
     if (_noteMoveRecoveryEpoch != index.epoch) {
+      for (final preview in _movePreviewCancellations.toList()) {
+        preview.cancel();
+      }
       _noteMoveRecoveryEpoch = index.epoch;
       _noteMoveRecords = const [];
       noteMoveRecoveryNotice = null;
@@ -127,6 +134,8 @@ class WorkspaceController extends ChangeNotifier {
 
   final MarkdownFileService fileService;
   final WorkspaceNoteTransactionStore noteTransactions;
+  final WorkspaceMoveTreeInspector moveTreeInspector;
+  final AttachmentSource movePreviewAttachments;
   Completer<void>? _activeNoteMove;
   int _noteMoveGeneration = 0;
   int _noteMoveRecoveryEpoch = -1;
@@ -1055,13 +1064,15 @@ class WorkspaceController extends ChangeNotifier {
     await _afterFileOperation([p.dirname(source), p.dirname(destination)]);
   });
 
-  /// Read-only proposal. The existing file move remains a separate, explicitly
-  /// warned action until the recoverable native executor is available.
+  /// Read-only proposal. Directory plans describe impact only; they never enter
+  /// the single-note executor, even when their supported-source coverage is complete.
   Future<WorkspaceNoteMovePlan> previewNoteMove(
     String source,
-    String destination,
-  ) async {
+    String destination, {
+    WorkspaceMovePreviewCancellation? cancellation,
+  }) async {
     final root = _workspaceRoot;
+    final epoch = index.epoch;
     if (root == null ||
         !p.isWithin(root, source) ||
         !p.isWithin(root, destination)) {
@@ -1069,39 +1080,90 @@ class WorkspaceController extends ChangeNotifier {
         'Reference maintenance requires one selected workspace.',
       );
     }
-    final snapshot = await references.refresh(refreshMetadata: true);
-    final from = p.posix.relative(source, from: root);
-    final to = p.posix.relative(destination, from: root);
-    final dirty = {
-      for (final document in _documents)
-        if (document.controller.isDirty) document.id,
-    };
-    AttachmentIndex? attachments;
-    if (p.posix.dirname(from) != p.posix.dirname(to) &&
-        snapshot.edges.any(
-          (edge) =>
-              edge.note.source.path == source &&
-              edge.status == WorkspaceReferenceStatus.external &&
-              attachmentExtensions.contains(
-                p.posix.extension(edge.reference.target).toLowerCase(),
-              ),
-        )) {
-      try {
-        // Metadata only; never reads image bytes or downloads provider files.
-        attachments = AttachmentIndex(
-          await const AppleAttachmentSource().list(root),
-        );
-      } on Object {
-        // The planner reports unknown coverage instead of guessing.
+    final cancelled = cancellation ?? WorkspaceMovePreviewCancellation();
+    _movePreviewCancellations.add(cancelled);
+    void checkCurrent() {
+      cancelled.throwIfCancelled();
+      if (_disposed || _workspaceRoot != root || index.epoch != epoch) {
+        throw StateError('The workspace changed. Open a new move preview.');
       }
     }
-    return WorkspaceNoteMovePlanner(references).build(
-      snapshot: snapshot,
-      sourcePath: from,
-      destinationPath: to,
-      dirtySessionIds: dirty,
-      attachments: attachments,
-    );
+
+    try {
+      checkCurrent();
+      final snapshot = await references.refresh(refreshMetadata: true);
+      checkCurrent();
+      final from = p.posix.relative(source, from: root);
+      final to = p.posix.relative(destination, from: root);
+      final directory = snapshot.catalog.entries.any(
+        (entry) => entry.relativePath == from && entry.isDirectory,
+      );
+      final dirty = {
+        for (final document in _documents)
+          if (document.controller.isDirty) document.id,
+      };
+      AttachmentIndex? attachments;
+      if (directory ||
+          p.posix.dirname(from) != p.posix.dirname(to) &&
+              snapshot.edges.any(
+                (edge) =>
+                    edge.note.source.path == source &&
+                    edge.status == WorkspaceReferenceStatus.external &&
+                    attachmentExtensions.contains(
+                      p.posix.extension(edge.reference.target).toLowerCase(),
+                    ),
+              )) {
+        try {
+          // Metadata only; never reads image bytes or downloads provider files.
+          attachments = AttachmentIndex(
+            await movePreviewAttachments.list(root),
+          );
+        } on Object {
+          // The planner reports unknown coverage instead of guessing.
+        }
+        checkCurrent();
+      }
+      final planner = WorkspaceNoteMovePlanner(references);
+      if (!directory) {
+        final result = await planner.build(
+          snapshot: snapshot,
+          sourcePath: from,
+          destinationPath: to,
+          dirtySessionIds: dirty,
+          attachments: attachments,
+        );
+        checkCurrent();
+        return result;
+      }
+      final requestId = newWorkspaceNoteTransactionId();
+      // The native request is registered before invoking its cancellation hook.
+      // Cancellation only marks a bounded read; no mutation is cancelled/replayed.
+      final pending = moveTreeInspector.inspect(root, from, requestId);
+      final detach = cancelled.listen(() {
+        unawaited(
+          moveTreeInspector.cancel(requestId).catchError((Object _) {}),
+        );
+      });
+      try {
+        final tree = await pending;
+        checkCurrent();
+        final result = await planner.buildDirectory(
+          snapshot: snapshot,
+          sourcePath: from,
+          destinationPath: to,
+          dirtySessionIds: dirty,
+          tree: tree,
+          attachments: attachments,
+          isCancelled: () => cancelled.isCancelled,
+        );
+        checkCurrent();
+        return result;
+      } finally {
+        detach();
+      }
+    } finally {
+      _movePreviewCancellations.remove(cancelled);
+    }
   }
 
   /// Called only after the user approves this exact, displayed proposal.
@@ -1312,7 +1374,10 @@ class WorkspaceController extends ChangeNotifier {
   }
 
   void _validateNoteMovePlan(WorkspaceNoteMovePlan plan) {
-    if (_disposed || !plan.complete || !plan.isCurrent(index)) {
+    if (_disposed ||
+        !plan.executionSupported ||
+        !plan.complete ||
+        !plan.isCurrent(index)) {
       throw StateError(
         'The preview changed. Refresh and confirm a new preview.',
       );
@@ -1874,6 +1939,10 @@ class WorkspaceController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    for (final preview in _movePreviewCancellations.toList()) {
+      preview.cancel();
+    }
+    _movePreviewCancellations.clear();
     sync.dispose();
     _persistTimer?.cancel();
     browser.removeListener(_schedulePersist);

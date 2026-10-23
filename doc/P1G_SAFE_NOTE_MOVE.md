@@ -297,3 +297,16 @@ writer's check-to-Trash race. Reporting an uncertain result afterward is not a
 substitute for a safe mutation protocol. This unresolved boundary is another
 reason this stage keeps every cleanup mutation disabled rather than claiming a
 safe garbage collector. No separate cleanup ledger or transaction is introduced.
+
+## G4a: read-only directory impact preview
+
+Single-directory rename/move now obtains a bounded complete-member metadata
+manifest and simulates one before/after namespace for reference impact. Unsupported
+members remain visible with explicit reasons rather than being omitted or turning
+the directory into a nonexistent source. The dialog remains manual-only for
+directories; a complete proposal cannot enter the single-note v1 executor.
+Multi-selection and directory execution remain unfinished.
+
+See [Directory reference-maintenance preview](P1G_DIRECTORY_MOVE_PREVIEW.md) for
+scope, budgets, cancellation, conservative blockers and the separate future G4b
+protocol requirements. G3b recoverable Trash cleanup remains unopened.
