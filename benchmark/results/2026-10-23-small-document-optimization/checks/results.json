@@ -9,5 +9,5 @@
   "appTests": 993,
   "appSkipped": 1,
   "appAnalyze": "passed",
-  "performance": "not passed: no complete paired runs"
+  "performance": "not passed: one valid example baseline; remaining runs blocked by repeated foreground loss"
 }

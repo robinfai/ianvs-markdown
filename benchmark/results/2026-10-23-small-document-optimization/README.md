@@ -48,3 +48,9 @@ Candidate Profile builds for both actual mains passed; the clean SDK and binary/
 The user authorized foreground time and remote push/PR creation. After recurring foreground loss, asked whether another desktop automation/task is competing for focus. Further timed runs require exclusive foreground availability. PR #43 remains draft and must not merge without the full pair.
 
 Remote CI observed on 2026-10-23: Core on Flutter 3.44.0 and 3.47.6 plus iOS simulator build passed; macOS native integrations still running at this update.
+
+### App attempt and current blocker
+
+`before-app-resume-invalid-focus`: app ran from 07:41:29 to 07:43:37 UTC, completed the 10 KiB cases including open/save and entered 100 KiB, then `active=false` and generation changed. The complete attempt is invalid. Repeated foreground loss affects both actual mains, so automatic retries stopped rather than weakening window validation. One valid example baseline remains; no complete app baseline or candidate performance run exists. The pending user question is whether other desktop automation can stop taking focus.
+
+Core/iOS success above refers to code head `663c17d`. Pushing evidence-only head `94b1f18` restarted CI and cancelled the still-running previous macOS job; current-head CI must be checked again before any merge. No code or acceptance criteria changed in these evidence commits.
