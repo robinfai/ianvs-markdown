@@ -672,11 +672,13 @@ class PDFFontDiagnosticTests(unittest.TestCase):
         self.root = alias
         code, calls, summary = self.execute_matrix()
         self.assertEqual(code, 0)
+        # macOS's temporary directory can itself use the /var -> /private/var alias.
+        expected_matrix = (real / "attempt/matrix").resolve()
         payload = json.loads((real / "attempt/matrix" / diagnostic.MANIFEST_NAME).read_bytes())
-        self.assertEqual(payload["matrixDirectory"], str(real / "attempt/matrix"))
+        self.assertEqual(payload["matrixDirectory"], str(expected_matrix))
         for arguments, _ in calls:
             case_path = arguments[2] if arguments[0] in ("--inventory", "--composite-case") else arguments[3]
-            self.assertEqual(Path(case_path).parent, real / "attempt/matrix")
+            self.assertEqual(Path(case_path).parent, expected_matrix)
         existing = alias / "existing-matrix"
         existing.symlink_to(real / "new-target", target_is_directory=True)
         with self.assertRaises((FileExistsError, ValueError)):
