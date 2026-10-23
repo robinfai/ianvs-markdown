@@ -8,6 +8,7 @@ from pathlib import Path
 import subprocess
 import resource
 import sys
+import time
 
 ORDERS = {"forward": "文⽂长⻓", "reverse": "⽂文⻓长", "mixed": "文文⽂⽂长长⻓⻓"}
 CANDIDATES = {"pingfang": "PingFang SC", "heiti": "Heiti SC", "songti": "Songti SC"}
@@ -17,9 +18,12 @@ MAX_NATIVE_FILE = 8 * 1024 * 1024
 # Inspector (16 MiB), original PDF (8), census/result/text (<=5), HTML (<1),
 # and bounded subprocess log (8). Reserve before starting, not only afterward.
 MAX_CASE_RESERVE = 40 * 1024 * 1024
+MAX_CENSUS_RESERVE = MAX_NATIVE_FILE + MAX_JSON
 MAX_ACCEPTANCE_LOG = 1024 * 1024
 MAX_SUMMARY = 2 * 1024 * 1024
 LOG_TAIL = 2048
+MAX_MATRIX_SECONDS = 18 * 60
+WATCHDOG_REAP_SECONDS = 5
 
 
 def read_json(path: Path) -> dict:
@@ -122,30 +126,74 @@ def run(executable: Path, root: Path, watchdog: Path, artifact_root: Path | None
         raise ValueError("Matrix must be a direct child of its complete artifact root")
     # New-only evidence root: never clean or replace a prior diagnostic artifact.
     root.mkdir(parents=False, exist_ok=False)
-    summary = {"schema": 1, "cases": [], "status": "failed",
+    deadline = time.monotonic() + MAX_MATRIX_SECONDS
+    summary = {"schema": 2, "cases": [], "status": "failed",
+               "families": [{"id": identity, "family": family, "status": "not-started"}
+                            for identity, family in CANDIDATES.items()],
                "productionAcceptance": False, "visualReview": "pending",
                "independentExtractor": "pending"}
+
+    def reserve_phase(bytes_required: int, seconds: int) -> None:
+        # Keep one global deadline and artifact allowance across all families.
+        # Do not start a process whose full watchdog + bounded reap cannot fit.
+        if time.monotonic() + seconds + WATCHDOG_REAP_SECONDS >= deadline:
+            raise ValueError("Global matrix time budget cannot reserve another bounded process")
+        reserved = bytes_required + MAX_ACCEPTANCE_LOG + MAX_SUMMARY
+        if evidence_bytes(artifact_root) > MAX_EVIDENCE - reserved:
+            raise ValueError("Aggregate artifact budget cannot reserve another bounded process")
+
     try:
-        census_root = root / "census"
-        code = run_case_command(executable, ["--inventory", str(census_root)],
-                                root / "census.log", watchdog, 30)
-        census = read_json(census_root / "inventory.json")
-        candidates = [item for item in census.get("candidates", []) if item.get("status") == "selected"]
-        if code != 0 or not 1 <= len(candidates) <= 3:
-            raise ValueError("No eligible local-font census; no render is authorized")
-        ids = [item.get("id") for item in candidates]
-        if len(set(ids)) != len(ids) or any(item.get("family") != CANDIDATES.get(item.get("id")) for item in candidates):
-            raise ValueError("Census selected an unknown or duplicate candidate")
-        summary["census"] = census
+        candidates = []
         all_passed = True
+        for record in summary["families"]:
+            identity = record["id"]
+            reserve_phase(MAX_CENSUS_RESERVE, 30)
+            census_root = root / f"census-{identity}"
+            print(f"PHASE: isolated family census {identity}", flush=True)
+            code = run_case_command(executable, ["--inventory", identity, str(census_root)],
+                                    root / f"census-{identity}.log", watchdog, 30)
+            record["exitCode"] = code
+            record["status"] = "failed"
+            try:
+                census = read_json(census_root / "inventory.json")
+                record["census"] = census
+                entries = census.get("candidates")
+                if census.get("requestedID") != identity:
+                    raise ValueError("Census requested family identity mismatch")
+                if (census.get("maxFamiliesPerProcess") != 1 or
+                        census.get("maxPreflightFaces") != 2 or
+                        census.get("crossFamilyRetainedData") is not False):
+                    raise ValueError("Census did not preserve single-family process isolation")
+                input_bytes, input_files = census.get("perProcessInputBytes"), census.get("uniqueInputFiles")
+                if (type(input_bytes) is not int or not 0 <= input_bytes <= 128 * 1024 * 1024 or
+                        type(input_files) is not int or not 0 <= input_files <= 2):
+                    raise ValueError("Census input accounting is missing or exceeds process limits")
+                if not isinstance(entries, list) or len(entries) != 1 or not isinstance(entries[0], dict):
+                    raise ValueError("Isolated census must contain exactly one family, not missing or duplicate entries")
+                candidate = entries[0]
+                if candidate.get("id") != identity or candidate.get("family") != CANDIDATES[identity]:
+                    raise ValueError("Census returned an unknown or wrong family")
+                if candidate.get("status") == "unavailable":
+                    record["status"] = "unavailable"
+                    record["problems"] = [f"Family unavailable (process exit {code}); not tested and not a pass"]
+                    all_passed = False
+                    continue
+                if code != 0:
+                    raise ValueError(f"Census process exit {code}; no render is authorized for this family")
+                if candidate.get("status") != "selected":
+                    raise ValueError("Census did not select the requested family")
+                if input_bytes == 0 or input_files == 0:
+                    raise ValueError("Selected census has no bounded local input evidence")
+                record["status"] = "selected"
+                candidates.append(candidate)
+            except (OSError, ValueError, KeyError, TypeError) as error:
+                record["problems"] = [str(error)]
+                all_passed = False
+            evidence_bytes(artifact_root)
         for candidate in candidates:
             for order in ORDERS:
                 label = f"{candidate['id']}-{order}"
-                # The outer acceptance capture can still grow after this process
-                # exits, and summary.json has not been written yet. Reserve both.
-                reserved = MAX_CASE_RESERVE + MAX_ACCEPTANCE_LOG + MAX_SUMMARY
-                if evidence_bytes(artifact_root) > MAX_EVIDENCE - reserved:
-                    raise ValueError("Aggregate artifact budget cannot reserve another bounded case")
+                reserve_phase(MAX_CASE_RESERVE, 100)
                 case_root = root / label
                 print(f"PHASE: bounded case {label}", flush=True)
                 code = run_case_command(executable,
@@ -165,13 +213,14 @@ def run(executable: Path, root: Path, watchdog: Path, artifact_root: Path | None
                 summary["evidenceBytesBeforeFinalSummary"] = evidence_bytes(artifact_root)
                 # A failed case remains a failed job, but later independent cases
                 # still collect evidence. No persistent process/print lease is reused.
-        summary["status"] = "diagnostic-text-geometry-passed" if all_passed else "failed"
+        complete = len(candidates) == len(CANDIDATES) and len(summary["cases"]) == len(CANDIDATES) * len(ORDERS)
+        summary["status"] = "diagnostic-text-geometry-passed" if all_passed and complete else "failed"
     except (OSError, ValueError, KeyError, TypeError) as error:
         summary["error"] = str(error)
     finally:
         encoded = (json.dumps(summary, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
         if len(encoded) > MAX_SUMMARY:
-            summary = {"schema": 1, "status": "failed", "productionAcceptance": False,
+            summary = {"schema": 2, "status": "failed", "productionAcceptance": False,
                        "error": "Final summary exceeded its 2 MiB reservation"}
             encoded = (json.dumps(summary) + "\n").encode("utf-8")
         with (root / "summary.json").open("xb") as stream:

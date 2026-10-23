@@ -36,6 +36,13 @@ struct NativePDFFontDiagnostic {
   ]
   static let coverage = "文⽂长⻓中文文档代码ABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789 "
 
+  static func requestedFamily(id: String) throws -> String {
+    guard let family = families.first(where: { $0.0 == id })?.1 else {
+      throw Failure(message: "Unknown fixed diagnostic family ID")
+    }
+    return family
+  }
+
   static func phase(_ value: String) {
     FileHandle.standardOutput.write(Data("PHASE: \(value)\n".utf8))
   }
@@ -86,7 +93,10 @@ struct NativePDFFontDiagnostic {
   /// macOS 13 is a diagnostic prerequisite, not a changed app deployment target.
   /// The options affect these CT calls only, never WK's own fallback service.
   @available(macOS 13.0, *)
-  static func inventory() throws -> ([Candidate], [String: Any]) {
+  static func inventory(id: String) throws -> ([Candidate], [String: Any]) {
+    // Reject unknown IDs before enumeration or file access. Each invocation
+    // materializes faces and retains input data for this one fixed family only.
+    let family = try requestedFamily(id: id)
     phase("enumerate existing system fonts without name probing")
     guard let names = CTFontManagerCopyAvailablePostScriptNames() as? [String],
           let urls = CTFontManagerCopyAvailableFontURLs() as? [URL] else {
@@ -102,8 +112,9 @@ struct NativePDFFontDiagnostic {
           let descriptors = rawDescriptors as? [CTFontDescriptor] else {
       throw Failure(message: "Available-font descriptor census is absent or has an unexpected type")
     }
-    var records = [[String: Any]]()
     var selected = [Candidate]()
+    // Canonical-URL caching deduplicates faces sharing a TTC/OTC for this family.
+    // No cached data or CTFont is carried across diagnostic-family preflights.
     var cachedData = [URL: Data]()
     var readBytes = 0
     let fm = FileManager.default
@@ -193,64 +204,66 @@ struct NativePDFFontDiagnostic {
       ])
     }
 
-    for (id, family) in families {
-      let matching = descriptors.filter {
-        guard name($0, kCTFontFamilyNameAttribute) == family,
-              let url = attribute($0, kCTFontURLAttribute) as? URL else { return false }
-        return url.isFileURL && url.standardizedFileURL.path.hasPrefix("/System/Library/Fonts/")
-      }
-      var record: [String: Any] = ["id": id, "family": family, "availableFaces": matching.count]
-      do {
-        guard matching.count <= 64 else { throw Failure(message: "Unexpected family inventory size") }
-        record["inventoryFaces"] = matching.map { descriptor -> [String: Any] in
-          ["postScriptName": name(descriptor, kCTFontNameAttribute) as Any? ?? NSNull(),
-           "enabled": flag(descriptor, kCTFontEnabledAttribute) as Any? ?? NSNull(),
-           "downloadable": flag(descriptor, kCTFontDownloadableAttribute) as Any? ?? NSNull(),
-           "weight": weight(descriptor) as Any? ?? NSNull(),
-           "italic": isItalic(descriptor) as Any? ?? NSNull(), "bold": isBold(descriptor) as Any? ?? NSNull(),
-           "fileName": (attribute(descriptor, kCTFontURLAttribute) as? URL)?.lastPathComponent as Any? ?? NSNull()]
-        }.sorted { ($0["postScriptName"] as? String ?? "") < ($1["postScriptName"] as? String ?? "") }
+    let matching = descriptors.filter {
+      guard name($0, kCTFontFamilyNameAttribute) == family,
+            let url = attribute($0, kCTFontURLAttribute) as? URL else { return false }
+      return url.isFileURL && url.standardizedFileURL.path.hasPrefix("/System/Library/Fonts/")
+    }
+    var record: [String: Any] = ["id": id, "family": family, "availableFaces": matching.count]
+    do {
+      guard matching.count <= 64 else { throw Failure(message: "Unexpected family inventory size") }
+      record["inventoryFaces"] = matching.map { descriptor -> [String: Any] in
+        ["postScriptName": name(descriptor, kCTFontNameAttribute) as Any? ?? NSNull(),
+         "enabled": flag(descriptor, kCTFontEnabledAttribute) as Any? ?? NSNull(),
+         "downloadable": flag(descriptor, kCTFontDownloadableAttribute) as Any? ?? NSNull(),
+         "weight": weight(descriptor) as Any? ?? NSNull(),
+         "italic": isItalic(descriptor) as Any? ?? NSNull(), "bold": isBold(descriptor) as Any? ?? NSNull(),
+         "fileName": (attribute(descriptor, kCTFontURLAttribute) as? URL)?.lastPathComponent as Any? ?? NSNull()]
+      }.sorted { ($0["postScriptName"] as? String ?? "") < ($1["postScriptName"] as? String ?? "") }
 
-        let eligible = matching.filter {
-          flag($0, kCTFontEnabledAttribute) == true &&
-          flag($0, kCTFontDownloadableAttribute) == false && weight($0) != nil && isItalic($0) == false && isBold($0) != nil
-        }
-        guard let regular = eligible.filter({ isBold($0) == false })
-          .sorted(by: {
-            let left = abs(weight($0)!), right = abs(weight($1)!)
-            return left == right ? (name($0, kCTFontNameAttribute) ?? "") < (name($1, kCTFontNameAttribute) ?? "") : left < right
-          }).first,
-          let bold = eligible.filter({ isBold($0) == true })
-          .sorted(by: {
-            let left = abs(weight($0)! - 0.4), right = abs(weight($1)! - 0.4)
-            return left == right ? (name($0, kCTFontNameAttribute) ?? "") < (name($1, kCTFontNameAttribute) ?? "") : left < right
-          }).first else {
-          throw Failure(message: "No known local non-bold/bold reference pair; no activation attempted")
-        }
-        let (regularFont, regularEvidence) = try makeFont(regular)
-        let (boldFont, boldEvidence) = try makeFont(bold)
-        let regularName = CTFontCopyPostScriptName(regularFont) as String
-        let boldName = CTFontCopyPostScriptName(boldFont) as String
-        record["status"] = "selected"
-        record["regular"] = regularEvidence
-        record["bold"] = boldEvidence
-        selected.append(Candidate(id: id, family: family, regularName: regularName,
-          boldName: boldName, regular: regularFont, bold: boldFont, evidence: record))
-      } catch {
-        record["status"] = "unavailable"
-        record["reason"] = error.localizedDescription
+      let eligible = matching.filter {
+        flag($0, kCTFontEnabledAttribute) == true &&
+        flag($0, kCTFontDownloadableAttribute) == false && weight($0) != nil && isItalic($0) == false && isBold($0) != nil
       }
-      records.append(record)
+      guard let regular = eligible.filter({ isBold($0) == false })
+        .sorted(by: {
+          let left = abs(weight($0)!), right = abs(weight($1)!)
+          return left == right ? (name($0, kCTFontNameAttribute) ?? "") < (name($1, kCTFontNameAttribute) ?? "") : left < right
+        }).first,
+        let bold = eligible.filter({ isBold($0) == true })
+        .sorted(by: {
+          let left = abs(weight($0)! - 0.4), right = abs(weight($1)! - 0.4)
+          return left == right ? (name($0, kCTFontNameAttribute) ?? "") < (name($1, kCTFontNameAttribute) ?? "") : left < right
+        }).first else {
+        throw Failure(message: "No known local non-bold/bold reference pair; no activation attempted")
+      }
+      let (regularFont, regularEvidence) = try makeFont(regular)
+      let (boldFont, boldEvidence) = try makeFont(bold)
+      let regularName = CTFontCopyPostScriptName(regularFont) as String
+      let boldName = CTFontCopyPostScriptName(boldFont) as String
+      record["status"] = "selected"
+      record["regular"] = regularEvidence
+      record["bold"] = boldEvidence
+      selected.append(Candidate(id: id, family: family, regularName: regularName,
+        boldName: boldName, regular: regularFont, bold: boldFont, evidence: record))
+    } catch {
+      record["status"] = "unavailable"
+      record["reason"] = error.localizedDescription
     }
     return (selected, [
       "schema": 1,
+      "requestedID": id,
       "os": ProcessInfo.processInfo.operatingSystemVersionString,
       "minimumDiagnosticOS": "macOS 13 (preventAutoDownload availability)",
-      "candidates": records,
+      "candidates": [record],
       "selectedCount": selected.count,
       "maxFamilies": 3,
-      "maxPreflightFaces": 6,
+      "maxFamiliesPerProcess": 1,
+      "maxPreflightFaces": 2,
       "fontBytesRead": readBytes,
+      "perProcessInputBytes": readBytes,
+      "uniqueInputFiles": cachedData.count,
+      "crossFamilyRetainedData": false,
       "wkBoundary": "Own CT options do not govern WK lookup or system fallback. No download, registration, activation, or security-setting API is requested by this fixture.",
     ])
   }
@@ -297,7 +310,7 @@ struct NativePDFFontDiagnostic {
   @MainActor
   @available(macOS 13.0, *)
   static func runCase(id: String, order: String, root: URL) throws -> Bool {
-    let (available, census) = try inventory()
+    let (available, census) = try inventory(id: id)
     try writeJSON(census, to: root.appendingPathComponent("inventory.json"))
     guard let candidate = available.first(where: { $0.id == id }) else {
       throw Failure(message: "Requested candidate is not an audited available system family")
@@ -397,17 +410,20 @@ struct NativePDFFontDiagnostic {
         throw Failure(message: "Diagnostic requires macOS 13 preventAutoDownload; app support is unchanged")
       }
       let args = CommandLine.arguments
-      guard args.count == 3 || args.count == 5 else { throw Failure(message: "Expected --inventory ROOT or --case ID ORDER ROOT") }
+      guard (args.count == 4 && args[1] == "--inventory") ||
+        (args.count == 5 && args[1] == "--case") else {
+        throw Failure(message: "Expected --inventory ID ROOT or --case ID ORDER ROOT")
+      }
+      _ = try requestedFamily(id: args[2])
+      if args[1] == "--case" { _ = try probes(order: args[3]) }
       let root = URL(fileURLWithPath: args.last!, isDirectory: true)
       try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
-      if args.count == 3, args[1] == "--inventory" {
-        let (selected, census) = try inventory()
+      if args[1] == "--inventory" {
+        let (selected, census) = try inventory(id: args[2])
         try writeJSON(census, to: root.appendingPathComponent("inventory.json"))
         guard !selected.isEmpty else { throw Failure(message: "No eligible local system font pair; no rendering attempted") }
-      } else if args.count == 5, args[1] == "--case" {
-        guard try runCase(id: args[2], order: args[3], root: root) else { exit(1) }
       } else {
-        throw Failure(message: "Unknown diagnostic mode")
+        guard try runCase(id: args[2], order: args[3], root: root) else { exit(1) }
       }
     } catch {
       FileHandle.standardError.write(Data("FAIL: \(error.localizedDescription)\n".utf8))
