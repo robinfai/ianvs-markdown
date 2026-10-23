@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check sandboxed copy export adds no unnecessary printing permission."""
+"""Check the sandbox permission required by the native PDF backend, not a Print feature."""
 import argparse
 from pathlib import Path
 import plistlib
@@ -10,8 +10,8 @@ def validate(data: bytes, label: str) -> None:
     value = plistlib.loads(data)
     if value.get("com.apple.security.app-sandbox") is not True:
         raise SystemExit(f"{label}: missing app sandbox")
-    if "com.apple.security.print" in value:
-        raise SystemExit(f"{label}: copy-only export must not request printing")
+    if value.get("com.apple.security.print") is not True:
+        raise SystemExit(f"{label}: native PDF backend requires printing permission")
 
 
 def main() -> None:
@@ -32,7 +32,7 @@ def main() -> None:
                 check=True, capture_output=True,
             )
             validate(result.stdout, str(bundle))
-    print("PASS: sandbox declarations with no printing permission" +
+    print("PASS: sandbox declarations with native PDF backend permission" +
           (" and actual Debug/Release code-signature entitlements" if args.built_apps else " (source only)"))
 
 

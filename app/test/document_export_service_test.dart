@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -107,6 +108,56 @@ void main() {
       expect(source, contains('**加粗**'));
     },
   );
+
+  test('PDF limitation notice is visible and incrementally budgeted', () async {
+    final value = snapshot('中文 source');
+    final html = await const DocumentExportService().build(
+      value,
+      isCurrent: () => true,
+    );
+    final pdf = await const DocumentExportService().build(
+      value,
+      isCurrent: () => true,
+      forPdf: true,
+    );
+    expect(html.notices, isNot(contains(documentExportPdfNotice)));
+    expect(html.content, isNot(contains(documentExportPdfNotice)));
+    expect(pdf.notices, contains(documentExportPdfNotice));
+    expect(pdf.content, contains('<li>$documentExportPdfNotice</li>'));
+    final exactBytes = utf8.encode(pdf.content).length;
+    expect(exactBytes, greaterThan(utf8.encode(html.content).length));
+    expect(
+      (await DocumentExportService(
+        maximumOutputBytes: exactBytes,
+      ).build(value, isCurrent: () => true, forPdf: true)).content,
+      pdf.content,
+    );
+    await expectLater(
+      DocumentExportService(
+        maximumOutputBytes: exactBytes - 1,
+      ).build(value, isCurrent: () => true, forPdf: true),
+      throwsA(isA<DocumentExportFailure>()),
+    );
+    final emptyPdf = await const DocumentExportService().build(
+      snapshot(''),
+      isCurrent: () => true,
+      forPdf: true,
+    );
+    final provider = FakeAttachmentSource();
+    await expectLater(
+      DocumentExportService(
+        attachmentSource: provider,
+        maximumOutputBytes: utf8.encode(emptyPdf.content).length - 1,
+      ).build(
+        snapshot('![not read](assets/image.png)'),
+        isCurrent: () => true,
+        forPdf: true,
+      ),
+      throwsA(isA<DocumentExportFailure>()),
+    );
+    expect(provider.listCalls, 0);
+    expect(provider.reads, isEmpty);
+  });
 
   test(
     'source HTML, attributes, links and title cannot inject active content',
@@ -483,10 +534,50 @@ void main() {
       source.writeln(
         '\n```text\n${'长代码 ABCDEFGHIJKLMNOPQRSTUVWXYZ ' * 35}\nCODE_END\n```\n\n文档结束 CJK END',
       );
-      // Keep the same production input budgets; this corpus is synthetic only.
-      final output = await const DocumentExportService().build(
-        snapshot(source.toString()),
-        isCurrent: () => true,
+      // Preserve the original 150 x 4 CJK/table/long-code corpus verbatim.
+      // Append a recognizable offline image, not the unrelated 1-pixel mock.
+      source.writeln(
+        '\n\nIMAGE_START\n\n![Synthetic four-color attachment](assets/acceptance-pattern.png)\n\nIMAGE_END',
+      );
+      final pattern = await _acceptancePatternPng();
+      final provider = FakeAttachmentSource()
+        ..files['assets/acceptance-pattern.png'] = pattern;
+      // Keep the same production input and image budgets and AttachmentSource
+      // authorization path. No external file, download or custom HTML is used.
+      final output = await DocumentExportService(
+        attachmentSource: provider,
+      ).build(snapshot(source.toString()), isCurrent: () => true, forPdf: true);
+      expect(output.notices, contains(documentExportPdfNotice));
+      expect(output.content, contains(documentExportPdfNotice));
+      expect(provider.roots, everyElement('/vault'));
+      expect(
+        provider.reads.where((path) => path == 'assets/acceptance-pattern.png'),
+        hasLength(1),
+      );
+      final imageMatches = RegExp(
+        r'<img src="data:image/png;base64,([^"]+)"',
+      ).allMatches(output.content).toList();
+      expect(imageMatches, hasLength(1));
+      final embeddedPng = base64Decode(imageMatches.single[1]!);
+      final codec = await ui.instantiateImageCodec(embeddedPng);
+      final frame = await codec.getNextFrame();
+      expect(frame.image.width, 192);
+      expect(frame.image.height, 128);
+      frame.image.dispose();
+      codec.dispose();
+      for (var row = 0; row < 150; row++) {
+        for (final column in ['A', 'B', 'C', 'D']) {
+          expect(
+            RegExp('CELL_${row}_$column').allMatches(output.content),
+            hasLength(1),
+          );
+        }
+      }
+      expect(output.content, contains('中文文档 CJK START 😀'));
+      expect(output.content, contains('文档结束 CJK END'));
+      expect(
+        output.content,
+        contains('${'长代码 ABCDEFGHIJKLMNOPQRSTUVWXYZ ' * 35}\nCODE_END'),
       );
       final directory = Directory('build/export-qa')
         ..createSync(recursive: true);
@@ -494,9 +585,62 @@ void main() {
       File(
         '${directory.path}/document.md',
       ).writeAsStringSync(source.toString());
+      File(
+        '${directory.path}/attachment-pattern.png',
+      ).writeAsBytesSync(pattern);
+      File('${directory.path}/fixture.json').writeAsStringSync(
+        const JsonEncoder.withIndent('  ').convert({
+          'generator': 'production DocumentExportService.build(forPdf: true)',
+          'rows': 150,
+          'columns': 4,
+          'cellMarkers': 600,
+          'originalCjkAndLongCodeUnchanged': true,
+          'attachment': {
+            'path': 'assets/acceptance-pattern.png',
+            'width': 192,
+            'height': 128,
+            'source':
+                'offline dart:ui PictureRecorder through AttachmentSource',
+            'appearance':
+                'black border; red, green, blue, yellow quadrants; white center circle',
+          },
+        }),
+      );
       expect(output.content, contains('CELL_149_D'));
     },
   );
+}
+
+Future<Uint8List> _acceptancePatternPng() async {
+  final recorder = ui.PictureRecorder();
+  final canvas = ui.Canvas(recorder);
+  canvas.drawRect(
+    const ui.Rect.fromLTWH(0, 0, 192, 128),
+    ui.Paint()..color = const ui.Color(0xff111111),
+  );
+  for (final (rect, color) in [
+    (const ui.Rect.fromLTWH(8, 8, 88, 56), const ui.Color(0xffe53935)),
+    (const ui.Rect.fromLTWH(96, 8, 88, 56), const ui.Color(0xff43a047)),
+    (const ui.Rect.fromLTWH(8, 64, 88, 56), const ui.Color(0xff1e88e5)),
+    (const ui.Rect.fromLTWH(96, 64, 88, 56), const ui.Color(0xfffdd835)),
+  ]) {
+    canvas.drawRect(rect, ui.Paint()..color = color);
+  }
+  canvas.drawCircle(
+    const ui.Offset(96, 64),
+    16,
+    ui.Paint()..color = const ui.Color(0xffffffff),
+  );
+  final picture = recorder.endRecording();
+  final image = await picture.toImage(192, 128);
+  try {
+    final png = await image.toByteData(format: ui.ImageByteFormat.png);
+    if (png == null) throw StateError('Could not encode synthetic attachment');
+    return png.buffer.asUint8List(png.offsetInBytes, png.lengthInBytes);
+  } finally {
+    image.dispose();
+    picture.dispose();
+  }
 }
 
 class _PhaseBlockedAttachmentSource extends FakeAttachmentSource {

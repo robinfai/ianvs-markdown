@@ -1,5 +1,6 @@
 import AppKit
 import CryptoKit
+import PDFKit
 
 /// Deliberately withholds the writer handoff on its own operation queue. This
 /// exercises real NSFileCoordinator waiting/cancel, not just a mocked gate.
@@ -80,7 +81,13 @@ struct NativeDocumentExportAcceptance {
     let blank = root.appendingPathComponent("blank.md")
     try DocumentExportFileWriter.write(Data(), to: blank, format: "md", sourcePath: source.path, expected: nil)
     assert((try? Data(contentsOf: blank))?.isEmpty == true)
-    rejects { try DocumentExportFileWriter.validate(root.appendingPathComponent("not-delivered.pdf"), format: "pdf", sourcePath: source.path) }
+    rejects { try DocumentExportFileWriter.validate(root.appendingPathComponent("not-delivered.print"), format: "print", sourcePath: source.path) }
+    let oversized = Data(repeating: 65, count: 32 * 1024 * 1024 + 1)
+    for format in ["html", "md"] {
+      let tooLarge = root.appendingPathComponent("too-large.\(format)")
+      rejects { try DocumentExportFileWriter.write(oversized, to: tooLarge, format: format, sourcePath: source.path, expected: nil) }
+      assert(!fm.fileExists(atPath: tooLarge.path), "Copy output keeps the existing 32 MiB cap")
+    }
 
     phase("coordination deadline and non-cancellable commit authorization")
     let expired = ExportCoordinationDeadline()
@@ -150,7 +157,7 @@ struct NativeDocumentExportAcceptance {
     assert(results.count == 2 && (try? results[1].get()) == false)
     selection?(copy) // A late duplicate selection cannot write or complete twice.
     assert(results.count == 2 && (try? Data(contentsOf: copy)) == original)
-    for unsupported in ["pdf", "print"] {
+    for unsupported in ["print", "share"] {
       coordinator.perform(unsupported, arguments: arguments) { results.append($0) }
     }
     assert(choices == 1 && results.count == 4)
@@ -239,9 +246,274 @@ struct NativeDocumentExportAcceptance {
       assert(SHA256.hash(data: actual) == SHA256.hash(data: input))
       assert((try? String(contentsOf: exported, encoding: .utf8))?.contains("CELL_149_D") == true)
     }
+    phase("PDF lifecycle, lease and final-approval safety")
+    try NativePDFExportSafetyTests.run(window: window)
+
+    phase("offline production HTML through native PDF export")
+    let fixture = URL(fileURLWithPath: CommandLine.arguments[1])
+    let output = evidence.appendingPathComponent("pagination.pdf")
+    let productionHTML = try String(contentsOf: fixture, encoding: .utf8)
+    assert(productionHTML.contains("data:image/png;base64,"), "Fixture must include the authorized synthetic attachment")
+    window.makeKeyAndOrderFront(nil)
+    var pdfSelections = 0
+    var pdfApprovals = 0
+    var outcome: Result<Bool, Error>?
+    let pdfCoordinator = DocumentExportCoordinator(window: window,
+      pickDestination: { _, _, format, selected in
+        assert(format == "pdf")
+        pdfSelections += 1
+        selected(output)
+        return {}
+      }, approveCommit: { id, approved in
+        assert(id == "production-pdf")
+        pdfApprovals += 1
+        approved(true)
+      })
+    pdfCoordinator.perform("pdf", arguments: [
+      "operationId": "production-pdf", "content": productionHTML,
+      "title": "pagination.md", "sourcePath": fixture.path,
+      "protectedPaths": [fixture.path, CommandLine.arguments[2]],
+    ]) { result in
+      assert(Thread.isMainThread, "Native PDF completion must return to the main actor")
+      assert(outcome == nil, "Native PDF export completes exactly once")
+      outcome = result
+    }
+    // Keep the existing 90-second native bound inside the 120-second watchdog.
+    let pdfDeadline = Date().addingTimeInterval(90)
+    while outcome == nil && Date() < pdfDeadline {
+      RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+    }
+    withExtendedLifetime(pdfCoordinator) {}
+    guard let outcome else { fatalError("Native PDF generation exceeded 90 seconds") }
+    guard try outcome.get() else { fatalError("Native PDF generation was cancelled") }
+    assert(pdfSelections == 1 && pdfApprovals == 1)
+    phase("practical PDF content, page geometry, image and all-page evidence")
+    try PracticalPDFEvidence.validate(output: output, evidence: evidence)
+
     let finalSourceHash = SHA256.hash(data: try Data(contentsOf: source))
     assert(finalSourceHash == originalHash)
-    print("PASS: exact HTML/Markdown UTF-8 copies, source hash, empty Markdown, cancellation/once-only completion, unsupported PDF/Print, explicit replacement, racing collision, hard-link/symlink, permissions and offline placeholders.")
+    print("PASS: exact HTML/Markdown UTF-8 copies, source hash, empty Markdown, cancellation/once-only completion, unsupported Print/share, practical paged PDF evidence, explicit replacement, racing collision, hard-link/symlink, permissions and offline placeholders.")
     window.orderOut(nil)
   }
+}
+
+/// Practical acceptance keeps content, geometry and selectable text as hard
+/// gates, while retaining raw evidence for platform font/header diagnostics.
+/// It does not normalize Unicode or assign a fabricated fidelity percentage.
+private enum PracticalPDFEvidence {
+  @MainActor
+  static func validate(output: URL, evidence: URL) throws {
+    guard let pdf = PDFDocument(url: output) else {
+      throw DocumentExportError(message: "Native PDF output is not readable")
+    }
+    let text = pdf.string ?? ""
+    try text.write(to: evidence.appendingPathComponent("pagination.txt"), atomically: true, encoding: .utf8)
+    // Bound evidence work before per-page scans/thumbnails. A failed layout
+    // must not turn the production 256-page ceiling into 256 large screenshots.
+    guard (3...30).contains(pdf.pageCount) else {
+      let message = "Expected 3...30 finite A4 pages, got \(pdf.pageCount)"
+      let report: [String: Any] = ["automatedChecksPassed": false,
+        "pageCount": pdf.pageCount, "failures": [message],
+        "rawText": "pagination.txt", "visualReview": "not performed; page-count limit exceeded",
+        "screenshotsWritten": 0]
+      try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
+        .write(to: evidence.appendingPathComponent("practical-pdf-report.json"))
+      throw DocumentExportError(message: message)
+    }
+    // Layout-only whitespace removal can rejoin narrow table-cell lines. Never
+    // apply NFKC, alter Chinese mappings, rewrite source, or fix extracted text.
+    let compact = text.filter { !$0.isWhitespace }
+    let markerPattern = try NSRegularExpression(pattern: "CELL_[0-9]+_[A-D]")
+    let compactNSString = compact as NSString
+    var markerCounts = [String: Int]()
+    for match in markerPattern.matches(in: compact, range: NSRange(location: 0, length: compactNSString.length)) {
+      markerCounts[compactNSString.substring(with: match.range), default: 0] += 1
+    }
+    var missing = [String]()
+    var duplicates = [String: Int]()
+    let expectedMarkers = Set((0..<150).flatMap { row in ["A", "B", "C", "D"].map { "CELL_\(row)_\($0)" } })
+    for marker in expectedMarkers.sorted() {
+      let count = markerCounts[marker, default: 0]
+      if count == 0 { missing.append(marker) }
+      if count > 1 { duplicates[marker] = count }
+    }
+    let unexpected = Set(markerCounts.keys).subtracting(expectedMarkers).sorted()
+    let cjkCharacters = text.unicodeScalars.filter {
+      (0x3400...0x4DBF).contains($0.value) || (0x4E00...0x9FFF).contains($0.value)
+        || (0xF900...0xFAFF).contains($0.value) || (0x20000...0x3134F).contains($0.value)
+    }.count
+    let codeRuns = compact.components(separatedBy: "ABCDEFGHIJKLMNOPQRSTUVWXYZ").count - 1
+    var failures = [String]()
+    if !missing.isEmpty || !duplicates.isEmpty || !unexpected.isEmpty {
+      failures.append("All 600 original table-cell markers must appear exactly once")
+    }
+    if !compact.contains("CJKSTART") || !compact.contains("CJKEND") || !compact.contains("CODE_END") || codeRuns != 35 {
+      failures.append("Original CJK boundary markers and all 35 long-code runs must survive")
+    }
+    if cjkCharacters < 300 { failures.append("PDF must retain substantial selectable Chinese text, not raster-only pages") }
+    if !compact.contains("IMAGE_START") || !compact.contains("IMAGE_END") {
+      failures.append("Attachment boundary markers must survive")
+    }
+
+    var pages = [[String: Any]]()
+    var imageResources = [[String: Any]]()
+    var tablePages = [Int]()
+    var missingHeaderPages = [Int]()
+    var totalOutOfBounds = 0
+    for index in 0..<pdf.pageCount {
+      guard let page = pdf.page(at: index) else {
+        failures.append("Missing PDF page \(index + 1)")
+        continue
+      }
+      let bounds = page.bounds(for: .mediaBox)
+      let finitePage = [bounds.minX, bounds.minY, bounds.width, bounds.height].allSatisfy { $0.isFinite }
+      let isA4 = finitePage && abs(bounds.width - 595.276) < 2 && abs(bounds.height - 841.89) < 2
+      if !isA4 { failures.append("Page \(index + 1) is not finite A4") }
+      let pageText = page.string ?? ""
+      let pageCompact = pageText.filter { !$0.isWhitespace }
+      let hasTable = pageCompact.contains("CELL_")
+      let headers = ["HEADER_ONE", "HEADER_TWO", "HEADER_THREE", "HEADER_FOUR"].allSatisfy { pageCompact.contains($0) }
+      if hasTable {
+        tablePages.append(index + 1)
+        if !headers { missingHeaderPages.append(index + 1) }
+      }
+      var outOfBounds = 0
+      var badBounds = [[String: Any]]()
+      for character in 0..<page.numberOfCharacters {
+        let rectangle = page.characterBounds(at: character)
+        if rectangle.isEmpty || rectangle.isNull { continue }
+        let finite = [rectangle.minX, rectangle.minY, rectangle.maxX, rectangle.maxY].allSatisfy { $0.isFinite }
+        let inside = finite && rectangle.minX >= bounds.minX - 2 && rectangle.maxX <= bounds.maxX + 2
+          && rectangle.minY >= bounds.minY - 2 && rectangle.maxY <= bounds.maxY + 2
+        if !inside {
+          outOfBounds += 1
+          if badBounds.count < 12 {
+            badBounds.append(["character": character, "rectangle": NSStringFromRect(rectangle)])
+          }
+        }
+      }
+      totalOutOfBounds += outOfBounds
+      let scanner = PDFImageResourceScanner(pageNumber: index + 1)
+      if let pageRef = page.pageRef, let dictionary = pageRef.dictionary {
+        scanner.scan(dictionary, depth: 0)
+      }
+      imageResources.append(contentsOf: scanner.images)
+
+      // Use the established PDFKit thumbnail path on every page. The former
+      // font-diagnostic drawing helper is intentionally not used here.
+      let image = page.thumbnail(of: NSSize(width: 840, height: 1188), for: .mediaBox)
+      let screenshot = "page-\(index + 1).png"
+      if let tiff = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiff),
+         let png = bitmap.representation(using: .png, properties: [:]) {
+        try png.write(to: evidence.appendingPathComponent(screenshot))
+      } else {
+        failures.append("Could not save PDFKit thumbnail for page \(index + 1)")
+      }
+      pages.append([
+        "page": index + 1, "mediaBox": NSStringFromRect(bounds), "finiteA4": isA4,
+        "selectableCharacters": page.numberOfCharacters, "containsTable": hasTable,
+        "allFourHeadersPresent": headers, "offPaperCharacterCount": outOfBounds,
+        "offPaperExamples": badBounds, "screenshot": screenshot,
+      ])
+    }
+    if totalOutOfBounds != 0 { failures.append("Text character bounds must not leave the page horizontally or vertically") }
+    if tablePages.count < 3 { failures.append("The original long table must span at least three pages") }
+    // A generic >=64-pixel image could be a rasterized emoji. Require the exact
+    // synthetic attachment dimensions; screenshots still verify its four colors.
+    let recognizableImages = imageResources.filter {
+      ($0["width"] as? Int ?? 0) == 192 && ($0["height"] as? Int ?? 0) == 128
+    }
+    if recognizableImages.isEmpty { failures.append("PDF must contain the actual 192 x 128 synthetic raster image resource, not an emoji or 1-pixel placeholder") }
+    let exactChineseTitle = text.contains("中文文档")
+    let exactChineseEnd = text.contains("文档结束")
+    let knownLimitations = [
+      "Chinese font ToUnicode mappings can vary by macOS/WebKit. Exact original Chinese phrase extraction is diagnostic, not a hard gate; substantial selectable CJK and all-page visual review remain required.",
+      "Repeated table headers can vary across WebKit pagination. Missing repeated headers are recorded per page, not silently omitted or treated as lost table-cell content.",
+      "All PDFKit page thumbnails must be visually reviewed for readable Chinese, complete last-column content, wrapped code and the recognizable four-color attachment. Automated checks do not establish a numerical fidelity score.",
+      "Print and sharing remain unsupported. The sandbox printing permission is only for the native PDF backend.",
+    ]
+    let report: [String: Any] = [
+      "standard": "Practical PDF fidelity with complete content and unchanged safety gates",
+      "automatedChecksPassed": failures.isEmpty, "visualReview": "required; not performed by this test",
+      "failures": failures, "pdf": "pagination.pdf", "rawText": "pagination.txt",
+      "pageCount": pdf.pageCount, "expectedTableCells": 600,
+      "observedTableCellOccurrences": markerCounts.values.reduce(0, +),
+      "missingMarkers": missing, "duplicateMarkers": duplicates, "unexpectedMarkers": unexpected,
+      "longCodeRuns": codeRuns, "selectableCjkCharacters": cjkCharacters,
+      "exactChineseTitleExtracts": exactChineseTitle, "exactChineseEndExtracts": exactChineseEnd,
+      "tablePages": tablePages, "tablePagesWithoutAllHeaders": missingHeaderPages,
+      "offPaperCharacterCount": totalOutOfBounds, "imageResources": imageResources,
+      "syntheticImageWidth": 192, "syntheticImageHeight": 128,
+      "matchingSyntheticImageResources": recognizableImages.count,
+      "pages": pages, "knownLimitations": knownLimitations,
+      "strictFixtureHistory": "6a571f906d40a496ccb96c940b57d41831735068",
+    ]
+    let json = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
+    try json.write(to: evidence.appendingPathComponent("practical-pdf-report.json"))
+    let summary = """
+    Practical native PDF acceptance
+    Automated checks: \(failures.isEmpty ? "PASS" : "FAIL")
+    Pages: \(pdf.pageCount), cell occurrences: \(markerCounts.values.reduce(0, +))/600, selectable CJK characters: \(cjkCharacters)
+    Long-code runs: \(codeRuns)/35; synthetic-size image resources (192 x 128): \(recognizableImages.count)
+    Exact Chinese title/end extraction (diagnostic): \(exactChineseTitle)/\(exactChineseEnd)
+    Table pages without all repeated headers (diagnostic): \(missingHeaderPages)
+    Off-paper characters: \(totalOutOfBounds)
+    Visual review is still required for every page-*.png and attachment-pattern.png in the parent folder.
+    No fidelity percentage has been calculated or claimed.
+
+    \(knownLimitations.joined(separator: "\n\n"))
+
+    Failures: \(failures.isEmpty ? "none" : failures.joined(separator: "; "))
+    """
+    try summary.write(to: evidence.appendingPathComponent("practical-pdf-report.txt"), atomically: true, encoding: .utf8)
+    if !failures.isEmpty { throw DocumentExportError(message: failures.joined(separator: "; ")) }
+    print("PASS: \(pdf.pageCount) A4 pages, exactly 600 table cells, selectable CJK, full wrapped code, real image resource and all-page evidence; visual review remains required.")
+  }
+}
+
+/// Check actual PDF XObjects, including images nested in Form resources. Image
+/// dimensions alone do not establish appearance; every rendered page is saved.
+private final class PDFImageResourceScanner {
+  let pageNumber: Int
+  var images = [[String: Any]]()
+  init(pageNumber: Int) { self.pageNumber = pageNumber }
+
+  func scan(_ dictionary: CGPDFDictionaryRef, depth: Int) {
+    guard depth < 16 else { return }
+    var resources: CGPDFDictionaryRef?
+    var objects: CGPDFDictionaryRef?
+    guard CGPDFDictionaryGetDictionary(dictionary, "Resources", &resources), let resources,
+          CGPDFDictionaryGetDictionary(resources, "XObject", &objects), let objects else { return }
+    let context = PDFImageResourceContext(scanner: self, depth: depth)
+    CGPDFDictionaryApplyFunction(objects, { name, object, info in
+      guard let info else { return }
+      let context = Unmanaged<PDFImageResourceContext>.fromOpaque(info).takeUnretainedValue()
+      var stream: CGPDFStreamRef?
+      guard CGPDFObjectGetValue(object, .stream, &stream), let stream else { return }
+      guard let dictionary = CGPDFStreamGetDictionary(stream) else { return }
+      var subtype: UnsafePointer<CChar>?
+      guard CGPDFDictionaryGetName(dictionary, "Subtype", &subtype), let subtype else { return }
+      switch String(cString: subtype) {
+      case "Image":
+        var width: CGPDFInteger = 0
+        var height: CGPDFInteger = 0
+        guard CGPDFDictionaryGetInteger(dictionary, "Width", &width),
+              CGPDFDictionaryGetInteger(dictionary, "Height", &height) else { return }
+        context.scanner.images.append([
+          "page": context.scanner.pageNumber, "name": String(cString: name),
+          "width": width, "height": height,
+        ])
+      case "Form":
+        context.scanner.scan(dictionary, depth: context.depth + 1)
+      default: break
+      }
+    }, Unmanaged.passUnretained(context).toOpaque())
+    withExtendedLifetime(context) {}
+  }
+}
+
+private final class PDFImageResourceContext {
+  let scanner: PDFImageResourceScanner
+  let depth: Int
+  init(scanner: PDFImageResourceScanner, depth: Int) { self.scanner = scanner; self.depth = depth }
 }

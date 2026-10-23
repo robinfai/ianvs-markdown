@@ -880,6 +880,14 @@ class _EditorShellState extends State<EditorShell> {
               attachmentSource: widget.attachmentSource,
             ),
           ),
+          onExportPdf: () => unawaited(
+            _documentExport.run(
+              context,
+              workspace,
+              DocumentExportAction.pdf,
+              attachmentSource: widget.attachmentSource,
+            ),
+          ),
           onClose: () => _guard(() => _closeDocument(document)),
           onToggleTheme: widget.onToggleTheme,
           onUseSystemTheme: widget.onUseSystemTheme,

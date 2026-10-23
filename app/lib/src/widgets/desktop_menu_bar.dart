@@ -24,6 +24,7 @@ class DesktopMenuBar extends StatelessWidget {
     this.onImportImage,
     this.onExportHtml,
     this.onExportMarkdown,
+    this.onExportPdf,
     this.onFind,
     this.onFindNext,
     this.onFindPrevious,
@@ -42,6 +43,7 @@ class DesktopMenuBar extends StatelessWidget {
   final VoidCallback? onImportImage;
   final VoidCallback? onExportHtml;
   final VoidCallback? onExportMarkdown;
+  final VoidCallback? onExportPdf;
   final VoidCallback? onFind;
   final VoidCallback? onFindNext;
   final VoidCallback? onFindPrevious;
@@ -159,6 +161,7 @@ class DesktopMenuBar extends StatelessWidget {
                   label: 'Export Markdown Copy…',
                   onSelected: onExportMarkdown,
                 ),
+                PlatformMenuItem(label: 'Export PDF…', onSelected: onExportPdf),
               ],
             ),
             PlatformMenuItem(

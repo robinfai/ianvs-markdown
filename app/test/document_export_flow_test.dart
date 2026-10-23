@@ -12,6 +12,7 @@ import 'wiki_note_navigation_test.dart' show WikiFiles, wikiWorkspace;
 class FakeExportPlatform implements DocumentExportPlatform {
   final snapshots = <DocumentExportSnapshot>[];
   final outputs = <ExportedDocument>[];
+  final actions = <DocumentExportAction>[];
   int cancellations = 0;
   bool Function()? approval;
   @override
@@ -29,6 +30,7 @@ class FakeExportPlatform implements DocumentExportPlatform {
     required bool Function() isCurrent,
   }) async {
     approval = isCurrent;
+    actions.add(action);
     snapshots.add(snapshot);
     outputs.add(document);
     await beforeOutput;
@@ -126,6 +128,60 @@ void main() {
     },
   );
 
+  testWidgets(
+    'PDF discloses practical fidelity and exports the dirty snapshot without saving',
+    (tester) async {
+      final document = workspace.activeDocument!;
+      document.controller.text = '# PDF snapshot 中文😀';
+      await mount(tester, action: DocumentExportAction.pdf);
+      await begin(tester);
+      expect(find.text('Export PDF'), findsOneWidget);
+      expect(find.textContaining('not a pixel-perfect copy'), findsOneWidget);
+      expect(
+        find.textContaining('visually similar CJK radicals'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('only on the first page'), findsOneWidget);
+      expect(
+        find.textContaining('PDF preparation is still cancelled'),
+        findsOneWidget,
+      );
+      document.controller.text = '# Later PDF edits';
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+      expect(platform.actions, [DocumentExportAction.pdf]);
+      expect(platform.outputs.single.content, contains('PDF snapshot 中文😀'));
+      expect(
+        platform.outputs.single.content,
+        contains('not a pixel-perfect copy'),
+      );
+      expect(
+        platform.outputs.single.content,
+        isNot(contains('Later PDF edits')),
+      );
+      expect(document.controller.text, '# Later PDF edits');
+      expect(document.controller.isDirty, isTrue);
+      expect(files.files['/vault/Origin.md'], '# Saved');
+      await tester.pump(const Duration(seconds: 1));
+    },
+  );
+
+  testWidgets(
+    'cancel PDF before confirmation performs no output or asset I/O',
+    (tester) async {
+      workspace.activeDocument!.controller.text =
+          '![private](assets/image.png)';
+      await mount(tester, action: DocumentExportAction.pdf);
+      await begin(tester);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(platform.outputs, isEmpty);
+      expect(attachments.reads, isEmpty);
+      expect(files.files['/vault/Origin.md'], '# Saved');
+      expect(workspace.activeDocument!.controller.isDirty, isTrue);
+    },
+  );
+
   testWidgets('cancel Markdown copy performs no output or attachment I/O', (
     tester,
   ) async {
@@ -219,64 +275,71 @@ void main() {
     },
   );
 
-  testWidgets(
-    'new opened dirty source during native panel invalidates final approval',
-    (tester) async {
-      files.files['/vault/Other.md'] = '# Other persisted';
-      final original = workspace.activeDocument!;
-      final pending = Completer<void>();
-      platform.beforeOutput = pending.future;
-      await mount(tester, action: DocumentExportAction.markdown);
-      await tester.tap(find.text('Export'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Continue'));
-      await tester.pumpAndSettle();
-      expect(platform.approval!(), isTrue);
-      final other = await workspace.openPath('/vault/Other.md');
-      other!.controller.text = '# Other dirty';
-      workspace.selectDocument(workspace.documents.indexOf(original));
-      expect(platform.approval!(), isFalse);
-      expect(platform.cancellations, 1);
-      expect(
-        platform.snapshots.single.protectedPaths,
-        isNot(contains('/vault/Other.md')),
-      );
-      pending.complete();
-      await tester.pumpAndSettle();
-      await tester.pump(const Duration(seconds: 1));
-      expect(other.controller.text, '# Other dirty');
-      expect(other.controller.isDirty, isTrue);
-      expect(files.files['/vault/Other.md'], '# Other persisted');
-      expect(files.files['/vault/Origin.md'], '# Saved');
-    },
-  );
-
-  for (final dispose in [false, true]) {
+  for (final action in [
+    DocumentExportAction.markdown,
+    DocumentExportAction.pdf,
+  ]) {
     testWidgets(
-      'native pending selection loses final approval on ${dispose ? 'dispose' : 'tab change'}',
+      'new opened dirty source during native ${action.name} preparation invalidates final approval',
       (tester) async {
+        files.files['/vault/Other.md'] = '# Other persisted';
+        final original = workspace.activeDocument!;
         final pending = Completer<void>();
         platform.beforeOutput = pending.future;
-        await mount(tester);
-        await begin(tester);
+        await mount(tester, action: action);
+        await tester.tap(find.text('Export'));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('Continue'));
         await tester.pumpAndSettle();
         expect(platform.approval!(), isTrue);
-        if (dispose) {
-          flow.dispose();
-        } else {
-          final original = workspace.activeDocument!;
-          workspace.newDocument();
-          workspace.selectDocument(workspace.documents.indexOf(original));
-        }
+        final other = await workspace.openPath('/vault/Other.md');
+        other!.controller.text = '# Other dirty';
+        workspace.selectDocument(workspace.documents.indexOf(original));
         expect(platform.approval!(), isFalse);
         expect(platform.cancellations, 1);
+        expect(
+          platform.snapshots.single.protectedPaths,
+          isNot(contains('/vault/Other.md')),
+        );
         pending.complete();
         await tester.pumpAndSettle();
         await tester.pump(const Duration(seconds: 1));
+        expect(other.controller.text, '# Other dirty');
+        expect(other.controller.isDirty, isTrue);
+        expect(files.files['/vault/Other.md'], '# Other persisted');
         expect(files.files['/vault/Origin.md'], '# Saved');
       },
     );
+  }
+
+  for (final action in [DocumentExportAction.html, DocumentExportAction.pdf]) {
+    for (final dispose in [false, true]) {
+      testWidgets(
+        'native pending ${action.name} loses final approval on ${dispose ? 'dispose' : 'tab change'}',
+        (tester) async {
+          final pending = Completer<void>();
+          platform.beforeOutput = pending.future;
+          await mount(tester, action: action);
+          await begin(tester);
+          await tester.tap(find.text('Continue'));
+          await tester.pumpAndSettle();
+          expect(platform.approval!(), isTrue);
+          if (dispose) {
+            flow.dispose();
+          } else {
+            final original = workspace.activeDocument!;
+            workspace.newDocument();
+            workspace.selectDocument(workspace.documents.indexOf(original));
+          }
+          expect(platform.approval!(), isFalse);
+          expect(platform.cancellations, 1);
+          pending.complete();
+          await tester.pumpAndSettle();
+          await tester.pump(const Duration(seconds: 1));
+          expect(files.files['/vault/Origin.md'], '# Saved');
+        },
+      );
+    }
   }
 
   testWidgets('native permission failure leaves source dirty and retryable', (

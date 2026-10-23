@@ -60,18 +60,23 @@ class DocumentExportFlow {
     _pending = true;
     workspace.addListener(observe);
     try {
+      final label = switch (action) {
+        DocumentExportAction.html => 'HTML',
+        DocumentExportAction.markdown => 'Markdown copy',
+        DocumentExportAction.pdf => 'PDF',
+      };
       final proceed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text(
-            'Export ${action == DocumentExportAction.markdown ? 'Markdown copy' : 'HTML'}',
-          ),
+          title: Text('Export $label'),
+          scrollable: true,
           content: Text(
             '${action == DocumentExportAction.markdown ? documentExportMarkdownNotice : documentExportFidelityNotice}\n\n'
+            '${action == DocumentExportAction.pdf ? '$documentExportPdfNotice\n\n' : ''}'
             'This exports the complete document, including unsaved changes, '
             'as it was when you opened this dialog. Later edits are not included.\n\n'
             'Cancelling the Save dialog writes nothing. After Save is confirmed, '
-            'the copy may be committed even if you switch tabs.',
+            '${action == DocumentExportAction.pdf ? 'PDF preparation is still cancelled if you switch documents or folders. After final approval starts the commit, the copy cannot be recalled.' : 'the copy may be committed even if you switch tabs.'}',
           ),
           actions: [
             TextButton(
@@ -89,7 +94,11 @@ class DocumentExportFlow {
       final service = DocumentExportService(attachmentSource: attachmentSource);
       final document = action == DocumentExportAction.markdown
           ? service.buildMarkdown(snapshot, isCurrent: isCurrent)
-          : await service.build(snapshot, isCurrent: isCurrent);
+          : await service.build(
+              snapshot,
+              isCurrent: isCurrent,
+              forPdf: action == DocumentExportAction.pdf,
+            );
       if (!isCurrent()) return;
       // All values below are immutable. Native code never reads the source.
       _cancelNative = () {
@@ -106,11 +115,7 @@ class DocumentExportFlow {
       );
       if (context.mounted && !_disposed && completed) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${action == DocumentExportAction.markdown ? 'Markdown copy' : 'HTML'} exported. Original unchanged.',
-            ),
-          ),
+          SnackBar(content: Text('$label exported. Original unchanged.')),
         );
       }
     } on Object catch (error) {

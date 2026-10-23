@@ -15,6 +15,7 @@ test -s "$app_dir/build/export-qa/document.html"
 echo "PHASE: compile native export acceptance"
 xcrun swiftc -target "$(uname -m)-apple-macos12.0" \
   "$app_dir/macos/Runner/DocumentExport.swift" \
+  "$app_dir/test/native_pdf_export_safety_test.swift" \
   "$app_dir/test/native_document_export_test.swift" \
   -o "$test_dir/document_export_tests"
 python3 "$app_dir/tool/native_test_watchdog.py" --timeout-seconds 120 -- \

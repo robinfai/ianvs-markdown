@@ -27,7 +27,7 @@ class DocumentExportSnapshot {
   final List<String> protectedPaths;
 }
 
-enum DocumentExportAction { html, markdown }
+enum DocumentExportAction { html, markdown, pdf }
 
 class DocumentExportFailure implements Exception {
   const DocumentExportFailure(this.message);
@@ -55,6 +55,12 @@ const documentExportMarkdownNotice =
     'Attachments are not copied. Relative image and note links stay unchanged '
     'and may not resolve in the destination folder. '
     'Your original and unsaved edits are not changed.';
+
+const documentExportPdfNotice =
+    'PDF is a readable paged export, not a pixel-perfect copy. '
+    'Some Chinese characters may copy or search as visually similar CJK radicals. '
+    'Table headers may appear only on the first page. '
+    'Complex math and Mermaid remain readable source, as described above.';
 
 /// No raw HTML is copied through. Only known AST elements and individually
 /// checked attributes are serialized; source HTML is visible escaped text.
@@ -107,6 +113,7 @@ class DocumentExportService {
   Future<ExportedDocument> build(
     DocumentExportSnapshot snapshot, {
     required bool Function() isCurrent,
+    bool forPdf = false,
   }) async {
     void check() {
       if (!isCurrent()) {
@@ -149,6 +156,11 @@ class DocumentExportService {
       );
       notesOutput.writeEscaped(documentExportFidelityNotice);
       notesOutput.write('</li>');
+      if (forPdf) {
+        notesOutput.write('<li>');
+        notesOutput.writeEscaped(documentExportPdfNotice);
+        notesOutput.write('</li>');
+      }
       ending.write('</ul></aside></body></html>');
       final writer = _ExportWriter(
         this,
@@ -192,7 +204,11 @@ class DocumentExportService {
         await writer.node(node);
         check();
       }
-      final notices = [documentExportFidelityNotice, ...writer.notices];
+      final notices = [
+        documentExportFidelityNotice,
+        if (forPdf) documentExportPdfNotice,
+        ...writer.notices,
+      ];
       // Each segment was already charged against the shared UTF-8 budget.
       // Concatenation is now bounded, unlike checking a completed large string.
       final html = '$output$notesOutput$ending';
@@ -569,7 +585,7 @@ const _tags = {
 };
 
 const _exportCss = '''
-@page { size: A4; margin: 18mm; }
+@page { margin: 18mm; }
 * { box-sizing: border-box; }
 body { margin: 0 auto; max-width: 174mm; padding: 12px; color: #171717; background: #fff;
  font: 11pt/1.6 -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; overflow-wrap: anywhere; }
@@ -589,7 +605,7 @@ a { color: #174c91; }
 .align-left { text-align: left; } .align-center { text-align: center; } .align-right { text-align: right; }
 .placeholder { border: 1px dashed #777; padding: 4px; }
 .export-notes { margin-top: 24px; border-top: 1px solid #aaa; font-size: 9pt; }
-@media print { body { width: 100%; max-width: none; padding: 0; } }
+@media print { body { width: 100%; max-width: none; margin: 0; padding: 1px; } }
 ''';
 
 abstract class DocumentExportPlatform {
