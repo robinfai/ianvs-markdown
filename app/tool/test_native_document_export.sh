@@ -12,6 +12,10 @@ mkdir -p "$app_dir/build/export-qa"
 python3 -m unittest discover -s "$app_dir/tool" -p test_native_test_watchdog.py
 python3 "$app_dir/tool/check_document_export_entitlements.py"
 test -s "$app_dir/build/export-qa/document.html"
+: "${PDF_QA_PYTHON:?Set PDF_QA_PYTHON to the isolated hash-pinned export QA Python}"
+echo "PHASE: independent PDF content checker regressions"
+python3 "$app_dir/tool/native_test_watchdog.py" --timeout-seconds 60 -- \
+  "$PDF_QA_PYTHON" -m unittest discover -s "$app_dir/tool" -p test_check_practical_pdf_content.py
 echo "PHASE: compile native export acceptance"
 xcrun swiftc -target "$(uname -m)-apple-macos12.0" \
   "$app_dir/macos/Runner/DocumentExport.swift" \
@@ -20,4 +24,8 @@ xcrun swiftc -target "$(uname -m)-apple-macos12.0" \
   -o "$test_dir/document_export_tests"
 python3 "$app_dir/tool/native_test_watchdog.py" --timeout-seconds 120 -- \
   "$test_dir/document_export_tests" "$app_dir/build/export-qa/document.html" "$app_dir/build/export-qa/document.md" "$app_dir/build/export-qa/native"
+echo "PHASE: mandatory independent PDF content acceptance"
+python3 "$app_dir/tool/native_test_watchdog.py" --timeout-seconds 60 -- \
+  "$PDF_QA_PYTHON" "$app_dir/tool/check_practical_pdf_content.py" \
+  "$app_dir/build/export-qa/native/pagination.pdf" "$app_dir/build/export-qa/native"
 } 2>&1 | tee "$app_dir/build/export-qa/native-acceptance.log"

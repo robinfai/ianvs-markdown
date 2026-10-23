@@ -58,8 +58,9 @@ const documentExportMarkdownNotice =
 
 const documentExportPdfNotice =
     'PDF is a readable paged export, not a pixel-perfect copy. '
+    'Copy/search text and reading order vary by PDF viewer, including punctuation. '
     'Some Chinese characters may copy or search as visually similar CJK radicals. '
-    'Table headers may appear only on the first page. '
+    'Table headers may appear only on the first page, and a blank trailing page may occur. '
     'Complex math and Mermaid remain readable source, as described above.';
 
 /// No raw HTML is copied through. Only known AST elements and individually

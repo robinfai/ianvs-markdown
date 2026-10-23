@@ -46,8 +46,30 @@ jobs:
           sw_vers
       - name: Export fixture and snapshot regressions
         run: make deps-integrations test-document-export-fixture
+      - name: Install pinned PDF content checker (CI only)
+        run: |
+          python3 -c 'import sys; print(sys.version); assert sys.version_info >= (3, 11), "PDF QA requires Python >=3.11"'
+          python3 -m venv "$RUNNER_TEMP/linefold-export-qa"
+          "$RUNNER_TEMP/linefold-export-qa/bin/python" -m pip install --disable-pip-version-check --no-input --no-deps --only-binary=:all: --require-hashes --index-url https://pypi.org/simple -r app/tool/requirements-export-qa.txt
+          echo "PDF_QA_PYTHON=$RUNNER_TEMP/linefold-export-qa/bin/python" >> "$GITHUB_ENV"
       - name: Bounded HTML, Markdown and practical PDF acceptance
         run: make test-native-document-export
+      # Publish the small export-only evidence before the unrelated builds. The
+      # guard fails closed and includes logs/reports in the same byte budget.
+      - name: Bound early export evidence
+        id: export-evidence
+        if: always()
+        run: |
+          python3 -m unittest discover -s app/tool -p test_check_export_evidence_budget.py
+          python3 app/tool/check_export_evidence_budget.py app/build/export-qa
+      - name: Save early export evidence
+        if: ${{ always() && steps.export-evidence.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: document-export-${{ github.run_id }}-${{ github.run_attempt }}
+          path: app/build/export-qa/
+          if-no-files-found: error
+          retention-days: 7
       # A failed export acceptance must not hide the original host/build gates.
       # No step uses continue-on-error; every gate must pass for this job.
       - name: Host and remaining native regressions

@@ -24,8 +24,9 @@ resource limits, cancellation, offline behavior or data integrity.
 - PDF renders that same safe HTML into real A4 pages using the system offline
   WebKit/AppKit print backend, then saves a separate `.pdf`. It is not a screenshot
   or a pixel-identical Flutter rendering. The confirmation and PDF notes also
-  disclose that some Chinese characters may copy/search as visually similar CJK
-  radicals, and table headers may appear only on the first page. Font metrics,
+  disclose viewer-dependent copy/search text and reading order (including
+  punctuation), Chinese characters mapping to visually similar CJK radicals,
+  first-page-only table headers and an occasional blank trailing page. Font metrics,
   line breaks and page breaks can differ from the editor. Native PDF paper size
   is selected by NSPrintInfo; standalone HTML does not force A4 when the user
   later prints it from a browser. Production accepts
@@ -54,6 +55,20 @@ local Songti/Heiti combination did not distinguish 文 from the literal radical
 Unicode or evidence of perfect copying. The practical gate records raw CJK text
 and header counts without normalizing/replacing them to manufacture a pass.
 It does not import the diagnostic font matrix or its PNG helper into production.
+
+The first practical run (`b62a29e`) generated seven A4 pages, with the final page
+blank. Poppler, pypdf and MuPDF independently found all 600 cells exactly once,
+all 35 code runs and image boundary markers; all seven pages were visually
+reviewed. Body/Chinese/emoji/code/image text was readable, the colored image was
+present and the simple inset restored the right border. Native geometry/images/
+safety and signed builds passed, but the first content fixture failed because
+PDFKit reordered underscores: for example `CELL_0_A` became
+`CELL\n0\n_\n_\nA`, and `IMAGE_START` became `IMAGE\nSTART\n_`.
+Its page-one header diagnostic was likewise a false absence. These are
+reader-dependent extraction observations, not evidence that manual Preview copy
+was exercised. The test-only pinned pypdf gate checks the unchanged actual PDF;
+it does not repair the PDF's semantics or promise identical search/copy in every
+viewer. The blank tail page is a disclosed minor pagination imperfection.
 
 ## Safety and resource boundaries
 
@@ -153,21 +168,35 @@ See [Apple's cancellation contract](https://developer.apple.com/documentation/fo
   delegate callback. That combined path remains a manual native coverage boundary.
   The real rendered-PDF fixture is an uncancelled successful job. Print/Share
   commands remain refused.
-- The real PDF gate requires all 600 cell markers exactly once, code/CJK boundary
-  markers, reasonable multi-page A4 geometry and text character bounds, plus actual
-  image resources. A fixture outside 3…30 pages saves a failure report and raw text
-  before stopping, without generating unbounded screenshots. A valid fixture
+- The real PDF gate requires all 600 cell markers exactly once and code/CJK/image
+  boundary markers through a mandatory independently implemented pypdf content
+  checker, pinned to pypdf 6.21.2 by version and official PyPI wheel hash in a
+  temporary CI-only venv (Python 3.11 or newer; no product dependency). Missing/
+  duplicate markers, fewer than three table pages or missing code/image tails
+  fail; PDFKit raw
+  marker/header observations remain diagnostic and are not silently reordered.
+  Native tests still require reasonable multi-page A4 geometry, text character
+  bounds and actual image resources. A fixture outside 3…30 pages saves a failure
+  report and raw text before stopping, without generating unbounded screenshots. A valid fixture
   emits raw text, diagnostics and **all-page PDFKit thumbnails**
   for visual review of CJK glyphs, body/code/table readability, the color image and
   clipping. CJK copy mappings and repeated table heads are observations, not hard
   fidelity gates under the user's revised contract. No global normalization is used.
 - A 120-second process watchdog fails closed and cleans only its own process group
-  on timeout/error. Five regressions cover results, leader-exit cleanup and cleanup
+  on timeout/error. The separate independent-content regressions and extraction
+  each have a 60-second watchdog; neither stage may be skipped. Five watchdog regressions cover results, leader-exit cleanup and cleanup
   errors; a timeout is never a pass. This is not an OS-wide resource guarantee.
 - Native CI keeps all pre-existing Host/native and transaction gates, four macOS
   example/app Debug/Release builds and the unsigned iOS build. Source and actual
   signed app checks require sandboxing and the minimal print entitlement used by
   the PDF backend. Export fixtures/logs are retained as artifacts.
+- Before those longer builds, an attempt-named early export-only artifact is
+  admitted only if its checkout-anchored sequential metadata check rejects symbolic
+  links in every path component below the trusted checkout and finds regular files,
+  no symbolic links/special files, at most 64 files/128 entries, 32 MiB per file and 64 MiB total
+  including logs/reports. Oversize evidence fails the check and is not uploaded by
+  that early step; it is not truncated into a pass. This is not an adversarial
+  filesystem snapshot. The original final rendering artifact and every gate remain.
 
 Local Dart/static checks are not evidence of Swift compilation, rendered PDF
 quality or native UI behavior. Each new head requires its own native CI and

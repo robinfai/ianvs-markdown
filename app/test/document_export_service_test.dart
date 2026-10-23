@@ -123,7 +123,10 @@ void main() {
     expect(html.notices, isNot(contains(documentExportPdfNotice)));
     expect(html.content, isNot(contains(documentExportPdfNotice)));
     expect(pdf.notices, contains(documentExportPdfNotice));
-    expect(pdf.content, contains('<li>$documentExportPdfNotice</li>'));
+    expect(
+      pdf.content,
+      contains('<li>${htmlEscape.convert(documentExportPdfNotice)}</li>'),
+    );
     final exactBytes = utf8.encode(pdf.content).length;
     expect(exactBytes, greaterThan(utf8.encode(html.content).length));
     expect(
@@ -548,7 +551,10 @@ void main() {
         attachmentSource: provider,
       ).build(snapshot(source.toString()), isCurrent: () => true, forPdf: true);
       expect(output.notices, contains(documentExportPdfNotice));
-      expect(output.content, contains(documentExportPdfNotice));
+      expect(
+        output.content,
+        contains(htmlEscape.convert(documentExportPdfNotice)),
+      );
       expect(provider.roots, everyElement('/vault'));
       expect(
         provider.reads.where((path) => path == 'assets/acceptance-pattern.png'),
