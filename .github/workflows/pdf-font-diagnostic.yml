@@ -1,0 +1,48 @@
+name: Synthetic PDF font investigation
+
+on:
+  push:
+    branches: [diag/p2-offline-pdf-system-fonts]
+    paths:
+      - 'app/test/native_pdf_font_diagnostic.swift'
+      - 'app/test/native_pdf_font_evidence_test.swift'
+      - 'app/test/document_export_service_test.dart'
+      - 'app/test/support/offline_pdf_diagnostic_job.swift'
+      - 'app/test/support/pdf_font_evidence.swift'
+      - 'app/tool/run_pdf_font_diagnostic.py'
+      - 'app/tool/test_pdf_font_diagnostic.py'
+      - 'app/tool/test_native_pdf_font_diagnostic.sh'
+      - 'app/tool/native_test_watchdog.py'
+      - 'app/tool/test_native_test_watchdog.py'
+      - 'Makefile'
+      - 'docs/pdf-font-diagnostic.md'
+      - '.github/workflows/pdf-font-diagnostic.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# This group is separate from Native integrations. A diagnostic push cannot
+# cancel the already-running product gates or discard active PDF evidence.
+concurrency:
+  group: pdf-font-diagnostic-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  pdf-font-diagnostic:
+    name: Synthetic PDF font diagnostic (not product acceptance)
+    if: ${{ github.ref == 'refs/heads/diag/p2-offline-pdf-system-fonts' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - name: Bounded installed-system-font matrix
+        id: font_diagnostic
+        run: make test-native-pdf-font-diagnostic
+      - name: Save strict Unicode results and actual PDF evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdf-font-diagnostic
+          path: ${{ steps.font_diagnostic.outputs.evidence-path }}
+          if-no-files-found: error

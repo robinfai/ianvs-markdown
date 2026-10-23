@@ -33,7 +33,9 @@ The original full-document cells, repeated table headers, long-code content, sou
 
 ## CI isolation
 
-Only exact branch `diag/p2-offline-pdf-system-fonts` gets the diagnostic job, via its explicit push trigger or workflow_dispatch. The existing macOS host/native/build/signature and iOS jobs remain unchanged and run alongside it. No wildcard trigger, new credentials or third-party automation is added. These WIP-only workflow changes are not intended for main.
+Only exact branch `diag/p2-offline-pdf-system-fonts` gets the separate `Synthetic PDF font investigation` workflow, via its explicit push trigger or workflow_dispatch. It runs the diagnostic's Python budget/corpus tests, process-watchdog regressions, actual Swift evidence/lifecycle harness, and strict PDF matrix, preserving failure and current-attempt artifact behavior. Its independent concurrency group does not cancel active Native integrations runs.
+
+The original Native integrations main/PR/manual triggers and all existing macOS host/native/build/signature and iOS jobs remain unchanged. Pure diagnostic-branch pushes no longer repeat those unrelated product builds. This is not a removal of production required checks, and a diagnostic pass cannot establish product readiness. No wildcard branch trigger, new credentials or third-party automation is added. These WIP-only workflow changes are not intended for main; this branch must never be merged.
 
 ## Official API references
 

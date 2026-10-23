@@ -184,7 +184,12 @@ struct NativePDFFontDiagnostic {
         throw Failure(message: "Variable-font coordinate instances are outside this minimal diagnostic")
       }
       let mapping = glyphs(font, coverage)
-      guard !mapping.contains(0) else { throw Failure(message: "Face lacks required diagnostic glyphs") }
+      guard !mapping.contains(0) else {
+        let missing = Set(coverage.unicodeScalars.filter {
+          glyphs(font, String($0)).contains(0)
+        }.map { String(format: "U+%04X", $0.value) }).sorted().joined(separator: ", ")
+        throw Failure(message: "Face \(ps) lacks required diagnostic glyphs: \(missing)")
+      }
       return (font, [
         "postScriptName": ps,
         "systemFile": local.lastPathComponent,

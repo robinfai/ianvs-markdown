@@ -18,6 +18,7 @@ grep -n -A 5 -B 5 'kCTFontOptionsPreventAutoDownload\|kCTFontCollectionDisallowA
   "$sdk/System/Library/Frameworks/CoreText.framework/Headers/CTFont.h" \
   "$sdk/System/Library/Frameworks/CoreText.framework/Headers/CTFontCollection.h"
 python3 -m unittest discover -s "$app_dir/tool" -p 'test_pdf_font_diagnostic.py'
+python3 -m unittest discover -s "$app_dir/tool" -p 'test_native_test_watchdog.py'
 echo "PHASE: compile and run evidence/lifetime boundary tests"
 python3 "$app_dir/tool/native_test_watchdog.py" --timeout-seconds 120 -- \
   xcrun swiftc -target "$(uname -m)-apple-macos12.0" \

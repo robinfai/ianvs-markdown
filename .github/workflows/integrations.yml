@@ -15,7 +15,7 @@ on:
       - 'Makefile'
       - '.github/workflows/**'
   push:
-    branches: [main, diag/p2-offline-pdf-system-fonts]
+    branches: [main]
     paths: *integration-paths
   workflow_dispatch:
 
@@ -98,21 +98,3 @@ jobs:
       # signing identity, credentials, simulator boot, or release/upload step.
       - name: Build unsigned iOS reading preview
         run: make build-ios-preview
-
-  pdf-font-diagnostic:
-    name: Synthetic PDF font diagnostic (not product acceptance)
-    if: ${{ github.ref == 'refs/heads/diag/p2-offline-pdf-system-fonts' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
-    runs-on: macos-15
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v6
-      - name: Bounded installed-system-font matrix
-        id: font_diagnostic
-        run: make test-native-pdf-font-diagnostic
-      - name: Save strict Unicode results and actual PDF evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pdf-font-diagnostic
-          path: ${{ steps.font_diagnostic.outputs.evidence-path }}
-          if-no-files-found: error
