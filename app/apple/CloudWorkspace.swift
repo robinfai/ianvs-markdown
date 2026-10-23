@@ -2670,9 +2670,14 @@ private final class WorkspaceDirectoryMoveInspection {
       $0.contains("\\") || $0.contains(":") || $0.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 })
     }) { try issue("unsupportedPath", path: path) }
     if kind == "unsupported" { try issue("unsupportedMember", path: path) }
+    // The initializer defaults to .data, which is not the directory branch.
+    // Code bundles are also opaque to reference maintenance; .bundle does not
+    // necessarily conform to .package. Query only type metadata, never bodies.
     if type == mode_t(S_IFDIR),
-       let contentType = UTType(filenameExtension: (name as NSString).pathExtension),
-       contentType.conforms(to: .package) { try issue("packageMember", path: path) }
+       let contentType = UTType(filenameExtension: (name as NSString).pathExtension.lowercased(), conformingTo: .directory),
+       contentType.conforms(to: .package) || contentType.conforms(to: .bundle) {
+      try issue("packageMember", path: path)
+    }
     if kind == "symlink" { try issue("symlinkMember", path: path) }
     if kind == "special" { try issue("specialMember", path: path) }
     if !local { try issue("offline", path: path) }

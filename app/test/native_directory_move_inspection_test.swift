@@ -7,6 +7,7 @@ import Darwin
 struct DirectoryMoveInspectionAcceptance {
   static func main() throws {
     try verifyManifestAndBlockers()
+    try verifyDirectoryPackageClassification()
     try verifySourceAndRootStates()
     try verifyBudgetsAndCancellation()
     try verifyRequestAndFailureEnvelopeBounds()
@@ -119,6 +120,36 @@ private func verifyManifestAndBlockers() throws {
     try directory(root, "source")
     try file(root, "source/only.bmp")
     requireClean(inspect(root), count: 2)
+  }
+}
+
+private func verifyDirectoryPackageClassification() throws {
+  try fixture { root in
+    // Empty synthetic packages intentionally contain no Info.plist/executable.
+    // Inspection must reject their known directory type without reading bodies
+    // or instantiating Bundle/resourceValues to validate an application's code.
+    let names = ["Application.app", "Resources.bundle", "Library.framework", "Uppercase.APP"]
+    for name in names { try directory(root, "source/" + name + "/empty") }
+    let value = inspect(root)
+    has(value, "packageMember", complete: true)
+    let packagePaths = Set((value["issues"] as! [[String: String]]).compactMap {
+      $0["code"] == "packageMember" ? $0["path"] : nil
+    })
+    precondition(packagePaths == Set(names.map { "source/" + $0 }),
+                 "Every known package/bundle type must block, including uppercase extensions")
+    for name in names {
+      let path = "source/" + name
+      let source = inspect(root, path)
+      has(source, "packageMember", complete: true)
+      precondition(source["sourceState"] as? String == "directory")
+      precondition(rows(source).count == 2)
+      precondition(rows(source).contains { $0["path"] as? String == path + "/empty" },
+                   "Blocking a package must not silently skip its members")
+    }
+    // A directory-constrained dynamic type is not itself proof of a package.
+    // Constraining the lookup to .package would falsely block this ordinary tree.
+    try directory(root, "ordinary.linefold-unknown-directory-type/empty")
+    requireClean(inspect(root, "ordinary.linefold-unknown-directory-type"), count: 2)
   }
 }
 

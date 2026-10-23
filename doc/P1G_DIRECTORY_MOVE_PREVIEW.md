@@ -22,6 +22,12 @@ includes the source, nested directories, notes, images, unsupported regular
 files, hidden entries, symlinks and special objects. Physical `.icloud` names are
 not remapped into invented logical members. Unknown locality stays unknown.
 
+Package/bundle blockers use a directory-constrained, registered filename-extension
+type lookup. This recognizes supported system type declarations without opening
+bundle contents for classification, but does not prove the absence of custom
+packages with unrecognized extensions. Complete enumeration is not a complete
+filesystem type-identification or execution-safety proof.
+
 The descriptor-rooted implementation pins/rechecks root, parents and members,
 does not follow descendant symlinks, and requires exact stored directory spelling.
 All inspection filesystem access disables materialization. This endpoint reads no
@@ -91,7 +97,7 @@ stopwatch. Blocking provider calls cannot be forcibly interrupted either.
 No directory execution is available, even for an otherwise complete preview.
 Coverage is additionally incomplete for unknown syntax or ambiguous targets;
 incomplete/changed catalogs, aliases or member evidence; unsupported files (PDFs
-included); hidden/recovery artifacts, packages, symlinks, special objects, hard
+included); hidden/recovery artifacts, recognized packages/bundles, symlinks, special objects, hard
 links or offline members; unsupported assets or missing stable image metadata;
 dirty/conflicted moved or reference/alias-bearing dependencies; ghost buffers;
 catalog-visible occupied/reserved destinations; unavailable parents; case/NFC collisions;
