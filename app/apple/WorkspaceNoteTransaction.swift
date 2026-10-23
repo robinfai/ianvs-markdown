@@ -1430,10 +1430,11 @@ final class WorkspaceNoteTransaction {
     try checkCapacityNeeds(reservations.map { try capacityNeed($0.0, count: $0.1, context: context) })
   }
   private func parentCapacity(_ scope: WorkspaceTextScope, path: String, identity: String,
-                              count: Int, context: String) throws -> CapacityNeed {
+                              count: Int, context: String, directory: Bool = false) throws -> CapacityNeed {
     // Extract bounded volume metadata and close this temporary descriptor now;
     // do not hold 2 * 128 extra descriptors alongside the pinned live session.
-    let parent = try Parent(scope: scope, components: components(path))
+    let parts = try WorkspaceTextScope.textComponents(path, directory: directory)
+    let parent = try Parent(scope: scope, components: parts)
     guard parent.identity == identity else { throw Failure("parent_changed") }
     try verifyParent(scope: scope, path: path, parent: parent)
     let need = try capacityNeed(parent.descriptor, count: count, context: context)
@@ -1482,7 +1483,8 @@ final class WorkspaceNoteTransaction {
       guard let roots = record.namespaces else { throw Failure("journal_invalid") }
       for root in roots {
         for (path, identity) in [(root.sourcePath, root.sourceParentIdentity), (root.destinationPath, root.destinationParentIdentity)] {
-          needs.append(try parentCapacity(scope, path: path, identity: identity, count: 0, context: context))
+          needs.append(try parentCapacity(scope, path: path, identity: identity, count: 0, context: context,
+                                          directory: root.kind == "directory"))
         }
       }
       for entry in record.entries {
