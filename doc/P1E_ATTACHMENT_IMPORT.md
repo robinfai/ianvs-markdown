@@ -19,8 +19,8 @@ directory drops keep the existing open workflow. These decisions use the filenam
 only for routing; actual image bytes are validated before any destination write.
 
 A drag must supply a temporary security-scoped file bookmark from the native
-`desktop_drop` event. Its resolved path must exactly match the dropped path and
-it must not be stale. The capability is held only for the bounded source read,
+`desktop_drop` event. Its resolved path must exactly match the dropped path (except for the
+identity-verified `/var` system alias described below), and it must not be stale. The capability is held only for the bounded source read,
 then released; it is not saved or widened to a directory. File promises and
 other sources without a bookmark must use **Import Image** instead. There is no
 path-only fallback. This first iteration intentionally imports only one image
@@ -117,3 +117,5 @@ security scope, screenshot interoperability with other apps, signed sandbox,
 real iCloud/offline providers, sandboxed Finder drop/bookmark interoperability,
 macOS/iOS deployment behavior. iOS already has a quick-note editor; this phase adds desktop-only image drop,
 not iOS image import or image clipboard UI.
+
+Dropped-image bookmark paths are compared byte-for-byte. The only alternate spelling accepted is macOS `/var/…` ↔ `/private/var/…` with an identical suffix, and only when both leaf paths are regular files with the same device, inode, and revision under the temporary bookmark scope. Arbitrary symlink aliases, dot/empty path components, case/Unicode variants, stale bookmarks, and source replacement are rejected. No persistent or parent-directory grant is created.
