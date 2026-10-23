@@ -136,7 +136,7 @@ test-document-export-fixture: ## Validate snapshot/export generation and create 
 
 # CI invokes export and this remainder separately so a failed native export
 # has a visible stage. check-integrations still includes every original gate.
-check-integrations-rest: test-native-note-transactions test-native-guarded-save test-native-sync-metadata test-native-attachments deps-integrations format-check-integrations analyze-integrations test-app test-mermaid test-mermaid-example test-clipboard test-quicklook test-native-import ## Validate all remaining host/native gates (after check-document-export)
+check-integrations-rest: test-native-directory-move-inspection test-native-note-transactions test-native-guarded-save test-native-sync-metadata test-native-attachments deps-integrations format-check-integrations analyze-integrations test-app test-mermaid test-mermaid-example test-clipboard test-quicklook test-native-import ## Validate all remaining host/native gates (after check-document-export)
 
 check-package: ## Test the actual Pub snapshot in an external Flutter host
 	$(PYTHON) tool/check_package.py --flutter "$(FLUTTER)" --dart "$(DART)"
@@ -186,3 +186,7 @@ test-native-document-export: ## Verify HTML/Markdown copies, cancellation and ex
 .PHONY: test-native-note-transactions
 test-native-note-transactions: ## Verify recoverable native note move transactions using synthetic fixtures
 	FLUTTER="$(FLUTTER)" PYTHON="$(PYTHON)" bash app/tool/test_native_note_transactions.sh
+
+.PHONY: test-native-directory-move-inspection
+test-native-directory-move-inspection: ## Verify read-only native directory manifests with synthetic fixtures
+	FLUTTER="$(FLUTTER)" PYTHON="$(PYTHON)" bash app/tool/test_native_directory_move_inspection.sh

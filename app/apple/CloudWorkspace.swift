@@ -3,9 +3,9 @@ import Darwin
 import CoreFoundation
 import ImageIO
 import CoreGraphics
+import UniformTypeIdentifiers
 #if os(macOS)
 import AppKit
-import UniformTypeIdentifiers
 #endif
 #if os(iOS)
 import Flutter
@@ -23,6 +23,7 @@ final class CloudWorkspace {
   private let attachmentQueue = DispatchQueue(label: "work.ianvs.linefold.attachments", qos: .userInitiated)
   private let noteWriteQueue = DispatchQueue(label: "work.ianvs.linefold.note-create", qos: .userInitiated)
   private let readScheduler = WorkspaceReadScheduler()
+  private let directoryMoveInspections = WorkspaceDirectoryMoveInspectionRegistry()
   private let transactionQueue = DispatchQueue(label: "work.ianvs.linefold.note-move", qos: .userInitiated)
   private let searchQueue = DispatchQueue(label: "work.ianvs.linefold.search", qos: .utility)
   private var channel: FlutterMethodChannel?
@@ -51,6 +52,50 @@ final class CloudWorkspace {
       guard let self else { return }
       let arguments = call.arguments as? [String: Any] ?? [:]
       let method = call.method
+      // Cancellation is a lock-only control path, never queued behind the scan
+      // it needs to stop. Register before bounded-lane admission so queued scans
+      // can be cancelled too; cancelled I/O retains its budget until it returns.
+      if method == "cancelWorkspaceDirectoryMoveInspection" {
+        guard let requestId = arguments["requestId"] as? String,
+              requestId.utf8.count == 36, UUID(uuidString: requestId) != nil else {
+          result(FlutterError(code: "workspace_invalid", message: "Invalid inspection request ID.", details: nil))
+          return
+        }
+        result(self.directoryMoveInspections.cancel(requestId))
+        return
+      }
+      if method == "inspectWorkspaceDirectoryMoveTree" {
+        guard let path = arguments["path"] as? String,
+              let relativePath = arguments["relativePath"] as? String,
+              let requestId = arguments["requestId"] as? String,
+              Self.isValidWorkspaceDirectoryMoveInspectionRequest(
+                rootPath: path, relativePath: relativePath, requestId: requestId
+              ) else {
+          result(FlutterError(code: "workspace_invalid", message: "Invalid directory inspection request.", details: nil))
+          return
+        }
+        let cancellation: WorkspaceDirectoryMoveInspectionCancellation
+        do { cancellation = try self.directoryMoveInspections.register(requestId) }
+        catch {
+          result(FlutterError(code: "workspace_busy", message: "Directory inspections are busy or the request ID is already active.", details: ["retryable": true]))
+          return
+        }
+        let accepted = self.readScheduler.execute(kind: .directory, operation: { () -> [String: Any] in
+          defer { self.directoryMoveInspections.finish(requestId, cancellation: cancellation) }
+          return Self.inspectWorkspaceDirectoryMoveTree(
+            URL(fileURLWithPath: path, isDirectory: true), relativePath: relativePath,
+            requestId: requestId, cancellation: cancellation, requestedRootPath: path
+          )
+        }, completion: { outcome in
+          switch outcome {
+          case .success(let value): result(value)
+          case .failure:
+            result(FlutterError(code: "workspace_busy", message: "Workspace reads are busy. Retry after an earlier read finishes.", details: ["retryable": true]))
+          }
+        })
+        if !accepted { self.directoryMoveInspections.finish(requestId, cancellation: cancellation) }
+        return
+      }
       if WorkspaceNoteTransaction.methods.contains(method) {
         self.transactionQueue.async {
           let value = WorkspaceNoteTransaction.shared.perform(method, arguments: arguments)
@@ -2268,6 +2313,480 @@ extension CloudWorkspace {
   }
 }
 #endif
+
+/// A preview manifest is not a reservation or an executable move capability.
+/// This helper reads only descriptor-relative metadata, never note/image bodies,
+/// provider downloads, transaction journals, recovery records or write authority.
+final class WorkspaceDirectoryMoveInspectionCancellation {
+  private let lock = NSLock()
+  private var cancelled = false
+  let deadline: DispatchTime
+
+  init(deadline: DispatchTime = .now() + 10) { self.deadline = deadline }
+  func cancel() { lock.lock(); cancelled = true; lock.unlock() }
+  var isCancelled: Bool { lock.lock(); defer { lock.unlock() }; return cancelled }
+}
+
+/// Bound tokens independently of queue admission. Unknown/finished cancellations
+/// are harmless and never create tombstones or an unbounded UUID cache.
+final class WorkspaceDirectoryMoveInspectionRegistry {
+  private let lock = NSLock()
+  private var active: [UUID: WorkspaceDirectoryMoveInspectionCancellation] = [:]
+  private let capacity = 2
+
+  func register(_ requestId: String) throws -> WorkspaceDirectoryMoveInspectionCancellation {
+    guard let id = UUID(uuidString: requestId) else { throw AttachmentError.invalid }
+    lock.lock()
+    defer { lock.unlock() }
+    guard active[id] == nil, active.count < capacity else { throw WorkspaceReadQueueError.busy }
+    let token = WorkspaceDirectoryMoveInspectionCancellation()
+    active[id] = token
+    return token
+  }
+
+  @discardableResult
+  func cancel(_ requestId: String) -> Bool {
+    guard let id = UUID(uuidString: requestId) else { return false }
+    lock.lock()
+    let token = active[id]
+    lock.unlock()
+    token?.cancel()
+    return token != nil
+  }
+
+  func finish(_ requestId: String, cancellation: WorkspaceDirectoryMoveInspectionCancellation) {
+    guard let id = UUID(uuidString: requestId) else { return }
+    lock.lock()
+    defer { lock.unlock() }
+    if active[id] === cancellation { active.removeValue(forKey: id) }
+  }
+}
+
+struct WorkspaceDirectoryMoveInspectionLimits {
+  var entries = 256
+  var directories = 64
+  var metadataBytes = 1024 * 1024
+}
+
+extension CloudWorkspace {
+  /// Pure bounded validation runs before token/queue admission, with no URL or
+  /// filesystem construction. Invalid giant inputs must not occupy a read lane.
+  static func isValidWorkspaceDirectoryMoveInspectionRequest(
+    rootPath: String, relativePath: String, requestId: String
+  ) -> Bool {
+    guard rootPath.utf8.count <= 16_384, rootPath.hasPrefix("/"), !rootPath.contains("\0"),
+          relativePath.utf8.count <= 16_384,
+          requestId.utf8.count == 36, UUID(uuidString: requestId) != nil,
+          let components = try? WorkspaceFileScope.relativeComponents(relativePath),
+          components.count <= WorkspaceFileScope.maximumPathDepth else { return false }
+    return true
+  }
+
+  static func inspectWorkspaceDirectoryMoveTree(
+    _ root: URL, relativePath: String, requestId: String,
+    cancellation: WorkspaceDirectoryMoveInspectionCancellation = WorkspaceDirectoryMoveInspectionCancellation(),
+    limits: WorkspaceDirectoryMoveInspectionLimits = WorkspaceDirectoryMoveInspectionLimits(),
+    afterDirectoryEnumerated: ((String) throws -> Void)? = nil,
+    requestedRootPath: String? = nil
+  ) -> [String: Any] {
+    let inspection = WorkspaceDirectoryMoveInspection(
+      root: root, rootRequestPath: requestedRootPath ?? root.path,
+      sourcePath: relativePath, requestId: requestId,
+      cancellation: cancellation, limits: limits, afterDirectoryEnumerated: afterDirectoryEnumerated
+    )
+    return inspection.run()
+  }
+}
+
+private final class WorkspaceDirectoryMoveInspection {
+  private struct Stopped: Error { let code: String; let path: String? }
+  private struct Directory {
+    let descriptor: Int32
+    let components: [String]
+    let before: stat
+  }
+  private let root: URL
+  private let rootRequestPath: String
+  private let sourcePath: String
+  private let requestId: String
+  private let cancellation: WorkspaceDirectoryMoveInspectionCancellation
+  private let limits: WorkspaceDirectoryMoveInspectionLimits
+  private let afterDirectoryEnumerated: ((String) throws -> Void)?
+  private var scope: WorkspaceFileScope?
+  private var directories: [Directory] = []
+  private var subtreeDirectoryCount = 0
+  private var observedEntryCount = 0
+  private var metadataBytes = 0
+  private var members: [[String: Any]] = []
+  private var issues: [[String: String]] = []
+  private var sourceState = "unavailable"
+  private var complete = false
+  private var rootIdentity: String?
+  private var sourceIdentity: String?
+
+  init(root: URL, rootRequestPath: String, sourcePath: String, requestId: String,
+       cancellation: WorkspaceDirectoryMoveInspectionCancellation,
+       limits: WorkspaceDirectoryMoveInspectionLimits,
+       afterDirectoryEnumerated: ((String) throws -> Void)?) {
+    self.root = root
+    self.rootRequestPath = rootRequestPath
+    self.sourcePath = sourcePath
+    self.requestId = requestId
+    self.cancellation = cancellation
+    self.limits = limits
+    self.afterDirectoryEnumerated = afterDirectoryEnumerated
+  }
+
+  deinit { for directory in directories { close(directory.descriptor) } }
+
+  func run() -> [String: Any] {
+    do {
+      try checkpoint()
+      guard root.isFileURL, root.path.utf8.count <= 16_384,
+            rootRequestPath.utf8.count <= 16_384, rootRequestPath.hasPrefix("/"),
+            !rootRequestPath.contains("\0"),
+            requestId.utf8.count == 36, UUID(uuidString: requestId) != nil,
+            limits.entries > 0, limits.entries <= 256,
+            limits.directories > 0, limits.directories <= 64,
+            limits.metadataBytes > 0, limits.metadataBytes <= 1024 * 1024 else {
+        throw Stopped(code: "invalidRequest", path: nil)
+      }
+      guard sourcePath.utf8.count <= 16_384 else { throw Stopped(code: "invalidPath", path: nil) }
+      let components: [String]
+      do { components = try WorkspaceFileScope.relativeComponents(sourcePath) }
+      catch { throw Stopped(code: "invalidPath", path: sourcePath) }
+      guard components.count <= WorkspaceFileScope.maximumPathDepth else {
+        throw Stopped(code: "depthLimit", path: sourcePath)
+      }
+      // Reserve the envelope and one terminal error; all rows and other issues
+      // are charged by their actual JSON bytes before entering the result.
+      metadataBytes = try JSONSerialization.data(withJSONObject: [
+        "root": rootRequestPath, "sourcePath": sourcePath, "requestId": requestId,
+      ]).count + 2048
+      try WorkspaceFileScope.withoutMaterialization {
+        do { scope = try WorkspaceFileScope(root) }
+        catch { throw Stopped(code: Self.errorCode(error), path: nil) }
+        guard let scope else { throw Stopped(code: "unavailable", path: nil) }
+        try charge(["canonicalRoot": scope.rootURL.path])
+        let rootFD = dup(scope.rootDescriptor)
+        guard rootFD >= 0 else { throw Stopped(code: Self.errorCode(AttachmentError.posix()), path: nil) }
+        let rootDirectory = try pin(rootFD, components: [], expected: nil)
+        rootIdentity = Self.identity(rootDirectory.before)
+        var parent = rootDirectory
+        for index in components.dropLast().indices {
+          try checkpoint()
+          let name = components[index]
+          let path = Array(components.prefix(index + 1))
+          var attributes = stat()
+          guard fstatat(parent.descriptor, name, &attributes, AT_SYMLINK_NOFOLLOW) == 0 else {
+            throw Stopped(code: Self.errorCode(AttachmentError.posix()), path: path.joined(separator: "/"))
+          }
+          guard attributes.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR) else {
+            throw Stopped(code: "invalidAncestor", path: path.joined(separator: "/"))
+          }
+          guard attributes.st_flags & UInt32(SF_DATALESS) == 0 else {
+            throw Stopped(code: "offline", path: path.joined(separator: "/"))
+          }
+          let child = openat(parent.descriptor, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+          guard child >= 0 else { throw Stopped(code: Self.errorCode(AttachmentError.posix()), path: path.joined(separator: "/")) }
+          parent = try pin(child, components: path, expected: attributes)
+        }
+        try validateDirectories()
+        var source = stat()
+        if fstatat(parent.descriptor, components.last!, &source, AT_SYMLINK_NOFOLLOW) != 0 {
+          let failure = errno
+          if failure == ENOENT {
+            // A provider placeholder is offline evidence, not proof of absence.
+            var placeholder = stat()
+            if fstatat(parent.descriptor, ".\(components.last!).icloud", &placeholder, AT_SYMLINK_NOFOLLOW) == 0 {
+              throw Stopped(code: "offline", path: sourcePath)
+            }
+            guard errno == ENOENT else { throw Stopped(code: Self.errorCode(AttachmentError.posix()), path: sourcePath) }
+            try validateDirectories()
+            sourceState = "missing"
+            throw Stopped(code: "sourceMissing", path: sourcePath)
+          }
+          throw Stopped(code: Self.errorCode(AttachmentError.posix(failure)), path: sourcePath)
+        }
+        sourceIdentity = Self.identity(source)
+        sourceState = source.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR) ? "directory" : "notDirectory"
+        try observe(source, components: components)
+        guard sourceState == "directory" else { throw Stopped(code: "sourceNotDirectory", path: sourcePath) }
+        guard source.st_flags & UInt32(SF_DATALESS) == 0 else { throw Stopped(code: "offline", path: sourcePath) }
+        try openAndScan(parent: parent.descriptor, components: components, attributes: source)
+        // Revisit every pinned directory, including already enumerated siblings,
+        // and every member. A later edit cannot leave an earlier row trusted.
+        try validateDirectories()
+        try validateMembers()
+        try checkpoint()
+        complete = true
+      }
+    } catch let stopped as Stopped {
+      terminalIssue(stopped.code, path: stopped.path)
+    } catch {
+      terminalIssue(Self.errorCode(error), path: sourceState == "directory" ? sourcePath : nil)
+    }
+    return dictionary()
+  }
+
+  /// Helper callers also fail closed: cancellation/deadline/invalid requests
+  /// can return before validation and must never echo unbounded caller strings.
+  private func dictionary(issues replacementIssues: [[String: String]]? = nil) -> [String: Any] {
+    var result: [String: Any] = [
+      "root": rootRequestPath.utf8.count <= 16_384 ? rootRequestPath : "",
+      "sourcePath": sourcePath.utf8.count <= 16_384 ? sourcePath : "",
+      "requestId": requestId.utf8.count <= 128 ? requestId : "",
+      "sourceState": sourceState, "complete": complete,
+      "members": members.sorted { ($0["path"] as! String).utf8.lexicographicallyPrecedes(($1["path"] as! String).utf8) },
+      "issues": replacementIssues ?? issues, "observedEntryCount": observedEntryCount,
+    ]
+    if let scope { result["canonicalRoot"] = scope.rootURL.path }
+    if let rootIdentity { result["rootIdentity"] = rootIdentity }
+    if let sourceIdentity { result["sourceIdentity"] = sourceIdentity }
+    return result
+  }
+
+  private func checkpoint() throws {
+    if cancellation.isCancelled { throw Stopped(code: "cancelled", path: nil) }
+    if DispatchTime.now().uptimeNanoseconds >= cancellation.deadline.uptimeNanoseconds {
+      throw Stopped(code: "deadlineExceeded", path: nil)
+    }
+  }
+
+  private static func identity(_ value: stat) -> String { "\(value.st_dev):\(value.st_ino)" }
+
+  private func pin(_ descriptor: Int32, components: [String], expected: stat?) throws -> Directory {
+    var attributes = stat()
+    guard fstat(descriptor, &attributes) == 0 else {
+      let failure = AttachmentError.posix(); close(descriptor); throw failure
+    }
+    guard attributes.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR),
+          attributes.st_flags & UInt32(SF_DATALESS) == 0 else {
+      close(descriptor); throw Stopped(code: "offline", path: components.joined(separator: "/"))
+    }
+    if let expected, WorkspaceFileScope.revision(attributes) != WorkspaceFileScope.revision(expected) {
+      close(descriptor); throw Stopped(code: "treeChanged", path: components.joined(separator: "/"))
+    }
+    // Preserve exact stored namespace spelling, rather than accepting a
+    // case/NFC alias as if it were the selected canonical source path.
+    if let scope {
+      var path = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+      let status = path.withUnsafeMutableBufferPointer { fcntl(descriptor, F_GETPATH, $0.baseAddress!) }
+      guard status == 0 else {
+        let failure = AttachmentError.posix(); close(descriptor); throw failure
+      }
+      let prefix = scope.rootURL.path.hasSuffix("/") ? scope.rootURL.path : scope.rootURL.path + "/"
+      let expectedPath = components.isEmpty ? scope.rootURL.path : prefix + components.joined(separator: "/")
+      guard String(cString: path).utf8.elementsEqual(expectedPath.utf8) else {
+        close(descriptor); throw Stopped(code: "unsupportedPath", path: components.joined(separator: "/"))
+      }
+    }
+    let value = Directory(descriptor: descriptor, components: components, before: attributes)
+    directories.append(value)
+    return value
+  }
+
+  private func openAndScan(parent: Int32, components: [String], attributes: stat) throws {
+    try checkpoint()
+    guard subtreeDirectoryCount < limits.directories else {
+      throw Stopped(code: "directoryLimit", path: components.joined(separator: "/"))
+    }
+    guard components.count <= WorkspaceFileScope.maximumPathDepth else {
+      throw Stopped(code: "depthLimit", path: components.joined(separator: "/"))
+    }
+    let descriptor = openat(parent, components.last!, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+    guard descriptor >= 0 else { throw AttachmentError.posix() }
+    let current = try pin(descriptor, components: components, expected: attributes)
+    subtreeDirectoryCount += 1
+    try validateDirectories()
+    let duplicate = openat(descriptor, ".", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+    guard duplicate >= 0 else { throw AttachmentError.posix() }
+    guard let stream = fdopendir(duplicate) else {
+      let failure = AttachmentError.posix(); close(duplicate); throw failure
+    }
+    defer { closedir(stream) }
+    while true {
+      try checkpoint()
+      errno = 0
+      guard let entry = readdir(stream) else {
+        if errno != 0 { throw AttachmentError.posix() }
+        break
+      }
+      let name = withUnsafePointer(to: &entry.pointee.d_name) {
+        $0.withMemoryRebound(to: CChar.self, capacity: Int(entry.pointee.d_namlen) + 1) { String(validatingUTF8: $0) }
+      }
+      guard let name else { throw Stopped(code: "invalidFilename", path: components.joined(separator: "/")) }
+      if name == "." || name == ".." { continue }
+      let childComponents = components + [name]
+      var child = stat()
+      guard fstatat(descriptor, name, &child, AT_SYMLINK_NOFOLLOW) == 0 else {
+        throw Stopped(code: Self.errorCode(AttachmentError.posix()), path: childComponents.joined(separator: "/"))
+      }
+      try observe(child, components: childComponents)
+      if child.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR) {
+        guard child.st_flags & UInt32(SF_DATALESS) == 0 else {
+          throw Stopped(code: "offline", path: childComponents.joined(separator: "/"))
+        }
+        try openAndScan(parent: descriptor, components: childComponents, attributes: child)
+      }
+    }
+    try afterDirectoryEnumerated?(current.components.joined(separator: "/"))
+    try checkpoint()
+    try validateDirectories()
+  }
+
+  private func observe(_ attributes: stat, components: [String]) throws {
+    observedEntryCount += 1
+    let path = components.joined(separator: "/")
+    guard observedEntryCount <= limits.entries else { throw Stopped(code: "entryLimit", path: path) }
+    let name = components.last!
+    let type = attributes.st_mode & mode_t(S_IFMT)
+    if type == mode_t(S_IFDIR), subtreeDirectoryCount >= limits.directories {
+      throw Stopped(code: "directoryLimit", path: path)
+    }
+    let placeholder = name.hasPrefix(".") && name.hasSuffix(".icloud")
+    let local = !placeholder && attributes.st_flags & UInt32(SF_DATALESS) == 0
+    let kind: String
+    switch type {
+    case mode_t(S_IFDIR): kind = "directory"
+    case mode_t(S_IFLNK): kind = "symlink"
+    case mode_t(S_IFREG):
+      let suffix = (name as NSString).pathExtension.lowercased()
+      kind = CloudWorkspace.extensions.contains(suffix) ? "note" :
+        (AttachmentScope.imageExtensions.contains(suffix) ? "image" : "unsupported")
+    default: kind = "special"
+    }
+    let row: [String: Any] = [
+      "path": path, "kind": kind, "revision": WorkspaceFileScope.revision(attributes),
+      "identity": Self.identity(attributes), "local": local, "size": Int64(attributes.st_size),
+    ]
+    try charge(row)
+    members.append(row)
+    if components.contains(where: { $0.hasPrefix(".linefold-note-move-") }) { try issue("recoveryArtifact", path: path) }
+    if components.contains(where: { $0.hasPrefix(".") }) || attributes.st_flags & UInt32(UF_HIDDEN) != 0 {
+      try issue("hiddenMember", path: path)
+    }
+    if path.utf16.count > 4096 || components.contains(where: {
+      $0.contains("\\") || $0.contains(":") || $0.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 })
+    }) { try issue("unsupportedPath", path: path) }
+    if kind == "unsupported" { try issue("unsupportedMember", path: path) }
+    // The initializer defaults to .data, which is not the directory branch.
+    // Code bundles are also opaque to reference maintenance; .bundle does not
+    // necessarily conform to .package. Query only type metadata, never bodies.
+    if type == mode_t(S_IFDIR),
+       let contentType = UTType(filenameExtension: (name as NSString).pathExtension.lowercased(), conformingTo: .directory),
+       contentType.conforms(to: .package) || contentType.conforms(to: .bundle) {
+      try issue("packageMember", path: path)
+    }
+    if kind == "symlink" { try issue("symlinkMember", path: path) }
+    if kind == "special" { try issue("specialMember", path: path) }
+    if !local { try issue("offline", path: path) }
+    if type == mode_t(S_IFREG), attributes.st_nlink != 1 { try issue("multiplyLinkedMember", path: path) }
+    if let rootIdentity, !rootIdentity.hasPrefix("\(attributes.st_dev):") { try issue("differentDevice", path: path) }
+  }
+
+  private func freshDirectory(_ components: [String]) throws -> Int32 {
+    guard let scope else { throw AttachmentError.unavailable }
+    var descriptor = dup(scope.rootDescriptor)
+    guard descriptor >= 0 else { throw AttachmentError.posix() }
+    for name in components {
+      let next = openat(descriptor, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+      let failure = errno
+      close(descriptor)
+      guard next >= 0 else { throw AttachmentError.posix(failure) }
+      descriptor = next
+    }
+    return descriptor
+  }
+
+  private func validateDirectories() throws {
+    try checkpoint()
+    guard let scope else { throw AttachmentError.unavailable }
+    do {
+      try scope.verifyRootLocation()
+      // Also re-open the requested root: canonical location alone would miss a
+      // replaced ancestor alias in the original selected-root pathname.
+      let requested = open(root.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+      guard requested >= 0 else { throw AttachmentError.posix() }
+      defer { close(requested) }
+      var requestedState = stat()
+      guard fstat(requested, &requestedState) == 0,
+            Self.identity(requestedState) == rootIdentity else { throw AttachmentError.unavailable }
+      for directory in directories {
+        try checkpoint()
+        var pinned = stat()
+        guard fstat(directory.descriptor, &pinned) == 0 else { throw AttachmentError.posix() }
+        let fresh = try freshDirectory(directory.components)
+        defer { close(fresh) }
+        var current = stat()
+        guard fstat(fresh, &current) == 0,
+              WorkspaceFileScope.revision(current) == WorkspaceFileScope.revision(directory.before),
+              WorkspaceFileScope.revision(pinned) == WorkspaceFileScope.revision(directory.before),
+              current.st_flags & UInt32(SF_DATALESS) == 0 else { throw AttachmentError.unavailable }
+      }
+    } catch let stopped as Stopped { throw stopped }
+    catch { throw Stopped(code: "treeChanged", path: sourcePath) }
+  }
+
+  private func validateMembers() throws {
+    for member in members {
+      try checkpoint()
+      let path = member["path"] as! String
+      let components = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+      let parent = try freshDirectory(Array(components.dropLast()))
+      defer { close(parent) }
+      var current = stat()
+      guard fstatat(parent, components.last!, &current, AT_SYMLINK_NOFOLLOW) == 0,
+            WorkspaceFileScope.revision(current) == (member["revision"] as? String),
+            Self.identity(current) == (member["identity"] as? String) else {
+        throw Stopped(code: "treeChanged", path: path)
+      }
+    }
+    try validateDirectories()
+  }
+
+  private func charge(_ value: Any) throws {
+    let size = try JSONSerialization.data(withJSONObject: value).count + 1
+    guard metadataBytes <= limits.metadataBytes - size else { throw Stopped(code: "metadataLimit", path: nil) }
+    metadataBytes += size
+  }
+
+  private func issue(_ code: String, path: String) throws {
+    guard issues.count < 1023 else { throw Stopped(code: "issueLimit", path: nil) }
+    let value = ["code": code, "path": path]
+    try charge(value)
+    issues.append(value)
+  }
+
+  private func terminalIssue(_ code: String, path: String?) {
+    complete = false
+    if issues.contains(where: { $0["code"] == code && $0["path"] == path }) { return }
+    let codeOnly = ["code": code]
+    // Raw UTF-8 size is not JSON size (control characters can expand sixfold).
+    // Charge the exact final envelope plus issue; the fixed reserve guarantees
+    // a code-only failure, not an arbitrary diagnostic path. Tiny injected test
+    // budgets can be smaller than the unavoidable fixed failure envelope.
+    if let path, !path.isEmpty, path.utf8.count <= 16_384 {
+      let candidate = ["code": code, "path": path]
+      if let encoded = try? JSONSerialization.data(withJSONObject: dictionary(issues: issues + [candidate])),
+         encoded.count <= min(limits.metadataBytes, 1024 * 1024) {
+        issues.append(candidate)
+        return
+      }
+    }
+    issues.append(codeOnly)
+  }
+
+  private static func errorCode(_ error: Error) -> String {
+    switch AttachmentError.classify(error) {
+    case .denied: return "permissionDenied"
+    case .offline: return "offline"
+    case .missing: return "unavailable"
+    case .invalid: return "invalidPath"
+    default: return "unavailable"
+    }
+  }
+}
 
 /// Isolate metadata-only directory listing and active-document metadata from
 /// potentially blocking content reads, without borrowing any write/transaction

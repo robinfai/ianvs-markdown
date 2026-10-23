@@ -20,6 +20,7 @@ Future<WorkspaceNoteMoveDecision> showWorkspaceNoteMovePreview({
   String? unavailable,
   Future<WorkspaceNoteMoveRecord> Function(WorkspaceNoteMovePlan)? onMaintain,
   Future<WorkspaceNoteMoveRecord> Function(String)? onRecoverCopies,
+  VoidCallback? onCancelPreview,
 }) async {
   // Attach the error handler before the dialog's first frame. A fast native
   // failure must not become an unhandled Future error before FutureBuilder
@@ -28,18 +29,22 @@ Future<WorkspaceNoteMoveDecision> showWorkspaceNoteMovePreview({
     (plan) => (plan, false),
     onError: (Object _, StackTrace _) => (null, true),
   );
-  return await showDialog<WorkspaceNoteMoveDecision>(
-        context: context,
-        builder: (context) => _MovePreviewDialog(
-          sources: sources,
-          destinations: destinations,
-          pending: pending,
-          unavailable: unavailable,
-          onMaintain: onMaintain,
-          onRecoverCopies: onRecoverCopies,
-        ),
-      ) ??
-      const WorkspaceNoteMoveDecision();
+  try {
+    return await showDialog<WorkspaceNoteMoveDecision>(
+          context: context,
+          builder: (context) => _MovePreviewDialog(
+            sources: sources,
+            destinations: destinations,
+            pending: pending,
+            unavailable: unavailable,
+            onMaintain: onMaintain,
+            onRecoverCopies: onRecoverCopies,
+          ),
+        ) ??
+        const WorkspaceNoteMoveDecision();
+  } finally {
+    onCancelPreview?.call();
+  }
 }
 
 class _MovePreviewDialog extends StatefulWidget {
@@ -70,7 +75,13 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
   String? _error;
 
   Future<void> _maintain(WorkspaceNoteMovePlan plan) async {
-    if (_busy || _attempted || widget.onMaintain == null) return;
+    if (_busy ||
+        _attempted ||
+        !plan.executionSupported ||
+        !plan.complete ||
+        widget.onMaintain == null) {
+      return;
+    }
     setState(() {
       _busy = true;
       _attempted = true;
@@ -127,137 +138,185 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
             state.connectionState != ConnectionState.done;
         final plan = state.data?.$1;
         return AlertDialog(
+          scrollable: true,
           title: const Text('Preview rename / move'),
           content: SizedBox(
             width: 620,
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (var i = 0; i < widget.sources.length && i < 20; i++)
-                    Text('${widget.sources[i]} → ${widget.destinations[i]}'),
-                  if (widget.sources.length > 20)
-                    Text('… and ${widget.sources.length - 20} more items.'),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Move without updating links only moves the selected files. Links in other notes and relative links or images inside moved notes will NOT be updated and may break.',
-                  ),
-                  const SizedBox(height: 12),
-                  if (waiting) ...[
-                    const LinearProgressIndicator(),
-                    const SizedBox(height: 8),
-                    const Text('Preparing a read-only reference preview…'),
-                  ] else if (plan != null) ...[
-                    Text(
-                      'Proposed reference maintenance: ${plan.editCount} source replacement(s) across ${plan.files.length} affected note(s), including the moved note.',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var i = 0; i < widget.sources.length && i < 20; i++)
+                  Text('${widget.sources[i]} → ${widget.destinations[i]}'),
+                if (widget.sources.length > 20)
+                  Text('… and ${widget.sources.length - 20} more items.'),
+                const SizedBox(height: 16),
+                const Text(
+                  'Move without updating links only moves the selected files. Links in other notes and relative links or images inside moved notes will NOT be updated and may break.',
+                ),
+                const SizedBox(height: 12),
+                if (waiting) ...[
+                  const LinearProgressIndicator(),
+                  const SizedBox(height: 8),
+                  const Text('Preparing a read-only reference preview…'),
+                ] else if (plan != null) ...[
+                  if (!plan.executionSupported) ...[
+                    const Text(
+                      'Directory impact preview only. Automatic folder reference maintenance is not enabled. The manual action below will not apply any proposed edits.',
                     ),
-                    const SizedBox(height: 8),
-                    if (plan.complete)
-                      const Text(
-                        'Supported-source coverage is complete. Execution rechecks local identities and exact bytes. Files change independently; a failure can leave a partial result.',
-                      )
-                    else
-                      const Text(
-                        'Coverage is incomplete or blocked. This is not a safe-maintenance approval.',
-                      ),
-                    for (final blocker in plan.blockers.take(12))
+                    if (plan.treeSnapshot case final tree?) ...[
                       Text(
-                        '• ${blocker.path == null ? '' : '${blocker.path}: '}${blocker.message}',
+                        'Directory members observed: ${tree.members.length}${tree.complete ? '' : ' (incomplete scan)'}.',
                       ),
-                    if (plan.blockers.length > 12)
-                      Text(
-                        '… and ${plan.blockers.length - 12} more coverage issue(s).',
-                      ),
-                    const SizedBox(height: 8),
-                    if (plan.complete && widget.onMaintain != null)
-                      const Text(
-                        'Moving with updates retains original recovery copies: a private app journal and hidden recovery files beside changed notes. Hidden files use disk space and may sync with your vault. They are not automatically deleted. Review recovery before retrying a partial or unknown result.',
-                      ),
-                    for (final file in plan.files)
-                      ExpansionTile(
-                        key: ValueKey('note-move-diff-${file.path}'),
-                        title: Text(
-                          '${file.path}${file.destination == file.path ? '' : ' → ${file.destination}'}',
-                        ),
-                        subtitle: Text(
-                          '${file.edits.length} exact source replacement(s)',
-                        ),
-                        children: [
-                          if (file.edits.isEmpty)
-                            const Text(
-                              'The note contents stay byte-for-byte unchanged.',
-                            ),
-                          if (file.edits.isNotEmpty)
+                      if (tree.members.isNotEmpty)
+                        ExpansionTile(
+                          key: const ValueKey('directory-move-manifest'),
+                          title: const Text('Observed directory members'),
+                          subtitle: const Text(
+                            'Metadata only. Unsupported members are included.',
+                          ),
+                          children: [
                             SizedBox(
-                              height: file.edits.length < 4
-                                  ? file.edits.length * 90.0
-                                  : 300,
+                              height: 260,
                               child: ListView.builder(
-                                itemCount: file.edits.length,
+                                itemCount: tree.members.length,
                                 itemBuilder: (context, index) {
-                                  final edit = file.edits[index];
-                                  final line =
-                                      '\n'
-                                          .allMatches(
-                                            file.source.text.substring(
-                                              0,
-                                              edit.range.start,
-                                            ),
-                                          )
-                                          .length +
-                                      1;
+                                  final member = tree.members[index];
+                                  final locality = switch (member.local) {
+                                    true => 'local',
+                                    false => 'not local',
+                                    null => 'availability unknown',
+                                  };
                                   return Padding(
                                     padding: const EdgeInsets.all(8),
-                                    child: SelectableText(
-                                      'Line $line: ${edit.before} → ${edit.after}',
+                                    child: Text(
+                                      '${member.path} · ${member.kind.name} · $locality',
                                     ),
                                   );
                                 },
                               ),
                             ),
-                        ],
-                      ),
-                  ] else
+                          ],
+                        ),
+                    ],
+                    const SizedBox(height: 8),
+                  ],
+                  Text(
+                    'Proposed reference maintenance: ${plan.editCount} source replacement(s) across ${plan.files.length} affected note(s)${plan.executionSupported ? ', including the moved note' : ', including moved notes with unchanged text'}.',
+                  ),
+                  const SizedBox(height: 8),
+                  if (plan.complete)
                     Text(
-                      (state.data?.$2 == true
-                              ? 'The reference preview is unavailable. No complete maintenance plan could be verified.'
-                              : widget.unavailable) ??
-                          'Folder and multi-item reference maintenance is not supported. No complete reference preview is available.',
-                    ),
-                  if (_busy && !_confirmingRecovery) ...[
-                    const SizedBox(height: 12),
-                    const LinearProgressIndicator(),
+                      plan.executionSupported
+                          ? 'Supported-source coverage is complete. Execution rechecks local identities and exact bytes. Files change independently; a failure can leave a partial result.'
+                          : 'Supported-source impact coverage is complete for this preview. No directory move transaction is available.',
+                    )
+                  else
                     const Text(
-                      'Verifying and recording the operation. Do not start another move.',
+                      'Coverage is incomplete or blocked. This is not a safe-maintenance approval.',
                     ),
-                  ],
-                  if (_error != null) Text(_error!),
-                  if (_record case final record?) ...[
-                    const SizedBox(height: 12),
+                  if (!plan.executionSupported)
+                    const Text(
+                      'Destination vacancy and conflicts with all filesystem objects have not been verified. This is a hypothetical impact preview, not approval to move safely.',
+                    ),
+                  for (final blocker in plan.blockers.take(12))
                     Text(
-                      record.completed
-                          ? 'Move and reference updates verified.'
-                          : 'Operation state: ${record.phase}. Do not assume every file changed.',
+                      '• ${blocker.path == null ? '' : '${blocker.path}: '}${blocker.message}',
                     ),
-                    if (record.message != null) Text(record.message!),
-                    if (record.code != null) Text(record.code!),
-                    for (final entry in record.entries)
-                      Text(
-                        '${entry.path}: ${entry.state}${entry.verified ? ' (verified)' : ' (not verified)'}${entry.actualPath == null ? '' : ' at ${entry.actualPath}'}',
+                  if (plan.blockers.length > 12)
+                    Text(
+                      '… and ${plan.blockers.length - 12} more coverage issue(s).',
+                    ),
+                  const SizedBox(height: 8),
+                  if (plan.complete &&
+                      plan.executionSupported &&
+                      widget.onMaintain != null)
+                    const Text(
+                      'Moving with updates retains original recovery copies: a private app journal and hidden recovery files beside changed notes. Hidden files use disk space and may sync with your vault. They are not automatically deleted. Review recovery before retrying a partial or unknown result.',
+                    ),
+                  for (final file in plan.files)
+                    ExpansionTile(
+                      key: ValueKey('note-move-diff-${file.path}'),
+                      title: Text(
+                        '${file.path}${file.destination == file.path ? '' : ' → ${file.destination}'}',
                       ),
-                    for (final artifact in record.retainedArtifacts)
-                      Text(
-                        'Retained artifact: ${artifact.path} (${artifact.state}${artifact.verified ? ', verified' : ', unverified'})',
+                      subtitle: Text(
+                        '${file.edits.length} exact source replacement(s)',
                       ),
-                    for (final copy in record.recoveryEntries)
-                      Text('Original copy: ${copy.path} (${copy.state})'),
-                    for (final path in record.recoveryPaths)
-                      Text('Recovered original copy: $path'),
-                    Text('Recovery journal: ${record.transactionId}'),
-                  ],
+                      children: [
+                        if (file.edits.isEmpty)
+                          const Text(
+                            'The note contents stay byte-for-byte unchanged.',
+                          ),
+                        if (file.edits.isNotEmpty)
+                          SizedBox(
+                            height: file.edits.length < 4
+                                ? file.edits.length * 90.0
+                                : 300,
+                            child: ListView.builder(
+                              itemCount: file.edits.length,
+                              itemBuilder: (context, index) {
+                                final edit = file.edits[index];
+                                final line =
+                                    '\n'
+                                        .allMatches(
+                                          file.source.text.substring(
+                                            0,
+                                            edit.range.start,
+                                          ),
+                                        )
+                                        .length +
+                                    1;
+                                return Padding(
+                                  padding: const EdgeInsets.all(8),
+                                  child: SelectableText(
+                                    'Line $line: ${edit.before} → ${edit.after}',
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                      ],
+                    ),
+                ] else
+                  Text(
+                    (state.data?.$2 == true
+                            ? 'The reference preview is unavailable. No complete maintenance plan could be verified.'
+                            : widget.unavailable) ??
+                        'Folder and multi-item reference maintenance is not supported. No complete reference preview is available.',
+                  ),
+                if (_busy && !_confirmingRecovery) ...[
+                  const SizedBox(height: 12),
+                  const LinearProgressIndicator(),
+                  const Text(
+                    'Verifying and recording the operation. Do not start another move.',
+                  ),
                 ],
-              ),
+                if (_error != null) Text(_error!),
+                if (_record case final record?) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    record.completed
+                        ? 'Move and reference updates verified.'
+                        : 'Operation state: ${record.phase}. Do not assume every file changed.',
+                  ),
+                  if (record.message != null) Text(record.message!),
+                  if (record.code != null) Text(record.code!),
+                  for (final entry in record.entries)
+                    Text(
+                      '${entry.path}: ${entry.state}${entry.verified ? ' (verified)' : ' (not verified)'}${entry.actualPath == null ? '' : ' at ${entry.actualPath}'}',
+                    ),
+                  for (final artifact in record.retainedArtifacts)
+                    Text(
+                      'Retained artifact: ${artifact.path} (${artifact.state}${artifact.verified ? ', verified' : ', unverified'})',
+                    ),
+                  for (final copy in record.recoveryEntries)
+                    Text('Original copy: ${copy.path} (${copy.state})'),
+                  for (final path in record.recoveryPaths)
+                    Text('Recovered original copy: $path'),
+                  Text('Recovery journal: ${record.transactionId}'),
+                ],
+              ],
             ),
           ),
           actions: [
@@ -283,6 +342,7 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
               ),
             if (!_attempted &&
                 plan?.complete == true &&
+                plan?.executionSupported == true &&
                 widget.onMaintain != null)
               FilledButton(
                 key: const ValueKey('move-and-update-links'),
