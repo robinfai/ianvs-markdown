@@ -4,7 +4,8 @@ linefold_timed() {
   local phase="$1"
   shift
   if [[ "${LINEFOLD_TEST_TIMINGS:-0}" == 1 ]]; then
-    local TIMEFORMAT="TIMING ${BASH_SOURCE[1]##*/} $phase real=%3R user=%3U sys=%3S"
+    local caller="${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}"
+    local TIMEFORMAT="TIMING ${caller##*/} $phase real=%3R user=%3U sys=%3S"
     time "$@"
   else
     "$@"

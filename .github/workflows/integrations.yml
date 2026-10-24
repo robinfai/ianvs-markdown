@@ -33,7 +33,8 @@ jobs:
     timeout-minutes: 40
     env:
       LINEFOLD_TEST_TIMINGS: '1'
-      APP_TEST_FLAGS: --concurrency=1 --file-reporter=json:build/ci-timings/app-tests.jsonl
+      # Use two isolated suites on the 3-core runner; leave native tests sequential.
+      APP_TEST_FLAGS: --concurrency=2 --file-reporter=json:build/ci-timings/app-tests.jsonl
       LINEFOLD_SWIFT_MODULE_CACHE: ${{ github.workspace }}/app/build/native-test-module-cache
     steps:
       - uses: actions/checkout@v6
