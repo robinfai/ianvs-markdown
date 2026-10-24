@@ -31,6 +31,8 @@ jobs:
     name: macOS regressions
     runs-on: macos-15
     timeout-minutes: 40
+    env:
+      LINEFOLD_SWIFT_MODULE_CACHE: ${{ github.workspace }}/app/build/native-test-module-cache
     steps:
       - uses: actions/checkout@v6
       - uses: subosito/flutter-action@v2
@@ -45,6 +47,32 @@ jobs:
           rustc --version
           xcodebuild -version
           sw_vers
+      # Share SDK modules between sequential Swift test compilations; cache only
+      # compiler intermediates. Every compile/test command still runs; no results
+      # or hook-success metadata are restored. Swift executables stay temporary.
+      - name: Identify regression compiler cache
+        id: regression-cache-key
+        run: |
+          fingerprint=$({
+            xcodebuild -version
+            xcrun --sdk macosx --show-sdk-version
+            xcrun swiftc --version
+            rustc -vV
+            flutter --version
+            printf '%s\n' "$ImageOS" "$ImageVersion"
+          } | shasum -a 256 | cut -d ' ' -f 1)
+          echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
+      - name: Restore regression compiler intermediates
+        uses: actions/cache@v4
+        with:
+          path: |
+            app/build/native-test-module-cache
+            app/.dart_tool/hooks_runner/shared/ianvs_mermaid/build/cargo
+            packages/ianvs_mermaid/.dart_tool/hooks_runner/shared/ianvs_mermaid/build/cargo
+            packages/ianvs_mermaid/example/.dart_tool/hooks_runner/shared/ianvs_mermaid/build/cargo
+            packages/ianvs_mermaid/rust/target
+            app/build/quicklook-native
+          key: macos-regressions-v1-${{ runner.arch }}-${{ steps.regression-cache-key.outputs.fingerprint }}-${{ hashFiles('**/pubspec.lock', '**/Cargo.lock', '**/Cargo.toml', 'packages/ianvs_mermaid/rust/src/**', 'packages/ianvs_mermaid/rust/fonts/**', 'packages/ianvs_mermaid/hook/**', 'app/macos/QuickLook/renderer/**') }}
       - name: Export fixture and snapshot regressions
         run: make deps-integrations test-document-export-fixture
       - name: Install pinned PDF content checker (CI only)

@@ -32,7 +32,7 @@ export MERMAN_LIB_DIR="$linefold_output"
 cargo test --locked --manifest-path "$linefold_app_dir/macos/QuickLook/renderer/Cargo.toml"
 cargo build --locked --manifest-path "$linefold_app_dir/macos/QuickLook/renderer/Cargo.toml"
 xcrun swiftc \
-  -module-cache-path "$linefold_output/ModuleCache" \
+  -module-cache-path "${LINEFOLD_SWIFT_MODULE_CACHE:-$linefold_output/ModuleCache}" \
   -import-objc-header "$linefold_app_dir/macos/QuickLook/PreviewBridge.h" \
   "$linefold_app_dir/macos/QuickLook/PreviewProvider.swift" \
   "$linefold_app_dir/test/native_quicklook_test.swift" \

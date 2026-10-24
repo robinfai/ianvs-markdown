@@ -18,6 +18,7 @@ python3 "$app_dir/tool/native_test_watchdog.py" --timeout-seconds 60 -- \
   "$PDF_QA_PYTHON" -m unittest discover -s "$app_dir/tool" -p test_check_practical_pdf_content.py
 echo "PHASE: compile native export acceptance"
 xcrun swiftc -target "$(uname -m)-apple-macos12.0" \
+  -module-cache-path "${LINEFOLD_SWIFT_MODULE_CACHE:-$test_dir/module-cache}" \
   "$app_dir/macos/Runner/DocumentExport.swift" \
   "$app_dir/test/native_pdf_export_safety_test.swift" \
   "$app_dir/test/native_document_export_test.swift" \

@@ -30,7 +30,7 @@ PY
 
 xcrun swiftc \
   -swift-version 5 -target "$(uname -m)-apple-macosx12.0" \
-  -module-cache-path "$linefold_test_dir/module-cache" \
+  -module-cache-path "${LINEFOLD_SWIFT_MODULE_CACHE:-$linefold_test_dir/module-cache}" \
   -F "$framework_dir" -framework FlutterMacOS \
   -Xlinker -rpath -Xlinker "$framework_dir" \
   "$linefold_app_dir/apple/CloudWorkspace.swift" \
