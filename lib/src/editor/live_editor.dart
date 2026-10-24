@@ -627,7 +627,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     _linkReferences = decision.useMarkdown
         ? IanvsMarkdownEditorDiagnostics.measure(
             'live.references',
-            () => MarkdownLinkReferenceContext.parse(source, budget: null),
+            () =>
+                ianvsMarkdownControllerReferences(widget.controller, source) ??
+                MarkdownLinkReferenceContext.parse(source, budget: null),
           )
         : MarkdownLinkReferenceContext.empty();
     _blockController.linkReferenceLabels = _linkReferences.labels;

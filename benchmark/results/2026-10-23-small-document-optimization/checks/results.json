@@ -1,0 +1,13 @@
+{
+  "candidate": "da4de94",
+  "checkCore": "passed",
+  "coreTests": 1144,
+  "exampleTests": 35,
+  "apiCheckerTests": 8,
+  "toolTests": 30,
+  "targetedTests": 4,
+  "appTests": 993,
+  "appSkipped": 1,
+  "appAnalyze": "passed",
+  "performance": "not passed: one valid example baseline; remaining runs blocked by repeated foreground loss"
+}
