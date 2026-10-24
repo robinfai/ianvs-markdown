@@ -106,6 +106,29 @@ jobs:
           rustc --version
           xcodebuild -version
           sw_vers
+      # Cache compiler intermediates only. Every Flutter build, link, sign and
+      # entitlement check still runs, including on an exact cache hit.
+      - name: Identify native compiler cache
+        id: native-cache-key
+        run: |
+          fingerprint=$({
+            xcodebuild -version
+            xcrun --sdk macosx --show-sdk-version
+            rustc -vV
+            flutter --version
+            printf '%s\n' "$ImageOS" "$ImageVersion"
+          } | shasum -a 256 | cut -d ' ' -f 1)
+          echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
+      - name: Restore native compiler intermediates
+        id: native-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            app/.dart_tool/hooks_runner/shared/ianvs_mermaid/build/cargo
+            app/build/quicklook-native
+            app/build/macos/ModuleCache.noindex
+            example/build/macos/ModuleCache.noindex
+          key: macos-compilers-v1-${{ runner.arch }}-${{ steps.native-cache-key.outputs.fingerprint }}-${{ hashFiles('**/pubspec.lock', '**/Cargo.lock', '**/Cargo.toml', 'packages/ianvs_mermaid/rust/src/**', 'packages/ianvs_mermaid/rust/fonts/**', 'packages/ianvs_mermaid/hook/**', 'app/macos/QuickLook/renderer/**', 'app/tool/build_quicklook.sh') }}
       - name: Build the example and app main entries
         if: ${{ !cancelled() }}
         run: make build-local build-local-release
