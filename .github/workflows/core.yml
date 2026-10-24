@@ -34,6 +34,7 @@ jobs:
         id: formatter
         run: echo "dart=$FLUTTER_ROOT/bin/dart" >> "$GITHUB_OUTPUT"
       - uses: subosito/flutter-action@v2
+        if: matrix.flutter != '3.44.0'
         with:
           channel: stable
           flutter-version: ${{ matrix.flutter }}

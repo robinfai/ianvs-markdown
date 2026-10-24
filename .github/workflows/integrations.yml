@@ -27,7 +27,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  macos:
+  macos-tests:
+    name: macOS regressions
     runs-on: macos-15
     timeout-minutes: 40
     steps:
@@ -75,12 +76,6 @@ jobs:
       - name: Host and remaining native regressions
         if: ${{ !cancelled() }}
         run: make check-integrations-rest
-      - name: Build the example and app main entries
-        if: ${{ !cancelled() }}
-        run: make build-local build-local-release
-      - name: Check sandbox PDF backend app declarations
-        if: ${{ !cancelled() }}
-        run: python3 app/tool/check_document_export_entitlements.py --built-apps
       - name: Save native rendering evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -90,6 +85,49 @@ jobs:
             packages/ianvs_mermaid/build/visual-regression/
             app/build/export-qa/
           if-no-files-found: ignore
+
+  # Build in an independent checkout: Flutter and Cargo generated files must
+  # never be mutated concurrently by tests and builds in the same workspace.
+  macos-builds:
+    name: macOS builds
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.44.8'
+          cache: true
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Record toolchains
+        run: |
+          flutter --version
+          rustc --version
+          xcodebuild -version
+          sw_vers
+      - name: Build the example and app main entries
+        if: ${{ !cancelled() }}
+        run: make build-local build-local-release
+      - name: Check sandbox PDF backend app declarations
+        if: ${{ !cancelled() }}
+        run: python3 app/tool/check_document_export_entitlements.py --built-apps
+
+  # Preserve the existing required check name and reject failed, cancelled or
+  # skipped dependencies. Both branches retain all of the previous macOS gates.
+  macos:
+    if: always()
+    needs: [macos-tests, macos-builds]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require macOS regressions and builds
+        env:
+          TEST_RESULT: ${{ needs.macos-tests.result }}
+          BUILD_RESULT: ${{ needs.macos-builds.result }}
+        run: |
+          test "$TEST_RESULT" = success
+          test "$BUILD_RESULT" = success
 
   ios-simulator:
     name: iOS simulator build
