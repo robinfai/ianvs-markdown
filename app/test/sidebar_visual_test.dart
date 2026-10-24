@@ -11,9 +11,13 @@ import 'package:linefold/src/services/markdown_file_service.dart';
 import 'package:linefold/src/widgets/workspace_sidebar.dart';
 import 'support/fakes.dart';
 
+// Enable manual acceptance PNGs with --dart-define=CAPTURE_ACCEPTANCE=true.
+// Default runs retain every layout and interaction assertion without PNG I/O.
+const _captureAcceptance = bool.fromEnvironment('CAPTURE_ACCEPTANCE');
+
 void main() {
   testWidgets(
-    'render normal, narrow, and search sidebar acceptance artifacts',
+    'sidebar remains usable at normal and narrow widths and after search',
     (tester) async {
       final icons = FontLoader('MaterialIcons')
         ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
@@ -95,6 +99,7 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
+        if (!_captureAcceptance) return;
         await tester.runAsync(() async {
           final render =
               boundary.currentContext!.findRenderObject()!

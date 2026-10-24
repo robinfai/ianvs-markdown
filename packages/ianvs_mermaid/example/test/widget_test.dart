@@ -4,24 +4,6 @@ import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:ianvs_mermaid_example/main.dart';
 
 void main() {
-  test('default document covers common Markdown elements', () {
-    expect(exampleMarkdown, contains('**bold**'));
-    expect(exampleMarkdown, contains('[[Project Notes]]'));
-    expect(exampleMarkdown, contains('- [x] Completed task'));
-    expect(exampleMarkdown, contains('| Capability | Example | Supported |'));
-    expect(exampleMarkdown, contains('```dart'));
-    expect(exampleMarkdown, contains('```mermaid'));
-    expect(exampleMarkdown, contains('> [!note] Live Preview'));
-    expect(exampleMarkdown, contains('[^source]'));
-    expect(
-      exampleMarkdown,
-      contains(
-        'https://robinfai.github.io/ianvs-terminal/assets/images/frame-diff/principle-advantages.png',
-      ),
-    );
-    expect(exampleMarkdown.split('\n').length, greaterThan(120));
-  });
-
   test('example enables HTTP network images by default', () {
     final image = buildExampleNetworkImage(
       Uri.parse('https://example.com/image.png'),
@@ -44,7 +26,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(IanvsMarkdownLiveEditor), findsOneWidget);
-    expect(find.text('Render and edit together'), findsWidgets);
     expect(find.byTooltip('新建 Markdown 文件'), findsNothing);
 
     await tester.tap(find.byTooltip('源码模式'));

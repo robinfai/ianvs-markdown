@@ -108,7 +108,7 @@ void main() {
           bodyTop = sample(row.top + 4);
           bodyMiddle = sample(row.center.dy);
           bodyBottom = sample(row.bottom - 4);
-          if (save) {
+          if (save && const bool.fromEnvironment('CAPTURE_ACCEPTANCE')) {
             final directory = Directory('build/table-background-acceptance');
             await directory.create(recursive: true);
             final png = (await image.toByteData(

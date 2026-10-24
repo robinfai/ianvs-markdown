@@ -15,9 +15,13 @@ import 'package:linefold/src/widgets/editor_shell.dart';
 
 import 'support/fakes.dart';
 
+// Enable manual acceptance PNGs with --dart-define=CAPTURE_ACCEPTANCE=true.
+// Default runs retain every layout and interaction assertion without PNG I/O.
+const _captureAcceptance = bool.fromEnvironment('CAPTURE_ACCEPTANCE');
+
 void main() {
   testWidgets(
-    'render desktop design acceptance in light, dark and narrow views',
+    'desktop layout and interactions remain usable across themes and sizes',
     (tester) async {
       final icons = FontLoader('MaterialIcons')
         ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
@@ -117,6 +121,7 @@ A familiar sidebar, quiet controls, and a comfortable reading surface.
       final boundary = GlobalKey();
 
       Future<void> saveFrame(String name) async {
+        if (!_captureAcceptance) return;
         await tester.runAsync(() async {
           final render =
               boundary.currentContext!.findRenderObject()!
