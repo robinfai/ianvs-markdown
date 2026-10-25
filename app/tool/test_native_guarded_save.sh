@@ -2,6 +2,7 @@
 set -euo pipefail
 
 linefold_app_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$linefold_app_dir/tool/native_test_timing.sh"
 linefold_test_dir="$(mktemp -d "${TMPDIR:-/tmp}/linefold-guarded-save-tests.XXXXXX")"
 trap 'rm -rf "$linefold_test_dir"' EXIT
 
@@ -22,7 +23,7 @@ print(frameworks[0].parent)
 PY
 )"
 
-xcrun swiftc \
+linefold_timed compile xcrun swiftc \
   -swift-version 5 -target "$(uname -m)-apple-macosx12.0" \
   -module-cache-path "${LINEFOLD_SWIFT_MODULE_CACHE:-$linefold_test_dir/module-cache}" \
   -F "$framework_dir" -framework FlutterMacOS \
@@ -31,11 +32,11 @@ xcrun swiftc \
   "$linefold_app_dir/apple/WorkspaceNoteTransaction.swift" \
   "$linefold_app_dir/test/native_guarded_save_test.swift" \
   -o "$linefold_test_dir/guarded_save_tests"
-"$linefold_test_dir/guarded_save_tests"
+linefold_timed execute "$linefold_test_dir/guarded_save_tests"
 
 # Root-scoped iOS edit semantics use synthetic local fixtures only. This also
 # compiles the shared production implementation with the real Flutter module.
-xcrun swiftc \
+linefold_timed compile xcrun swiftc \
   -swift-version 5 -target "$(uname -m)-apple-macosx12.0" \
   -module-cache-path "${LINEFOLD_SWIFT_MODULE_CACHE:-$linefold_test_dir/module-cache}" \
   -F "$framework_dir" -framework FlutterMacOS \
@@ -44,4 +45,4 @@ xcrun swiftc \
   "$linefold_app_dir/apple/WorkspaceNoteTransaction.swift" \
   "$linefold_app_dir/test/native_scoped_note_save_test.swift" \
   -o "$linefold_test_dir/scoped_note_save_tests"
-"$linefold_test_dir/scoped_note_save_tests"
+linefold_timed execute "$linefold_test_dir/scoped_note_save_tests"

@@ -32,6 +32,9 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 40
     env:
+      LINEFOLD_TEST_TIMINGS: '1'
+      # Use two isolated suites on the 3-core runner; leave native tests sequential.
+      APP_TEST_FLAGS: --concurrency=2 --file-reporter=json:build/ci-timings/app-tests.jsonl
       LINEFOLD_SWIFT_MODULE_CACHE: ${{ github.workspace }}/app/build/native-test-module-cache
     steps:
       - uses: actions/checkout@v6
@@ -47,6 +50,8 @@ jobs:
           rustc --version
           xcodebuild -version
           sw_vers
+          sysctl hw.logicalcpu hw.physicalcpu hw.memsize
+          vm_stat
       # Share SDK modules between sequential Swift test compilations; cache only
       # compiler intermediates. Every compile/test command still runs; no results
       # or hook-success metadata are restored. Swift executables stay temporary.
@@ -104,6 +109,14 @@ jobs:
       - name: Host and remaining native regressions
         if: ${{ !cancelled() }}
         run: make check-integrations-rest
+      - name: Save app test timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-test-timings-${{ github.run_id }}-${{ github.run_attempt }}
+          path: app/build/ci-timings/app-tests.jsonl
+          if-no-files-found: error
+          retention-days: 7
       - name: Save native rendering evidence
         if: always()
         uses: actions/upload-artifact@v4

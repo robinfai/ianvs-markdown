@@ -3,6 +3,7 @@ DART ?= dart
 FORMAT_DART ?= $(DART)
 INSTALL_DIR ?= /Applications
 PYTHON ?= python3
+APP_TEST_FLAGS ?=
 
 CORE_DART = lib test example/lib example/test tool/package_smoke_test.dart benchmark
 API_CHECK_DART = tool/api_check/lib tool/api_check/bin tool/api_check/test
@@ -61,7 +62,7 @@ test-clipboard: ## Run the optional native clipboard adapter contracts
 	cd packages/ianvs_markdown_clipboard && $(FLUTTER) test
 
 test-app: ## Run desktop application tests
-	cd app && $(FLUTTER) test
+	cd app && time $(FLUTTER) test $(APP_TEST_FLAGS)
 
 test-native-import: ## Verify native Markdown file import handling
 	bash app/tool/test_native_markdown_import.sh

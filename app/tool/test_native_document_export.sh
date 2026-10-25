@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 app_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$app_dir/tool/native_test_timing.sh"
 test_dir="$(mktemp -d "${TMPDIR:-/tmp}/linefold-export-tests.XXXXXX")"
 trap 'rm -rf "$test_dir"' EXIT
 # Keep PHASE/error evidence in the uploaded artifact too: the GitHub job-log
@@ -17,13 +18,13 @@ echo "PHASE: independent PDF content checker regressions"
 python3 "$app_dir/tool/native_test_watchdog.py" --timeout-seconds 60 -- \
   "$PDF_QA_PYTHON" -m unittest discover -s "$app_dir/tool" -p test_check_practical_pdf_content.py
 echo "PHASE: compile native export acceptance"
-xcrun swiftc -target "$(uname -m)-apple-macos12.0" \
+linefold_timed compile xcrun swiftc -target "$(uname -m)-apple-macos12.0" \
   -module-cache-path "${LINEFOLD_SWIFT_MODULE_CACHE:-$test_dir/module-cache}" \
   "$app_dir/macos/Runner/DocumentExport.swift" \
   "$app_dir/test/native_pdf_export_safety_test.swift" \
   "$app_dir/test/native_document_export_test.swift" \
   -o "$test_dir/document_export_tests"
-python3 "$app_dir/tool/native_test_watchdog.py" --timeout-seconds 120 -- \
+linefold_timed execute python3 "$app_dir/tool/native_test_watchdog.py" --timeout-seconds 120 -- \
   "$test_dir/document_export_tests" "$app_dir/build/export-qa/document.html" "$app_dir/build/export-qa/document.md" "$app_dir/build/export-qa/native"
 echo "PHASE: mandatory independent PDF content acceptance"
 python3 "$app_dir/tool/native_test_watchdog.py" --timeout-seconds 60 -- \
