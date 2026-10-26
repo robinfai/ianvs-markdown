@@ -95,11 +95,15 @@ class MarkdownSaveConflict implements Exception {
     required this.path,
     required this.expectedContents,
     required this.currentContents,
+    this.localContents,
   });
 
   final String path;
   final String? expectedContents;
   final String? currentContents;
+
+  /// Exact local snapshot this save attempt will write, supplied by the workspace.
+  final String? localContents;
 
   @override
   String toString() => 'The file changed on disk: $path';

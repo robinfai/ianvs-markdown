@@ -1,3 +1,4 @@
+import 'preview_test_support.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -34,7 +35,11 @@ void main() {
     final controller = PreviewController(library: library);
     addTearDown(controller.dispose);
     await tester.pumpWidget(
-      LinefoldPreviewApp(controller: controller, platform: _Platform()),
+      LinefoldPreviewApp(
+        readingPositions: memoryPreviewReadingPositions(),
+        controller: controller,
+        platform: _Platform(),
+      ),
     );
     await tester.pumpAndSettle();
     await controller.open('/a/note.md');
@@ -63,7 +68,11 @@ void main() {
       final controller = PreviewController(library: library);
       addTearDown(controller.dispose);
       await tester.pumpWidget(
-        LinefoldPreviewApp(controller: controller, platform: _Platform()),
+        LinefoldPreviewApp(
+          readingPositions: memoryPreviewReadingPositions(),
+          controller: controller,
+          platform: _Platform(),
+        ),
       );
       await tester.pumpAndSettle();
       await controller.open('/a/note.md');
@@ -95,33 +104,41 @@ void main() {
     },
   );
 
-  testWidgets('different document and scope ABA reset the reader position', (
-    tester,
-  ) async {
-    final library = _Library()..workspace = _workspace('/a');
-    final controller = PreviewController(library: library);
-    addTearDown(controller.dispose);
-    await tester.pumpWidget(
-      LinefoldPreviewApp(controller: controller, platform: _Platform()),
-    );
-    await tester.pumpAndSettle();
-    await controller.open('/a/note.md');
-    await tester.pumpAndSettle();
-    _position(tester).jumpTo(1200);
-    await tester.pumpAndSettle();
-    await controller.open('/a/other.md');
-    await tester.pumpAndSettle();
-    expect(_position(tester).pixels, 0);
-    _position(tester).jumpTo(1200);
-    await tester.pumpAndSettle();
-    library.workspace = _workspace('/b');
-    library.workspace = _workspace('/a');
-    await controller.open('/a/other.md');
-    await tester.pumpAndSettle();
-    expect(_position(tester).pixels, 0);
-    expect(tester.takeException(), isNull);
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
+  testWidgets(
+    'new documents start at top and returning workspace restores its own position',
+    (tester) async {
+      final library = _Library()..workspace = _workspace('/a');
+      final controller = PreviewController(library: library);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        LinefoldPreviewApp(
+          readingPositions: memoryPreviewReadingPositions(),
+          controller: controller,
+          platform: _Platform(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await controller.open('/a/note.md');
+      await tester.pumpAndSettle();
+      _position(tester).jumpTo(1200);
+      await tester.pumpAndSettle();
+      await controller.open('/a/other.md');
+      await tester.pumpAndSettle();
+      expect(_position(tester).pixels, 0);
+      _position(tester).jumpTo(1200);
+      await tester.pumpAndSettle();
+      library.workspace = _workspace('/b');
+      await controller.open('/b/other.md');
+      await tester.pumpAndSettle();
+      expect(_position(tester).pixels, 0);
+      library.workspace = _workspace('/a');
+      await controller.open('/a/other.md');
+      await tester.pumpAndSettle();
+      expect(_position(tester).pixels, closeTo(1200, 1));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 }
 
 PreviewWorkspace _workspace(String path) =>

@@ -116,10 +116,12 @@ class ScopedMarkdownBuilder implements md.NodeVisitor {
     this.onTapText,
     this.contextMenuBuilder,
     this.softLineBreak = false,
+    this.wrapSourceNode,
   });
 
   /// A delegate that controls how link and `pre` elements behave.
   final ScopedMarkdownBuilderDelegate delegate;
+  final Widget Function(md.Node, Widget)? wrapSourceNode;
 
   /// If true, the text is selectable.
   ///
@@ -561,7 +563,7 @@ class ScopedMarkdownBuilder implements md.NodeVisitor {
         );
       }
 
-      _addBlockChild(child);
+      _addBlockChild(wrapSourceNode?.call(element, child) ?? child);
     } else {
       final _InlineElement current = _inlines.removeLast();
       final _InlineElement parent = _inlines.last;

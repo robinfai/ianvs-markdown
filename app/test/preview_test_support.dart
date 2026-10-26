@@ -1,3 +1,5 @@
+import 'package:linefold/src/preview/preview_reading_positions.dart';
+import 'package:linefold/src/services/workspace_session_store.dart';
 import 'dart:async';
 
 import 'package:path/path.dart' as p;
@@ -143,4 +145,17 @@ class MemoryPreviewPlatform extends PreviewPlatform {
 
   @override
   void dispose() {}
+}
+
+PreviewReadingPositions memoryPreviewReadingPositions() =>
+    PreviewReadingPositions(store: _MemoryReadingStore());
+
+class _MemoryReadingStore implements WorkspaceSessionStore {
+  WorkspaceSnapshot? snapshot;
+  @override
+  Future<WorkspaceSnapshot?> load() async => snapshot;
+  @override
+  Future<void> save(WorkspaceSnapshot value) async {
+    snapshot = value;
+  }
 }

@@ -165,6 +165,21 @@ and replacement text are transient window state and are not recovery content.
 
 ## Source-of-truth rules
 
+Recovery snapshots include the source selection's UTF-16 base/extent, affinity,
+and direction. Missing or invalid selection metadata retains the legacy default;
+IME composing ranges are never recovered. Reloading identical disk text retains
+the selection. Changed disk text maps positions in the unchanged prefix/suffix
+and falls back to the replacement start for positions inside the changed span,
+without splitting a surrogate pair at that boundary. Snapshots also include the
+viewport's source offset and vertical position, bound to the snapshot's text.
+Viewport-only changes schedule the existing debounced recovery writer; they do
+not mark the document dirty or write the original Markdown file. The desktop
+editor opts into `preserveViewport` for tab, mode and restart restoration. Text
+changes rebase anchors through unchanged spans or a unique following excerpt;
+ambiguous changes fall back to the changed span. User scrolling cancels delayed
+restoration. Read also retains its paragraph through image and typography size
+changes. These tests do not substitute for physical IME or performance checks.
+
 1. `DocumentSession.controller.text` is the current source shown by the editor.
 2. `persistedText` is the last version successfully saved to the document path.
 3. A dirty recovered document wins over the disk copy, but a changed disk copy
@@ -404,3 +419,54 @@ during a scan must rerun before publishing to any joined caller.
 See [reference-index contract](../doc/WORKSPACE_REFERENCE_INDEX.md) and
 [parser semantic boundaries](../doc/NOTE_SEMANTICS.md) for budgets, supported
 syntax, URI decoding, collision rules, incomplete coverage and test evidence.
+
+正文查找的大文档索引由 `BodySearchWorker` 执行：每个查找会话延迟启动一个 isolate，
+在后台缓存当前原文的语义索引。最多一个请求运行、一个最新请求等待；被替代的等待请求返回空取消结果，
+不与“零命中”混淆。关闭查找终止 isolate。主控制器在接收结果时重新校验查询代次、原文和组合输入，
+预算拒绝或后台失败均显示正文搜索不可用并保留显式源码入口。小文档继续使用防抖后的本地缓存索引。
+
+桌面 Read/Live 文内查找默认保持正文组件挂载并使用正文索引；显式切换到 Source 时，
+源码选区定位必须延迟到该帧旧 Live 编辑监听器卸载后，防止 YAML 等隐藏元数据命中被重定向。
+关闭正文查找保留既有编辑选区，直接恢复原编辑焦点；只有临时 Source 查找需要重新激活 Live 表面。
+
+### Native PDF table pagination (2026-10-26)
+
+The macOS host declares `com.apple.security.network.client` in all four signing
+configurations because sandboxed WKWebView needs it to launch even when loading
+only an in-memory HTML string. A same-binary sandboxed probe on macOS 27.0.1
+terminated without this entitlement and loaded with it. This is an app-wide
+outgoing-network capability, not a domain-specific permission. PDF export still
+uses a nonpersistent data store, disabled document JavaScript, content blocking
+rules and a navigation allowlist; the entitlement does not authorize remote
+document resources. The signing checker verifies this and the print entitlement,
+including a selected built mode via `--built-apps --build-mode Profile`.
+
+`OfflineDocumentPrintJob` keeps document JavaScript disabled. Before starting the
+print factory, it runs a fixed application-owned layout function in WebKit's
+isolated default client world. After fonts and images settle, it measures rows
+at the A4 printable width, splits long tables into page-sized blocks with cloned
+headers and fixed column widths, and keeps short tables together. No Markdown or
+persisted file is changed. The existing output deadline covers preparation.
+The job holds its owner-token print lease during preparation; terminal failure
+or cancellation releases it, and late layout callbacks cannot start printing.
+A single row taller than the page fails explicitly; tables are bounded to 5,000
+rows and 256 generated blocks. These are rejection limits, never truncation.
+Native acceptance checks repeated headers, nonblank pages, unchanged original
+content, oversized-row cleanup, and a successful subsequent graphics export.
+
+### Transaction provenance preservation
+
+Native note transactions accept the macOS-generated `com.apple.provenance`
+extended attribute only, bounded to 4 KiB. Its actual bytes are captured in the
+source snapshot and private journal, compared during conflict/recovery checks,
+and retained on replacement and recovery files. Existing journals without the
+optional field represent an absent attribute. Other extended attributes, ACLs,
+unsupported flags and ownership still fail closed.
+
+The executor never removes provenance. If a newly created artifact differs from
+the original, it attempts an exact copy and reads it back before writing document
+bytes. A successful `fsetxattr` return alone is insufficient: on the tested macOS
+version an attempted different value can be ignored. Failure to preserve the
+value (including absence) aborts that artifact operation. Recovery receipts also
+verify provenance, mode, owner, group and data protection before treating a copy
+as complete. This does not provide general extended-attribute migration support.

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show TextRange;
 
 import '../markdown_list_syntax.dart';
 import '../markdown_table_syntax.dart';
@@ -24,6 +25,108 @@ final class IanvsMarkdownHeadingNavigation {
   const IanvsMarkdownHeadingNavigation(this.sourceOffset);
 
   final int sourceOffset;
+}
+
+/// Snapshot-bound source navigation, independent of the editing selection.
+///
+/// Offsets are UTF-16. A collapsed range locates a caret; a nonempty range
+/// locates content. Requests are invalidated when the source changes.
+@immutable
+final class IanvsMarkdownSourceNavigation {
+  const IanvsMarkdownSourceNavigation({
+    required this.source,
+    required this.range,
+    this.viewportOffset,
+    this.targetId,
+  });
+
+  final String source;
+  final TextRange range;
+
+  /// Optional decoded rendered anchor ID; source range remains the fallback.
+  final String? targetId;
+
+  /// Optional target top relative to the viewport top, in logical pixels.
+  /// Negative values preserve a partially visible block.
+  final double? viewportOffset;
+}
+
+/// A visible source location and its vertical placement, bound to a snapshot.
+/// Hosts may persist offsets alongside the same source snapshot; composing and
+/// reading selection are deliberately not part of this value.
+@immutable
+final class IanvsMarkdownViewportAnchor {
+  const IanvsMarkdownViewportAnchor({
+    required this.source,
+    required this.sourceOffset,
+    required this.viewportOffset,
+  });
+
+  final String source;
+  final int sourceOffset;
+  final double viewportOffset;
+
+  bool get isValid =>
+      sourceOffset >= 0 &&
+      sourceOffset <= source.length &&
+      viewportOffset.isFinite;
+
+  /// Retains unchanged prefix/suffix positions. A uniquely matching following
+  /// excerpt also survives a moved block. Ambiguous/replaced content falls back
+  /// to the start of the changed span, without guessing between duplicates.
+  IanvsMarkdownViewportAnchor rebase(String next) {
+    if (next == source) return this;
+    var prefix = 0;
+    while (prefix < source.length &&
+        prefix < next.length &&
+        source.codeUnitAt(prefix) == next.codeUnitAt(prefix)) {
+      prefix++;
+    }
+    if (prefix > 0 &&
+        prefix < next.length &&
+        next.codeUnitAt(prefix) >= 0xdc00 &&
+        next.codeUnitAt(prefix) <= 0xdfff &&
+        next.codeUnitAt(prefix - 1) >= 0xd800 &&
+        next.codeUnitAt(prefix - 1) <= 0xdbff) {
+      prefix--;
+    }
+    var suffix = 0;
+    while (suffix < source.length - prefix &&
+        suffix < next.length - prefix &&
+        source.codeUnitAt(source.length - suffix - 1) ==
+            next.codeUnitAt(next.length - suffix - 1)) {
+      suffix++;
+    }
+    int? offset;
+    if (sourceOffset < prefix) {
+      offset = sourceOffset;
+    } else if (sourceOffset >= source.length - suffix) {
+      offset = sourceOffset + next.length - source.length;
+    } else if (sourceOffset >= 0 && sourceOffset < source.length) {
+      final excerpt = source.substring(
+        sourceOffset,
+        (sourceOffset + 128).clamp(0, source.length),
+      );
+      if (excerpt.trim().length >= 8) {
+        final found = next.indexOf(excerpt);
+        if (found >= 0 && next.indexOf(excerpt, found + 1) < 0) offset = found;
+      }
+    }
+    return IanvsMarkdownViewportAnchor(
+      source: next,
+      sourceOffset: (offset ?? prefix).clamp(0, next.length),
+      viewportOffset: offset == null ? 0 : viewportOffset,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is IanvsMarkdownViewportAnchor &&
+      source == other.source &&
+      sourceOffset == other.sourceOffset &&
+      viewportOffset == other.viewportOffset;
+  @override
+  int get hashCode => Object.hash(source, sourceOffset, viewportOffset);
 }
 
 enum IanvsMarkdownBlockType {

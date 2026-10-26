@@ -13,6 +13,7 @@ mkdir -p "$app_dir/build/export-qa"
 python3 -m unittest discover -s "$app_dir/tool" -p test_native_test_watchdog.py
 python3 "$app_dir/tool/check_document_export_entitlements.py"
 test -s "$app_dir/build/export-qa/document.html"
+python3 "$app_dir/tool/check_bundle_fixtures.py" "$app_dir/build/export-qa"
 : "${PDF_QA_PYTHON:?Set PDF_QA_PYTHON to the isolated hash-pinned export QA Python}"
 echo "PHASE: independent PDF content checker regressions"
 python3 "$app_dir/tool/native_test_watchdog.py" --timeout-seconds 60 -- \

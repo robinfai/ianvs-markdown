@@ -2,10 +2,14 @@ import 'link_target.dart';
 import 'localization.dart';
 import 'keyboard.dart';
 import 'dart:async';
+import 'dart:convert' show LineSplitter;
+import 'renderer/source_mapped_document.dart';
+import 'renderer/reading_text_index.dart';
 
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show SelectedContent;
+import 'package:flutter/rendering.dart'
+    show SelectedContent, ScrollDirection, RenderAbstractViewport;
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
@@ -61,6 +65,9 @@ import 'obsidian_image.dart';
 import 'render_budget.dart';
 import 'budget_notice.dart';
 import 'renderer/scoped_body.dart';
+import 'renderer/source_regions.dart';
+import 'renderer/reading_highlight.dart';
+import 'renderer/viewport_geometry.dart';
 import 'rich_clipboard.dart';
 import 'strikethrough.dart';
 import 'syntax_preset.dart';
@@ -68,6 +75,8 @@ import 'task_checkbox.dart';
 import 'task_syntax.dart';
 import 'theme.dart';
 import 'wiki_embed.dart';
+
+part 'renderer/reading_dialect.dart';
 
 typedef IanvsMarkdownFallbackBuilder =
     Widget Function(BuildContext context, IanvsMarkdownRenderDecision decision);
@@ -250,6 +259,9 @@ class IanvsMarkdown extends StatelessWidget {
     );
   }
 
+  Widget _wrapPlainFallback(BuildContext context, String text, Widget child) =>
+      MarkdownSourceRegionScope.of(context)?.wrapPlain(text, child) ?? child;
+
   Widget _buildConstrained(
     BuildContext context,
     BoxConstraints constraints, {
@@ -278,20 +290,23 @@ class IanvsMarkdown extends StatelessWidget {
                 : IanvsMarkdownMessage.documentPlainReading,
             colors: colors,
           ),
-          if (blockSelectable)
-            SelectableText(
-              contextMenuBuilder: (_, state) =>
-                  buildMarkdownSelectableContextMenu(context, state),
-              decision.text,
-              key: const ValueKey('ianvs-markdown-plain-fallback'),
-              style: style,
-            )
-          else
-            Text(
-              decision.text,
-              key: const ValueKey('ianvs-markdown-plain-fallback'),
-              style: style,
-            ),
+          _wrapPlainFallback(
+            context,
+            decision.text,
+            blockSelectable
+                ? SelectableText(
+                    contextMenuBuilder: (_, state) =>
+                        buildMarkdownSelectableContextMenu(context, state),
+                    decision.text,
+                    key: const ValueKey('ianvs-markdown-plain-fallback'),
+                    style: style,
+                  )
+                : Text(
+                    decision.text,
+                    key: const ValueKey('ianvs-markdown-plain-fallback'),
+                    style: style,
+                  ),
+          ),
         ],
       );
     }
@@ -564,101 +579,14 @@ class IanvsMarkdown extends StatelessWidget {
         ),
       ...builders,
     };
-    final effectiveBlockSyntaxes = <md.BlockSyntax>[
-      ...?blockSyntaxes,
-      const IanvsMarkdownIndentedCodeBlockSyntax(),
-      const IanvsMarkdownHtmlHorizontalRuleSyntax(),
-      const IanvsMarkdownHtmlButtonSyntax(),
-      const IanvsMarkdownHtmlCheckboxSyntax(),
-      const IanvsMarkdownHtmlDateInputSyntax(),
-      if (obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.reading)
-        const IanvsMarkdownHtmlMeterSyntax(),
-      const IanvsMarkdownHtmlNumberInputSyntax(),
-      const IanvsMarkdownHtmlPasswordInputSyntax(),
-      const IanvsMarkdownHtmlPreSyntax(),
-      const IanvsMarkdownHtmlProgressSyntax(),
-      const IanvsMarkdownHtmlRadioGroupSyntax(),
-      const IanvsMarkdownHtmlRangeInputSyntax(),
-      const IanvsMarkdownHtmlSelectSyntax(),
-      const IanvsMarkdownHtmlTextareaSyntax(),
-      const IanvsMarkdownHtmlFieldsetSyntax(),
-      const IanvsMarkdownHtmlBlockquoteSyntax(),
-      const IanvsMarkdownHtmlCenterSyntax(),
-      const IanvsMarkdownHtmlDefinitionListSyntax(),
-      const IanvsMarkdownHtmlFigureSyntax(),
-      const IanvsMarkdownHtmlTableSyntax(),
-      const IanvsMarkdownHtmlTemporalInputSyntax(),
-      const IanvsMarkdownHtmlTextInputSyntax(),
-      const IanvsMarkdownHtmlTimeInputSyntax(),
-      const IanvsMarkdownHtmlUnorderedListSyntax(),
-      const IanvsMarkdownHtmlOrderedListSyntax(),
-      const IanvsMarkdownHtmlDetailsSyntax(),
-      if (obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing)
-        const IanvsMarkdownEditingCommentBlockSyntax(),
-      if (obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing)
-        const IanvsMarkdownEditingFootnoteDefinitionSyntax(),
-      const IanvsMarkdownDisplayMathSyntax(),
-      const IanvsMarkdownWikiEmbedSyntax(),
-      const IanvsMarkdownCalloutSyntax(),
-    ];
-    final effectiveInlineSyntaxes = <md.InlineSyntax>[
-      ...?inlineSyntaxes,
-      IanvsMarkdownCodeSpanSyntax(
-        presentation:
-            obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing
-            ? IanvsMarkdownCodeSpanPresentation.editing
-            : IanvsMarkdownCodeSpanPresentation.reading,
-      ),
-      IanvsMarkdownInlineDisplayMathSyntax(),
-      IanvsMarkdownInlineMathSyntax(),
-      IanvsMarkdownEntitySyntax(
-        presentation:
-            obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing
-            ? IanvsMarkdownEntityPresentation.editing
-            : IanvsMarkdownEntityPresentation.reading,
-      ),
-      // Angle autolinks are syntactically more specific than raw HTML.
-      // Giving them first refusal keeps `<https:…>`, `<user@example.com>`,
-      // and custom schemes from being consumed by the safe HTML fallback.
-      IanvsMarkdownAutolinkSyntax(),
-      ...ianvsMarkdownInlineHtmlSyntaxes(obsidianMetadataMode),
-      if (obsidianMetadataMode ==
-          IanvsMarkdownObsidianMetadataMode.editing) ...[
-        IanvsMarkdownEditingMetadataInlineSyntax.comment(),
-        IanvsMarkdownEditingMetadataInlineSyntax.blockId(),
-        IanvsMarkdownEditingMetadataInlineSyntax.standardFootnote(),
-        IanvsMarkdownEditingMetadataInlineSyntax.inlineFootnote(),
-      ],
-      IanvsMarkdownLiteralReferenceWhitespaceSyntax(),
-      // Metadata syntaxes such as block IDs include their leading space, so
-      // they must get first refusal before rendered whitespace is collapsed.
-      IanvsMarkdownRenderedWhitespaceSyntax(),
-      IanvsMarkdownEmphasisSyntax(
-        presentation:
-            obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing
-            ? IanvsMarkdownEmphasisPresentation.editing
-            : IanvsMarkdownEmphasisPresentation.reading,
-      ),
-      IanvsMarkdownHighlightSyntax(
-        presentation:
-            obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing
-            ? IanvsMarkdownHighlightPresentation.editing
-            : IanvsMarkdownHighlightPresentation.reading,
-      ),
-      IanvsMarkdownStrikethroughSyntax(
-        presentation:
-            obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing
-            ? IanvsMarkdownStrikethroughPresentation.editing
-            : IanvsMarkdownStrikethroughPresentation.reading,
-      ),
-      IanvsMarkdownWikiLinkSyntax(
-        presentation:
-            obsidianMetadataMode == IanvsMarkdownObsidianMetadataMode.editing
-            ? IanvsMarkdownWikiLinkPresentation.editing
-            : IanvsMarkdownWikiLinkPresentation.reading,
-      ),
-      IanvsMarkdownTagSyntax(),
-    ];
+    final effectiveBlockSyntaxes = _readingBlockSyntaxes(
+      obsidianMetadataMode,
+      blockSyntaxes?.toList(),
+    );
+    final effectiveInlineSyntaxes = _readingInlineSyntaxes(
+      obsidianMetadataMode,
+      inlineSyntaxes?.toList(),
+    );
     final preparedData = IanvsMarkdownEditorDiagnostics.measure(
       'body.prepare',
       () => _projectIrregularObsidianTables(
@@ -1334,6 +1262,10 @@ class IanvsMarkdownView extends StatefulWidget {
     this.enableHeadingFolding = false,
     this.headingFoldController,
     this.headingNavigation,
+    this.sourceNavigation,
+    this.readingHighlights,
+    this.initialViewportAnchor,
+    this.onViewportChanged,
     this.outlineBreakpoint = 560,
     this.outlineWidth = 180,
     this.contentMaxWidth = 840,
@@ -1393,6 +1325,14 @@ class IanvsMarkdownView extends StatefulWidget {
 
   /// Optional heading requests using offsets in [data], including front matter.
   final ValueListenable<IanvsMarkdownHeadingNavigation?>? headingNavigation;
+
+  /// Snapshot-bound source positioning, independent of reading selection.
+  final ValueListenable<IanvsMarkdownSourceNavigation?>? sourceNavigation;
+
+  /// Snapshot-bound paint-only search matches in the rendered body.
+  final IanvsMarkdownReadingHighlights? readingHighlights;
+  final IanvsMarkdownViewportAnchor? initialViewportAnchor;
+  final ValueChanged<IanvsMarkdownViewportAnchor>? onViewportChanged;
   final double outlineBreakpoint;
   final double outlineWidth;
   final double contentMaxWidth;
@@ -1441,6 +1381,14 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
   late IanvsMarkdownDocument _document;
   late List<IanvsMarkdownHeading> _headings;
   late IanvsMarkdownHeadingFoldModel _headingFoldModel;
+  MarkdownSourceRegions? _sourceRegions;
+  final _plainFallbackKey = GlobalKey();
+  var _sourceNavigationEpoch = 0;
+  IanvsMarkdownViewportAnchor? _viewportAnchor;
+  IanvsMarkdownViewportAnchor? _reportedViewportAnchor;
+  var _viewportCaptureScheduled = false;
+  var _restoringViewport = false;
+  var _layoutRestoreScheduled = false;
   var _outlineCollapsed = false;
   int? _activeHeadingIndex;
 
@@ -1451,23 +1399,52 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
   void initState() {
     super.initState();
     _scrollController = widget.controller ?? ScrollController();
+    _scrollController.addListener(_scheduleViewportCapture);
+    _viewportAnchor = widget.initialViewportAnchor;
     _headingFoldController =
         widget.headingFoldController ?? IanvsMarkdownHeadingFoldController();
     _parseDocument();
     _headingFoldController.addListener(_handleHeadingFoldsChanged);
     widget.headingNavigation?.addListener(_handleHeadingNavigation);
+    widget.sourceNavigation?.addListener(_handleSourceNavigation);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (widget.sourceNavigation?.value != null) {
+        _handleSourceNavigation();
+      } else if (_viewportAnchor != null) {
+        _restoreReadingAnchor();
+      } else {
+        _scheduleViewportCapture();
+      }
+    });
   }
 
   @override
   void didUpdateWidget(covariant IanvsMarkdownView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.sourceNavigation, widget.sourceNavigation)) {
+      oldWidget.sourceNavigation?.removeListener(_handleSourceNavigation);
+      widget.sourceNavigation?.addListener(_handleSourceNavigation);
+      _sourceNavigationEpoch++;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _handleSourceNavigation();
+      });
+    }
+    if (oldWidget.data != widget.data ||
+        !identical(oldWidget.controller, widget.controller)) {
+      _sourceNavigationEpoch++;
+      _restoringViewport = false;
+    }
     if (!identical(oldWidget.headingNavigation, widget.headingNavigation)) {
       oldWidget.headingNavigation?.removeListener(_handleHeadingNavigation);
       widget.headingNavigation?.addListener(_handleHeadingNavigation);
     }
     if (!identical(oldWidget.controller, widget.controller)) {
+      _scrollController.removeListener(_scheduleViewportCapture);
       if (oldWidget.controller == null) _scrollController.dispose();
       _scrollController = widget.controller ?? ScrollController();
+      _scrollController.addListener(_scheduleViewportCapture);
+      _viewportAnchor = widget.initialViewportAnchor;
     }
     if (!identical(
       oldWidget.headingFoldController,
@@ -1488,12 +1465,24 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
         oldWidget.renderBudget != widget.renderBudget) {
       _parseDocument();
       _activeHeadingIndex = null;
-      if (!widget.preserveScrollOnUpdate) {
+      _viewportAnchor =
+          !identical(
+            oldWidget.initialViewportAnchor,
+            widget.initialViewportAnchor,
+          )
+          ? widget.initialViewportAnchor?.rebase(widget.data)
+          : widget.preserveScrollOnUpdate
+          ? _viewportAnchor?.rebase(widget.data)
+          : null;
+      if (_viewportAnchor != null) {
+        _restoreReadingAnchor();
+      } else if (!widget.preserveScrollOnUpdate) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted &&
               !widget.preserveScrollOnUpdate &&
               _scrollController.hasClients) {
             _scrollController.jumpTo(0);
+            _scheduleViewportCapture();
           }
         });
       }
@@ -1531,6 +1520,218 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
     if (mounted) setState(() {});
   }
 
+  void _handleSourceNavigation() {
+    final request = widget.sourceNavigation?.value;
+    final epoch = ++_sourceNavigationEpoch;
+    _restoringViewport = false;
+    if (request == null ||
+        request.source != widget.data ||
+        !request.range.isValid ||
+        !request.range.isNormalized ||
+        request.range.end > widget.data.length) {
+      return;
+    }
+    _restoringViewport = true;
+    unawaited(_revealSource(request, epoch));
+  }
+
+  Future<void> _revealSource(
+    IanvsMarkdownSourceNavigation request,
+    int epoch, {
+    bool restoringAnchor = false,
+  }) async {
+    final scroll = _scrollController;
+    bool current() =>
+        mounted &&
+        epoch == _sourceNavigationEpoch &&
+        identical(scroll, _scrollController) &&
+        request.source == widget.data &&
+        (restoringAnchor || identical(widget.sourceNavigation?.value, request));
+    final bodyOffset =
+        request.range.start - (widget.data.length - _document.body.length);
+    final blockIndex = _headingFoldModel.blocks.indexWhere(
+      (block) => block.end >= bodyOffset,
+    );
+    if (widget.enableHeadingFolding && blockIndex >= 0) {
+      _headingFoldController.expandIdentities(
+        _headingFoldModel.collapsedAncestorIdentities(
+          blockIndex,
+          _headingFoldController,
+        ),
+      );
+    }
+    await WidgetsBinding.instance.endOfFrame;
+    if (!current() || !scroll.hasClients) return;
+    final target =
+        _sourceRegions?.contextForTarget(request.targetId) ??
+        _sourceRegions?.contextAt(request.range.start);
+    if (_sourceRegions?.revealPlain(request, scroll) == true) {
+      // Plain fallback uses caret geometry without changing its selection.
+    } else if (target != null && target.mounted) {
+      if (request.viewportOffset case final offset?) {
+        restoreMarkdownViewport(target, scroll, offset);
+      } else if (target.findRenderObject()
+          case final RenderMarkdownReadingHighlight highlight
+          when highlight.activeRect != null) {
+        highlight.revealActiveText();
+        final viewport = RenderAbstractViewport.maybeOf(highlight);
+        if (viewport != null) {
+          final position = scroll.position;
+          final offset = viewport
+              .getOffsetToReveal(highlight, .08, rect: highlight.activeRect)
+              .offset;
+          scroll.jumpTo(
+            offset.clamp(position.minScrollExtent, position.maxScrollExtent),
+          );
+        }
+      } else {
+        await Scrollable.ensureVisible(
+          target,
+          alignment: .08,
+          duration: Duration.zero,
+        );
+      }
+    }
+    if (current()) {
+      _restoringViewport = false;
+      _scheduleViewportCapture();
+    }
+  }
+
+  void _scheduleViewportCapture() {
+    if (!mounted ||
+        _restoringViewport ||
+        _viewportCaptureScheduled ||
+        (widget.onViewportChanged == null &&
+            widget.initialViewportAnchor == null)) {
+      return;
+    }
+    _viewportCaptureScheduled = true;
+    final source = widget.data;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _viewportCaptureScheduled = false;
+      if (!mounted || _restoringViewport || widget.data != source) return;
+      final anchor = _sourceRegions?.capture();
+      if (anchor == null) return;
+      _viewportAnchor = anchor;
+      if (anchor == _reportedViewportAnchor) return;
+      _reportedViewportAnchor = anchor;
+      widget.onViewportChanged?.call(anchor);
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  void _restoreReadingAnchor() {
+    final anchor = _viewportAnchor;
+    if (anchor == null || !anchor.isValid || anchor.source != widget.data) {
+      return;
+    }
+    _restoringViewport = true;
+    final request = IanvsMarkdownSourceNavigation(
+      source: anchor.source,
+      range: TextRange.collapsed(anchor.sourceOffset),
+      viewportOffset: anchor.viewportOffset,
+    );
+    unawaited(
+      _revealSource(request, ++_sourceNavigationEpoch, restoringAnchor: true),
+    );
+  }
+
+  bool _handleUserReadingScroll(UserScrollNotification notification) {
+    if (notification.direction != ScrollDirection.idle &&
+        notification.context != null &&
+        _scrollController.hasClients &&
+        identical(
+          Scrollable.maybeOf(notification.context!)?.position,
+          _scrollController.position,
+        )) {
+      _sourceNavigationEpoch++;
+      _restoringViewport = false;
+      _scheduleViewportCapture();
+    }
+    return false;
+  }
+
+  bool _handleReadingLayout(SizeChangedLayoutNotification notification) {
+    if (_restoringViewport ||
+        _layoutRestoreScheduled ||
+        _viewportAnchor == null ||
+        _viewportCaptureScheduled ||
+        !_scrollController.hasClients ||
+        _scrollController.position.isScrollingNotifier.value) {
+      return false;
+    }
+    _layoutRestoreScheduled = true;
+    final epoch = _sourceNavigationEpoch;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _layoutRestoreScheduled = false;
+      if (mounted &&
+          epoch == _sourceNavigationEpoch &&
+          !_restoringViewport &&
+          !_viewportCaptureScheduled) {
+        _restoreReadingAnchor();
+      }
+    });
+    return false;
+  }
+
+  List<int> _readingLineOffsets(String projected) {
+    final source = _document.body;
+    final bodyStart = widget.data.length - source.length;
+    final spans = <({int projected, int original, int length})>[];
+    var outputOffset = 0;
+    var cursor = 0;
+    void retain(int start, int end) {
+      spans.add((
+        projected: outputOffset,
+        original: bodyStart + start,
+        length: end - start,
+      ));
+      outputOffset += end - start;
+    }
+
+    if (widget.enableHeadingFolding) {
+      final hidden = _headingFoldModel.hiddenBlockIndices(
+        _headingFoldController,
+      );
+      for (final section in _headingFoldModel.sections) {
+        if (!section.canFold ||
+            hidden.contains(section.headingBlockIndex) ||
+            !_headingFoldController.isCollapsed(section.identity)) {
+          continue;
+        }
+        final heading = _headingFoldModel.blocks[section.headingBlockIndex];
+        final end = section.endBlockIndex < _headingFoldModel.blocks.length
+            ? _headingFoldModel.blocks[section.endBlockIndex].start
+            : source.length;
+        if (heading.end < cursor) continue;
+        retain(cursor, heading.end);
+        if (end < source.length) {
+          outputOffset += 2; // Generated blank separator.
+        }
+        cursor = end;
+      }
+    }
+    retain(cursor, source.length);
+    final offsets = <int>[
+      0,
+      for (final match in RegExp(r'\r\n|\r|\n').allMatches(projected))
+        match.end,
+    ];
+    var spanIndex = 0;
+    return offsets
+        .map((offset) {
+          while (spanIndex + 1 < spans.length &&
+              offset >= spans[spanIndex].projected + spans[spanIndex].length) {
+            spanIndex++;
+          }
+          final span = spans[spanIndex];
+          return span.original +
+              (offset - span.projected).clamp(0, span.length);
+        })
+        .toList(growable: false);
+  }
+
   void _handleHeadingNavigation() {
     final request = widget.headingNavigation?.value;
     if (request == null) return;
@@ -1547,8 +1748,10 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
   @override
   void dispose() {
     widget.headingNavigation?.removeListener(_handleHeadingNavigation);
+    widget.sourceNavigation?.removeListener(_handleSourceNavigation);
     _headingFoldController.removeListener(_handleHeadingFoldsChanged);
     if (_ownsHeadingFoldController) _headingFoldController.dispose();
+    _scrollController.removeListener(_scheduleViewportCapture);
     if (_ownsController) _scrollController.dispose();
     super.dispose();
   }
@@ -1562,6 +1765,20 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
             source: _document.body,
             visibleHeadingIdentities: _headingFoldModel.identities,
           );
+    final sourceRegions =
+        widget.sourceNavigation == null &&
+            widget.onViewportChanged == null &&
+            widget.initialViewportAnchor == null &&
+            widget.readingHighlights == null
+        ? null
+        : MarkdownSourceRegions(
+            plainKey: _plainFallbackKey,
+            source: widget.data,
+            lineOffsets: _readingLineOffsets(foldProjection.source),
+            highlights:
+                widget.readingHighlights?._flowsFor(widget.data) ?? const {},
+          );
+    _sourceRegions = sourceRegions;
     final headingPresentations = <_MarkdownHeadingPresentation>[];
     for (
       var index = 0;
@@ -1597,99 +1814,115 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
         'h6': headingBuilder,
       },
     };
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final showOutline =
-            widget.showOutline &&
-            constraints.maxWidth >= widget.outlineBreakpoint &&
-            _headings.isNotEmpty;
-        return Row(
-          key: const ValueKey('ianvs-markdown-view'),
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (showOutline) ...[
-              SizedBox(
-                width: _outlineCollapsed ? 44 : widget.outlineWidth,
-                child: _MarkdownOutline(
-                  headings: _headings,
-                  collapsed: _outlineCollapsed,
-                  activeHeadingIndex: _activeHeadingIndex,
-                  maximumItems: widget.maximumOutlineItems,
-                  colors: colors,
-                  onToggle: () =>
-                      setState(() => _outlineCollapsed = !_outlineCollapsed),
-                  onSelect: _scrollToHeading,
+    return NotificationListener<UserScrollNotification>(
+      onNotification: _handleUserReadingScroll,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final showOutline =
+              widget.showOutline &&
+              constraints.maxWidth >= widget.outlineBreakpoint &&
+              _headings.isNotEmpty;
+          return Row(
+            key: const ValueKey('ianvs-markdown-view'),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (showOutline) ...[
+                SizedBox(
+                  width: _outlineCollapsed ? 44 : widget.outlineWidth,
+                  child: _MarkdownOutline(
+                    headings: _headings,
+                    collapsed: _outlineCollapsed,
+                    activeHeadingIndex: _activeHeadingIndex,
+                    maximumItems: widget.maximumOutlineItems,
+                    colors: colors,
+                    onToggle: () =>
+                        setState(() => _outlineCollapsed = !_outlineCollapsed),
+                    onSelect: _scrollToHeading,
+                  ),
                 ),
-              ),
-              VerticalDivider(width: 1, color: colors.border),
-            ],
-            Expanded(
-              child: _IanvsMarkdownReadingSelection(
-                enabled: widget.selectable,
-                focusNode: widget.focusNode,
-                autofocus: widget.autofocus,
-                markdown: widget.data,
-                richMarkdown: _document.body,
-                syntaxPreset: widget.syntaxPreset,
-                clipboardWriter: widget.clipboardWriter,
-                clipboardBudget: widget.clipboardBudget,
-                onSelectionChanged: widget.onSelectionChanged,
-                child: SingleChildScrollView(
-                  key: const ValueKey('ianvs-markdown-scroll-view'),
-                  controller: _scrollController,
-                  padding: widget.padding,
-                  child: Align(
-                    alignment: widget.contentAlignment,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: widget.contentMaxWidth,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (widget.showFrontMatter &&
-                              _document.metadata.isNotEmpty) ...[
-                            IanvsMarkdownFrontMatterCard(
-                              entries: _document.metadata,
-                              theme: colors,
-                              compact: widget.compactFrontMatter,
-                              initiallyExpanded: true,
-                              showDocumentTitle: widget.showDocumentTitle,
-                              onTapLink: widget.onTapLink,
-                              onTapLinkTarget: widget.onTapLinkTarget,
+                VerticalDivider(width: 1, color: colors.border),
+              ],
+              Expanded(
+                child: _IanvsMarkdownReadingSelection(
+                  enabled: widget.selectable,
+                  focusNode: widget.focusNode,
+                  autofocus: widget.autofocus,
+                  markdown: widget.data,
+                  richMarkdown: _document.body,
+                  syntaxPreset: widget.syntaxPreset,
+                  clipboardWriter: widget.clipboardWriter,
+                  clipboardBudget: widget.clipboardBudget,
+                  onSelectionChanged: widget.onSelectionChanged,
+                  child: SingleChildScrollView(
+                    key: const ValueKey('ianvs-markdown-scroll-view'),
+                    controller: _scrollController,
+                    padding: widget.padding,
+                    child: Align(
+                      alignment: widget.contentAlignment,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: widget.contentMaxWidth,
+                        ),
+                        child:
+                            NotificationListener<SizeChangedLayoutNotification>(
+                              onNotification: _handleReadingLayout,
+                              child: SizeChangedLayoutNotifier(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    if (widget.showFrontMatter &&
+                                        _document.metadata.isNotEmpty) ...[
+                                      IanvsMarkdownFrontMatterCard(
+                                        entries: _document.metadata,
+                                        theme: colors,
+                                        compact: widget.compactFrontMatter,
+                                        initiallyExpanded: true,
+                                        showDocumentTitle:
+                                            widget.showDocumentTitle,
+                                        onTapLink: widget.onTapLink,
+                                        onTapLinkTarget: widget.onTapLinkTarget,
+                                      ),
+                                      const SizedBox(height: 18),
+                                    ],
+                                    MarkdownSourceRegionScope(
+                                      regions: sourceRegions,
+                                      child: IanvsMarkdown(
+                                        data: foldProjection.source,
+                                        syntaxPreset: widget.syntaxPreset,
+                                        selectable: false,
+                                        softLineBreak: widget.softLineBreak,
+                                        styleSheet: widget.styleSheet,
+                                        onTapLink: widget.onTapLink,
+                                        onTapLinkTarget: widget.onTapLinkTarget,
+                                        imageBuilder: widget.imageBuilder,
+                                        builders: headingBuilders,
+                                        renderBudget: widget.renderBudget,
+                                        fallbackBuilder: widget.fallbackBuilder,
+                                        diagramBuilder: widget.diagramBuilder,
+                                        mathBuilder: widget.mathBuilder,
+                                        onCopyCode: widget.onCopyCode,
+                                        wikiEmbedBuilder:
+                                            widget.wikiEmbedBuilder,
+                                        wikiLinkExists: widget.wikiLinkExists,
+                                        enableFileLinkChips:
+                                            widget.enableFileLinkChips,
+                                        theme: colors,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
-                            const SizedBox(height: 18),
-                          ],
-                          IanvsMarkdown(
-                            data: foldProjection.source,
-                            syntaxPreset: widget.syntaxPreset,
-                            selectable: false,
-                            softLineBreak: widget.softLineBreak,
-                            styleSheet: widget.styleSheet,
-                            onTapLink: widget.onTapLink,
-                            onTapLinkTarget: widget.onTapLinkTarget,
-                            imageBuilder: widget.imageBuilder,
-                            builders: headingBuilders,
-                            renderBudget: widget.renderBudget,
-                            fallbackBuilder: widget.fallbackBuilder,
-                            diagramBuilder: widget.diagramBuilder,
-                            mathBuilder: widget.mathBuilder,
-                            onCopyCode: widget.onCopyCode,
-                            wikiEmbedBuilder: widget.wikiEmbedBuilder,
-                            wikiLinkExists: widget.wikiLinkExists,
-                            enableFileLinkChips: widget.enableFileLinkChips,
-                            theme: colors,
-                          ),
-                        ],
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
-        );
-      },
+            ],
+          );
+        },
+      ),
     );
   }
 

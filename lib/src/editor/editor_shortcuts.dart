@@ -56,6 +56,7 @@ class IanvsMarkdownEditorShortcuts extends StatelessWidget {
       },
       IanvsMarkdownCommand.indent: const _IndentIntent(),
       IanvsMarkdownCommand.outdent: const _OutdentIntent(),
+      IanvsMarkdownCommand.pastePlainText: const MarkdownPlainPasteIntent(),
     };
     final shortcuts = Shortcuts(
       shortcuts: <ShortcutActivator, Intent>{
@@ -87,6 +88,7 @@ class IanvsMarkdownEditorShortcuts extends StatelessWidget {
           ),
           _DeleteLineIntent: _DeleteLineAction(controller),
           PasteTextIntent: _MarkdownPasteAction(controller, onPaste),
+          MarkdownPlainPasteIntent: _MarkdownPlainPasteAction(controller),
           _BoldIntent: CallbackAction<_BoldIntent>(
             onInvoke: (_) {
               if (controller.mode != IanvsMarkdownEditorMode.preview) {
@@ -234,6 +236,27 @@ class _DeleteLineAction extends ContextAction<_DeleteLineIntent> {
   }
 }
 
+class _MarkdownPlainPasteAction
+    extends ContextAction<MarkdownPlainPasteIntent> {
+  _MarkdownPlainPasteAction(this.controller);
+  final IanvsMarkdownController controller;
+
+  @override
+  Object? invoke(MarkdownPlainPasteIntent intent, [BuildContext? context]) {
+    final request = _MarkdownPasteRequest(controller, context);
+    if (!request.isCurrent || markdownHasComposition(controller)) return null;
+    unawaited(
+      _MarkdownPasteAction(controller, null)._pasteWithHost(
+        const PasteTextIntent(SelectionChangedCause.keyboard),
+        null,
+        request,
+        plain: true,
+      ),
+    );
+    return null;
+  }
+}
+
 class _MarkdownPasteAction extends ContextAction<PasteTextIntent> {
   _MarkdownPasteAction(this.controller, this.onPaste);
 
@@ -247,33 +270,26 @@ class _MarkdownPasteAction extends ContextAction<PasteTextIntent> {
         _isInsideFrontMatterCard(context)) {
       return defaultAction?.invoke(intent);
     }
-    if (onPaste case final callback?) {
-      final kind = markdownFocusedKind(controller);
-      if (kind == MarkdownCommandKind.table ||
-          kind == MarkdownCommandKind.property) {
-        return defaultAction?.invoke(intent);
-      }
-      final request = _MarkdownPasteRequest(controller, context);
-      if (!request.isCurrent || markdownHasComposition(controller)) return null;
-      unawaited(_pasteWithHost(intent, callback, request));
-      return null;
-    }
-    final selection = controller.selection;
-    if (!selection.isValid || selection.isCollapsed) {
+    final kind = markdownFocusedKind(controller);
+    if (kind == MarkdownCommandKind.table ||
+        kind == MarkdownCommandKind.property) {
       return defaultAction?.invoke(intent);
     }
-    unawaited(_pasteSelectedText(intent, defaultAction, context));
+    final request = _MarkdownPasteRequest(controller, context);
+    if (!request.isCurrent || markdownHasComposition(controller)) return null;
+    unawaited(_pasteWithHost(intent, onPaste, request));
     return null;
   }
 
   Future<void> _pasteWithHost(
     PasteTextIntent intent,
-    Future<bool> Function() callback,
-    _MarkdownPasteRequest request,
-  ) async {
+    Future<bool> Function()? callback,
+    _MarkdownPasteRequest request, {
+    bool plain = false,
+  }) async {
     request.listen();
     try {
-      if (await callback()) return;
+      if (callback != null && await callback()) return;
       await WidgetsBinding.instance.endOfFrame;
       if (!request.isCurrent) return;
       final data = await readPlainTextClipboardSafely();
@@ -281,7 +297,23 @@ class _MarkdownPasteAction extends ContextAction<PasteTextIntent> {
       if (!request.isCurrent) return;
       final text = data?.text;
       if (text == null) return;
-      final replacement = smartUrlPasteValue(controller.value, text);
+      final kind = markdownFocusedKind(controller);
+      final local =
+          kind == MarkdownCommandKind.table ||
+          kind == MarkdownCommandKind.property;
+      final replacement = plain
+          ? (local
+                ? null
+                : controller.value
+                      .replaced(controller.selection, text)
+                      .copyWith(
+                        selection: TextSelection.collapsed(
+                          offset: controller.selection.start + text.length,
+                        ),
+                        composing: TextRange.empty,
+                      ))
+          : smartTablePasteValue(controller.value, text) ??
+                smartUrlPasteValue(controller.value, text);
       if (replacement != null) {
         controller.commitHistoryGroup();
         controller.value = replacement;
@@ -308,41 +340,6 @@ class _MarkdownPasteAction extends ContextAction<PasteTextIntent> {
       request.dispose();
     }
   }
-
-  Future<void> _pasteSelectedText(
-    PasteTextIntent intent,
-    Action<PasteTextIntent>? defaultAction,
-    BuildContext? context,
-  ) async {
-    final editable = context?.findAncestorStateOfType<EditableTextState>();
-    final inputController = editable?.widget.controller;
-    final data = await readPlainTextClipboardSafely();
-    // A tab may have been removed or switched synchronously while its old
-    // EditableText is still mounted until the next frame. Let pending surface
-    // changes settle before deciding whether this clipboard request is current.
-    await WidgetsBinding.instance.endOfFrame;
-    // A pending clipboard read must not edit an old document or a Source
-    // surface that became read-only while the platform was responding.
-    if (controller.mode == IanvsMarkdownEditorMode.preview ||
-        (context != null && !context.mounted) ||
-        (editable != null &&
-            (!editable.mounted ||
-                editable.widget.readOnly ||
-                !identical(editable.widget.controller, inputController)))) {
-      return;
-    }
-    final pastedText = data?.text;
-    if (pastedText == null) return;
-    final replacement = smartUrlPasteValue(controller.value, pastedText);
-    if (replacement == null) {
-      defaultAction?.invoke(intent);
-      return;
-    }
-
-    controller.commitHistoryGroup();
-    controller.value = replacement;
-    controller.commitHistoryGroup();
-  }
 }
 
 /// Captures both full-source and live-block state before asynchronous paste.
@@ -354,8 +351,14 @@ class _MarkdownPasteRequest {
       value = controller.value {
     inputController = editable?.widget.controller;
     inputValue = inputController?.value;
+    hadHost =
+        context
+            ?.findAncestorWidgetOfExactType<IanvsMarkdownEditorShortcuts>()
+            ?.onPaste !=
+        null;
   }
 
+  late final bool hadHost;
   final IanvsMarkdownController controller;
   final BuildContext? context;
   final EditableTextState? editable;
@@ -391,7 +394,8 @@ class _MarkdownPasteRequest {
         .findAncestorWidgetOfExactType<IanvsMarkdownEditorShortcuts>();
     // Hosts commonly rebuild a busy indicator while their hook is pending;
     // an equivalent closure created by that build must not cancel text paste.
-    return identical(owner?.controller, controller) && owner?.onPaste != null;
+    return identical(owner?.controller, controller) &&
+        (owner?.onPaste != null) == hadHost;
   }
 
   void _checkInput() {

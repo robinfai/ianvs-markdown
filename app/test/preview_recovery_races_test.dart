@@ -76,6 +76,7 @@ void main() {
       final preview = PreviewController(library: library);
       await tester.pumpWidget(
         LinefoldPreviewApp(
+          readingPositions: memoryPreviewReadingPositions(),
           controller: preview,
           platform: MemoryPreviewPlatform(),
           draftStore: MemoryPreviewDraftStore(),
@@ -116,6 +117,7 @@ void main() {
         );
       await tester.pumpWidget(
         LinefoldPreviewApp(
+          readingPositions: memoryPreviewReadingPositions(),
           controller: preview,
           platform: MemoryPreviewPlatform()..initial = [],
           draftStore: store,
@@ -145,6 +147,7 @@ void main() {
       final preview = PreviewController(library: library);
       await tester.pumpWidget(
         LinefoldPreviewApp(
+          readingPositions: memoryPreviewReadingPositions(),
           controller: preview,
           platform: MemoryPreviewPlatform(),
           draftStore: MemoryPreviewDraftStore(),
@@ -184,6 +187,7 @@ void main() {
       final platform = MemoryPreviewPlatform()..initial = [];
       await tester.pumpWidget(
         LinefoldPreviewApp(
+          readingPositions: memoryPreviewReadingPositions(),
           controller: preview,
           platform: platform,
           draftStore: MemoryPreviewDraftStore(),
@@ -224,6 +228,7 @@ void main() {
       final store = CleanupStore();
       await tester.pumpWidget(
         LinefoldPreviewApp(
+          readingPositions: memoryPreviewReadingPositions(),
           controller: preview,
           platform: MemoryPreviewPlatform(),
           draftStore: store,
@@ -278,6 +283,7 @@ void main() {
       final store = MemoryPreviewDraftStore()..draft = original;
       await tester.pumpWidget(
         LinefoldPreviewApp(
+          readingPositions: memoryPreviewReadingPositions(),
           controller: preview,
           platform: MemoryPreviewPlatform()..initial = [],
           draftStore: store,

@@ -171,6 +171,36 @@ struct NativeDocumentExportAcceptance {
     assert(results.count == 6 && (try? results[5].get()) == true)
     assert((try? String(contentsOf: chosen, encoding: .utf8)) == arguments["content"] as? String)
 
+    phase("binary ZIP destination, cancellation and protected-source handling")
+    let bundleFixture = URL(fileURLWithPath: CommandLine.arguments[1]).deletingLastPathComponent().appendingPathComponent("bundle.zip")
+    let zipBytes = try Data(contentsOf: bundleFixture)
+    var zipSelection: ((URL?) -> Void)?
+    var zipResults = [Result<Bool, Error>]()
+    let zipCoordinator = DocumentExportCoordinator(window: window, pickDestination: { _, _, format, selected in
+      assert(format == "zip")
+      zipSelection = selected
+      return {}
+    }, approveCommit: { _, approved in approved(true) })
+    let zipArguments: [String: Any] = ["operationId": "zip", "bytes": zipBytes, "title": "中文.md", "sourcePath": source.path]
+    zipCoordinator.perform("bundle", arguments: zipArguments) { zipResults.append($0) }
+    zipSelection?(nil)
+    assert(zipResults.count == 1 && (try? zipResults.last!.get()) == false)
+    let zipTarget = root.appendingPathComponent("bundle.zip")
+    zipCoordinator.perform("bundle", arguments: zipArguments) { zipResults.append($0) }
+    zipSelection?(zipTarget)
+    assert(zipResults.count == 2 && (try? zipResults.last!.get()) == true)
+    assert((try? Data(contentsOf: zipTarget)) == zipBytes)
+    let zipAlias = root.appendingPathComponent("source-alias.zip")
+    try fm.linkItem(at: source, to: zipAlias)
+    zipCoordinator.perform("bundle", arguments: zipArguments) { zipResults.append($0) }
+    zipSelection?(zipAlias)
+    assert(zipResults.count == 3 && (try? zipResults.last!.get()) == nil)
+    assert((try? Data(contentsOf: source)) == original)
+    var invalidZip = zipArguments
+    invalidZip["bytes"] = Data("not a ZIP".utf8)
+    zipCoordinator.perform("bundle", arguments: invalidZip) { zipResults.append($0) }
+    assert(zipResults.count == 4 && (try? zipResults.last!.get()) == nil)
+
     phase("scope approval, cancellation identity, timeout and late callbacks")
     var approve: ((Bool) -> Void)?
     var approvals = 0
@@ -290,10 +320,166 @@ struct NativeDocumentExportAcceptance {
     phase("practical PDF content, page geometry, image and all-page evidence")
     try PracticalPDFEvidence.validate(output: output, evidence: evidence)
 
+    phase("variable-height and multiple-table pagination")
+    try MixedTableEvidence.validate(fixture: fixture.deletingLastPathComponent().appendingPathComponent("tables.html"),
+      evidence: evidence, window: window)
+
+    phase("oversized table rejects without holding the print lease")
+    let rejectedOutput = evidence.appendingPathComponent("oversized-table.pdf")
+    var rejectedResult: Result<Bool, Error>?
+    var rejectedCleanup = 0
+    let rejectedJob = OfflineDocumentPrintJob()
+    rejectedJob.run(html: "<table><thead><tr><th>Header</th></tr></thead><tbody><tr><td><div style='height:2000px'>Tall row</div></td></tr></tbody></table>",
+      window: window, pdfDestination: rejectedOutput, terminalCleanup: { rejectedCleanup += 1 }) { rejectedResult = $0 }
+    let rejectionDeadline = Date().addingTimeInterval(10)
+    while rejectedResult == nil && Date() < rejectionDeadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    guard case .failure(let layoutError) = rejectedResult else { fatalError("Oversized row must fail explicitly") }
+    assert(layoutError.localizedDescription.contains("PDF table layout failed"))
+    assert(rejectedCleanup == 1 && !fm.fileExists(atPath: rejectedOutput.path))
+    assert(NSPrintOperation.current == nil)
+
+    phase("rendered math and native Mermaid through offline PDF")
+    try RenderedGraphicsEvidence.validate(
+      fixture: fixture.deletingLastPathComponent().appendingPathComponent("rendered.html"),
+      evidence: evidence, window: window)
+
     let finalSourceHash = SHA256.hash(data: try Data(contentsOf: source))
     assert(finalSourceHash == originalHash)
     print("PASS: exact HTML/Markdown UTF-8 copies, source hash, empty Markdown, cancellation/once-only completion, unsupported Print/share, practical paged PDF evidence, explicit replacement, racing collision, hard-link/symlink, permissions and offline placeholders.")
     window.orderOut(nil)
+  }
+}
+
+private enum MixedTableEvidence {
+  @MainActor
+  static func validate(fixture: URL, evidence: URL, window: NSWindow) throws {
+    let html = try String(contentsOf: fixture, encoding: .utf8)
+    let output = evidence.appendingPathComponent("tables.pdf")
+    let job = OfflineDocumentPrintJob()
+    var result: Result<Bool, Error>?
+    job.run(html: html, window: window, pdfDestination: output) { result = $0 }
+    let deadline = Date().addingTimeInterval(60)
+    while result == nil && Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    guard let result, try result.get(), let pdf = PDFDocument(url: output),
+          (3...20).contains(pdf.pageCount) else {
+      throw DocumentExportError(message: "Mixed table PDF failed or exceeded its page limit")
+    }
+    let text = (pdf.string ?? "").filter { !$0.isWhitespace }
+    var failures = [String]()
+    for group in ["A", "B"] {
+      for row in 0..<40 {
+        for suffix in ["START", "END"] {
+          let marker = "\(group)_ROW_\(row)_\(suffix)"
+          if text.components(separatedBy: marker).count != 2 { failures.append("Lost/duplicated \(marker)") }
+        }
+      }
+      for suffix in ["START", "END"] {
+        if text.components(separatedBy: "SHORT_\(group)_\(suffix)").count != 2 { failures.append("Lost short table \(group)") }
+      }
+    }
+    var tablePages = [String: [Int]]()
+    for index in 0..<pdf.pageCount {
+      guard let page = pdf.page(at: index) else { continue }
+      let content = (page.string ?? "").filter { !$0.isWhitespace }
+      if content.isEmpty { failures.append("Blank mixed-table page \(index + 1)") }
+      let bounds = page.bounds(for: .mediaBox).insetBy(dx: -2, dy: -2)
+      for character in 0..<page.numberOfCharacters {
+        let rectangle = page.characterBounds(at: character)
+        if !rectangle.isEmpty && !rectangle.isNull && !bounds.contains(rectangle) {
+          failures.append("Mixed-table character outside page \(index + 1)")
+          break
+        }
+      }
+      for group in ["A", "B"] {
+        let first = content.contains("SHORT_\(group)_START")
+        let last = content.contains("SHORT_\(group)_END")
+        if first != last { failures.append("Short table row split across pages: \(group)") }
+      }
+
+      for group in ["A", "B"] where content.contains("\(group)_ROW_") {
+        tablePages[group, default: []].append(index + 1)
+        for column in ["ONE", "TWO"] where !content.contains("\(group)_HEAD_\(column)") {
+          failures.append("Missing \(group) header on page \(index + 1)")
+        }
+      }
+      let image = page.thumbnail(of: NSSize(width: 840, height: 1188), for: .mediaBox)
+      guard let tiff = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiff),
+            let png = bitmap.representation(using: .png, properties: [:]) else {
+        throw DocumentExportError(message: "Cannot inspect mixed table PDF")
+      }
+      try png.write(to: evidence.appendingPathComponent("tables-\(index + 1).png"))
+    }
+    for group in ["A", "B"] where (tablePages[group]?.count ?? 0) < 2 { failures.append("Table \(group) did not span pages") }
+    let report: [String: Any] = ["pageCount": pdf.pageCount, "tablePages": tablePages, "failures": failures]
+    try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
+      .write(to: evidence.appendingPathComponent("tables-report.json"))
+    if !failures.isEmpty { throw DocumentExportError(message: failures.joined(separator: "; ")) }
+  }
+}
+
+private enum RenderedGraphicsEvidence {
+  @MainActor
+  static func validate(fixture: URL, evidence: URL, window: NSWindow) throws {
+    let html = try String(contentsOf: fixture, encoding: .utf8)
+    assert(html.contains("data:image/svg+xml;base64,") && html.contains("data:image/png;base64,"))
+    let output = evidence.appendingPathComponent("rendered.pdf")
+    let job = OfflineDocumentPrintJob()
+    var result: Result<Bool, Error>?
+    job.run(html: html, window: window, pdfDestination: output) { result = $0 }
+    let deadline = Date().addingTimeInterval(60)
+    while result == nil && Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    guard let result, try result.get(), let pdf = PDFDocument(url: output),
+          (1...3).contains(pdf.pageCount) else {
+      throw DocumentExportError(message: "Rendered graphics PDF failed or exceeded its page limit")
+    }
+    let text = pdf.string ?? ""
+    for marker in ["FORMULA_INLINE", "FORMULA_DISPLAY", "DIAGRAM_END"] {
+      guard text.components(separatedBy: marker).count == 2 else {
+        throw DocumentExportError(message: "Rendered graphics marker lost or duplicated: \(marker)")
+      }
+    }
+    let expectedImages = try JSONSerialization.jsonObject(with: Data(contentsOf:
+      fixture.deletingLastPathComponent().appendingPathComponent("rendered-math.json"))) as! [[String: Int]]
+    assert(expectedImages.count == 2)
+    var images = [[String: Any]]()
+    var diagramFill = 0, diagramStroke = 0, imageCount = 0
+    for index in 0..<pdf.pageCount {
+      guard let page = pdf.page(at: index) else { continue }
+      let scanner = PDFImageResourceScanner(pageNumber: index + 1)
+      if let dictionary = page.pageRef?.dictionary { scanner.scan(dictionary, depth: 0) }
+      images.append(contentsOf: scanner.images)
+      imageCount += scanner.images.filter { ($0["width"] as? Int ?? 0) > 16 && ($0["height"] as? Int ?? 0) > 16 }.count
+      let image = page.thumbnail(of: NSSize(width: 840, height: 1188), for: .mediaBox)
+      guard let tiff = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiff),
+            let png = bitmap.representation(using: .png, properties: [:]) else {
+        throw DocumentExportError(message: "Cannot inspect rendered graphics page")
+      }
+      try png.write(to: evidence.appendingPathComponent("rendered-\(index + 1).png"))
+      for y in stride(from: 0, to: bitmap.pixelsHigh, by: 3) {
+        for x in stride(from: 0, to: bitmap.pixelsWide, by: 3) {
+          guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { continue }
+          // Production renderer's blue-gray fill/stroke is the only non-gray
+          // content in this fixture. White paper and formula/text ink cannot
+          // satisfy these tests, unlike a count of all dark pixels.
+          if color.blueComponent - color.redComponent > 0.008 &&
+             color.greenComponent - color.redComponent > 0.003 {
+            if color.redComponent > 0.9 { diagramFill += 1 }
+            if color.redComponent > 0.4 && color.redComponent < 0.85 { diagramStroke += 1 }
+          }
+        }
+      }
+    }
+    let report: [String: Any] = ["formulaImageResources": imageCount,
+      "diagramFillSamples": diagramFill, "diagramStrokeSamples": diagramStroke, "pageCount": pdf.pageCount]
+    try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
+      .write(to: evidence.appendingPathComponent("rendered-report.json"))
+    let formulasPresent = expectedImages.allSatisfy { expected in
+      images.contains { ($0["width"] as? Int) == expected["width"] &&
+        ($0["height"] as? Int) == expected["height"] }
+    }
+    guard formulasPresent, diagramFill > 100, diagramStroke > 20 else {
+      throw DocumentExportError(message: "Formula images or production Mermaid fill/stroke missing from PDF")
+    }
   }
 }
 
@@ -398,6 +584,19 @@ private enum PracticalPDFEvidence {
       if let tiff = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiff),
          let png = bitmap.representation(using: .png, properties: [:]) {
         try png.write(to: evidence.appendingPathComponent(screenshot))
+        var hasInk = false
+        for y in stride(from: 0, to: bitmap.pixelsHigh, by: 8) {
+          for x in stride(from: 0, to: bitmap.pixelsWide, by: 8) {
+            if let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB),
+               color.alphaComponent > 0.1,
+               min(color.redComponent, color.greenComponent, color.blueComponent) < 0.98 {
+              hasInk = true; break
+            }
+          }
+          if hasInk { break }
+        }
+        if !hasInk { failures.append("Unexpected blank page \(index + 1)") }
+
       } else {
         failures.append("Could not save PDFKit thumbnail for page \(index + 1)")
       }
@@ -408,6 +607,9 @@ private enum PracticalPDFEvidence {
         "offPaperExamples": badBounds, "screenshot": screenshot,
       ])
     }
+    if !missingHeaderPages.isEmpty {
+      failures.append("Every table continuation page must repeat all four headers: \(missingHeaderPages)")
+    }
     if totalOutOfBounds != 0 { failures.append("Text character bounds must not leave the page horizontally or vertically") }
     // A generic >=64-pixel image could be a rasterized emoji. Require the exact
     // synthetic attachment dimensions; screenshots still verify its four colors.
@@ -417,10 +619,22 @@ private enum PracticalPDFEvidence {
     if recognizableImages.isEmpty { failures.append("PDF must contain the actual 192 x 128 synthetic raster image resource, not an emoji or 1-pixel placeholder") }
     let exactChineseTitle = text.contains("中文文档")
     let exactChineseEnd = text.contains("文档结束")
+    let expectedChinese = ["中文文档": 1, "文档结束": 1, "中文内容": 150,
+      "中间列": 150, "末列": 150, "长代码": 35]
+    for (phrase, count) in expectedChinese {
+      if compact.components(separatedBy: phrase).count - 1 != count {
+        failures.append("Original Chinese phrase must survive exactly \(count) times: \(phrase)")
+      }
+    }
+    if pdf.findString("中文文档", withOptions: []).count != 1 ||
+       pdf.findString("文档结束", withOptions: []).count != 1 {
+      failures.append("PDFKit search must find original Chinese title and ending exactly once")
+    }
+
     let knownLimitations = [
-      "Chinese font ToUnicode mappings can vary by macOS/WebKit. Exact original Chinese phrase extraction is diagnostic, not a hard gate; substantial selectable CJK and all-page visual review remain required.",
+      "Original Chinese fixture phrases and PDFKit title/end searches are hard gates. Other fonts, characters and PDF viewers still require platform coverage; all-page visual review remains required.",
       "PDFKit can reorder underscores and other characters during text extraction. Its observed marker/header counts do not prove content is missing: even visually present first-page headers may not match the extracted strings. Original PDFKit text is preserved; the mandatory independent pypdf stage checks all 600 cells, 35 code runs and boundaries without Unicode normalization or reordering.",
-      "Viewer-dependent text extraction and reading order remain limitations. Passing an independent content checker does not fix Preview copy/search behavior, which this test has not manually verified. Repeated table headers may still appear only on the first page; inspect all-page screenshots.",
+      "Viewer-dependent text extraction and reading order remain limitations. Passing an independent content checker does not fix Preview copy/search behavior, which this test has not manually verified. Repeated table headers and nonblank pages are native hard gates; inspect all-page screenshots for layout quality.",
       "All PDFKit page thumbnails must be visually reviewed for readable Chinese, complete last-column content, wrapped code and the recognizable four-color attachment. Automated checks do not establish a numerical fidelity score.",
       "Print and sharing remain unsupported. The sandbox printing permission is only for the native PDF backend.",
     ]
@@ -438,7 +652,7 @@ private enum PracticalPDFEvidence {
     ]
     let report: [String: Any] = [
       "standard": "Practical PDF fidelity with complete content and unchanged safety gates",
-      "automatedChecksPassed": failures.isEmpty, "hardGateScope": "Native geometry, selectable CJK, actual image resource and safety only",
+      "automatedChecksPassed": failures.isEmpty, "hardGateScope": "Native geometry, exact original CJK and PDFKit search, actual image resource and safety",
       "independentContentCheck": "Mandatory pypdf stage runs after this native test; see practical-pdf-content-report.json",
       "visualReview": "required; not performed by this test",
       "failures": failures, "pdf": "pagination.pdf", "rawText": "pagination.txt",

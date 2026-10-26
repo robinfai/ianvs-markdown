@@ -7,6 +7,7 @@ import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:linefold/src/controllers/workspace_controller.dart';
 import 'package:linefold/src/models/document_session.dart';
 import 'package:linefold/src/widgets/editor_shell.dart';
+import 'package:linefold/src/widgets/save_conflict_diff_dialog.dart';
 
 import 'support/fakes.dart';
 
@@ -50,7 +51,8 @@ void main() {
       expect(
         await workspace.saveDocument(
           document,
-          onConflict: (_) async {
+          onConflict: (conflict) async {
+            expect(conflict.localContents, 'My edits');
             document.controller.text = 'Newer typing';
             return SaveConflictChoice.keepBoth;
           },
@@ -307,6 +309,27 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
     await tester.pumpAndSettle();
     expect(find.text('Keep Both'), findsOneWidget);
+    await tester.tap(find.text('Compare Changes'));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byType(SaveConflictDiffDialog),
+        matching: find.text('Compare Changes'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('External edits'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(SaveConflictDiffDialog),
+        matching: find.text('My edits'),
+      ),
+      findsOneWidget,
+    );
+    expect(files.files['/notes/one.md'], 'External edits');
+    expect(document.controller.text, 'My edits');
+    await tester.tap(find.text('Back to conflict'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     expect(files.files['/notes/one.md'], 'External edits');

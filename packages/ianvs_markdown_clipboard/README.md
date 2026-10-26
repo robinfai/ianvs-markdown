@@ -51,3 +51,18 @@ From the repository root, `make test-clipboard` runs the native/fallback
 contracts; `make check-integrations` includes them plus the migrated Linefold
 and Mermaid hosts. Tests use a fake native writer and do not modify the OS
 clipboard. Real destination-app paste remains an R3-01 acceptance item.
+
+## Reading a native text snapshot
+
+`readIanvsMarkdownClipboardText()` returns nullable `IanvsMarkdownClipboardText`
+with `html` and `plainText` from the first text-capable item of one native
+snapshot. Missing plugins, textless clipboards or unreadable representations
+return null. HTML read failures, empty HTML, and HTML above 1 Mi UTF-16 code units
+leave the same item's plain text intact; plain text is never truncated. No file
+or image data is read, and a missing representation is not borrowed from another
+item. The adapter does not retry against a newer clipboard snapshot.
+
+HTML is untrusted and must be converted or sanitized by the host. This API does
+not itself insert into an editor; hosts must validate that the original editing
+selection is still current after awaiting it. The reader tests use injected
+native snapshots and do not establish cross-application platform acceptance.

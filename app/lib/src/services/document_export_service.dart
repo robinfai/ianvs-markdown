@@ -8,6 +8,7 @@ import 'package:markdown/markdown.dart' as md;
 
 import 'attachment_repository.dart';
 import 'attachment_resolver.dart';
+import 'math_export_renderer.dart';
 
 /// Immutable command-time source, not the persisted file or a later editor value.
 class DocumentExportSnapshot {
@@ -27,7 +28,7 @@ class DocumentExportSnapshot {
   final List<String> protectedPaths;
 }
 
-enum DocumentExportAction { html, markdown, pdf }
+enum DocumentExportAction { html, markdown, pdf, bundle }
 
 class DocumentExportFailure implements Exception {
   const DocumentExportFailure(this.message);
@@ -37,14 +38,16 @@ class DocumentExportFailure implements Exception {
 }
 
 class ExportedDocument {
-  const ExportedDocument(this.content, this.notices);
+  const ExportedDocument(this.content, this.notices) : bytes = null;
+  const ExportedDocument.binary(this.bytes, this.notices) : content = '';
   final String content;
+  final Uint8List? bytes;
   final List<String> notices;
 }
 
 const documentExportFidelityNotice =
     'Basic offline export, not an exact copy of the editor. '
-    'Math and Mermaid are included as readable source, not rendered diagrams. '
+    'Math uses an embedded image when rendering succeeds; source is retained. Mermaid uses an embedded diagram when rendering succeeds, with source retained on failure. '
     'Images use the first frame and at most 2048 pixels per side. '
     'Missing or blocked images become labeled placeholders. '
     'Local note links are text only; remote images are never downloaded. '
@@ -59,9 +62,8 @@ const documentExportMarkdownNotice =
 const documentExportPdfNotice =
     'PDF is a readable paged export, not a pixel-perfect copy. '
     'Copy/search text and reading order vary by PDF viewer, including punctuation. '
-    'Some Chinese characters may copy or search as visually similar CJK radicals. '
-    'Table headers may appear only on the first page, and a blank trailing page may occur. '
-    'Complex math and Mermaid remain readable source, as described above.';
+    'Long tables repeat their headers; a row taller than a page must be reduced before export. '
+    'Math and Mermaid follow the offline HTML rendering above; formula images retain source but are not searchable equation text.';
 
 /// No raw HTML is copied through. Only known AST elements and individually
 /// checked attributes are serialized; source HTML is visible escaped text.
@@ -72,7 +74,12 @@ class DocumentExportService {
     this.maximumImages = 32,
     this.maximumImageBytes = 16 * 1024 * 1024,
     this.maximumOutputBytes = 32 * 1024 * 1024,
+    this.renderMermaid,
+    this.renderMath,
   });
+  final Future<String> Function(String source)? renderMermaid;
+  final Future<MathExportImage> Function(String source, bool displayMode)?
+  renderMath;
   final AttachmentSource attachmentSource;
   final int maximumImages;
   final int maximumImageBytes;
@@ -379,6 +386,16 @@ class _ExportWriter {
     if (node is! md.Element) return;
     final tag = node.tag;
     final attributes = node.attributes;
+    if (tag == 'pre' && node.children?.length == 1) {
+      final code = node.children!.single;
+      if (code is md.Element &&
+          code.tag == 'code' &&
+          code.attributes['class'] == 'language-mermaid' &&
+          service.renderMermaid != null) {
+        if (await mermaid(code.textContent)) return;
+      }
+    }
+
     if (tag == 'img' || tag == 'ianvs-wiki-embed') {
       final wiki = tag == 'ianvs-wiki-embed';
       final target = attributes[wiki ? 'data-target' : 'src'] ?? '';
@@ -403,6 +420,8 @@ class _ExportWriter {
     }
     if (tag.contains('math')) {
       final inline = tag == 'ianvs-inline-math';
+      final expression = attributes['data-expression'] ?? node.textContent;
+      if (service.renderMath != null && await math(expression, inline)) return;
       output.write(
         inline
             ? '<code class="math-source">\$'
@@ -449,6 +468,131 @@ class _ExportWriter {
       await this.node(child);
     }
     if (known && tag != 'hr' && tag != 'br') output.write('</$tag>');
+  }
+
+  Future<bool> math(String source, bool inline) async {
+    void fallback(String reason) {
+      final notice = 'Math: $reason Source retained.';
+      notices.add(notice);
+      notesOutput.write('<li>');
+      notesOutput.writeEscaped(notice);
+      notesOutput.write('</li>');
+    }
+
+    if (++imageCount > service.maximumImages) {
+      fallback('Image count limit reached.');
+      return false;
+    }
+    try {
+      check();
+      final rendered = await service.renderMath!(source, !inline);
+      check();
+      final bytes = rendered.png;
+      if (bytes.isEmpty ||
+          imageBytes + bytes.length > service.maximumImageBytes) {
+        fallback('Embedded image byte limit reached.');
+        return false;
+      }
+      if (!rendered.width.isFinite ||
+          !rendered.height.isFinite ||
+          rendered.width <= 0 ||
+          rendered.height <= 0 ||
+          rendered.width > 1024 ||
+          rendered.height > 512) {
+        fallback('Unsupported image dimensions.');
+        return false;
+      }
+      output.budget.ensureCapacity(4 * ((bytes.length + 2) ~/ 3) + 26);
+      imageBytes += bytes.length;
+      output.write(
+        inline
+            ? '<span class="math-rendered">'
+            : '<figure class="math-rendered">',
+      );
+      output.write('<img alt="');
+      output.writeEscaped(source);
+      output.write(
+        '" width="${rendered.width.ceil()}" height="${rendered.height.ceil()}" src="data:image/png;base64,',
+      );
+      output.writeAscii(base64Encode(bytes));
+      output.write('">');
+      if (!inline) {
+        output.write('<details><summary>Formula source</summary><code>');
+        output.writeEscaped(source);
+        output.write('</code></details>');
+      }
+      output.write(inline ? '</span>' : '</figure>');
+      return true;
+    } on DocumentExportFailure {
+      rethrow;
+    } on Object {
+      check();
+      fallback('Rendering failed.');
+      return false;
+    }
+  }
+
+  Future<bool> mermaid(String source) async {
+    void fallback(String reason) {
+      final notice = 'Mermaid: $reason Source retained.';
+      notices.add(notice);
+      notesOutput.write('<li>');
+      notesOutput.writeEscaped(notice);
+      notesOutput.write('</li>');
+    }
+
+    if (++imageCount > service.maximumImages) {
+      fallback('Image count limit reached.');
+      return false;
+    }
+    try {
+      check();
+      final svg = await service.renderMermaid!(source);
+      check();
+      final references = svg
+          .replaceAll(
+            RegExp(r'(?:href|src)\s*=\s*[\x22\x27]#', caseSensitive: false),
+            '',
+          )
+          .replaceAll(RegExp(r'url\(\s*#[^)]+\)', caseSensitive: false), '');
+      if (!svg.contains('<svg') ||
+          RegExp(
+            r'<(?:script|foreignObject|image)\b|<!DOCTYPE|<!ENTITY',
+            caseSensitive: false,
+          ).hasMatch(svg) ||
+          RegExp(
+            r'(?:href|src)\s*=|url\(|@import',
+            caseSensitive: false,
+          ).hasMatch(references)) {
+        fallback('Rendered output requires unsupported resources.');
+        return false;
+      }
+      if (svg.length > service.maximumImageBytes - imageBytes) {
+        fallback('Embedded image byte limit reached.');
+        return false;
+      }
+      final bytes = utf8.encode(svg);
+      if (imageBytes + bytes.length > service.maximumImageBytes) {
+        fallback('Embedded image byte limit reached.');
+        return false;
+      }
+      output.budget.ensureCapacity(4 * ((bytes.length + 2) ~/ 3) + 26);
+      imageBytes += bytes.length;
+      output.write(
+        '<figure class="mermaid-rendered"><img alt="Mermaid diagram" src="data:image/svg+xml;base64,',
+      );
+      output.writeAscii(base64Encode(bytes));
+      output.write('"><details><summary>Diagram source</summary><pre>');
+      output.writeEscaped(source);
+      output.write('</pre></details></figure>');
+      return true;
+    } on DocumentExportFailure {
+      rethrow;
+    } on Object {
+      check();
+      fallback('Rendering failed.');
+      return false;
+    }
   }
 
   Future<void> image(
@@ -585,14 +729,18 @@ const _tags = {
   'sub',
 };
 
+// Arial Unicode avoids shared Kangxi-radical glyph mappings in Apple PDF output.
+// Disable synthetic bold (which prints duplicate text runs); stroke retains
+// emphasis, while synthetic oblique remains available for italic text.
 const _exportCss = '''
 @page { margin: 18mm; }
-* { box-sizing: border-box; }
+* { box-sizing: border-box; font-synthesis: style; }
+h1,h2,h3,h4,h5,h6,strong,b,th { -webkit-text-stroke: 0.25px currentColor; }
 body { margin: 0 auto; max-width: 174mm; padding: 12px; color: #171717; background: #fff;
- font: 11pt/1.6 -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; overflow-wrap: anywhere; }
+ font: 11pt/1.6 "Arial Unicode MS", -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; overflow-wrap: anywhere; }
 h1,h2,h3,h4,h5,h6 { break-after: avoid; line-height: 1.25; }
 p,li { orphans: 3; widows: 3; }
-pre,code { font-family: "SFMono-Regular", Menlo, "Noto Sans Mono CJK SC", monospace; font-size: 9pt; }
+pre,code { font-family: "SFMono-Regular", Menlo, "Arial Unicode MS", "Noto Sans Mono CJK SC", monospace; font-size: 9pt; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; padding: 10px; border: 1px solid #ccc; }
 code { white-space: pre-wrap; overflow-wrap: anywhere; }
 blockquote { border-left: 3px solid #aaa; margin-left: 0; padding-left: 12px; }
@@ -602,6 +750,7 @@ tfoot { display: table-footer-group; }
 th,td { border: 1px solid #999; padding: 5px; vertical-align: top; overflow-wrap: anywhere; word-break: break-word; }
 tr { break-inside: avoid; }
 img { max-width: 100%; height: auto; break-inside: avoid; }
+span.math-rendered img { vertical-align: middle; }
 a { color: #174c91; }
 .align-left { text-align: left; } .align-center { text-align: center; } .align-right { text-align: right; }
 .placeholder { border: 1px dashed #777; padding: 4px; }
@@ -672,7 +821,10 @@ class AppleDocumentExportPlatform implements DocumentExportPlatform {
     try {
       return await channel.invokeMethod<bool>(action.name, {
             'operationId': id,
-            'content': document.content,
+            if (action == DocumentExportAction.bundle)
+              'bytes': document.bytes
+            else
+              'content': document.content,
             'title': snapshot.title,
             'sourcePath': snapshot.documentPath,
             'protectedPaths': snapshot.protectedPaths,

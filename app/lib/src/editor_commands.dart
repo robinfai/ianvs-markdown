@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 
 import 'controllers/workspace_controller.dart';
+import 'models/reading_preferences.dart';
 
 /// Shared by the native View menu and the in-window mode picker.
 void setEditorMode(
@@ -48,4 +50,64 @@ bool hasEditorComposition(WorkspaceController workspace) {
       .value
       .composing;
   return local != null && local.isValid && !local.isCollapsed;
+}
+
+/// Resizing during composition can rebuild the active editor's text layout.
+/// Keep the same guard for window shortcuts and native menu invocations.
+void changeReadingTextSize(WorkspaceController workspace, {double? delta}) {
+  if (hasEditorComposition(workspace)) return;
+  final current = workspace.readingPreferences;
+  workspace.setReadingPreferences(
+    current.copyWith(
+      fontSize: delta == null
+          ? ReadingPreferences.defaults.fontSize
+          : current.fontSize + delta,
+    ),
+  );
+}
+
+Map<ShortcutActivator, VoidCallback> readingSizeShortcuts(
+  WorkspaceController workspace,
+) => {
+  for (final command in [true, false]) ...{
+    for (final shift in [false, true])
+      SingleActivator(
+        LogicalKeyboardKey.equal,
+        meta: command,
+        control: !command,
+        shift: shift,
+      ): () =>
+          changeReadingTextSize(workspace, delta: 0.5),
+    SingleActivator(
+      LogicalKeyboardKey.add,
+      meta: command,
+      control: !command,
+    ): () =>
+        changeReadingTextSize(workspace, delta: 0.5),
+    SingleActivator(
+      LogicalKeyboardKey.minus,
+      meta: command,
+      control: !command,
+    ): () =>
+        changeReadingTextSize(workspace, delta: -0.5),
+    SingleActivator(
+      LogicalKeyboardKey.numpadSubtract,
+      meta: command,
+      control: !command,
+    ): () =>
+        changeReadingTextSize(workspace, delta: -0.5),
+    SingleActivator(
+      LogicalKeyboardKey.digit0,
+      meta: command,
+      control: !command,
+    ): () =>
+        changeReadingTextSize(workspace),
+  },
+};
+
+/// Returns within the active document, preserving local IME composition.
+void navigateBack(WorkspaceController workspace) {
+  if (!hasEditorComposition(workspace)) {
+    workspace.navigateBack();
+  }
 }

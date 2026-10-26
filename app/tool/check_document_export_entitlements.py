@@ -12,18 +12,22 @@ def validate(data: bytes, label: str) -> None:
         raise SystemExit(f"{label}: missing app sandbox")
     if value.get("com.apple.security.print") is not True:
         raise SystemExit(f"{label}: native PDF backend requires printing permission")
+    if value.get("com.apple.security.network.client") is not True:
+        raise SystemExit(f"{label}: offline WKWebView requires client entitlement to launch")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--built-apps", action="store_true")
+    parser.add_argument("--build-mode", action="append", choices=("Debug", "Profile", "Release"),
+                        help="Built modes to inspect; defaults to Debug and Release")
     args = parser.parse_args()
     app = Path(__file__).resolve().parents[1]
     for name in ("DebugProfile", "Release", "DebugProfileLocal", "ReleaseLocal"):
         path = app / "macos" / "Runner" / f"{name}.entitlements"
         validate(path.read_bytes(), str(path))
     if args.built_apps:
-        for mode in ("Debug", "Release"):
+        for mode in (args.build_mode or ("Debug", "Release")):
             bundle = app / "build/macos/Build/Products" / mode / "Linefold.app"
             if not bundle.is_dir():
                 raise SystemExit(f"Missing built app: {bundle}")
@@ -33,7 +37,7 @@ def main() -> None:
             )
             validate(result.stdout, str(bundle))
     print("PASS: sandbox declarations with native PDF backend permission" +
-          (" and actual Debug/Release code-signature entitlements" if args.built_apps else " (source only)"))
+          (" and selected built code-signature entitlements" if args.built_apps else " (source only)"))
 
 
 if __name__ == "__main__":

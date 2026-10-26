@@ -1,3 +1,6 @@
+import '../reading_typography.dart';
+import 'save_conflict_diff_dialog.dart';
+import '../services/rich_paste_service.dart';
 import 'document_sync_indicator.dart';
 import 'dart:async';
 import 'dart:math' as math;
@@ -55,8 +58,10 @@ class EditorShell extends StatefulWidget {
     this.onRetryInitialization,
     this.attachmentSource = const AppleAttachmentSource(),
     this.attachmentImportPlatform = const AppleAttachmentImportPlatform(),
+    this.readClipboardText = readIanvsMarkdownClipboardText,
   });
 
+  final Future<IanvsMarkdownClipboardText?> Function() readClipboardText;
   final WorkspaceController workspace;
   final AttachmentSource attachmentSource;
   final AttachmentImportPlatform attachmentImportPlatform;
@@ -193,6 +198,11 @@ class _EditorShellState extends State<EditorShell> {
     _editorFocus.unfocus();
     final find = DocumentFindController(
       document: controller,
+      scope:
+          controller.mode != IanvsMarkdownEditorMode.source &&
+              sourceAnchor == null
+          ? DocumentFindScope.body
+          : DocumentFindScope.source,
       query:
           seedSelection &&
               selected.isNotEmpty &&
@@ -286,6 +296,22 @@ class _EditorShellState extends State<EditorShell> {
       return;
     }
     await _importImage(droppedImage: image);
+  }
+
+  Future<bool> _pasteFromClipboard() async {
+    final workspace = widget.workspace;
+    final document = workspace.activeDocument;
+    if (document == null) return true;
+    final handled = await pasteClipboardHtml(
+      controller: document.controller,
+      isCurrent: () =>
+          mounted &&
+          identical(widget.workspace, workspace) &&
+          identical(workspace.activeDocument, document),
+      read: widget.readClipboardText,
+    );
+    if (handled) return true;
+    return _importImage(fromClipboard: true);
   }
 
   Future<bool> _importImage({
@@ -625,6 +651,9 @@ class _EditorShellState extends State<EditorShell> {
         .map((d) => d.id)
         .toSet();
     final mode = origin.controller.mode;
+    final originSource = origin.controller.text;
+    final originSelection = origin.controller.selection;
+    final originAnchor = origin.controller.viewportAnchor.value;
     final opened = await widget.workspace.openIndexedNote(
       selected.relativePath,
       epoch: epoch,
@@ -635,6 +664,15 @@ class _EditorShellState extends State<EditorShell> {
         !existingSessionIds.contains(opened.id) &&
         identical(widget.workspace.activeDocument, opened)) {
       opened.controller.mode = mode;
+    }
+    if (mounted && opened != null) {
+      widget.workspace.rememberDocumentJump(
+        origin,
+        opened,
+        anchor: originAnchor,
+        selection: originSelection,
+        source: originSource,
+      );
     }
   }
 
@@ -748,11 +786,24 @@ class _EditorShellState extends State<EditorShell> {
     }
   }
 
+  void _changeFindScope(DocumentFindScope scope) {
+    final find = _find;
+    if (find == null || find.isComposing || find.scope == scope) return;
+    find.setScope(scope, reveal: false);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !identical(_find, find) || find.scope != scope) return;
+      // Source selection must change after Live's editing listener detaches.
+      find.next();
+      _findFocus.requestFocus();
+    });
+  }
+
   void _enableFindEditing() {
     final find = _find;
     if (find == null || find.isComposing) return;
     _enablingFindEditing = true;
     try {
+      _changeFindScope(DocumentFindScope.source);
       find.readOnly = false;
       widget.workspace.setMode(IanvsMarkdownEditorMode.source);
     } finally {
@@ -770,7 +821,8 @@ class _EditorShellState extends State<EditorShell> {
         _beforeFindFocused || _editorFocus.hasFocus || find.highlight != null;
     final scroll =
         identical(find.document, document?.controller) &&
-            find.document.mode == IanvsMarkdownEditorMode.source &&
+            (find.document.mode == IanvsMarkdownEditorMode.source ||
+                find.scope == DocumentFindScope.body) &&
             document!.scrollController.hasClients
         ? document.scrollController.offset
         : restoreScroll
@@ -786,6 +838,7 @@ class _EditorShellState extends State<EditorShell> {
       _resumeLiveController =
           restoreFocus &&
               restoreEditorFocus &&
+              find.scope == DocumentFindScope.source &&
               find.document.mode == IanvsMarkdownEditorMode.livePreview
           ? find.document
           : null;
@@ -937,6 +990,8 @@ class _EditorShellState extends State<EditorShell> {
               context,
               workspace,
               DocumentExportAction.html,
+              renderMermaid: (source) async =>
+                  (await _mermaidRenderer.render(source)).svg,
               attachmentSource: widget.attachmentSource,
             ),
           ),
@@ -948,11 +1003,21 @@ class _EditorShellState extends State<EditorShell> {
               attachmentSource: widget.attachmentSource,
             ),
           ),
+          onExportBundle: () => unawaited(
+            _documentExport.run(
+              context,
+              workspace,
+              DocumentExportAction.bundle,
+              attachmentSource: widget.attachmentSource,
+            ),
+          ),
           onExportPdf: () => unawaited(
             _documentExport.run(
               context,
               workspace,
               DocumentExportAction.pdf,
+              renderMermaid: (source) async =>
+                  (await _mermaidRenderer.render(source)).svg,
               attachmentSource: widget.attachmentSource,
             ),
           ),
@@ -965,6 +1030,18 @@ class _EditorShellState extends State<EditorShell> {
           onFindPrevious: () => _findNext(backwards: true),
           child: CallbackShortcuts(
             bindings: <ShortcutActivator, VoidCallback>{
+              ...readingSizeShortcuts(workspace),
+              const SingleActivator(
+                LogicalKeyboardKey.bracketLeft,
+                meta: true,
+              ): () =>
+                  navigateBack(workspace),
+              const SingleActivator(
+                LogicalKeyboardKey.arrowLeft,
+                control: true,
+                alt: true,
+              ): () =>
+                  navigateBack(workspace),
               _WikiLinkActivator(workspace, meta: true): _insertWikiLink,
               _WikiLinkActivator(workspace, control: true): _insertWikiLink,
               const SingleActivator(
@@ -1226,6 +1303,7 @@ class _EditorShellState extends State<EditorShell> {
                                 queryFocus: _findFocus,
                                 onClose: _closeFind,
                                 onEnableEditing: _enableFindEditing,
+                                onScopeChanged: _changeFindScope,
                               ),
                             if (workspace.recoveryError != null ||
                                 workspace.recoveryNotice != null)
@@ -1285,11 +1363,16 @@ class _EditorShellState extends State<EditorShell> {
                                                     ? 24.0
                                                     : 48.0,
                                                 (constraints.maxWidth -
-                                                        DesktopMetrics
-                                                            .documentMaxWidth) /
+                                                        workspace
+                                                            .readingPreferences
+                                                            .width
+                                                            .pixels) /
                                                     2,
                                               );
-                                              if (_find case final find?) {
+                                              if (_find case final find?
+                                                  when find.scope ==
+                                                      DocumentFindScope
+                                                          .source) {
                                                 return IanvsMarkdownEditor(
                                                   key: ValueKey(
                                                     'find-source-${document.id}',
@@ -1300,9 +1383,7 @@ class _EditorShellState extends State<EditorShell> {
                                                   scrollController:
                                                       document.scrollController,
                                                   readOnly: find.readOnly,
-                                                  onPaste: () => _importImage(
-                                                    fromClipboard: true,
-                                                  ),
+                                                  onPaste: _pasteFromClipboard,
                                                   highlightedRange:
                                                       find.highlight,
                                                   showToolbar: false,
@@ -1327,85 +1408,115 @@ class _EditorShellState extends State<EditorShell> {
                                                         .workspaceFilesRevision +
                                                     _attachmentRevision,
                                                 source: widget.attachmentSource,
-                                                builder: (context, images) => IanvsMarkdownLiveEditor(
-                                                  imageBuilder: images.image,
-                                                  onPaste: () => _importImage(
-                                                    fromClipboard: true,
-                                                  ),
-                                                  wikiEmbedBuilder: images.wiki,
-                                                  key: ValueKey(document.id),
-                                                  controller:
+                                                builder: (context, images) => IanvsMarkdownCodeLayout(
+                                                  softWrap: workspace
+                                                      .readingPreferences
+                                                      .wrapCode,
+                                                  child: IanvsMarkdownLiveEditor(
+                                                    preserveViewport: true,
+                                                    styleSheet: readingStyleSheet(
+                                                      context,
+                                                      workspace
+                                                          .readingPreferences,
+                                                    ),
+                                                    readingHighlights:
+                                                        _find?.scope ==
+                                                            DocumentFindScope
+                                                                .body
+                                                        ? IanvsMarkdownReadingHighlights(
+                                                            source: document
+                                                                .controller
+                                                                .text,
+                                                            matches: _find!
+                                                                .bodyMatches,
+                                                            activeIndex: _find!
+                                                                .currentIndex,
+                                                          )
+                                                        : null,
+                                                    imageBuilder: images.image,
+                                                    onPaste:
+                                                        _pasteFromClipboard,
+                                                    wikiEmbedBuilder:
+                                                        images.wiki,
+                                                    key: ValueKey(document.id),
+                                                    controller:
+                                                        document.controller,
+                                                    focusNode: _editorFocus,
+                                                    autofocus: identical(
+                                                      _resumeLiveController,
                                                       document.controller,
-                                                  focusNode: _editorFocus,
-                                                  autofocus: identical(
-                                                    _resumeLiveController,
-                                                    document.controller,
-                                                  ),
-                                                  clipboardWriter: (data) =>
-                                                      writeIanvsMarkdownRichClipboard(
-                                                        markdown: data.markdown,
-                                                        html: data.html,
-                                                      ),
-                                                  onTapLinkTarget: (link) => _guard(
-                                                    () =>
-                                                        link.kind ==
-                                                            IanvsMarkdownLinkKind
-                                                                .wiki
-                                                        ? _openWikiLink(
-                                                            document,
-                                                            link.href ?? '',
-                                                          )
-                                                        : link.kind ==
+                                                    ),
+                                                    clipboardWriter: (data) =>
+                                                        writeIanvsMarkdownRichClipboard(
+                                                          markdown:
+                                                              data.markdown,
+                                                          html: data.html,
+                                                        ),
+                                                    onTapLinkTarget: (link) => _guard(
+                                                      () =>
+                                                          link.kind ==
                                                               IanvsMarkdownLinkKind
-                                                                  .tag
-                                                        ? _openWorkspaceReferences(
-                                                            tag: (link.href ?? '')
-                                                                .replaceFirst(
-                                                                  RegExp(
-                                                                    r'^tag:#?',
+                                                                  .wiki
+                                                          ? _openWikiLink(
+                                                              document,
+                                                              link.href ?? '',
+                                                            )
+                                                          : link.kind ==
+                                                                IanvsMarkdownLinkKind
+                                                                    .tag
+                                                          ? _openWorkspaceReferences(
+                                                              tag: (link.href ?? '')
+                                                                  .replaceFirst(
+                                                                    RegExp(
+                                                                      r'^tag:#?',
+                                                                    ),
+                                                                    '',
                                                                   ),
-                                                                  '',
-                                                                ),
-                                                          )
-                                                        : DocumentLinkService(
-                                                            workspace:
-                                                                workspace,
-                                                            openImage:
-                                                                _openImage,
-                                                          ).open(
-                                                            document,
-                                                            link.href,
-                                                          ),
+                                                            )
+                                                          : DocumentLinkService(
+                                                              workspace:
+                                                                  workspace,
+                                                              openImage:
+                                                                  _openImage,
+                                                            ).open(
+                                                              document,
+                                                              link.href,
+                                                            ),
+                                                    ),
+                                                    diagramBuilder:
+                                                        (
+                                                          context,
+                                                          source,
+                                                        ) => DocumentDiagram(
+                                                          source: source,
+                                                          renderer:
+                                                              _mermaidRenderer,
+                                                        ),
+                                                    scrollController: document
+                                                        .scrollController,
+                                                    showToolbar: false,
+                                                    placeholder:
+                                                        'Start writing Markdown…',
+                                                    enableModeShortcuts: false,
+                                                    showNavigationPane: false,
+                                                    showOutlineInPreview: false,
+                                                    showFrontMatter: false,
+                                                    contentMaxWidth: workspace
+                                                        .readingPreferences
+                                                        .width
+                                                        .pixels,
+                                                    padding:
+                                                        EdgeInsets.fromLTRB(
+                                                          inset,
+                                                          32,
+                                                          inset,
+                                                          56,
+                                                        ),
+                                                    onSaveRequested: (_) =>
+                                                        _saveFromEditor(
+                                                          document,
+                                                        ),
                                                   ),
-                                                  diagramBuilder:
-                                                      (
-                                                        context,
-                                                        source,
-                                                      ) => DocumentDiagram(
-                                                        source: source,
-                                                        renderer:
-                                                            _mermaidRenderer,
-                                                      ),
-                                                  scrollController:
-                                                      document.scrollController,
-                                                  showToolbar: false,
-                                                  placeholder:
-                                                      'Start writing Markdown…',
-                                                  enableModeShortcuts: false,
-                                                  showNavigationPane: false,
-                                                  showOutlineInPreview: false,
-                                                  showFrontMatter: false,
-                                                  contentMaxWidth:
-                                                      DesktopMetrics
-                                                          .documentMaxWidth,
-                                                  padding: EdgeInsets.fromLTRB(
-                                                    inset,
-                                                    32,
-                                                    inset,
-                                                    56,
-                                                  ),
-                                                  onSaveRequested: (_) =>
-                                                      _saveFromEditor(document),
                                                 ),
                                               );
                                             },
@@ -1485,6 +1596,17 @@ class _EditorShellState extends State<EditorShell> {
                         'captured edits. Cancel keeps your edits unsaved.',
             ),
             actions: [
+              if (conflict.localContents != null)
+                TextButton(
+                  onPressed: () => showDialog<void>(
+                    context: context,
+                    builder: (_) => SaveConflictDiffDialog(
+                      disk: conflict.currentContents,
+                      local: conflict.localContents!,
+                    ),
+                  ),
+                  child: const Text('Compare Changes'),
+                ),
               OutlinedButton(
                 onPressed: () =>
                     Navigator.pop(context, SaveConflictChoice.cancel),

@@ -213,14 +213,22 @@ void main() {
     () {
       expect(attachments, contains('maximumImageBytes = 32 * 1024 * 1024'));
       expect(attachments, contains('maximumSettingsBytes = 64 * 1024'));
-      expect(attachments, contains('if path == ".obsidian/app.json"'));
+      expect(
+        attachments,
+        contains('if !forBundle && path == ".obsidian/app.json"'),
+      );
+      expect(attachments, contains('forBundle: Bool = false'));
+      expect(
+        attachments,
+        contains('if forBundle { throw AttachmentError.offline }'),
+      );
       expect(attachments, contains('Self.imageExtensions.contains'));
       expect(
         attachments,
         contains('startDownloadingUbiquitousItem(at: target)'),
       );
       expect(attachments, contains('NSFileCoordinator()'));
-      expect(attachments, contains('verifyRevision: false'));
+      expect(attachments, contains('verifyRevision: forBundle'));
       expect(text, isNot(contains('if path == ".obsidian/app.json"')));
     },
   );

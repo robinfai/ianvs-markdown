@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 
 import '../services/literal_source_matcher.dart';
+import '../services/body_search_worker.dart';
+
+enum DocumentFindScope { source, body }
 
 /// Literal, non-overlapping search over the current unsaved source buffer.
 ///
@@ -15,6 +18,7 @@ class DocumentFindController extends ChangeNotifier {
     String replacement = '',
     this._matchCase = false,
     this.readOnly = false,
+    this._scope = DocumentFindScope.source,
     bool revealInitialMatch = true,
   }) : query = TextEditingController(text: query),
        replacement = TextEditingController(text: replacement),
@@ -36,6 +40,28 @@ class DocumentFindController extends ChangeNotifier {
   final TextEditingController query;
   final TextEditingController replacement;
   bool readOnly;
+  DocumentFindScope _scope;
+  IanvsMarkdownReadingSearch? _readingIndex;
+  BodySearchWorker? _bodyWorker;
+  String? _indexedSource;
+  List<IanvsMarkdownReadingMatch> _bodyMatches = const [];
+  bool _bodyUnavailable = false;
+  DocumentFindScope get scope => _scope;
+  bool get bodyUnavailable => _bodyUnavailable;
+  List<IanvsMarkdownReadingMatch> get bodyMatches => _bodyMatches;
+  IanvsMarkdownReadingMatch? get currentBodyMatch =>
+      _scope == DocumentFindScope.body && _currentIndex >= 0
+      ? _bodyMatches[_currentIndex]
+      : null;
+
+  void setScope(DocumentFindScope scope, {bool reveal = true}) {
+    if (_disposed || isComposing || scope == _scope) return;
+    _scope = scope;
+    document.clearSourceNavigation();
+    _refresh(reveal: reveal);
+    notifyListeners();
+  }
+
   bool _matchCase;
   String _source;
   String _effectiveQuery = '';
@@ -73,8 +99,13 @@ class DocumentFindController extends ChangeNotifier {
       _source == document.text &&
       _effectiveQuery == query.text &&
       _matches.isNotEmpty;
-  bool get canReplace => !readOnly && canNavigate && _highlight != null;
-  bool get canReplaceAll => !readOnly && canNavigate;
+  bool get canReplace =>
+      _scope == DocumentFindScope.source &&
+      !readOnly &&
+      canNavigate &&
+      _highlight != null;
+  bool get canReplaceAll =>
+      _scope == DocumentFindScope.source && !readOnly && canNavigate;
 
   static bool _composing(TextEditingValue value) =>
       value.composing.isValid && !value.composing.isCollapsed;
@@ -118,6 +149,7 @@ class DocumentFindController extends ChangeNotifier {
 
   void _refresh({required bool reveal, int? anchor}) {
     final generation = ++_generation;
+    if (_scope == DocumentFindScope.body) document.clearSourceNavigation();
     _searchTimer?.cancel();
     _searchTimer = null;
     _pendingNavigation = null;
@@ -130,6 +162,8 @@ class DocumentFindController extends ChangeNotifier {
     _replacementComposition = replacement.value.composing;
     _documentComposition = document.value.composing;
     _highlight = null;
+    _bodyMatches = const [];
+    _bodyUnavailable = false;
     _matches = const [];
     _currentIndex = -1;
     if (_effectiveQuery.isEmpty || isComposing) return;
@@ -137,6 +171,57 @@ class DocumentFindController extends ChangeNotifier {
     final source = _source;
     final searchQuery = _effectiveQuery;
     final matchCase = _matchCase;
+    if (_scope == DocumentFindScope.body) {
+      bool current() =>
+          !_disposed &&
+          generation == _generation &&
+          !isComposing &&
+          document.text == source &&
+          query.text == searchQuery;
+      Future<void> searchBody() async {
+        if (!current()) return;
+        if (source.length >= _synchronousLimit) {
+          try {
+            final result = await (_bodyWorker ??= BodySearchWorker()).search(
+              source: source,
+              query: searchQuery,
+              matchCase: matchCase,
+            );
+            if (!current() || result == null) return;
+            _bodyUnavailable = !result.available;
+            _bodyMatches = result.matches;
+          } catch (_) {
+            if (!current()) return;
+            _bodyWorker?.dispose();
+            _bodyWorker = null;
+            _bodyUnavailable = true;
+            _bodyMatches = const [];
+          }
+        } else {
+          if (_indexedSource != source) {
+            _readingIndex = IanvsMarkdownReadingSearch.parse(source);
+            _indexedSource = source;
+          }
+          _bodyUnavailable = _readingIndex == null;
+          _bodyMatches =
+              _readingIndex?.find(searchQuery, matchCase: matchCase) ??
+              const [];
+        }
+        _searchTimer = null;
+        _publish(
+          _bodyMatches.map((match) => match.navigationRange).toList(),
+          reveal: reveal,
+          anchor: anchor,
+        );
+        notifyListeners();
+      }
+
+      // Debounce parsing independently of source search. The index is reused
+      // for subsequent queries until the unsaved document changes.
+      _isSearching = true;
+      _searchTimer = Timer(_debounce, searchBody);
+      return;
+    }
     final scanner = LiteralSourceMatcher(
       source,
       searchQuery,
@@ -197,6 +282,10 @@ class DocumentFindController extends ChangeNotifier {
   void _reveal() {
     final range = currentMatch;
     if (range == null || isComposing) return;
+    if (_scope == DocumentFindScope.body) {
+      document.revealSourceRange(range, source: _source);
+      return;
+    }
     _updating = true;
     try {
       document.selection = TextSelection(
@@ -231,7 +320,8 @@ class DocumentFindController extends ChangeNotifier {
     required bool skipCurrentSelection,
   }) {
     if (_matches.isEmpty) return;
-    if (_highlight == null) {
+    if (_currentIndex < 0 ||
+        (_scope == DocumentFindScope.source && _highlight == null)) {
       final anchor = document.selection.start.clamp(0, _source.length);
       _currentIndex = backwards
           ? _matches.lastIndexWhere((match) => match.end <= anchor)
@@ -303,6 +393,7 @@ class DocumentFindController extends ChangeNotifier {
     _generation++;
     _searchTimer?.cancel();
     _searchTimer = null;
+    _bodyWorker?.dispose();
     document.removeListener(_documentChanged);
     query.dispose();
     replacement.dispose();

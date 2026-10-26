@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:linefold/src/controllers/workspace_controller.dart';
+import 'package:linefold/src/controllers/document_find_controller.dart';
 import 'package:linefold/src/desktop_theme.dart';
 import 'package:linefold/src/editor_commands.dart';
 import 'package:linefold/src/widgets/desktop_menu_bar.dart';
@@ -68,6 +69,15 @@ void main() {
     tester.widget<DesktopMenuBar>(find.byType(DesktopMenuBar)).onFind!();
     await tester.pumpAndSettle();
     expect(find.byKey(barKey), findsOneWidget);
+  }
+
+  Future<void> chooseSource(WidgetTester tester) async {
+    tester
+        .widget<DropdownButton<DocumentFindScope>>(
+          find.byKey(const ValueKey('document-find-scope')),
+        )
+        .onChanged!(DocumentFindScope.source);
+    await tester.pumpAndSettle();
   }
 
   Future<void> command(
@@ -248,12 +258,21 @@ void main() {
     await tester.pumpAndSettle();
     final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
     expect(active, findsOneWidget);
+    final start = document.text.indexOf('Second');
+    final editingBefore = tester
+        .widget<EditableText>(
+          find.descendant(of: active, matching: find.byType(EditableText)),
+        )
+        .controller
+        .value;
+    final beforeFind = document.value;
     await command(tester, LogicalKeyboardKey.keyF);
     await tester.enterText(find.byKey(queryKey), 'Second');
     await tester.pumpAndSettle();
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
     expect(find.byKey(barKey), findsNothing);
+    expect(document.value, beforeFind);
     expect(active, findsOneWidget);
     final editable = tester.widget<EditableText>(
       find.descendant(of: active, matching: find.byType(EditableText)),
@@ -261,6 +280,7 @@ void main() {
     expect(editable.focusNode.hasFocus, isTrue);
     expect(tester.testTextInput.hasAnyClients, isTrue);
     final value = editable.controller.value;
+    expect(value, editingBefore);
     tester.testTextInput.updateEditingValue(
       TextEditingValue(
         text: value.text.replaceRange(
@@ -272,7 +292,16 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(document.text, 'First paragraph.\n\nNext paragraph.');
+    expect(
+      document.text,
+      beforeFind.text.replaceRange(
+        start + value.selection.start,
+        start + value.selection.end,
+        'Next',
+      ),
+    );
+    await command(tester, LogicalKeyboardKey.keyZ);
+    expect(document.text, beforeFind.text);
     await command(tester, LogicalKeyboardKey.keyF);
     expect(find.byKey(barKey), findsOneWidget);
     await finish(tester);
@@ -406,11 +435,13 @@ void main() {
       await tester.tap(find.text('Body paragraph.'));
       await tester.pumpAndSettle();
       await command(tester, LogicalKeyboardKey.keyF);
+      await chooseSource(tester);
       await tester.enterText(find.byKey(queryKey), 'secret');
       await tester.pumpAndSettle();
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
       await command(tester, LogicalKeyboardKey.keyF);
+      await chooseSource(tester);
       expect(
         document.selection,
         const TextSelection(baseOffset: 11, extentOffset: 17),
@@ -433,6 +464,7 @@ void main() {
       final workspace = await open(tester, mode: mode);
       final document = workspace.activeDocument!.controller;
       await showFind(tester);
+      await chooseSource(tester);
       await tester.enterText(find.byKey(queryKey), 'one');
       await tester.pumpAndSettle();
       expect(find.byKey(sourceKey), findsOneWidget);
@@ -452,6 +484,108 @@ void main() {
     });
   }
 
+  testWidgets(
+    'Read searches in place without changing selection or remounting',
+    (tester) async {
+      final workspace = await open(
+        tester,
+        mode: IanvsMarkdownEditorMode.preview,
+        text: 'one **two** [label](hidden)\n\none two',
+      );
+      final document = workspace.activeDocument!.controller;
+      final before = document.value;
+      final readingElement = tester.element(find.byType(IanvsMarkdownView));
+      await showFind(tester);
+      expect(
+        tester.element(find.byType(IanvsMarkdownView)),
+        same(readingElement),
+      );
+      expect(find.byKey(sourceKey), findsNothing);
+      await tester.enterText(find.byKey(queryKey), 'one two');
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpAndSettle();
+      var view = tester.widget<IanvsMarkdownView>(
+        find.byType(IanvsMarkdownView),
+      );
+      expect(view.readingHighlights!.matches.length, 2);
+      expect(view.readingHighlights!.activeIndex, 0);
+      expect(document.value, before);
+      await tester.tap(find.byTooltip('Next match (⌘G)'));
+      await tester.pumpAndSettle();
+      view = tester.widget<IanvsMarkdownView>(find.byType(IanvsMarkdownView));
+      expect(view.readingHighlights!.activeIndex, 1);
+      expect(document.value, before);
+      await tester.enterText(find.byKey(queryKey), 'hidden');
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<IanvsMarkdownView>(find.byType(IanvsMarkdownView))
+            .readingHighlights!
+            .matches,
+        isEmpty,
+      );
+      await tester.tap(find.byTooltip('Close find (Esc)'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.element(find.byType(IanvsMarkdownView)),
+        same(readingElement),
+      );
+      expect(document.value, before);
+      expect(document.canUndo, isFalse);
+      await finish(tester);
+    },
+  );
+
+  testWidgets(
+    'Live body search retains its component and reaches repeated list hits',
+    (tester) async {
+      final workspace = await open(
+        tester,
+        mode: IanvsMarkdownEditorMode.livePreview,
+        text: '- same **phrase**\n- same phrase',
+      );
+      final document = workspace.activeDocument!.controller;
+      final before = document.value;
+      final element = tester.element(find.byType(IanvsMarkdownLiveEditor));
+      await showFind(tester);
+      expect(find.byKey(sourceKey), findsNothing);
+      expect(
+        tester.element(find.byType(IanvsMarkdownLiveEditor)),
+        same(element),
+      );
+      await tester.enterText(find.byKey(queryKey), 'same phrase');
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpAndSettle();
+      var live = tester.widget<IanvsMarkdownLiveEditor>(
+        find.byType(IanvsMarkdownLiveEditor),
+      );
+      expect(live.readingHighlights!.matches.length, 2);
+      expect(live.readingHighlights!.activeIndex, 0);
+      await tester.tap(find.byTooltip('Next match (⌘G)'));
+      await tester.pumpAndSettle();
+      live = tester.widget<IanvsMarkdownLiveEditor>(
+        find.byType(IanvsMarkdownLiveEditor),
+      );
+      expect(live.readingHighlights!.activeIndex, 1);
+      expect(live.readingHighlights!.matches.last.navigationRange.start, 18);
+      expect(document.value, before);
+      expect(
+        tester.widget<TextField>(find.byKey(queryKey)).focusNode!.hasFocus,
+        isTrue,
+      );
+      await tester.tap(find.byTooltip('Close find (Esc)'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.element(find.byType(IanvsMarkdownLiveEditor)),
+        same(element),
+      );
+      expect(document.value, before);
+      expect(document.canUndo, isFalse);
+      await finish(tester);
+    },
+  );
+
   testWidgets('Read find requires explicit edit action before replacement', (
     tester,
   ) async {
@@ -459,12 +593,13 @@ void main() {
     final document = workspace.activeDocument!.controller;
     await showFind(tester);
     await tester.enterText(find.byKey(queryKey), 'one');
-    await tester.enterText(find.byKey(replacementKey), 'two');
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.byKey(replacementKey), findsNothing);
     expect(find.text('Replace All'), findsNothing);
-    await tester.tap(find.text('Edit to replace'));
+    await tester.tap(find.text('Edit source to replace'));
     await tester.pumpAndSettle();
     expect(document.mode, IanvsMarkdownEditorMode.source);
+    await tester.enterText(find.byKey(replacementKey), 'two');
     expect(tester.widget<TextField>(find.byKey(sourceKey)).readOnly, isFalse);
     await tester.tap(find.text('Replace'));
     await tester.pumpAndSettle();
@@ -618,7 +753,7 @@ void main() {
       document.text = 'unsaved one';
       await showFind(tester);
       await tester.enterText(find.byKey(queryKey), 'one');
-      await tester.tap(find.byKey(sourceKey));
+      await tester.tap(find.byKey(queryKey));
       await tester.pumpAndSettle();
       tester.widget<DesktopMenuBar>(find.byType(DesktopMenuBar)).onSave();
       await tester.pumpAndSettle();

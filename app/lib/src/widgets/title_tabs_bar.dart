@@ -116,6 +116,23 @@ class TitleTabsBar extends StatelessWidget {
               children: [
                 Expanded(child: _DocumentLocation(workspace: workspace)),
                 const SizedBox(width: 16),
+                if (workspace.activeDocument case final document?)
+                  ValueListenableBuilder<bool>(
+                    valueListenable: document.controller.canNavigateBack,
+                    builder: (context, canGoBack, _) => IconButton(
+                      key: const ValueKey('document-navigation-back-button'),
+                      tooltip: 'Back to previous position',
+                      onPressed: (canGoBack || workspace.canNavigateBack)
+                          ? () => navigateBack(workspace)
+                          : null,
+                      icon: const Icon(Icons.arrow_back, size: 16),
+                      style: const ButtonStyle(
+                        minimumSize: WidgetStatePropertyAll(Size(32, 32)),
+                        padding: WidgetStatePropertyAll(EdgeInsets.all(6)),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ),
                 ...documentActions,
                 if (documentActions.isNotEmpty) const SizedBox(width: 8),
                 _EditorModePicker(workspace: workspace),

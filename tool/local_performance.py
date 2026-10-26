@@ -29,7 +29,8 @@ def command(args, cwd=ROOT):
 
 def sources():
     paths = command(['git', 'ls-files', '--cached', '--others', '--exclude-standard']).splitlines()
-    prefixes = ('lib/', 'example/lib/', 'app/lib/', 'example/macos/', 'app/macos/', 'packages/')
+    prefixes = ('lib/', 'example/lib/', 'app/lib/', 'example/macos/', 'app/macos/',
+                'app/apple/', 'packages/')
     explicit = {'pubspec.yaml', 'pubspec.lock', 'example/pubspec.yaml', 'example/pubspec.lock',
                 'app/pubspec.yaml', 'app/pubspec.lock', 'benchmark/LOCAL-PERFORMANCE-PROTOCOL.md',
                 'tool/local_performance.py', 'tool/analyze_local_performance.py'}
@@ -38,7 +39,10 @@ def sources():
 
 
 def sdk_info(binary):
-    sdk = Path(binary).resolve().parents[1]
+    executable = shutil.which(binary)
+    if executable is None:
+        raise ValueError(f'Flutter executable not found: {binary}')
+    sdk = Path(executable).resolve().parents[1]
     changes = command(['git', 'status', '--porcelain'], sdk)
     if changes:
         raise ValueError(f'SDK must be unmodified: {changes}')

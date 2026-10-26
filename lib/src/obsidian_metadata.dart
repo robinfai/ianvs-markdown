@@ -7,6 +7,7 @@ import 'package:markdown/markdown.dart' as md;
 import 'editor/editor_models.dart';
 import 'editor/markdown_code_ranges.dart';
 import 'footnote_syntax.dart';
+import 'front_matter.dart';
 import 'markdown_link_source.dart';
 import 'theme.dart';
 
@@ -251,7 +252,9 @@ int _rangeEndContainingOffset(List<TextRange> ranges, int offset) {
   return -1;
 }
 
-final RegExp _obsidianTrailingBlockIdPattern = RegExp(r'\^[A-Za-z0-9_-]+ *$');
+final RegExp _obsidianTrailingBlockIdPattern = RegExp(
+  r'\^[A-Za-z0-9_-]+ *(?=\r?$)',
+);
 final RegExp _obsidianTableBlockIdPattern = RegExp(
   r'\|([ \t]*)(\\*)\^([A-Za-z0-9_-]+)([ \t]*)(?=\|)',
 );
@@ -1059,6 +1062,68 @@ Map<String, int> collectObsidianStandardFootnoteOrdinals(String source) {
   return Map<String, int>.unmodifiable(collector.standardOrdinals);
 }
 
+/// Resolves a decoded standard-footnote fragment to its original source range.
+/// Uses the same code/comment exclusion and last-definition precedence as Read.
+/// Generated inline-footnote IDs map to the original inline marker; use the
+/// rendered ID as a navigation target to reveal the generated footer in Read.
+TextRange? ianvsMarkdownFootnoteSourceRange(String source, String fragment) {
+  final body = parseMarkdownFrontMatter(source).body;
+  final bodyStart = source.length - body.length;
+  source =
+      source.substring(0, bodyStart).replaceAll(RegExp(r'[^\r\n]'), ' ') + body;
+  final content = _maskObsidianComments(
+    source,
+  ).replaceAll('\r\n', ' \n').replaceAll('\r', '\n');
+  if (fragment.startsWith('fn-ianvs-inline-footnote-') ||
+      fragment.startsWith('fnref-ianvs-inline-footnote-')) {
+    final label = fragment.substring(fragment.startsWith('fnref-') ? 6 : 3);
+    final reserved = RegExp(
+      r'\[\^([^\] \r\n\x00\t]+)\]',
+    ).allMatches(content).map((match) => match.group(1)!.toLowerCase()).toSet();
+    final expansion = _InlineFootnoteExpansion(reserved)..expand(content);
+    for (final definition in expansion.definitions) {
+      if (definition.label == label) return definition.sourceRange;
+    }
+  }
+  final definitions = _standardFootnoteDefinitions(content);
+  if (fragment.startsWith('fn-')) {
+    final label = fragment.substring(3).toLowerCase();
+    for (final definition in definitions.reversed) {
+      if (definition.normalizedLabel == label) {
+        return TextRange(
+          start: definition.labelStart - 2,
+          end: definition.labelEnd + 2,
+        );
+      }
+    }
+    return null;
+  }
+  if (!fragment.startsWith('fnref-')) return null;
+  var label = fragment.substring(6).toLowerCase();
+  var occurrence = 1;
+  final labels = definitions
+      .map((definition) => definition.normalizedLabel)
+      .toSet();
+  if (!labels.contains(label)) {
+    final suffix = RegExp(r'-(\d+)$').firstMatch(label);
+    if (suffix == null) return null;
+    occurrence = int.tryParse(suffix.group(1)!) ?? 0;
+    label = label.substring(0, suffix.start);
+    if (occurrence < 2 || !labels.contains(label)) return null;
+  }
+  for (final reference in ianvsMarkdownLivePreviewFootnoteReferences(content)) {
+    final marker = content.substring(
+      reference.sourceRange.start,
+      reference.sourceRange.end,
+    );
+    if (marker.toLowerCase() == '[^$label]' &&
+        reference.occurrence == occurrence) {
+      return reference.sourceRange;
+    }
+  }
+  return null;
+}
+
 /// One footnote reference source range with its document-wide Reading ordinal.
 ///
 /// Live Preview keeps the exact marker visible; the ordinal presentation is
@@ -1361,7 +1426,10 @@ String _stripObsidianComments(String source) {
   for (final range in ianvsMarkdownCommentRanges(source)) {
     output.write(source.substring(cursor, range.start));
     for (var index = range.start; index < range.end; index += 1) {
-      if (source.codeUnitAt(index) == 0x0a) output.write('\n');
+      final character = source.codeUnitAt(index);
+      if (character == 0x0a || character == 0x0d) {
+        output.writeCharCode(character);
+      }
     }
     cursor = range.end;
   }
@@ -1415,9 +1483,10 @@ String _expandInlineFootnotes(String source) {
 }
 
 final class _ExpandedInlineFootnoteDefinition {
-  _ExpandedInlineFootnoteDefinition(this.label);
+  _ExpandedInlineFootnoteDefinition(this.label, this.sourceRange);
 
   final String label;
+  final TextRange sourceRange;
   String body = '';
 }
 
@@ -1428,7 +1497,11 @@ final class _InlineFootnoteExpansion {
   final List<_ExpandedInlineFootnoteDefinition> definitions = [];
   int _nextLabelOrdinal = 1;
 
-  String expand(String source, {bool allowFences = true}) {
+  String expand(
+    String source, {
+    bool allowFences = true,
+    int sourceOffset = 0,
+  }) {
     final output = StringBuffer();
     var index = 0;
     var fenceCharacter = 0;
@@ -1513,9 +1586,21 @@ final class _InlineFootnoteExpansion {
         if (close >= 0) {
           final body = source.substring(index + 2, close).trim();
           final label = _allocateLabel();
-          final definition = _ExpandedInlineFootnoteDefinition(label);
+          final definition = _ExpandedInlineFootnoteDefinition(
+            label,
+            TextRange(
+              start: sourceOffset + index,
+              end: sourceOffset + close + 1,
+            ),
+          );
           definitions.add(definition);
-          definition.body = expand(body, allowFences: false);
+          final rawBody = source.substring(index + 2, close);
+          final leadingSpace = rawBody.length - rawBody.trimLeft().length;
+          definition.body = expand(
+            body,
+            allowFences: false,
+            sourceOffset: sourceOffset + index + 2 + leadingSpace,
+          );
           output.write('[^$label]');
           index = close + 1;
           lineStart = false;

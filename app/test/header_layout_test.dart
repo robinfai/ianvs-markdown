@@ -70,6 +70,38 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('window return button follows active document history', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(840, 560);
+    workspace.setMode(IanvsMarkdownEditorMode.preview);
+    await pumpShell(tester);
+    final document = workspace.activeDocument!;
+    final back = find.byKey(const ValueKey('document-navigation-back-button'));
+    expect(tester.widget<IconButton>(back).onPressed, isNull);
+    final before = document.controller.value;
+    document.controller.revealHeading(text.indexOf('## Next'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<IconButton>(back).onPressed, isNotNull);
+    await tester.tap(back);
+    await tester.pumpAndSettle();
+    expect(document.controller.value, before);
+    expect(document.controller.canUndo, isFalse);
+    expect(tester.widget<IconButton>(back).onPressed, isNull);
+    document.controller.revealHeading(text.indexOf('## Next'));
+    await tester.pumpAndSettle();
+    final index = workspace.documents.indexOf(document);
+    workspace.newDocument();
+    await tester.pumpAndSettle();
+    expect(tester.widget<IconButton>(back).onPressed, isNull);
+    workspace.selectDocument(index);
+    await tester.pumpAndSettle();
+    expect(tester.widget<IconButton>(back).onPressed, isNotNull);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 600));
+  });
+
   testWidgets(
     'document stays centered in all modes as panels and window change',
     (tester) async {
@@ -272,6 +304,9 @@ void main() {
         expect(workspace.activeDocument!.name, '目标.md');
         expectActiveTabVisible();
         await tester.pumpWidget(const SizedBox.shrink());
+        // The final tab captures its viewport after layout; flush the same
+        // debounced recovery write that a normal application exit awaits.
+        await workspace.flushSession();
       } finally {
         semantics.dispose();
       }
@@ -284,123 +319,123 @@ void main() {
     (const Size(840, 480), 3.0),
     (const Size(1200, 780), 3.0),
   ]) {
-    testWidgets(
-      'three context actions stay reachable at $size and ${textScale}x text',
-      (tester) async {
-        tester.view.physicalSize = size;
-        var imagePickerCalls = 0;
-        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+    testWidgets('context actions stay reachable at $size and ${textScale}x text', (
+      tester,
+    ) async {
+      tester.view.physicalSize = size;
+      var imagePickerCalls = 0;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        AppleWorkspaceService.channel,
+        (call) async {
+          if (call.method == 'pickAttachmentImage') imagePickerCalls++;
+          return call.method == 'normalizeAttachmentPaths'
+              ? (call.arguments['values'] as List)
+                    .cast<String>()
+                    .map((path) => path.toLowerCase())
+                    .toList()
+              : null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
           AppleWorkspaceService.channel,
-          (call) async {
-            if (call.method == 'pickAttachmentImage') imagePickerCalls++;
-            return call.method == 'normalizeAttachmentPaths'
-                ? (call.arguments['values'] as List)
-                      .cast<String>()
-                      .map((path) => path.toLowerCase())
-                      .toList()
-                : null;
-          },
-        );
-        addTearDown(
-          () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-            AppleWorkspaceService.channel,
-            null,
-          ),
-        );
-        const path =
-            '/Projects/Project/notes/A very long document title 中文 with spaces and more words.md';
-        files.files[path] = '';
-        await workspace.openPath(path);
-        workspace.setMode(IanvsMarkdownEditorMode.source);
-        workspace.activeDocument!.controller.selection =
-            const TextSelection.collapsed(offset: 0);
-        await pumpShell(tester, textScale: textScale);
-        expect(tester.takeException(), isNull);
+          null,
+        ),
+      );
+      const path =
+          '/Projects/Project/notes/A very long document title 中文 with spaces and more words.md';
+      files.files[path] = '';
+      await workspace.openPath(path);
+      workspace.setMode(IanvsMarkdownEditorMode.source);
+      workspace.activeDocument!.controller.selection =
+          const TextSelection.collapsed(offset: 0);
+      await pumpShell(tester, textScale: textScale);
+      expect(tester.takeException(), isNull);
 
-        final action = find.byKey(const ValueKey('insert-wiki-link-button'));
-        final row = tester.getRect(
-          find.byKey(const ValueKey('document-context-row')),
-        );
-        final bounds = tester.getRect(action);
-        final mode = tester.getRect(
-          find.byKey(const ValueKey('editor-mode-button')),
-        );
-        debugPrint(
-          'Layout $size @ $textScale: row $row; action $bounds; mode $mode',
-        );
-        expect(bounds.width, greaterThanOrEqualTo(32));
-        expect(bounds.height, greaterThanOrEqualTo(32));
-        expect(row.contains(bounds.topLeft), isTrue);
-        expect(row.contains(bounds.bottomRight), isTrue);
-        expect(bounds.right, lessThan(mode.left));
-        expect(bounds.center.dy, closeTo(row.center.dy, 0.5));
-        var previousRight = row.left;
-        for (final key in [
-          'import-image-button',
-          'workspace-backlinks-button',
-          'insert-wiki-link-button',
-        ]) {
-          final button = tester.getRect(find.byKey(ValueKey(key)));
-          expect(button.width, greaterThanOrEqualTo(32), reason: key);
-          expect(button.height, greaterThanOrEqualTo(32), reason: key);
-          expect(row.contains(button.topLeft), isTrue, reason: key);
-          expect(row.contains(button.bottomRight), isTrue, reason: key);
-          expect(button.left, greaterThanOrEqualTo(previousRight), reason: key);
-          expect(button.right, lessThan(mode.left), reason: key);
-          expect(button.center.dy, closeTo(row.center.dy, 0.5), reason: key);
-          previousRight = button.right;
-        }
-        expect(
-          tester.getRect(find.byType(IanvsMarkdownLiveEditor)).top,
-          closeTo(row.bottom, 0.5),
-          reason: 'The action must not add a toolbar row or cover the editor.',
-        );
-        final semantics = tester.ensureSemantics();
-        await tester.pump();
-        expect(find.bySemanticsLabel('Insert note link'), findsOneWidget);
-        expect(find.bySemanticsLabel('Import image'), findsOneWidget);
-        expect(find.bySemanticsLabel('Backlinks'), findsOneWidget);
-        semantics.dispose();
+      final action = find.byKey(const ValueKey('insert-wiki-link-button'));
+      final row = tester.getRect(
+        find.byKey(const ValueKey('document-context-row')),
+      );
+      final bounds = tester.getRect(action);
+      final mode = tester.getRect(
+        find.byKey(const ValueKey('editor-mode-button')),
+      );
+      debugPrint(
+        'Layout $size @ $textScale: row $row; action $bounds; mode $mode',
+      );
+      expect(bounds.width, greaterThanOrEqualTo(32));
+      expect(bounds.height, greaterThanOrEqualTo(32));
+      expect(row.contains(bounds.topLeft), isTrue);
+      expect(row.contains(bounds.bottomRight), isTrue);
+      expect(bounds.right, lessThan(mode.left));
+      expect(bounds.center.dy, closeTo(row.center.dy, 0.5));
+      var previousRight = row.left;
+      for (final key in [
+        'document-navigation-back-button',
+        'import-image-button',
+        'workspace-backlinks-button',
+        'insert-wiki-link-button',
+      ]) {
+        final button = tester.getRect(find.byKey(ValueKey(key)));
+        expect(button.width, greaterThanOrEqualTo(32), reason: key);
+        expect(button.height, greaterThanOrEqualTo(32), reason: key);
+        expect(row.contains(button.topLeft), isTrue, reason: key);
+        expect(row.contains(button.bottomRight), isTrue, reason: key);
+        expect(button.left, greaterThanOrEqualTo(previousRight), reason: key);
+        expect(button.right, lessThan(mode.left), reason: key);
+        expect(button.center.dy, closeTo(row.center.dy, 0.5), reason: key);
+        previousRight = button.right;
+      }
+      expect(
+        tester.getRect(find.byType(IanvsMarkdownLiveEditor)).top,
+        closeTo(row.bottom, 0.5),
+        reason: 'The action must not add a toolbar row or cover the editor.',
+      );
+      final semantics = tester.ensureSemantics();
+      await tester.pump();
+      expect(find.bySemanticsLabel('Insert note link'), findsOneWidget);
+      expect(find.bySemanticsLabel('Import image'), findsOneWidget);
+      expect(find.bySemanticsLabel('Backlinks'), findsOneWidget);
+      semantics.dispose();
 
-        final outlineScroll = find.descendant(
-          of: find.byKey(const ValueKey('empty-outline-scroll')),
-          matching: find.byType(Scrollable),
-        );
-        final position = tester.state<ScrollableState>(outlineScroll).position;
-        await tester.drag(
-          outlineScroll,
-          Offset(0, -position.maxScrollExtent - 100),
-        );
-        await tester.pumpAndSettle();
-        expect(position.pixels, closeTo(position.maxScrollExtent, 0.5));
-        expect(tester.takeException(), isNull);
+      final outlineScroll = find.descendant(
+        of: find.byKey(const ValueKey('empty-outline-scroll')),
+        matching: find.byType(Scrollable),
+      );
+      final position = tester.state<ScrollableState>(outlineScroll).position;
+      await tester.drag(
+        outlineScroll,
+        Offset(0, -position.maxScrollExtent - 100),
+      );
+      await tester.pumpAndSettle();
+      expect(position.pixels, closeTo(position.maxScrollExtent, 0.5));
+      expect(tester.takeException(), isNull);
 
-        await tester.tap(action);
-        await tester.pumpAndSettle();
-        expect(find.byType(WikiNotePicker), findsOneWidget);
-        await tester.tap(find.text('Cancel'));
-        await tester.pumpAndSettle();
-        expect(workspace.activeDocument!.controller.text, '');
-        await tester.tap(find.byKey(const ValueKey('import-image-button')));
-        await tester.pumpAndSettle();
-        expect(imagePickerCalls, 1);
-        await tester.tap(
-          find.byKey(const ValueKey('workspace-backlinks-button')),
-        );
-        await tester.pumpAndSettle();
-        expect(
-          find.text(
-            'Backlinks · A very long document title 中文 with spaces and more words.md',
-          ),
-          findsOneWidget,
-        );
-        await tester.tap(find.byTooltip('Close references'));
-        await tester.pumpAndSettle();
-        expect(workspace.activeDocument!.controller.text, '');
-        expect(tester.takeException(), isNull);
-        await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pump(const Duration(milliseconds: 400));
-      },
-    );
+      await tester.tap(action);
+      await tester.pumpAndSettle();
+      expect(find.byType(WikiNotePicker), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(workspace.activeDocument!.controller.text, '');
+      await tester.tap(find.byKey(const ValueKey('import-image-button')));
+      await tester.pumpAndSettle();
+      expect(imagePickerCalls, 1);
+      await tester.tap(
+        find.byKey(const ValueKey('workspace-backlinks-button')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Backlinks · A very long document title 中文 with spaces and more words.md',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.byTooltip('Close references'));
+      await tester.pumpAndSettle();
+      expect(workspace.activeDocument!.controller.text, '');
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 400));
+    });
   }
 }

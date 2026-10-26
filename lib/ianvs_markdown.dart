@@ -15,10 +15,11 @@ export 'package:flutter_markdown_plus/flutter_markdown_plus.dart'
         MarkdownTapLinkCallback;
 
 export 'src/code_block.dart';
+export 'src/code_layout.dart' show IanvsMarkdownCodeLayout;
 export 'src/blocked_image.dart';
 export 'src/callout.dart';
 export 'src/editor/editor_controller.dart'
-    hide ianvsMarkdownInlineSourceRangeAt;
+    hide ianvsMarkdownInlineSourceRangeAt, markdownInlineVisibleSourceRanges;
 export 'src/editor/editor_models.dart';
 export 'src/editor/editor_shortcuts.dart';
 export 'src/editor/editor_toolbar.dart';
@@ -31,7 +32,8 @@ export 'src/heading_folding.dart';
 export 'src/highlight.dart';
 export 'src/inline_link.dart';
 export 'src/link_target.dart' hide dispatchIanvsMarkdownLinkTap;
-export 'src/ianvs_markdown.dart';
+export 'src/ianvs_markdown.dart'
+    hide buildMarkdownReadingTextIndex, markdownReadingHighlightFlowsForRange;
 export 'src/math.dart';
 export 'src/keyboard.dart' show IanvsMarkdownCommand, IanvsMarkdownShortcuts;
 export 'src/localization.dart'
@@ -48,3 +50,5 @@ export 'src/syntax_preset.dart';
 export 'src/task_checkbox.dart';
 export 'src/theme.dart';
 export 'src/wiki_embed.dart';
+
+export 'src/editor/html_paste.dart' show ianvsMarkdownHtmlPasteValue;

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:linefold/src/app.dart';
 import 'package:linefold/src/controllers/workspace_controller.dart';
+import 'package:linefold/src/models/reading_preferences.dart';
 
 import 'support/fakes.dart';
 
@@ -13,6 +14,69 @@ const _source =
     'Alpha paragraph.\n\n    indented code\n\nSecond **paragraph**.';
 
 void main() {
+  for (final mode in [
+    IanvsMarkdownEditorMode.preview,
+    IanvsMarkdownEditorMode.livePreview,
+  ]) {
+    testWidgets(
+      'reading zoom in $mode preserves content, focus and history',
+      (tester) async {
+        _mockNativeChannels(tester);
+        final workspace = await _pumpReadApp(tester);
+        final controller = workspace.activeDocument!.controller;
+        controller.mode = mode;
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Alpha paragraph.').first);
+        await tester.pumpAndSettle();
+        workspace.setReadingPreferences(
+          ReadingPreferences(lineHeight: 1.8, width: ReadingWidth.wide),
+        );
+        await tester.pumpAndSettle();
+        final value = controller.value;
+        final focus = FocusManager.instance.primaryFocus;
+        final undo = controller.canUndo;
+        final initialEditor = tester.element(
+          find.byType(IanvsMarkdownLiveEditor),
+        );
+        await _press(tester, LogicalKeyboardKey.equal);
+        expect(workspace.readingPreferences.fontSize, 15);
+        await _press(tester, LogicalKeyboardKey.equal, shift: true);
+        expect(workspace.readingPreferences.fontSize, 15.5);
+        await _press(
+          tester,
+          LogicalKeyboardKey.minus,
+          command: false,
+          control: true,
+        );
+        expect(workspace.readingPreferences.fontSize, 15);
+        await _press(
+          tester,
+          LogicalKeyboardKey.equal,
+          command: false,
+          control: true,
+        );
+        expect(workspace.readingPreferences.fontSize, 15.5);
+        await _press(tester, LogicalKeyboardKey.minus);
+        expect(workspace.readingPreferences.fontSize, 15);
+        await _press(tester, LogicalKeyboardKey.digit0);
+        expect(workspace.readingPreferences.fontSize, 14.5);
+        expect(workspace.readingPreferences.lineHeight, 1.8);
+        expect(workspace.readingPreferences.width, ReadingWidth.wide);
+        expect(controller.value, value);
+        expect(controller.canUndo, undo);
+        expect(controller.isDirty, isFalse);
+        expect(FocusManager.instance.primaryFocus, same(focus));
+        expect(
+          tester.element(find.byType(IanvsMarkdownLiveEditor)),
+          same(initialEditor),
+        );
+        await workspace.flushSession();
+        await _finish(tester);
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+    );
+  }
+
   final shortcuts =
       <({String name, LogicalKeyboardKey key, bool command, bool shift})>[
         (
@@ -314,13 +378,16 @@ Future<void> _press(
   WidgetTester tester,
   LogicalKeyboardKey key, {
   bool command = true,
+  bool control = false,
   bool shift = false,
 }) async {
   if (command) await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+  if (control) await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
   if (shift) await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
   await tester.sendKeyEvent(key);
   if (shift) await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
   if (command) await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+  if (control) await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
   await tester.pumpAndSettle();
 }
 

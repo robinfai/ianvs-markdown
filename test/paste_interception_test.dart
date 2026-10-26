@@ -62,12 +62,14 @@ Future<void> _focus(WidgetTester tester, {bool live = false}) async {
   await tester.pump();
 }
 
-Future<void> _pasteKey(WidgetTester tester) async {
+Future<void> _pasteKey(WidgetTester tester, {bool plain = false}) async {
   final modifier = defaultTargetPlatform == TargetPlatform.macOS
       ? LogicalKeyboardKey.metaLeft
       : LogicalKeyboardKey.controlLeft;
   await tester.sendKeyDownEvent(modifier);
+  if (plain) await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
   await tester.sendKeyEvent(LogicalKeyboardKey.keyV);
+  if (plain) await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
   await tester.sendKeyUpEvent(modifier);
   await tester.pumpAndSettle();
 }
@@ -98,6 +100,93 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(SystemChannels.platform, null);
   });
+
+  for (final live in [false, true]) {
+    for (final payload in ['Name\tValue\nalpha\t1', 'https://example.test']) {
+      testWidgets(
+        'plain paste bypasses host and conversion live=$live payload=$payload',
+        (tester) async {
+          final controller = IanvsMarkdownController(text: 'Label');
+          final focus = FocusNode();
+          addTearDown(controller.dispose);
+          addTearDown(focus.dispose);
+          var hostCalls = 0;
+          await tester.pumpWidget(
+            _host(
+              controller: controller,
+              focus: focus,
+              live: live,
+              onPaste: () async {
+                hostCalls++;
+                return true;
+              },
+            ),
+          );
+          await _focus(tester, live: live);
+          final input = tester.widget<EditableText>(_editorEditable).controller;
+          input.selection = const TextSelection(baseOffset: 0, extentOffset: 5);
+          await tester.pump();
+          clipboardText = payload;
+          await _pasteKey(tester, plain: true);
+          expect(controller.text, payload);
+          expect(
+            controller.selection,
+            TextSelection.collapsed(offset: payload.length),
+          );
+          expect(clipboardReads, 1);
+          expect(hostCalls, 0);
+          controller.undo();
+          await tester.pumpAndSettle();
+          expect(controller.text, 'Label');
+          expect(controller.canUndo, isFalse);
+          await tester.pumpWidget(const SizedBox());
+        },
+      );
+    }
+  }
+
+  for (final live in [false, true]) {
+    for (final hook in [false, true]) {
+      testWidgets(
+        'TSV paste creates one undoable table live=$live hook=$hook',
+        (tester) async {
+          final controller = IanvsMarkdownController(text: 'Label');
+          final focus = FocusNode();
+          addTearDown(controller.dispose);
+          addTearDown(focus.dispose);
+          await tester.pumpWidget(
+            _host(
+              controller: controller,
+              focus: focus,
+              live: live,
+              onPaste: hook ? () async => false : null,
+            ),
+          );
+          await _focus(tester, live: live);
+          final input = tester.widget<EditableText>(_editorEditable).controller;
+          input.selection = const TextSelection.collapsed(offset: 5);
+          await tester.pump();
+          final before = controller.value;
+          clipboardText = 'Name\tValue\nalpha\t1';
+          await _pasteKey(tester);
+          expect(
+            controller.text,
+            'Label\n\n| Name | Value |\n| --- | --- |\n| alpha | 1 |',
+          );
+          expect(clipboardReads, 1);
+          controller.undo();
+          await tester.pumpAndSettle();
+          expect(controller.value.text, before.text);
+          expect(controller.selection, before.selection);
+          expect(controller.canUndo, isFalse);
+          controller.redo();
+          await tester.pumpAndSettle();
+          expect(controller.text, contains('| alpha | 1 |'));
+          await tester.pumpWidget(const SizedBox());
+        },
+      );
+    }
+  }
 
   for (final live in [false, true]) {
     final surface = live ? 'Live' : 'Source';
@@ -513,50 +602,111 @@ void main() {
     },
   );
 
-  for (final property in [false, true]) {
-    testWidgets('${property ? 'property' : 'table'} paste stays local and '
-        'does not call host', (tester) async {
-      final source = property
-          ? '---\ntitle: Alpha\n---\nLabel'
-          : '| H | I |\n| --- | --- |\n| Alpha | Beta |';
-      final controller = IanvsMarkdownController(text: source);
-      final focus = FocusNode();
-      addTearDown(controller.dispose);
-      addTearDown(focus.dispose);
-      var calls = 0;
-      await tester.pumpWidget(
-        _host(
+  for (final plain in [false, true]) {
+    for (final change in [
+      'selection',
+      'selection restored',
+      'focus restored',
+      'unmount',
+    ]) {
+      testWidgets(
+        'table pending paste is discarded after $change plain=$plain',
+        (tester) async {
+          const source = '| H | I |\n| --- | --- |\n| Alpha | Beta |';
+          final controller = IanvsMarkdownController(text: source);
+          final focus = FocusNode();
+          final clipboard = Completer<Map<String, String>?>();
+          pendingClipboard = clipboard.future;
+          addTearDown(controller.dispose);
+          addTearDown(focus.dispose);
+          await tester.pumpWidget(
+            _host(controller: controller, focus: focus, live: true),
+          );
+          await tester.pumpAndSettle();
+          final field = find.byKey(const ValueKey('ianvs-markdown-table-1-0'));
+          await tester.tap(field);
+          final input = tester.widget<TextField>(field).controller!;
+          const original = TextSelection(baseOffset: 0, extentOffset: 5);
+          input.selection = original;
+          IanvsMarkdownShortcuts.invoke(
+            plain
+                ? IanvsMarkdownCommand.pastePlainText
+                : IanvsMarkdownCommand.paste,
+            controller: controller,
+          );
+          await tester.pumpAndSettle();
+          expect(clipboardReads, 1);
+          if (change == 'unmount') {
+            await tester.pumpWidget(const SizedBox());
+          } else if (change == 'focus restored') {
+            await tester.tap(find.byKey(_otherKey));
+            await tester.pump();
+            await tester.tap(field);
+            input.selection = original;
+          } else {
+            input.selection = const TextSelection.collapsed(offset: 0);
+            if (change == 'selection restored') input.selection = original;
+          }
+          clipboard.complete({'text': 'replacement'});
+          await tester.pumpAndSettle();
+          expect(controller.text, source);
+          expect(controller.canUndo, isFalse);
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox());
+        },
+      );
+    }
+  }
+
+  for (final plain in [false, true]) {
+    for (final property in [false, true]) {
+      testWidgets('${property ? 'property' : 'table'} paste stays local and '
+          'does not call host plain=$plain', (tester) async {
+        final source = property
+            ? '---\ntitle: Alpha\n---\nLabel'
+            : '| H | I |\n| --- | --- |\n| Alpha | Beta |';
+        final controller = IanvsMarkdownController(text: source);
+        final focus = FocusNode();
+        addTearDown(controller.dispose);
+        addTearDown(focus.dispose);
+        var calls = 0;
+        await tester.pumpWidget(
+          _host(
+            controller: controller,
+            focus: focus,
+            live: true,
+            onPaste: () async {
+              calls++;
+              return true;
+            },
+          ),
+        );
+        await tester.pumpAndSettle();
+        final field = find.byKey(
+          ValueKey(
+            property
+                ? 'ianvs-markdown-front-matter-input-title'
+                : 'ianvs-markdown-table-1-0',
+          ),
+        );
+        clipboardText = plain ? 'https://example.test' : 'plain';
+        await tester.tap(field);
+        tester.widget<TextField>(field).controller!.selection =
+            const TextSelection(baseOffset: 0, extentOffset: 5);
+        IanvsMarkdownShortcuts.invoke(
+          plain
+              ? IanvsMarkdownCommand.pastePlainText
+              : IanvsMarkdownCommand.paste,
           controller: controller,
-          focus: focus,
-          live: true,
-          onPaste: () async {
-            calls++;
-            return true;
-          },
-        ),
-      );
-      await tester.pumpAndSettle();
-      final field = find.byKey(
-        ValueKey(
-          property
-              ? 'ianvs-markdown-front-matter-input-title'
-              : 'ianvs-markdown-table-1-0',
-        ),
-      );
-      await tester.tap(field);
-      tester.widget<TextField>(field).controller!.selection =
-          const TextSelection(baseOffset: 0, extentOffset: 5);
-      IanvsMarkdownShortcuts.invoke(
-        IanvsMarkdownCommand.paste,
-        controller: controller,
-      );
-      await tester.pumpAndSettle();
-      expect(calls, 0);
-      expect(tester.widget<TextField>(field).controller!.text, 'plain');
-      expect(
-        controller.text,
-        property ? source : source.replaceFirst('Alpha', 'plain'),
-      );
-    });
+        );
+        await tester.pumpAndSettle();
+        expect(calls, 0);
+        expect(tester.widget<TextField>(field).controller!.text, clipboardText);
+        expect(
+          controller.text,
+          property ? source : source.replaceFirst('Alpha', clipboardText!),
+        );
+      });
+    }
   }
 }

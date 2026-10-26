@@ -15,6 +15,14 @@
 | `scoped_builder.dart` | 上游 `lib/src/builder.dart`；类型改名，块标签改为每次构建独立的 Set。核心要求提供图片回调，因此移除不可达的默认文件/网络加载分支；URI 分段和回调参数保持原语义 |
 | `scoped_body.dart` | 上游 `lib/src/widget.dart` 的 State 桥接；继续使用公共 `MarkdownBody` 构造和布局；调用内部 builder，增加默认关闭的解析/Widget 构建阶段计时 |
 | `fallback_style_io.dart` / `fallback_style_web.dart` | 上游同名平台辅助文件中的样式回退部分；保持原有 native 平台和 Web user-agent 判定及 text scaler |
+| `source_mapped_document.dart` | `markdown 7.3.1` 的 `block_parser.dart` 主循环和 `document.dart` 行内/脚注收尾；保留节点身份对应的源行范围。语法实现、行内解析器、引用表继续使用上游类型；只在正文定位作用域内启用 |
+
+源码映射派生部分保留 [markdown BSD 许可证](../lib/src/renderer/LICENSE.markdown)。
+升级 `markdown` 时必须逐项核对解析循环、回退/退行、段落缓冲以及脚注排序和反向链接，
+运行 `source_mapped_document_test.dart` 与渲染回归。对应实现不插入源码标记或 AST 属性，
+`source_regions.dart` 在原有 Widget 外层注册定位 Key；嵌套 callout/HTML 渲染器不会继承
+外层源码映射。View 映射折叠后的行到原文；现有渲染预处理保持原有正文行顺序，
+新增脚注尾部不伪造原文位置。未来若某一预处理改变正文行数，须同步扩展映射并增加测试。
 
 来源版本为 `1.0.12`，原 `builder.dart` SHA-256 为 `f1e276216dcc9715b80bc10a4dbcf16d2520e90dae4db477c8f1b7722b2be64d`。保留原版权和 [BSD 许可证](../lib/src/renderer/LICENSE.flutter_markdown_plus)，包根许可证也包含此声明。其余上游资源、样式表和公共类型不复制；依赖仍参与正常的版本锁定和包外验证。
 

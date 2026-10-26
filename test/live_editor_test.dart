@@ -16005,7 +16005,7 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
   );
 
   testWidgets(
-    'table smart paste resolves the cell after awaiting the clipboard',
+    'table smart paste cancels after focus moves and another cell changes',
     (tester) async {
       const url = 'https://example.com';
       const source =
@@ -16015,7 +16015,7 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
       const expected =
           '| H | I |\n'
           '| --- | --- |\n'
-          '| LONGalpha | [beta](https://example.com) |';
+          '| LONGalpha | beta |';
       final clipboard = Completer<Map<String, dynamic>?>();
       final controller = IanvsMarkdownController(text: source);
       addTearDown(controller.dispose);
@@ -16056,7 +16056,8 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
       await tester.pumpAndSettle();
 
       expect(controller.text, expected);
-      expect(tester.widget<TextField>(second).controller?.text, '[beta]($url)');
+      expect(tester.widget<TextField>(second).controller?.text, 'beta');
+      expect(tester.widget<TextField>(first).focusNode?.hasFocus, isTrue);
     },
     variant: const TargetPlatformVariant(<TargetPlatform>{
       TargetPlatform.macOS,

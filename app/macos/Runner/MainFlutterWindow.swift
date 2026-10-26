@@ -115,9 +115,12 @@ class MainFlutterWindow: NSWindow {
     exportChannel = FlutterMethodChannel(name: "work.ianvs.linefold/document_export",
       binaryMessenger: flutterViewController.engine.binaryMessenger)
     exportChannel?.setMethodCallHandler { [weak self] call, result in
-      guard let self, let arguments = call.arguments as? [String: Any] else {
+      guard let self, var arguments = call.arguments as? [String: Any] else {
         result(FlutterError(code: "export_unavailable", message: "The document window is unavailable.", details: nil))
         return
+      }
+      if let bytes = arguments["bytes"] as? FlutterStandardTypedData {
+        arguments["bytes"] = bytes.data
       }
       self.documentExport.perform(call.method, arguments: arguments) { output in
         switch output {

@@ -20,7 +20,16 @@ See [the execution checklist](../doc/R3_ACCEPTANCE.md) for save/reopen, recovery
 multiple-document, resource and input checks. Build success alone does not
 claim those interactions passed.
 
-## Workspace source search
+## Document and workspace search
+
+On Mac, **Command-F** searches the rendered body in Read and Live without
+switching the editor surface. Use the **Body / Source** selector for literal
+Markdown source search; replacement requires source editing. Next/previous
+matches keep the query focused, and closing body search preserves the editing
+selection and current viewport. Body indexing for documents of at least 64 Ki
+UTF-16 code units runs in a background isolate. Documents rejected by the render
+budget offer source search explicitly. External embeds and diagram source are
+not part of body search.
 
 On Mac, choose **Search source** in the sidebar or press **Command-Shift-F**
 (**Control-Shift-F** also works). This is separate from filename search and searches
@@ -39,6 +48,43 @@ or slow directory listings can also be incomplete and are explicitly labelled.
 
 The iOS reader shares the safe native source contract but does not yet expose the
 workspace search interface.
+
+## Mermaid in offline export
+
+HTML and PDF preparation now request diagrams from the same native Mermaid
+renderer used by the editor. Successful SVG output is embedded as an image data
+URI, with a collapsible copy of its source. Rendering errors, unsupported external
+resources and image-budget limits retain readable source and add a notice.
+No diagram resources are downloaded. Math export still uses readable source;
+real native HTML/PDF diagram fidelity and printing remain to be verified.
+
+## Compare desktop save conflicts
+
+A desktop save conflict offers **Compare Changes** before Cancel, Overwrite or
+Keep Both. The read-only comparison shows disk removals and captured local
+additions, both line numbers, and LF/CRLF/CR or missing final-newline markers.
+The local side is the exact snapshot the pending save would write. Large changed
+regions show complete removal/addition groups instead of an expensive fine diff;
+no content is truncated. Returning to Overwrite still rechecks the disk and asks
+again if it changed while the comparison was open.
+
+## Paste spreadsheet tables
+
+Paste a rectangular tab-separated range with at least two rows and two columns
+into ordinary prose in Source or Live to create a Markdown table. The first row
+becomes the header. Empty cells, quoted spreadsheet fields, embedded line breaks
+and literal Markdown punctuation are preserved; cell line breaks use `<br>`.
+One undo removes the complete insertion. Edit → Paste as Plain Text
+(Command/Ctrl+Shift+V) retains the clipboard text instead of converting TSV or
+wrapping a selected label in a link, and skips the host image-import hook. Code, existing tables, properties and
+other structured block contexts keep their native paste behavior. Single-row,
+ragged or malformed ranges stay plain text. Clipboard text above 1 MiB is not
+converted automatically. Normal Paste also reads native HTML when available and converts headings,
+paragraphs, emphasis, links, lists, code and rectangular tables to Markdown in
+ordinary Source/Live prose. Unsupported HTML or code editing contexts use the
+same clipboard item's plain text. Without HTML, the existing image/text paste
+pipeline remains available. Paste as Plain Text skips native rich reading.
+Real browser-to-app clipboard acceptance remains pending.
 
 ## Import images and paste screenshots
 
@@ -239,10 +285,11 @@ Integration boundaries in the current desktop shell:
 - Search matches names and relative paths in the workspace, and full paths for
   external files. It returns the best 200 matches with the total count; it is not
   a document-content search. Rename and move do not rewrite Markdown links.
-  Find/replace, export, and an encoding or line-ending selector are not currently
-  exposed.
-- Open-document text, modes, and workspace visibility are recovered. Appearance,
-  caret positions, undo history, and scroll offsets are not serialized across app launches.
+  Document find/replace and export are available; an encoding or line-ending
+  selector is not exposed.
+- Open-document text, modes, and workspace visibility are recovered.
+  Source selections and source-anchored reading positions are recovered separately;
+  undo history is not restored across app launches.
   Snapshot writes are serialized, including mode-only changes. Normal cancellable
   Quit requests wait for the latest recovery snapshot, including edits made while
   storage is busy. If recovery storage fails, Quit is cancelled with an error so
@@ -269,6 +316,21 @@ The app icon uses the folded-paper L mark. Its master artwork and generation
 prompt are in [design/linefold-icon-v1.md](design/linefold-icon-v1.md). Regenerate
 all macOS icon sizes from the repository root with
 `bash app/tool/generate_app_icons.sh`.
+
+Settings also provides reading text size (12–28 pt), line spacing (1.2–2.2),
+and narrow/standard/wide document columns (560/720/960 logical pixels, constrained
+by the window). Text size scales body text and headings in Read/Live; the column
+width remains shared across modes. Preferences survive restart independently of
+Markdown contents and undo history. Reset reading settings restores 14.5 pt,
+1.58 spacing and the standard column. View → Larger/Smaller Reading Text and
+Actual Reading Text Size share the reading preferences: Command/Ctrl + plus or
+minus changes size by 0.5 pt, and Command/Ctrl + 0 restores 14.5 pt without
+resetting width or spacing. Command/Ctrl + equals also enlarges text. These
+commands defer during active editor composition. “Wrap code lines” defaults to
+on; turning it off lets fenced and indented Markdown code scroll horizontally in
+Read and Live, including the active code editor. The preference survives restart
+and never inserts or removes source line breaks. Source mode and custom diagram
+renderers retain their own layout.
 
 The first-launch association prompt remembers both acceptance and refusal.
 Settings shows the saved preference alongside the actual macOS default. Changing
@@ -447,3 +509,104 @@ property undo stays local and toolbar Save commits its draft; in app, Search Fil
 keeps its own text history and the editor continues to hide front matter.
 See [the command contract](../doc/API_CONTRACTS.md#命令配置与焦点r1-03) and
 [the validation record](../benchmark/COMMAND-ROUTING-2026-10-13.md).
+
+### 跳转返回入口（2026-10-26 增量）
+
+桌面正文上下文栏提供返回按钮，无历史时禁用，状态随活动标签切换。
+View 菜单和窗口快捷键继续支持同一命令。iOS 阅读底栏新增「返回」，目录、标题链接和
+脚注跳转共用组件的文档内返回历史；正文刷新后按源码变化调整保存位置。
+当前 iOS 返回历史仅存在于阅读组件生命周期内，切到快速编辑、重新打开文档或重启后
+不承诺保留；跨文档历史和持久化位置仍待补齐。本批通过 widget 布局与实际滚动断言，
+尚未执行真机输入/手势及 VoiceOver 验收。
+
+### iOS 正文查找（2026-10-26 增量）
+
+阅读底栏的「查找」打开正文搜索，提供命中数、前后匹配和关闭入口，保持原阅读组件与
+正文高亮。链接地址等隐藏源码不纳入正文搜索；不提供替换。关闭保留当前命中位置，
+不会产生跳转返回历史或修改文档。复用搜索控制器的防抖、后台大文档索引、预算提示和
+过期结果保护；输入法组合输入期间禁用跳转/关闭。查找期间暂时收起阅读底栏，
+避免小屏、大字号和软键盘同时出现时溢出。320px/3倍字号/键盘及长文实际滚动已有
+widget 回归；真实 iOS 键盘、VoiceOver、性能和跨重启阅读位置仍待验收。
+
+### iOS 阅读位置持久化（2026-10-26 后续增量）
+
+存储目录初始化或读取失败后，后续加载/保存会重试。未成功读取已有位置前不会覆盖磁盘快照；
+关闭时的最终保存仍会合并旧位置与本次阅读进度，存储失败不修改 Markdown 文件。
+
+移动阅读器现在按工作区路径与文档路径保存正文锚点，重新挂载或重新打开同一文档时恢复；
+应用重建后从独立的 `LinefoldMobileReading` 主备快照读取。保存包含原文快照，以便磁盘内容
+改变后保守重定位；不修改 Markdown，不保存文件授权。滚动写入合并 400ms，生命周期暂停
+和退出组件时请求 flush；最多保留 24 项、合计 8 Mi UTF-16 源码单位，超限淘汰旧项。
+本项替代上文“重新打开或重启不保留阅读位置”的历史限制；返回栈仍不跨重启保存。
+已验证实际磁盘写入/重新加载与新应用控制器恢复，真机强制退出时机及 iCloud 路径变化
+仍需平台验收。位置存储失败不阻止阅读，服务保留错误状态并允许后续写入重试。
+
+### iOS 阅读到快速编辑的位置连续性
+
+从当前阅读文档进入「编辑源码」时，将光标定位到阅读锚点对应的源码位置；
+异步打开后核对路径与工作区，避免对另一文档应用旧位置。取消编辑恢复原阅读视口，
+保存后按新正文重定位原阅读段落。新增 iOS widget 测试检查光标屏幕坐标、取消恢复，
+以及前文插入并保存后的段落可见性；真实软键盘/IME 与强退仍需设备验收。
+
+### 桌面跨文档返回（增量）
+
+Markdown 和 Wiki 链接打开其他文档后，返回按钮/菜单会在处理后续文内跳转后回到来源标签，
+保留来源未保存内容并恢复离开时的选区及阅读锚点。普通标签切换不入栈；关闭文档即移除
+相关历史，返回不自动重开文件。跨文档历史仅在当前工作区控制器生命周期保留，最多64项，
+保存的源码快照合计不超过8 Mi UTF-16单位。iOS 跨文档返回仍待接入。
+
+### iOS 阅读返回的会话保留（2026-10-26）
+
+本地 Markdown/Wiki 链接可逐级返回来源阅读位置。到达目标后的文内跳转优先返回，
+回到来源后可继续返回它之前的段落；读取失败保留重试入口，不修改 Markdown。
+阅读会话按工作区代次与路径隔离，最多缓存 24 篇、8 Mi UTF-16 当前原文单位，
+活动文档单独超限时保留活动会话。淘汰后不再保留该文档的文内跳转历史。
+跳转历史仅限当前进程，重启恢复使用独立的阅读位置快照。
+当前自动测试覆盖实际视口恢复与缓存释放，尚未替代 iOS 真机和长会话性能验收。
+
+### 公式导出（2026-10-26）
+
+HTML/PDF 导出流程将可渲染公式生成为内嵌 2x PNG，与编辑器使用同一数学库。
+公式不依赖外部脚本或字体；行内图片 alt 保留原式，块级公式另附折叠源码。
+公式超过 8,192 字符、1,024×512 逻辑像素，或超过全局图像预算时保留源码并说明原因。
+公式图片不能作为 PDF 中可搜索的公式文字；原生 PDF 文字质量、分页与导出产物验收仍在进行。
+
+### PDF 中文复制与搜索验证（2026-10-26）
+
+导出优先使用系统 Arial Unicode MS，避免当前 Apple PDF 路径把部分汉字映射成康熙部首。
+同时避免 WebKit 合成粗体造成重复文本，以轻描边保留标题和强调的视觉区分。
+macOS 27.0.1 的原生验收已验证原标题、结尾、表格中文和长代码的精确码点与次数，
+并通过 PDFKit 原文搜索。没有改写原始提取文字或进行 Unicode 归一化。
+这不代表所有系统字体、字符或第三方阅读器已覆盖；跨页表头及原生公式/图表产物验收仍在进行。
+
+### 原生图形导出回归（2026-10-26）
+
+`make test-document-export-fixture test-native-document-export` 现同时验证真实数学渲染器、
+原生 Mermaid 与 WebKit PDF 输出；夹具检查两张公式的图像尺寸和 Mermaid 节点的实际像素，
+并保留独立 PDF、截图与 JSON 报告于 `build/export-qa/native/`。
+当前代表性公式和流程图已通过原生输出与 Poppler 页面检查，复杂图形和跨平台覆盖仍需扩展。
+
+### PDF 跨页表头（2026-10-26）
+
+原生导出按实际行高为长表格分页，并在续页复制表头；短表格保持整块。
+150 行、四列的验收语料已通过全部单元格、重复表头、中文搜索和无空白页检查。
+单行内容超过一页时会明确拒绝导出，不截断文字；请缩短该单行后重试。
+混合行高、多表格以及其他系统版本仍需扩展验收。
+
+### Markdown with attachments ZIP
+
+On macOS, **File → Export Markdown + Attachments…** exports the command-time
+buffer, including unsaved changes, into `document.md`, `assets/`, and
+`manifest.json`. Referenced local attachments retain their original bytes; references
+in the exported copy are rewritten to portable relative paths. Repeated attachments
+are copied once, and generated asset names avoid same-name collisions.
+
+The bundle reader supports local regular files, including images, PDF, SVG,
+archives and files without extensions. Linked Markdown notes are listed but not
+recursively copied. Hidden files and symbolic links are blocked; remote resources
+and cloud-only files are not downloaded. Missing or blocked resources remain unchanged in Markdown and are
+reported before the Save dialog, with the full list inside the manifest.
+You can cancel or export the available resources. The original document is
+never saved or rewritten by this operation. Bundle output is bounded to 32 MiB
+and 256 unique attachments, and uses the same native atomic destination and
+source-file protection as other exports.

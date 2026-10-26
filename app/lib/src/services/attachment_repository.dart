@@ -21,12 +21,16 @@ abstract class AttachmentSource {
 /// Only the native adapter touches the filesystem. In particular, there is no
 /// Dart File fallback which could follow a swapped symlink after validation.
 class AppleAttachmentSource implements AttachmentSource {
-  const AppleAttachmentSource();
+  const AppleAttachmentSource({this.forBundle = false});
+  final bool forBundle;
 
   @override
   Future<List<AttachmentMetadata>> list(String root) async {
     final result = await AppleWorkspaceService.channel
-        .invokeListMethod<dynamic>('listAttachments', {'path': root});
+        .invokeListMethod<dynamic>(
+          forBundle ? 'listBundleAssets' : 'listAttachments',
+          {'path': root},
+        );
     if (result == null) {
       throw const AttachmentFailure(AttachmentFailureKind.unavailable);
     }
@@ -76,7 +80,7 @@ class AppleAttachmentSource implements AttachmentSource {
     int maximumBytes,
   ) async {
     final result = await AppleWorkspaceService.channel.invokeMethod<Uint8List>(
-      'readAttachmentBytes',
+      forBundle ? 'readBundleAssetBytes' : 'readAttachmentBytes',
       {
         'path': root,
         'relativePath': relativePath,

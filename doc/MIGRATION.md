@@ -1,5 +1,18 @@
 # 从 0.3.1 升级到当前 Unreleased
 
+2026-10-25 增补：Controller 新增可选的 `revealSourceRange`、
+`sourceNavigation`、`clearSourceNavigation`，并导出不可变请求类型
+`IanvsMarkdownSourceNavigation`。现有宿主无需迁移；需要无选区副作用定位的宿主
+可在三模式编辑器中使用新接口。独立 Read View 可通过新增可选的
+`sourceNavigation` 参数订阅相同请求；源码范围对应可见正文块，完整边界见
+[范围导航契约](API_CONTRACTS.md#source-范围导航与只读展示r4-05-p1a)。
+
+位置保持为可选接入：三模式编辑器传 `preserveViewport: true`，宿主订阅
+`controller.viewportAnchor` 并将位置随同原文快照持久化。恢复时通过
+`rememberViewport` 载入，组件挂载后自动定位。独立 View 使用
+`initialViewportAnchor` / `onViewportChanged`。默认行为不变；Linefold 已启用，
+旧会话缺失位置字段时沿用原恢复行为，不恢复 IME composing。
+
 更新：2026-10-22。面向已使用 0.3.1 的宿主，整理当前仓库候选的行为变化与接入步骤。
 仓库版本仍是 `0.3.1`，这些变更尚未发布到 pub.dev；不能仅通过更新版本约束获得它们。
 接入验证应锁定候选提交或该提交的 Pub-selected 包快照，并记录文件哈希。
@@ -215,3 +228,73 @@ IanvsMarkdownEditor(
 
 Wiki embed、front matter Wiki 属性和嵌套渲染面也保留来源；Live 的普通 Markdown/tag
 编辑交互不变，Reading 则交付完整 typed 导航事件。该接口为可选新增，无需迁移已有回调。
+
+### 正文搜索快照（新增可选接口）
+
+`IanvsMarkdownReadingSearch.parse(source)` 创建正文索引，预算拒绝时返回 null；
+`find(query, matchCase: ...)` 返回不可变的 `IanvsMarkdownReadingMatch` 列表。
+`textRange` 属于命中的正文文本流 `text`；`sourceRange` 仅为原文块的导航锚点，
+不能用于替换。使用前需核对索引 `source` 与当前文档一致。
+现有调用无须修改。当前覆盖基本 Markdown、Wiki 标签和显式 callout 文本；
+不包含图片 alt、图表源码、外部嵌入内容或宿主本地化的默认 callout 标题。
+
+`IanvsMarkdownView.readingHighlights` 可选接收 `IanvsMarkdownReadingHighlights`，
+按源码块绘制命中与当前命中；原文快照不匹配时不绘制。高亮不修改文本、选区或焦点，
+布局变化后按实际文字重新计算。此接口不自动发起定位，宿主仍使用 `sourceNavigation`。
+
+`IanvsMarkdownLiveEditor.readingHighlights` 将同一可选快照转交给 Read 模式；
+Live 已支持完整的渲染块及普通段落活动块的粗体、链接、行内代码映射；
+标题、单个列表项、任务标记与嵌套引用的活动块映射已支持；多项列表拆分映射仍待补齐；
+Source 不使用正文高亮。Read 定位命中时优先显示当前高亮文字的矩形，
+无可用文字几何时沿用源码块定位。
+
+正文命中新增可选 `navigationRange`：默认等于 `sourceRange`，列表可细化到单个源码列表项。
+`sourceRange` 仍标识 Read 渲染块，不用于替换；宿主应将 `navigationRange` 用于滚动请求。
+当渲染解析与 Live 分块的列表项数量无法对应时，保留整列表定位，避免猜测重复文本位置。
+
+### 可选代码换行作用域
+
+新增 `IanvsMarkdownCodeLayout`，可包裹 `IanvsMarkdown`、`IanvsMarkdownView` 或
+`IanvsMarkdownLiveEditor`，用 `softWrap: false` 为 Markdown 代码块启用横向滚动。
+默认仍自动换行，无需迁移既有调用。该显示设置不改动原文；自定义 builder 需自行决定
+是否通过 `IanvsMarkdownCodeLayout.softWrapOf(context)` 采用偏好。
+
+### 纯文本粘贴命令
+
+`IanvsMarkdownCommand` 新增 `pastePlainText`，默认 Command/Ctrl+Shift+V，支持既有
+bindings 重映射和禁用。宿主如对命令 enum 做穷尽 switch，需加入该分支。
+它只读 plain text，不调用宿主 `onPaste`，也不执行 TSV/URL 自动转换；普通 Paste 不变。
+Live 表格/属性仍按本地字段约束编辑；Read 与组合输入期间不写入文档。
+
+### HTML 粘贴接入
+
+新增可选纯函数 `ianvsMarkdownHtmlPasteValue(TextEditingValue, String)`，无需修改既有调用。
+Linefold 普通粘贴优先尝试原生 HTML；可用时转换后按单独历史组插入，失败使用同项 plain text。
+只有无 HTML 时继续既有图片/普通文本管线。`pastePlainText` 始终跳过 HTML 读取和转换。
+核心库仍不依赖原生插件；可选 clipboard 包提供独立的同项读取适配器。
+
+### 文档内跳转返回（增量）
+
+Controller 新增 `rememberNavigationPosition()`、`navigateBack()` 和独立 listenable
+`canNavigateBack`，没有新增必填构造参数。`revealHeading` 现在自动记录返回点；其既有
+选区移动行为保持。搜索继续调用 `revealSourceRange`，不会污染返回历史。历史限 64 项，
+不跨 Controller/重启持久化。宿主可绑定返回按钮；组合输入时应同样检查局部表格编辑器。
+
+### 标准脚注链接（增量）
+
+新增可选工具函数 `ianvsMarkdownFootnoteSourceRange`。参数 fragment 不包含 `#`，
+由调用方 URL 解码一次。应用链接服务已处理 URI fragment 解码，支持标准脚注与回链，
+沿用现有正文定位和返回历史。自动生成的内联脚注目标仍待接入。
+
+### 内联脚注目标（增量）
+
+`ianvsMarkdownFootnoteSourceRange` 现在也支持自动生成的内联脚注 ID，复用渲染展开器
+编号和嵌套顺序。`IanvsMarkdownSourceNavigation` 构造函数和 `revealSourceRange`
+增加可选 `targetId`，已有调用保持兼容；未提供时原源码定位行为不变。
+Read 将脚注定义 ID 定位到文末渲染内容，找不到该 ID 时仍回退到源码范围。
+
+### 跨文档返回边界（增量）
+
+新增只读 `navigationHistoryToken`，供宿主组合文内与跨文档历史；现有 API 无需修改。
+标识不是条目数量，在达到历史上限以及源码重定位后仍可用作当前位置边界。
+桌面菜单、窗口快捷键和返回按钮现调用 Workspace 返回流程，局部 IME 保护保持。
