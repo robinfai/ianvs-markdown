@@ -3,6 +3,24 @@ import 'dart:math' as math;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
+/// Overrides list marker color without changing the item's body text.
+class IanvsMarkdownListMarkerColor extends InheritedWidget {
+  const IanvsMarkdownListMarkerColor({
+    super.key,
+    required this.color,
+    required super.child,
+  });
+  final Color color;
+
+  static Color? of(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<IanvsMarkdownListMarkerColor>()
+      ?.color;
+
+  @override
+  bool updateShouldNotify(IanvsMarkdownListMarkerColor oldWidget) =>
+      color != oldWidget.color;
+}
+
 /// Border-theme shapes used for unordered-list nesting levels.
 enum IanvsMarkdownUnorderedListMarkerShape { circle, square, diamond, ring }
 
@@ -180,6 +198,33 @@ class IanvsMarkdownListGuideAnchor extends SingleChildRenderObjectWidget {
 }
 
 /// Render box exposed for geometry-focused widget tests.
+/// Marks a contiguous source list so guides cannot bridge separate lists.
+class IanvsMarkdownListGuideGroup extends SingleChildRenderObjectWidget {
+  const IanvsMarkdownListGuideGroup({
+    super.key,
+    required this.identity,
+    required super.child,
+  });
+  final Object identity;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      IanvsMarkdownListGuideGroupRenderBox(identity);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    IanvsMarkdownListGuideGroupRenderBox renderObject,
+  ) {
+    renderObject.identity = identity;
+  }
+}
+
+class IanvsMarkdownListGuideGroupRenderBox extends RenderProxyBox {
+  IanvsMarkdownListGuideGroupRenderBox(this.identity);
+  Object identity;
+}
+
 class IanvsMarkdownListGuideRenderBox extends RenderProxyBox {
   IanvsMarkdownListGuideRenderBox(
     this._color,
@@ -364,7 +409,7 @@ final class _ListGuideGeometry {
       return const <IanvsMarkdownListGuideSegment>[];
     }
     final anchors = <_MeasuredListGuideAnchor>[];
-    void collect(RenderObject renderObject) {
+    void collect(RenderObject renderObject, [Object? group]) {
       // Retained editors outside the sliver's laid-out children have no
       // current scroll coordinates and must not contribute guide anchors.
       final parentData = renderObject.parentData;
@@ -379,6 +424,9 @@ final class _ListGuideGeometry {
           renderObject is IanvsMarkdownSliverListGuideRenderObject) {
         return;
       }
+      if (renderObject is IanvsMarkdownListGuideGroupRenderBox) {
+        group = renderObject.identity;
+      }
       if (renderObject is IanvsMarkdownListGuideAnchorRenderBox &&
           renderObject.hasSize) {
         final anchorRect = MatrixUtils.transformRect(
@@ -388,12 +436,13 @@ final class _ListGuideGeometry {
         anchors.add(
           _MeasuredListGuideAnchor(
             nestLevel: renderObject.nestLevel,
+            group: group,
             anchorRect: anchorRect,
             itemRect: _listItemRect(renderObject) ?? anchorRect,
           ),
         );
       }
-      renderObject.visitChildren(collect);
+      renderObject.visitChildren((child) => collect(child, group));
     }
 
     child!.visitChildren(collect);
@@ -443,6 +492,7 @@ final class _ListGuideGeometry {
 
       if (index + 1 >= anchors.length) continue;
       final next = anchors[index + 1];
+      if (anchor.group != next.group) continue;
       for (var level = 0; level < next.nestLevel; level += 1) {
         final double top;
         if (anchor.nestLevel > level) {
@@ -553,11 +603,13 @@ final class IanvsMarkdownListGuideAnchorRenderBox extends RenderProxyBox {
 final class _MeasuredListGuideAnchor {
   const _MeasuredListGuideAnchor({
     required this.nestLevel,
+    required this.group,
     required this.anchorRect,
     required this.itemRect,
   });
 
   final int nestLevel;
+  final Object? group;
   final Rect anchorRect;
   final Rect itemRect;
 }

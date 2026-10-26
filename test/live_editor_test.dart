@@ -8342,6 +8342,210 @@ url: https://example.com/path
     expect(find.text('Sibling'), findsOneWidget);
   });
 
+  testWidgets(
+    'nested list folds reveal on hover and preserve independent child folds',
+    (tester) async {
+      const source =
+          '1. Root\n   1. Parent\n      - Child\n   2. Sibling\n2. End';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+      Finder toggle(String line) => find.byKey(
+        ValueKey('ianvs-markdown-list-fold-${source.indexOf(line)}'),
+      );
+      double opacity(Finder button) => tester
+          .widget<AnimatedOpacity>(
+            find
+                .ancestor(of: button, matching: find.byType(AnimatedOpacity))
+                .first,
+          )
+          .opacity;
+      final parent = toggle('   1. Parent');
+      final root = toggle('1. Root');
+      expect(parent, findsOneWidget);
+      expect(toggle('      - Child'), findsNothing);
+      expect(opacity(parent), 0);
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: Offset.zero);
+      addTearDown(mouse.removePointer);
+      await mouse.moveTo(tester.getCenter(find.text('Parent')));
+      await tester.pumpAndSettle();
+      expect(opacity(parent), 1);
+      expect(opacity(root), 0);
+      await tester.tap(parent);
+      await tester.pumpAndSettle();
+      expect(find.text('Child'), findsNothing);
+      expect(find.text('Sibling'), findsOneWidget);
+      await mouse.moveTo(Offset.zero);
+      await tester.pumpAndSettle();
+      expect(opacity(parent), 1);
+      expect(
+        tester.widget<IconButton>(parent).color,
+        IanvsMarkdownThemeData.light.accent,
+      );
+      await tester.tap(root);
+      await tester.pumpAndSettle();
+      expect(find.text('Parent'), findsNothing);
+      expect(find.text('Sibling'), findsNothing);
+      expect(find.text('End'), findsOneWidget);
+      await tester.tap(root);
+      await tester.pumpAndSettle();
+      expect(find.text('Parent'), findsOneWidget);
+      expect(find.text('Child'), findsNothing);
+      await tester.tap(parent);
+      await tester.pumpAndSettle();
+      expect(find.text('Child'), findsOneWidget);
+      expect(controller.text, source);
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
+  testWidgets(
+    'collapsing a list with an active child moves editing to the parent',
+    (tester) async {
+      const source = '- Parent\n  - Child\n- Sibling';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Child'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('ianvs-markdown-list-fold-0')),
+      );
+      await tester.pumpAndSettle();
+      expect(controller.selection.extentOffset, '- Parent'.length);
+      final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
+      final field = find.descendant(
+        of: active,
+        matching: find.byType(TextField),
+      );
+      expect(tester.widget<TextField>(field).controller!.text, '- Parent');
+      expect(find.text('Sibling'), findsOneWidget);
+      expect(controller.text, source);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('list folding keeps RTL and scaled wrapped parent rows aligned', (
+    tester,
+  ) async {
+    final source =
+        '1. ${List.filled(8, 'Parent content').join(' ')}\n   - Child\n2. Sibling';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Directionality(
+          textDirection: TextDirection.rtl,
+          child: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(1.5)),
+            child: Scaffold(
+              body: SizedBox(
+                width: 320,
+                child: IanvsMarkdownLiveEditor(
+                  controller: controller,
+                  showToolbar: false,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final toggle = find.byKey(const ValueKey('ianvs-markdown-list-fold-0'));
+    final before = tester.getRect(toggle);
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    expect(find.text('Child'), findsNothing);
+    expect(tester.getRect(toggle), before);
+    expect(
+      (tester.widget<IconButton>(toggle).icon as Icon).icon,
+      Icons.keyboard_arrow_left_rounded,
+    );
+    final marker = tester.widget<Text>(
+      find.byKey(const ValueKey('ianvs-markdown-ordered-marker-0')).first,
+    );
+    expect(marker.style!.color, IanvsMarkdownThemeData.light.accent);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'list folding retains source identity and reveals selected descendants',
+    (tester) async {
+      const source = '- Root\n  - Child\n- End';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('ianvs-markdown-list-fold-0')),
+      );
+      await tester.pumpAndSettle();
+      controller.value = const TextEditingValue(
+        text: 'Before\n\n$source',
+        selection: TextSelection.collapsed(offset: 0),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Child'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('ianvs-markdown-list-fold-8')),
+        findsOneWidget,
+      );
+      controller.selection = TextSelection.collapsed(
+        offset: controller.text.indexOf('Child'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Child'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'list hierarchy guides stop at siblings and separate source lists',
+    (tester) async {
+      const source =
+          '- Parent\n    - Deep\n  - Middle\n- Sibling\n\nBreak\n\n- Next\n  - Leaf';
+      final controller = IanvsMarkdownController(text: source);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+      final anchors = tester
+          .widgetList<IanvsMarkdownListGuideAnchor>(
+            find.byType(IanvsMarkdownListGuideAnchor),
+          )
+          .toList();
+      expect(anchors.map((a) => a.nestLevel), [0, 1, 1, 0, 0, 1]);
+      final surface = tester
+          .renderObject<IanvsMarkdownSliverListGuideRenderObject>(
+            find.byKey(const ValueKey('ianvs-markdown-live-list-guides')),
+          );
+      final breakY =
+          tester.getCenter(find.text('Break')).dy -
+          surface.getTransformTo(null).getTranslation().y;
+      expect(
+        surface.debugGuideSegments().any(
+          (s) => s.start.dy < breakY && s.end.dy > breakY,
+        ),
+        isFalse,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('ianvs-markdown-list-fold-0')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Deep'), findsNothing);
+      expect(find.text('Middle'), findsNothing);
+      expect(find.text('Sibling'), findsOneWidget);
+      expect(find.text('Leaf'), findsOneWidget);
+      expect(surface.debugGuideSegments(), hasLength(1));
+    },
+  );
+
   testWidgets('blank-separated nested list items retain their depth', (
     tester,
   ) async {
@@ -15124,6 +15328,49 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     expect(contentEditor.controller?.selection.extentOffset, 3);
     expect(tester.widget<Container>(surface).decoration, isNull);
   });
+
+  testWidgets(
+    'tall table rows focus short and empty cells across their surface',
+    (tester) async {
+      final controller = IanvsMarkdownController(
+        text:
+            '| A | B | C |\n| --- | --- | --- |\n'
+            '| short | ${List.filled(60, 'wrapped text').join(' ')} | |',
+      );
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(app(controller));
+      await tester.pumpAndSettle();
+
+      final table = tester.renderObject<RenderTable>(find.byType(Table));
+      final rowHeight = table.getRowBox(1).height;
+      expect(rowHeight, greaterThan(64));
+      for (final column in [0, 2]) {
+        final cell = find.byKey(ValueKey('ianvs-markdown-table-1-$column'));
+        final surface = find.byKey(
+          ValueKey('ianvs-markdown-table-cell-surface-1-$column'),
+        );
+        expect(tester.getSize(surface).height, rowHeight);
+        final rect = tester.getRect(surface);
+        for (final target in [
+          rect.topLeft + const Offset(2, 2),
+          rect.bottomRight - const Offset(2, 2),
+        ]) {
+          await tester.tapAt(target);
+          await tester.pump();
+          final field = tester.widget<TextField>(cell);
+          expect(field.focusNode!.hasFocus, isTrue);
+          expect(field.controller!.selection.isCollapsed, isTrue);
+          expect(
+            field.controller!.selection.extentOffset,
+            target == rect.topLeft + const Offset(2, 2)
+                ? 0
+                : field.controller!.text.length,
+          );
+        }
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('table semantics expose headers and inactive cells before edit', (
     tester,

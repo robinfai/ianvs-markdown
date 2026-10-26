@@ -53,6 +53,7 @@ import 'source_editor.dart';
 part 'live_editor/navigation.dart';
 part 'live_editor/source_projection.dart';
 part 'live_editor/table.dart';
+part 'live_editor/list.dart';
 
 /// Obsidian-style Markdown editor with live, source, and reading modes.
 ///
@@ -209,6 +210,12 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   final Map<int, GlobalKey> _renderedBlockTapKeys = <int, GlobalKey>{};
   final IanvsMarkdownHeadingFoldController _headingFoldController =
       IanvsMarkdownHeadingFoldController();
+
+  final Set<GlobalKey> _collapsedListItems = {};
+  final Map<int, int> _listFoldEnds = {};
+  List<int> _listLevels = [];
+  final Map<int, GlobalKey> _listGroups = {};
+  final Set<GlobalKey> _foldableListGroups = {};
 
   late FocusNode _focusNode;
   late ScrollController _scrollController;
@@ -596,6 +603,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       // Finish a deferred return to Live after IME commits, without reparsing.
       _updateBudgetSurface();
     }
+    if (widget.controller.selection.isValid) {
+      _expandListAncestors(_documentSelectionOffset());
+    }
     if (_activeBlockStart != null &&
         widget.controller.mode == IanvsMarkdownEditorMode.livePreview) {
       final selected = markdownBlockAtOffset(
@@ -798,6 +808,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
 
     retainKeys(_blockKeys);
     retainKeys(_renderedBlockTapKeys);
+    _refreshListFolds();
     final headings = _navigationHeadings;
     if (headings.isEmpty) {
       _activeHeadingStart = null;
@@ -2460,6 +2471,89 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     );
   }
 
+  void _refreshListFolds() {
+    _listFoldEnds.clear();
+    final levels = _listLevels = _liveListNestingLevels();
+    _listGroups.clear();
+    _foldableListGroups.clear();
+    GlobalKey? group;
+    for (var index = 0; index < _blocks.length; index++) {
+      if (!_isListBlock(_blocks[index])) {
+        group = null;
+      } else {
+        group ??= _blockKeys[_blocks[index].start]!;
+        _listGroups[index] = group;
+      }
+    }
+    final parents = <int>[];
+    for (var index = 0; index <= _blocks.length; index++) {
+      final isList = index < _blocks.length && _isListBlock(_blocks[index]);
+      while (parents.isNotEmpty &&
+          (!isList || levels[index] <= levels[parents.last])) {
+        final parent = parents.removeLast();
+        if (index > parent + 1) _listFoldEnds[parent] = index;
+      }
+      if (isList) parents.add(index);
+    }
+    _foldableListGroups.addAll(
+      _listFoldEnds.keys.map((index) => _listGroups[index]!),
+    );
+    _collapsedListItems.retainAll({
+      for (final index in _listFoldEnds.keys) _blockKeys[_blocks[index].start]!,
+    });
+  }
+
+  void _expandListAncestors(int offset) {
+    _collapsedListItems.removeWhere((key) {
+      for (final entry in _listFoldEnds.entries) {
+        if (_blockKeys[_blocks[entry.key].start] == key &&
+            offset >= _blocks[entry.key + 1].start &&
+            offset <= _blocks[entry.value - 1].end) {
+          return true;
+        }
+      }
+      return false;
+    });
+  }
+
+  void _toggleListFold(int index) {
+    final key = _blockKeys[_blocks[index].start]!;
+    if (!_collapsedListItems.contains(key)) {
+      final end = _blocks[_listFoldEnds[index]! - 1].end;
+      if (_activeBlockStart != null &&
+          _activeBlockStart! > _blocks[index].start &&
+          _activeBlockStart! <= end) {
+        _activateBlock(_blocks[index], documentOffset: _blocks[index].end);
+      }
+    }
+    setState(() {
+      if (!_collapsedListItems.add(key)) _collapsedListItems.remove(key);
+    });
+  }
+
+  Widget _listFoldFrame(
+    int index,
+    IanvsMarkdownThemeData colors,
+    Widget child,
+  ) {
+    final block = _blocks[index];
+    if (!_isListBlock(block)) return child;
+    final group = _listGroups[index]!;
+    return IanvsMarkdownListGuideGroup(
+      identity: group,
+      child: !_foldableListGroups.contains(group)
+          ? child
+          : _LiveListFoldFrame(
+              blockStart: block.start,
+              colors: colors,
+              foldable: _listFoldEnds.containsKey(index),
+              collapsed: _collapsedListItems.contains(_blockKeys[block.start]),
+              onToggle: () => _toggleListFold(index),
+              child: child,
+            ),
+    );
+  }
+
   void _toggleHeadingFold(IanvsMarkdownHeadingSection section) {
     final collapsing = !_headingFoldController.isCollapsed(section.identity);
     if (collapsing && _activeBlockStart != null) {
@@ -2777,6 +2871,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         _blocks[index].type == IanvsMarkdownBlockType.frontMatter) {
       return;
     }
+    _expandListAncestors(_blocks[index].start);
     if (widget.enableHeadingFolding) {
       _headingFoldController.expandIdentities(
         _headingFoldModel.collapsedAncestorIdentities(
@@ -2999,15 +3094,19 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     final blockIndices = <Key, int>{
       for (var i = 0; i < _blocks.length; i++) _blockKeys[_blocks[i].start]!: i,
     };
-    final hiddenBlockIndices = widget.enableHeadingFolding
-        ? _headingFoldModel.hiddenBlockIndices(_headingFoldController)
-        : const <int>{};
+    final hiddenBlockIndices = <int>{
+      if (widget.enableHeadingFolding)
+        ..._headingFoldModel.hiddenBlockIndices(_headingFoldController),
+      for (final entry in _listFoldEnds.entries)
+        if (_collapsedListItems.contains(_blockKeys[_blocks[entry.key].start]))
+          for (var i = entry.key + 1; i < entry.value; i++) i,
+    };
     final styleSheet =
         widget.styleSheet ?? ianvsMarkdownStyleSheet(context, colors);
     final listIndentStep =
         (styleSheet.listIndent ?? 24) +
         (styleSheet.listBulletPadding?.horizontal ?? 4);
-    final listNestingLevels = _liveListNestingLevels();
+    final listNestingLevels = _listLevels;
     return Listener(
       key: const ValueKey('ianvs-markdown-document-drag-selection'),
       behavior: HitTestBehavior.translucent,
@@ -3088,21 +3187,24 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
                                 key: ValueKey(block.type),
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  if (_activeBlockStart == block.start &&
-                                      !activeGapLine)
-                                    _buildActiveBlock(
-                                      block,
-                                      colors,
-                                      listNestingLevel: listNestingLevel,
-                                      headingSection: headingSection,
-                                    )
-                                  else
-                                    _buildRenderedBlock(
-                                      block,
-                                      colors,
-                                      listNestingLevel: listNestingLevel,
-                                      headingSection: headingSection,
-                                    ),
+                                  _listFoldFrame(
+                                    index,
+                                    colors,
+                                    _activeBlockStart == block.start &&
+                                            !activeGapLine
+                                        ? _buildActiveBlock(
+                                            block,
+                                            colors,
+                                            listNestingLevel: listNestingLevel,
+                                            headingSection: headingSection,
+                                          )
+                                        : _buildRenderedBlock(
+                                            block,
+                                            colors,
+                                            listNestingLevel: listNestingLevel,
+                                            headingSection: headingSection,
+                                          ),
+                                  ),
                                   if (activeGapLine)
                                     _buildActiveGapLine(colors)
                                   else if (_activeBlockStart == block.start &&
@@ -3576,7 +3678,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
                 child: Center(
                   child: IanvsMarkdownUnorderedListMarker(
                     nestLevel: listNestingLevel,
-                    color: colors.textSecondary,
+                    color: _collapsedListItems.contains(_blockKeys[block.start])
+                        ? colors.accent
+                        : colors.textSecondary,
                     fontSize: activeTextStyle.fontSize ?? 14.5,
                     height: activeTextStyle.height ?? 1.58,
                   ),
@@ -3607,7 +3711,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
                   softWrap: false,
                   overflow: TextOverflow.visible,
                   style: activeTextStyle.copyWith(
-                    color: colors.textSecondary,
+                    color: _collapsedListItems.contains(_blockKeys[block.start])
+                        ? colors.accent
+                        : colors.textSecondary,
                     decoration: TextDecoration.none,
                   ),
                 ),
