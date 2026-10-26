@@ -8214,7 +8214,9 @@
         "taskSavings",
         "taskUp",
         "taskDown",
-        "taskChecked"
+        "taskChecked",
+        "expandList",
+        "collapseList"
       ]
     },
     "IanvsMarkdownMessage/constructor:new": {
@@ -8551,6 +8553,14 @@
       "static": true,
       "late": false
     },
+    "IanvsMarkdownMessage/field:collapseList": {
+      "kind": "field",
+      "type": "IanvsMarkdownMessage",
+      "const": true,
+      "final": false,
+      "static": true,
+      "late": false
+    },
     "IanvsMarkdownMessage/field:collapseMetadata": {
       "kind": "field",
       "type": "IanvsMarkdownMessage",
@@ -8728,6 +8738,14 @@
       "late": false
     },
     "IanvsMarkdownMessage/field:expandHeading": {
+      "kind": "field",
+      "type": "IanvsMarkdownMessage",
+      "const": true,
+      "final": false,
+      "static": true,
+      "late": false
+    },
+    "IanvsMarkdownMessage/field:expandList": {
       "kind": "field",
       "type": "IanvsMarkdownMessage",
       "const": true,

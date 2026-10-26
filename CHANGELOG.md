@@ -1,5 +1,10 @@
 ## Unreleased
 
+- Add hover-triggered nested list folding in Live Preview with independent fold
+  state, collapsed markers and ellipses, and aligned indentation guides. Add
+  `expandList` / `collapseList` interface messages. Expand table cell focus hit
+  areas to include blank space across the full row height.
+
 - Add explicit macOS image import and screenshot Paste using the opened vault's
   read-only Obsidian attachment destination settings. Validate image bytes and
   decode budgets before native exclusive/no-follow creation; preserve source
