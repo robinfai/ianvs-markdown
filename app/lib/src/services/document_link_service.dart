@@ -38,6 +38,9 @@ class DocumentLinkService {
 
   Future<void> open(DocumentSession origin, String? href) async {
     if (href == null) return;
+    final originSource = origin.controller.text;
+    final originSelection = origin.controller.selection;
+    final originAnchor = origin.controller.viewportAnchor.value;
     final link = Uri.parse(href);
     if ({'http', 'https', 'mailto'}.contains(link.scheme.toLowerCase())) {
       await openExternal(link);
@@ -77,6 +80,16 @@ class DocumentLinkService {
         // Following a link from Reading should stay in Reading for a new tab.
         if (!alreadyOpen) target.controller.mode = origin.controller.mode;
         _revealFragment(target, resolved.fragment);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          workspace.rememberDocumentJump(
+            origin,
+            target,
+            anchor: originAnchor,
+            selection: originSelection,
+            source: originSource,
+          );
+        });
+        WidgetsBinding.instance.scheduleFrame();
       }
     } else if (imageExtensions.contains(p.extension(path).toLowerCase())) {
       await openImage(path);
@@ -95,6 +108,25 @@ class DocumentLinkService {
 
   void _revealFragment(DocumentSession document, String fragment) {
     if (fragment.isEmpty) return;
+    fragment = Uri.decodeComponent(fragment);
+    final snapshot = document.controller.text;
+    final footnote = ianvsMarkdownFootnoteSourceRange(snapshot, fragment);
+    if (footnote != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (workspace.activeDocument == document &&
+            document.controller.text == snapshot) {
+          document.controller.rememberNavigationPosition();
+          document.controller.revealSourceRange(
+            footnote,
+            source: snapshot,
+            targetId: fragment.startsWith('fn-') ? fragment : null,
+          );
+          WidgetsBinding.instance.scheduleFrame();
+        }
+      });
+      WidgetsBinding.instance.scheduleFrame();
+      return;
+    }
     final counts = <String, int>{};
     for (final block in parseMarkdownBlocks(document.controller.text)) {
       if (block.type != IanvsMarkdownBlockType.heading) continue;

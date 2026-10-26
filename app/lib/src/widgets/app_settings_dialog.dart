@@ -3,16 +3,23 @@ import 'package:flutter/services.dart';
 
 import '../controllers/file_association_controller.dart';
 import '../desktop_typography.dart';
+import '../controllers/workspace_controller.dart';
+import '../models/reading_preferences.dart';
 
 class AppSettingsDialog extends StatelessWidget {
-  const AppSettingsDialog({super.key, required this.fileAssociation});
+  const AppSettingsDialog({
+    super.key,
+    required this.fileAssociation,
+    this.workspace,
+  });
 
   final FileAssociationController fileAssociation;
+  final WorkspaceController? workspace;
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: fileAssociation,
+      listenable: Listenable.merge([fileAssociation, ?workspace]),
       builder: (context, _) {
         final controller = fileAssociation;
         final state = controller.state;
@@ -26,6 +33,86 @@ class AppSettingsDialog extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (workspace case final workspace?) ...[
+                    Text('Reading', style: DesktopTypography.headline),
+                    Text(
+                      'Text size: ${workspace.readingPreferences.fontSize.toStringAsFixed(1)}',
+                    ),
+                    Slider(
+                      key: const ValueKey('reading-font-size'),
+                      label:
+                          '${workspace.readingPreferences.fontSize.toStringAsFixed(1)} pt',
+                      semanticFormatterCallback: (value) =>
+                          'Text size ${value.toStringAsFixed(1)} points',
+                      min: 12,
+                      max: 28,
+                      divisions: 32,
+                      value: workspace.readingPreferences.fontSize,
+                      onChanged: (value) => workspace.setReadingPreferences(
+                        workspace.readingPreferences.copyWith(fontSize: value),
+                      ),
+                    ),
+                    Text(
+                      'Line spacing: ${workspace.readingPreferences.lineHeight.toStringAsFixed(2)}',
+                    ),
+                    Slider(
+                      key: const ValueKey('reading-line-height'),
+                      label: workspace.readingPreferences.lineHeight
+                          .toStringAsFixed(2),
+                      semanticFormatterCallback: (value) =>
+                          'Line spacing ${value.toStringAsFixed(2)}',
+                      min: 1.2,
+                      max: 2.2,
+                      divisions: 50,
+                      value: workspace.readingPreferences.lineHeight,
+                      onChanged: (value) => workspace.setReadingPreferences(
+                        workspace.readingPreferences.copyWith(
+                          lineHeight: value,
+                        ),
+                      ),
+                    ),
+                    DropdownButton<ReadingWidth>(
+                      key: const ValueKey('reading-width'),
+                      value: workspace.readingPreferences.width,
+                      items: const [
+                        DropdownMenuItem(
+                          value: ReadingWidth.narrow,
+                          child: Text('Narrow body'),
+                        ),
+                        DropdownMenuItem(
+                          value: ReadingWidth.standard,
+                          child: Text('Standard body'),
+                        ),
+                        DropdownMenuItem(
+                          value: ReadingWidth.wide,
+                          child: Text('Wide body'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          workspace.setReadingPreferences(
+                            workspace.readingPreferences.copyWith(width: value),
+                          );
+                        }
+                      },
+                    ),
+                    CheckboxListTile(
+                      key: const ValueKey('reading-wrap-code'),
+                      title: const Text('Wrap code lines'),
+                      contentPadding: EdgeInsets.zero,
+                      value: workspace.readingPreferences.wrapCode,
+                      onChanged: (value) => workspace.setReadingPreferences(
+                        workspace.readingPreferences.copyWith(wrapCode: value),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => workspace.setReadingPreferences(
+                        ReadingPreferences.defaults,
+                      ),
+                      child: const Text('Reset reading settings'),
+                    ),
+                    const Divider(),
+                  ],
                   Text('Markdown files', style: DesktopTypography.headline),
                   const SizedBox(height: 12),
                   CheckboxListTile(

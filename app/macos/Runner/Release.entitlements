@@ -7,6 +7,10 @@
 	<true/>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
+	<!-- WKWebView requires this to launch even for in-memory offline PDF HTML.
+	     Export resource rules and navigation policy still block remote loads. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
 	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
 	<key>com.apple.developer.icloud-container-identifiers</key>

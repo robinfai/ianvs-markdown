@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:archive/archive.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -88,6 +90,53 @@ void main() {
     expect(find.textContaining('Basic offline export'), findsOneWidget);
   }
 
+  testWidgets('ZIP exports the command-time unsaved snapshot and image bytes', (
+    tester,
+  ) async {
+    workspace.activeDocument!.controller.text =
+        '# Unsaved\n![x](assets/image.png)';
+    await mount(tester, action: DocumentExportAction.bundle);
+    await tester.tap(find.text('Export'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Creates a ZIP'), findsOneWidget);
+    workspace.activeDocument!.controller.text = '# Later';
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(platform.actions, [DocumentExportAction.bundle]);
+    final zip = ZipDecoder().decodeBytes(
+      platform.outputs.single.bytes!,
+      verify: true,
+    );
+    expect(
+      utf8.decode(zip.findFile('document.md')!.content),
+      '# Unsaved\n![x](./assets/1.png)',
+    );
+    expect(zip.findFile('assets/1.png')!.content, tinyPng);
+    expect(workspace.activeDocument!.controller.text, '# Later');
+    await tester.pump(const Duration(seconds: 1));
+    expect(files.files['/vault/Origin.md'], '# Saved');
+  });
+
+  for (final continuePartial in [false, true]) {
+    testWidgets('ZIP missing resource disclosure: continue=$continuePartial', (
+      tester,
+    ) async {
+      workspace.activeDocument!.controller.text = '![x](missing.png)';
+      await mount(tester, action: DocumentExportAction.bundle);
+      await tester.tap(find.text('Export'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+      expect(find.text('Some resources were not included'), findsOneWidget);
+      expect(platform.outputs, isEmpty);
+      await tester.tap(
+        find.text(continuePartial ? 'Export available resources' : 'Cancel'),
+      );
+      await tester.pumpAndSettle();
+      expect(platform.outputs.length, continuePartial ? 1 : 0);
+    });
+  }
+
   testWidgets(
     'Markdown copy snapshot is verbatim, visible attachment caveat and no image I/O',
     (tester) async {
@@ -138,10 +187,12 @@ void main() {
       expect(find.text('Export PDF'), findsOneWidget);
       expect(find.textContaining('not a pixel-perfect copy'), findsOneWidget);
       expect(
-        find.textContaining('visually similar CJK radicals'),
+        find.textContaining(
+          'Copy/search text and reading order vary by PDF viewer',
+        ),
         findsOneWidget,
       );
-      expect(find.textContaining('only on the first page'), findsOneWidget);
+      expect(find.textContaining('row taller than a page'), findsOneWidget);
       expect(
         find.textContaining('PDF preparation is still cancelled'),
         findsOneWidget,
@@ -278,6 +329,7 @@ void main() {
   for (final action in [
     DocumentExportAction.markdown,
     DocumentExportAction.pdf,
+    DocumentExportAction.bundle,
   ]) {
     testWidgets(
       'new opened dirty source during native ${action.name} preparation invalidates final approval',

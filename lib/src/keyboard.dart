@@ -27,6 +27,12 @@ enum IanvsMarkdownCommand {
   copy,
   cut,
   paste,
+  pastePlainText,
+}
+
+/// Internal intent used by the public plain-text paste command.
+class MarkdownPlainPasteIntent extends PasteTextIntent {
+  const MarkdownPlainPasteIntent() : super(SelectionChangedCause.keyboard);
 }
 
 /// Configures shortcuts for focused Markdown components below this widget.
@@ -521,6 +527,7 @@ bool invokeMarkdownTextCommand(
     IanvsMarkdownCommand.paste => const PasteTextIntent(
       SelectionChangedCause.keyboard,
     ),
+    IanvsMarkdownCommand.pastePlainText => const MarkdownPlainPasteIntent(),
     IanvsMarkdownCommand.selectAll => const SelectAllTextIntent(
       SelectionChangedCause.keyboard,
     ),
@@ -593,6 +600,11 @@ List<SingleActivator> defaultMarkdownBindings(
     IanvsMarkdownCommand.cut => commandKeys(
       LogicalKeyboardKey.keyX,
       controlOnApple: false,
+    ),
+    IanvsMarkdownCommand.pastePlainText => commandKeys(
+      LogicalKeyboardKey.keyV,
+      controlOnApple: false,
+      shift: true,
     ),
     IanvsMarkdownCommand.paste => commandKeys(
       LogicalKeyboardKey.keyV,

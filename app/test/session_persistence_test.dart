@@ -44,6 +44,301 @@ class _ControlledStore extends MemoryWorkspaceSessionStore {
 }
 
 void main() {
+  testWidgets(
+    'desktop restores the visible paragraph and retains it across tabs',
+    (tester) async {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.menu,
+        (_) async => null,
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.menu,
+          null,
+        ),
+      );
+      final source = List.generate(
+        100,
+        (i) => 'Paragraph $i is visible.',
+      ).join('\n\n');
+      final original = DocumentSession(
+        id: 'document-1',
+        name: 'read.md',
+        path: '/local/read.md',
+        text: source,
+        mode: IanvsMarkdownEditorMode.preview,
+      );
+      original.controller.rememberViewport(
+        IanvsMarkdownViewportAnchor(
+          source: source,
+          sourceOffset: source.indexOf('Paragraph 70 '),
+          viewportOffset: 20,
+        ),
+      );
+      final files = MemoryMarkdownFileService()
+        ..files['/local/read.md'] = source;
+      final store = MemoryWorkspaceSessionStore()
+        ..snapshot = WorkspaceSnapshot(
+          documents: [original.toJson()],
+          activeDocumentId: original.id,
+          workspaceRoot: '/local',
+          workspaceAccessToken: null,
+          sidebarVisible: false,
+          outlineVisible: false,
+        );
+      original.dispose();
+      final workspace = WorkspaceController(
+        fileService: files,
+        sessionStore: store,
+      );
+      final association = FileAssociationController(
+        service: MemoryFileAssociationService()..preference = false,
+      );
+      addTearDown(workspace.dispose);
+      addTearDown(files.dispose);
+      addTearDown(association.dispose);
+      await tester.pumpWidget(
+        LinefoldApp(
+          workspaceController: workspace,
+          fileAssociationController: association,
+          incomingFilesService: MemoryIncomingFilesService(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Paragraph 70 is visible.', findRichText: true).hitTestable(),
+        findsOneWidget,
+      );
+      workspace.newDocument();
+      await tester.pumpAndSettle();
+      workspace.selectDocument(0);
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Paragraph 70 is visible.', findRichText: true).hitTestable(),
+        findsOneWidget,
+      );
+      expect(workspace.activeDocument!.controller.isDirty, isFalse);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 400));
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
+  test(
+    'viewport snapshots restore with their source and rebase on disk updates',
+    () {
+      const source =
+          'Introduction\n\nA distinct paragraph to keep visible.\n\nEnd';
+      final original = DocumentSession(
+        id: 'viewport',
+        name: 'view.md',
+        text: source,
+      );
+      addTearDown(original.dispose);
+      original.controller.rememberViewport(
+        IanvsMarkdownViewportAnchor(
+          source: source,
+          sourceOffset: source.indexOf('A distinct'),
+          viewportOffset: -12.5,
+        ),
+      );
+      final restored = DocumentSession.fromJson(original.toJson());
+      addTearDown(restored.dispose);
+      expect(
+        restored.controller.viewportAnchor.value,
+        original.controller.viewportAnchor.value,
+      );
+      restored.replaceFromDisk('Inserted\n\n$source');
+      expect(
+        restored.controller.viewportAnchor.value!.sourceOffset,
+        source.indexOf('A distinct') + 10,
+      );
+      expect(restored.controller.viewportAnchor.value!.viewportOffset, -12.5);
+      expect(restored.controller.isDirty, isFalse);
+      for (final viewport in [
+        null,
+        {'sourceOffset': -1, 'viewportOffset': 0},
+        {'sourceOffset': 99999, 'viewportOffset': 0},
+        {'sourceOffset': 0, 'viewportOffset': double.nan},
+        {'sourceOffset': 'bad', 'viewportOffset': 0},
+      ]) {
+        final invalid = DocumentSession.fromJson({
+          ...original.toJson(),
+          'viewport': viewport,
+        });
+        expect(invalid.controller.viewportAnchor.value, isNull);
+        invalid.dispose();
+      }
+    },
+  );
+
+  testWidgets('viewport-only changes are persisted without text changes', (
+    tester,
+  ) async {
+    final files = MemoryMarkdownFileService();
+    final store = MemoryWorkspaceSessionStore();
+    final workspace = WorkspaceController(
+      fileService: files,
+      sessionStore: store,
+    );
+    addTearDown(workspace.dispose);
+    addTearDown(files.dispose);
+    await workspace.initialize();
+    final document = workspace.activeDocument!;
+    document.controller.text = 'Introduction\n\nA visible paragraph.\n\nEnd';
+    await tester.pump(const Duration(milliseconds: 400));
+    document.controller.rememberViewport(
+      IanvsMarkdownViewportAnchor(
+        source: document.controller.text,
+        sourceOffset: 14,
+        viewportOffset: -8,
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(store.snapshot!.documents.single['viewport'], {
+      'sourceOffset': 14,
+      'viewportOffset': -8.0,
+    });
+  });
+
+  test(
+    'replaced emoji does not place fallback caret inside a surrogate pair',
+    () {
+      final document = DocumentSession(
+        id: 'emoji',
+        name: 'emoji.md',
+        text: '😀abc',
+      );
+      addTearDown(document.dispose);
+      document.controller.selection = const TextSelection.collapsed(offset: 3);
+      document.replaceFromDisk('😁xyz');
+      expect(
+        document.controller.selection,
+        const TextSelection.collapsed(offset: 0),
+      );
+    },
+  );
+  test('disk reload relocates selection with unchanged surrounding text', () {
+    final document = DocumentSession(
+      id: 'reload',
+      name: 'reload.md',
+      text: 'intro\n中文😀 target\nend',
+    );
+    addTearDown(document.dispose);
+    document.controller.selection = const TextSelection(
+      baseOffset: 17,
+      extentOffset: 11,
+    );
+    document.replaceFromDisk('new\nintro\n中文😀 target\nend');
+    expect(
+      document.controller.selection,
+      const TextSelection(baseOffset: 21, extentOffset: 15),
+    );
+    expect(document.controller.isDirty, isFalse);
+    document.replaceFromDisk('entirely replaced');
+    expect(
+      document.controller.selection,
+      const TextSelection.collapsed(offset: 0),
+    );
+  });
+
+  test(
+    'selection round trip preserves direction without recovering composing',
+    () {
+      final original = DocumentSession(
+        id: 'selection',
+        name: 'selection.md',
+        text: '中文😀 selection',
+      );
+      addTearDown(original.dispose);
+      const selection = TextSelection(
+        baseOffset: 8,
+        extentOffset: 4,
+        affinity: TextAffinity.upstream,
+        isDirectional: true,
+      );
+      original.controller.value = original.controller.value.copyWith(
+        selection: selection,
+        composing: const TextRange(start: 4, end: 8),
+      );
+      final restored = DocumentSession.fromJson(original.toJson());
+      addTearDown(restored.dispose);
+      expect(restored.controller.selection, selection);
+      expect(restored.controller.value.composing, TextRange.empty);
+      expect(restored.controller.isDirty, isFalse);
+      restored.replaceFromDisk(original.controller.text);
+      expect(restored.controller.selection, selection);
+    },
+  );
+
+  test('old and invalid selection snapshots retain the default caret', () {
+    for (final selection in [
+      null,
+      'bad',
+      {'base': -1, 'extent': 2},
+      {'base': 1, 'extent': 100},
+      {'base': 1.5, 'extent': 2},
+    ]) {
+      final restored = DocumentSession.fromJson({
+        'id': 'legacy',
+        'text': 'hello',
+        'selection': selection,
+      });
+      expect(
+        restored.controller.selection,
+        const TextSelection.collapsed(offset: 0),
+      );
+      restored.dispose();
+    }
+  });
+
+  testWidgets('caret-only movement persists and survives clean file reload', (
+    tester,
+  ) async {
+    final files = MemoryMarkdownFileService()
+      ..files['/local/a.md'] = 'hello 中文😀';
+    final document = DocumentSession(
+      id: 'document-1',
+      name: 'a.md',
+      text: files.files['/local/a.md']!,
+      path: '/local/a.md',
+    );
+    final store = MemoryWorkspaceSessionStore()
+      ..snapshot = WorkspaceSnapshot(
+        documents: [document.toJson()],
+        activeDocumentId: document.id,
+        workspaceRoot: '/local',
+        workspaceAccessToken: null,
+        sidebarVisible: true,
+        outlineVisible: true,
+      );
+    document.dispose();
+    final workspace = WorkspaceController(
+      fileService: files,
+      sessionStore: store,
+    );
+    await workspace.initialize();
+    await tester.pump(const Duration(milliseconds: 400));
+    const selection = TextSelection(baseOffset: 8, extentOffset: 6);
+    workspace.activeDocument!.controller.selection = selection;
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(
+      store.snapshot!.documents.single['selection'],
+      containsPair('base', 8),
+    );
+    workspace.dispose();
+    final reopened = WorkspaceController(
+      fileService: files,
+      sessionStore: store,
+    );
+    await reopened.initialize();
+    expect(reopened.activeDocument!.controller.selection, selection);
+    expect(reopened.activeDocument!.controller.isDirty, isFalse);
+    reopened.dispose();
+    files.dispose();
+    await tester.pump(const Duration(milliseconds: 400));
+  });
+
   testWidgets('mode-only changes are persisted after the previous snapshot', (
     tester,
   ) async {

@@ -14,12 +14,14 @@ class DocumentFindBar extends StatelessWidget {
     required this.queryFocus,
     required this.onClose,
     required this.onEnableEditing,
+    this.onScopeChanged,
   });
 
   final DocumentFindController controller;
   final FocusNode queryFocus;
   final VoidCallback onClose;
   final VoidCallback onEnableEditing;
+  final ValueChanged<DocumentFindScope>? onScopeChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +51,9 @@ class DocumentFindBar extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Find in Markdown source · $modeLabel',
+                    controller.scope == DocumentFindScope.body
+                        ? 'Find in rendered body'
+                        : 'Find in Markdown source · $modeLabel',
                     style: DesktopTypography.subheadline.copyWith(
                       color: colors.textSecondary,
                     ),
@@ -60,6 +64,32 @@ class DocumentFindBar extends StatelessWidget {
                     runSpacing: 6,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
+                      if (controller.document.mode !=
+                          IanvsMarkdownEditorMode.source)
+                        DropdownButton<DocumentFindScope>(
+                          key: const ValueKey('document-find-scope'),
+                          value: controller.scope,
+                          items: const [
+                            DropdownMenuItem(
+                              value: DocumentFindScope.body,
+                              child: Text('Body'),
+                            ),
+                            DropdownMenuItem(
+                              value: DocumentFindScope.source,
+                              child: Text('Source'),
+                            ),
+                          ],
+                          onChanged: controller.isComposing
+                              ? null
+                              : (scope) {
+                                  if (scope != null) {
+                                    (onScopeChanged ?? controller.setScope)(
+                                      scope,
+                                    );
+                                  }
+                                  queryFocus.requestFocus();
+                                },
+                        ),
                       SizedBox(
                         width: fieldWidth,
                         child: Focus(
@@ -97,6 +127,8 @@ class DocumentFindBar extends StatelessWidget {
                               ? 'Finish composing'
                               : controller.isSearching
                               ? 'Searching…'
+                              : controller.bodyUnavailable
+                              ? 'Body search unavailable · use Source'
                               : '${controller.currentIndex + 1} of ${controller.count}',
                           key: const ValueKey('document-find-count'),
                           style: DesktopTypography.callout,
@@ -134,45 +166,53 @@ class DocumentFindBar extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      SizedBox(
-                        width: fieldWidth,
-                        child: TextField(
-                          key: const ValueKey('document-find-replacement'),
-                          controller: controller.replacement,
-                          decoration: const InputDecoration(
-                            labelText: 'Replace with',
-                            isDense: true,
+                  if (controller.scope == DocumentFindScope.body)
+                    TextButton(
+                      onPressed: controller.isComposing
+                          ? null
+                          : onEnableEditing,
+                      child: const Text('Edit source to replace'),
+                    )
+                  else
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: fieldWidth,
+                          child: TextField(
+                            key: const ValueKey('document-find-replacement'),
+                            controller: controller.replacement,
+                            decoration: const InputDecoration(
+                              labelText: 'Replace with',
+                              isDense: true,
+                            ),
                           ),
                         ),
-                      ),
-                      if (controller.readOnly)
-                        TextButton(
-                          onPressed: controller.isComposing
-                              ? null
-                              : onEnableEditing,
-                          child: const Text('Edit to replace'),
-                        )
-                      else ...[
-                        TextButton(
-                          onPressed: controller.canReplace
-                              ? controller.replaceCurrent
-                              : null,
-                          child: const Text('Replace'),
-                        ),
-                        TextButton(
-                          onPressed: controller.canReplaceAll
-                              ? controller.replaceAll
-                              : null,
-                          child: const Text('Replace All'),
-                        ),
+                        if (controller.readOnly)
+                          TextButton(
+                            onPressed: controller.isComposing
+                                ? null
+                                : onEnableEditing,
+                            child: const Text('Edit to replace'),
+                          )
+                        else ...[
+                          TextButton(
+                            onPressed: controller.canReplace
+                                ? controller.replaceCurrent
+                                : null,
+                            child: const Text('Replace'),
+                          ),
+                          TextButton(
+                            onPressed: controller.canReplaceAll
+                                ? controller.replaceAll
+                                : null,
+                            child: const Text('Replace All'),
+                          ),
+                        ],
                       ],
-                    ],
-                  ),
+                    ),
                 ],
               );
             },

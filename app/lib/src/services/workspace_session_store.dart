@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../models/workspace_layout.dart';
+import '../models/reading_preferences.dart';
 
 class WorkspaceSnapshot {
   const WorkspaceSnapshot({
@@ -15,6 +16,7 @@ class WorkspaceSnapshot {
     required this.sidebarVisible,
     required this.outlineVisible,
     this.sidebarWidth = WorkspaceLayout.defaultSidebarWidth,
+    this.readingPreferences = ReadingPreferences.defaults,
     this.browserState = const {},
     this.operationGrants = const {},
     this.favoriteAccessTokens = const {},
@@ -28,6 +30,9 @@ class WorkspaceSnapshot {
     final rawDocuments = json['documents'];
     return WorkspaceSnapshot(
       recoveryNotice: recoveryNotice,
+      readingPreferences: ReadingPreferences.fromJson(
+        json['readingPreferences'],
+      ),
       browserState: json['browserState'] is Map
           ? Map<String, Object?>.from(json['browserState'] as Map)
           : const {},
@@ -64,6 +69,7 @@ class WorkspaceSnapshot {
   final bool sidebarVisible;
   final bool outlineVisible;
   final double sidebarWidth;
+  final ReadingPreferences readingPreferences;
   final Map<String, Object?> browserState;
   final Map<String, String> operationGrants;
   final Map<String, String> favoriteAccessTokens;
@@ -82,6 +88,7 @@ class WorkspaceSnapshot {
     'sidebarVisible': sidebarVisible,
     'outlineVisible': outlineVisible,
     'sidebarWidth': sidebarWidth,
+    'readingPreferences': readingPreferences.toJson(),
   };
 }
 

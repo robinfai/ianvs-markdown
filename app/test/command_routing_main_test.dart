@@ -9,7 +9,16 @@ import '../../test/fixtures/native_menu_harness.dart';
 import 'support/fakes.dart';
 
 void main() {
-  for (final command in ['Undo', 'Read', 'Save', 'Save As…']) {
+  for (final command in [
+    'Undo',
+    'Read',
+    'Save',
+    'Save As…',
+    'Larger Reading Text',
+    'Smaller Reading Text',
+    'Actual Reading Text Size',
+    'Back to Previous Position',
+  ]) {
     testWidgets(
       'app native $command preserves active source composition',
       (tester) async {
@@ -34,6 +43,9 @@ void main() {
         final field = find.byKey(const ValueKey('ianvs-markdown-source-field'));
         await tester.enterText(field, 'seed new ');
         document.controller.commitHistoryGroup();
+        if (command == 'Back to Previous Position') {
+          document.controller.rememberNavigationPosition();
+        }
         const composing = TextEditingValue(
           text: 'seed new ni',
           selection: TextSelection.collapsed(offset: 11),
@@ -42,8 +54,12 @@ void main() {
         tester.testTextInput.updateEditingValue(composing);
         await tester.pump();
         await menu.select(command);
+        expect(workspace.readingPreferences.fontSize, 14.5);
         expect(document.controller.mode, IanvsMarkdownEditorMode.source);
         expect(document.controller.value, composing);
+        if (command == 'Back to Previous Position') {
+          expect(document.controller.canNavigateBack.value, isTrue);
+        }
         await tester.tap(find.byKey(const ValueKey('editor-mode-button')));
         await tester.pumpAndSettle();
         expect(document.controller.value, composing);
@@ -63,6 +79,19 @@ void main() {
         await tester.pumpAndSettle();
         await menu.select('Save');
         expect(files.files['/notes/input.md'], 'seed new 你');
+        if (command.contains('Reading Text')) {
+          await menu.select(command);
+          expect(workspace.readingPreferences.fontSize, switch (command) {
+            'Larger Reading Text' => 15,
+            'Smaller Reading Text' => 14,
+            _ => 14.5,
+          });
+        }
+        if (command == 'Back to Previous Position') {
+          await menu.select(command);
+          expect(document.controller.canNavigateBack.value, isFalse);
+          expect(document.controller.text, 'seed new 你');
+        }
         expect(document.controller.isDirty, isFalse);
         await tester.pumpWidget(const SizedBox());
         await tester.pump(const Duration(milliseconds: 600));

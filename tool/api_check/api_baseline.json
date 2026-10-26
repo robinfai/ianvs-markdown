@@ -20,6 +20,7 @@
     "IanvsMarkdownCodeBlockPresentation": "package:ianvs_markdown/src/code_block.dart",
     "IanvsMarkdownCodeCopyHandler": "package:ianvs_markdown/src/code_block.dart",
     "IanvsMarkdownCodeFlair": "package:ianvs_markdown/src/code_block.dart",
+    "IanvsMarkdownCodeLayout": "package:ianvs_markdown/src/code_layout.dart",
     "IanvsMarkdownCodeSpanPresentation": "package:ianvs_markdown/src/obsidian_inline.dart",
     "IanvsMarkdownCodeSpanSyntax": "package:ianvs_markdown/src/obsidian_inline.dart",
     "IanvsMarkdownCommand": "package:ianvs_markdown/src/keyboard.dart",
@@ -87,6 +88,9 @@
     "IanvsMarkdownMetadataTextChanged": "package:ianvs_markdown/src/front_matter_card.dart",
     "IanvsMarkdownNoteSemantics": "package:ianvs_markdown/src/note_semantics.dart",
     "IanvsMarkdownObsidianMetadataMode": "package:ianvs_markdown/src/obsidian_metadata.dart",
+    "IanvsMarkdownReadingHighlights": "package:ianvs_markdown/src/ianvs_markdown.dart",
+    "IanvsMarkdownReadingMatch": "package:ianvs_markdown/src/ianvs_markdown.dart",
+    "IanvsMarkdownReadingSearch": "package:ianvs_markdown/src/ianvs_markdown.dart",
     "IanvsMarkdownRenderBudget": "package:ianvs_markdown/src/render_budget.dart",
     "IanvsMarkdownRenderDecision": "package:ianvs_markdown/src/render_budget.dart",
     "IanvsMarkdownRenderedWhitespaceSyntax": "package:ianvs_markdown/src/obsidian_inline.dart",
@@ -96,6 +100,7 @@
     "IanvsMarkdownShortcuts": "package:ianvs_markdown/src/keyboard.dart",
     "IanvsMarkdownSizedImage": "package:ianvs_markdown/src/obsidian_image.dart",
     "IanvsMarkdownSourceHighlight": "package:ianvs_markdown/src/editor/source_editor.dart",
+    "IanvsMarkdownSourceNavigation": "package:ianvs_markdown/src/editor/editor_models.dart",
     "IanvsMarkdownSourceReference": "package:ianvs_markdown/src/note_semantics.dart",
     "IanvsMarkdownSourceReferenceKind": "package:ianvs_markdown/src/note_semantics.dart",
     "IanvsMarkdownSourceTag": "package:ianvs_markdown/src/note_semantics.dart",
@@ -113,6 +118,7 @@
     "IanvsMarkdownTaskCheckbox": "package:ianvs_markdown/src/task_checkbox.dart",
     "IanvsMarkdownThemeData": "package:ianvs_markdown/src/theme.dart",
     "IanvsMarkdownView": "package:ianvs_markdown/src/ianvs_markdown.dart",
+    "IanvsMarkdownViewportAnchor": "package:ianvs_markdown/src/editor/editor_models.dart",
     "IanvsMarkdownWikiEmbed": "package:ianvs_markdown/src/wiki_embed.dart",
     "IanvsMarkdownWikiEmbedContentBuilder": "package:ianvs_markdown/src/wiki_embed.dart",
     "IanvsMarkdownWikiEmbedElementBuilder": "package:ianvs_markdown/src/wiki_embed.dart",
@@ -144,7 +150,9 @@
     "ianvsMarkdownCrossParagraphHighlightLiteralRuns": "package:ianvs_markdown/src/highlight.dart",
     "ianvsMarkdownDocumentClipboardData": "package:ianvs_markdown/src/rich_clipboard.dart",
     "ianvsMarkdownEmphasisScan": "package:ianvs_markdown/src/emphasis.dart",
+    "ianvsMarkdownFootnoteSourceRange": "package:ianvs_markdown/src/obsidian_metadata.dart",
     "ianvsMarkdownHighlightMatches": "package:ianvs_markdown/src/highlight.dart",
+    "ianvsMarkdownHtmlPasteValue": "package:ianvs_markdown/src/editor/html_paste.dart",
     "ianvsMarkdownInlineLinkSources": "package:ianvs_markdown/src/editor/editor_controller.dart",
     "ianvsMarkdownInlineMathSources": "package:ianvs_markdown/src/editor/editor_controller.dart",
     "ianvsMarkdownLivePreviewFootnoteReferences": "package:ianvs_markdown/src/obsidian_metadata.dart",
@@ -2230,6 +2238,83 @@
       "static": false,
       "abstract": false
     },
+    "IanvsMarkdownCodeLayout": {
+      "kind": "class",
+      "typeParameters": [],
+      "modifiers": [],
+      "supertype": "InheritedWidget",
+      "interfaces": [],
+      "mixins": []
+    },
+    "IanvsMarkdownCodeLayout/constructor:new": {
+      "kind": "constructor",
+      "typeParameters": [],
+      "returnType": "IanvsMarkdownCodeLayout",
+      "parameters": [
+        {
+          "name": "key",
+          "type": "Key?",
+          "kind": "named",
+          "required": false
+        },
+        {
+          "name": "child",
+          "type": "Widget",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "softWrap",
+          "type": "bool",
+          "kind": "named",
+          "required": false,
+          "default": "true"
+        }
+      ],
+      "static": false,
+      "abstract": false,
+      "const": true,
+      "factory": false
+    },
+    "IanvsMarkdownCodeLayout/field:softWrap": {
+      "kind": "field",
+      "type": "bool",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownCodeLayout/method:softWrapOf": {
+      "kind": "method",
+      "typeParameters": [],
+      "returnType": "bool",
+      "parameters": [
+        {
+          "name": "context",
+          "type": "BuildContext",
+          "kind": "positional",
+          "required": true
+        }
+      ],
+      "static": true,
+      "abstract": false
+    },
+    "IanvsMarkdownCodeLayout/method:updateShouldNotify": {
+      "kind": "method",
+      "typeParameters": [],
+      "returnType": "bool",
+      "parameters": [
+        {
+          "name": "oldWidget",
+          "type": "IanvsMarkdownCodeLayout",
+          "kind": "positional",
+          "required": true,
+          "covariant": true
+        }
+      ],
+      "static": false,
+      "abstract": false
+    },
     "IanvsMarkdownCodeSpanPresentation": {
       "kind": "enum",
       "typeParameters": [],
@@ -2366,7 +2451,8 @@
         "selectAll",
         "copy",
         "cut",
-        "paste"
+        "paste",
+        "pastePlainText"
       ]
     },
     "IanvsMarkdownCommand/constructor:new": {
@@ -2452,6 +2538,14 @@
       "late": false
     },
     "IanvsMarkdownCommand/field:paste": {
+      "kind": "field",
+      "type": "IanvsMarkdownCommand",
+      "const": true,
+      "final": false,
+      "static": true,
+      "late": false
+    },
+    "IanvsMarkdownCommand/field:pastePlainText": {
       "kind": "field",
       "type": "IanvsMarkdownCommand",
       "const": true,
@@ -2609,6 +2703,14 @@
       "static": false,
       "abstract": false
     },
+    "IanvsMarkdownController/getter:canNavigateBack": {
+      "kind": "getter",
+      "typeParameters": [],
+      "returnType": "ValueListenable<bool>",
+      "parameters": [],
+      "static": false,
+      "abstract": false
+    },
     "IanvsMarkdownController/getter:canRedo": {
       "kind": "getter",
       "typeParameters": [],
@@ -2673,6 +2775,14 @@
       "static": false,
       "abstract": false
     },
+    "IanvsMarkdownController/getter:navigationHistoryToken": {
+      "kind": "getter",
+      "typeParameters": [],
+      "returnType": "Object?",
+      "parameters": [],
+      "static": false,
+      "abstract": false
+    },
     "IanvsMarkdownController/getter:parseDecision": {
       "kind": "getter",
       "typeParameters": [],
@@ -2693,6 +2803,22 @@
       "kind": "getter",
       "typeParameters": [],
       "returnType": "int",
+      "parameters": [],
+      "static": false,
+      "abstract": false
+    },
+    "IanvsMarkdownController/getter:sourceNavigation": {
+      "kind": "getter",
+      "typeParameters": [],
+      "returnType": "ValueListenable<IanvsMarkdownSourceNavigation?>",
+      "parameters": [],
+      "static": false,
+      "abstract": false
+    },
+    "IanvsMarkdownController/getter:viewportAnchor": {
+      "kind": "getter",
+      "typeParameters": [],
+      "returnType": "ValueListenable<IanvsMarkdownViewportAnchor?>",
       "parameters": [],
       "static": false,
       "abstract": false
@@ -2725,6 +2851,14 @@
       "abstract": false
     },
     "IanvsMarkdownController/method:clearHistory": {
+      "kind": "method",
+      "typeParameters": [],
+      "returnType": "void",
+      "parameters": [],
+      "static": false,
+      "abstract": false
+    },
+    "IanvsMarkdownController/method:clearSourceNavigation": {
       "kind": "method",
       "typeParameters": [],
       "returnType": "void",
@@ -2869,11 +3003,42 @@
       "static": false,
       "abstract": false
     },
+    "IanvsMarkdownController/method:navigateBack": {
+      "kind": "method",
+      "typeParameters": [],
+      "returnType": "bool",
+      "parameters": [],
+      "static": false,
+      "abstract": false
+    },
     "IanvsMarkdownController/method:redo": {
       "kind": "method",
       "typeParameters": [],
       "returnType": "void",
       "parameters": [],
+      "static": false,
+      "abstract": false
+    },
+    "IanvsMarkdownController/method:rememberNavigationPosition": {
+      "kind": "method",
+      "typeParameters": [],
+      "returnType": "void",
+      "parameters": [],
+      "static": false,
+      "abstract": false
+    },
+    "IanvsMarkdownController/method:rememberViewport": {
+      "kind": "method",
+      "typeParameters": [],
+      "returnType": "void",
+      "parameters": [
+        {
+          "name": "anchor",
+          "type": "IanvsMarkdownViewportAnchor",
+          "kind": "positional",
+          "required": true
+        }
+      ],
       "static": false,
       "abstract": false
     },
@@ -2904,6 +3069,14 @@
       "static": false,
       "abstract": false
     },
+    "IanvsMarkdownController/method:restoreViewport": {
+      "kind": "method",
+      "typeParameters": [],
+      "returnType": "void",
+      "parameters": [],
+      "static": false,
+      "abstract": false
+    },
     "IanvsMarkdownController/method:revealHeading": {
       "kind": "method",
       "typeParameters": [],
@@ -2914,6 +3087,39 @@
           "type": "int",
           "kind": "positional",
           "required": true
+        }
+      ],
+      "static": false,
+      "abstract": false
+    },
+    "IanvsMarkdownController/method:revealSourceRange": {
+      "kind": "method",
+      "typeParameters": [],
+      "returnType": "bool",
+      "parameters": [
+        {
+          "name": "range",
+          "type": "TextRange",
+          "kind": "positional",
+          "required": true
+        },
+        {
+          "name": "source",
+          "type": "String?",
+          "kind": "named",
+          "required": false
+        },
+        {
+          "name": "viewportOffset",
+          "type": "double?",
+          "kind": "named",
+          "required": false
+        },
+        {
+          "name": "targetId",
+          "type": "String?",
+          "kind": "named",
+          "required": false
         }
       ],
       "static": false,
@@ -6849,6 +7055,19 @@
           "required": false
         },
         {
+          "name": "preserveViewport",
+          "type": "bool",
+          "kind": "named",
+          "required": false,
+          "default": "false"
+        },
+        {
+          "name": "readingHighlights",
+          "type": "IanvsMarkdownReadingHighlights?",
+          "kind": "named",
+          "required": false
+        },
+        {
           "name": "autofocus",
           "type": "bool",
           "kind": "named",
@@ -7315,6 +7534,22 @@
     "IanvsMarkdownLiveEditor/field:placeholder": {
       "kind": "field",
       "type": "String?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownLiveEditor/field:preserveViewport": {
+      "kind": "field",
+      "type": "bool",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownLiveEditor/field:readingHighlights": {
+      "kind": "field",
+      "type": "IanvsMarkdownReadingHighlights?",
       "const": false,
       "final": true,
       "static": false,
@@ -9288,6 +9523,224 @@
       "static": true,
       "late": false
     },
+    "IanvsMarkdownReadingHighlights": {
+      "kind": "class",
+      "typeParameters": [],
+      "modifiers": [],
+      "supertype": "Object",
+      "interfaces": [],
+      "mixins": []
+    },
+    "IanvsMarkdownReadingHighlights/constructor:new": {
+      "kind": "constructor",
+      "typeParameters": [],
+      "returnType": "IanvsMarkdownReadingHighlights",
+      "parameters": [
+        {
+          "name": "source",
+          "type": "String",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "matches",
+          "type": "List<IanvsMarkdownReadingMatch>",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "activeIndex",
+          "type": "int",
+          "kind": "named",
+          "required": false,
+          "default": "-1"
+        }
+      ],
+      "static": false,
+      "abstract": false,
+      "const": false,
+      "factory": false
+    },
+    "IanvsMarkdownReadingHighlights/field:activeIndex": {
+      "kind": "field",
+      "type": "int",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownReadingHighlights/field:matches": {
+      "kind": "field",
+      "type": "List<IanvsMarkdownReadingMatch>",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownReadingHighlights/field:source": {
+      "kind": "field",
+      "type": "String",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownReadingMatch": {
+      "kind": "class",
+      "typeParameters": [],
+      "modifiers": [],
+      "supertype": "Object",
+      "interfaces": [],
+      "mixins": []
+    },
+    "IanvsMarkdownReadingMatch/constructor:new": {
+      "kind": "constructor",
+      "typeParameters": [],
+      "returnType": "IanvsMarkdownReadingMatch",
+      "parameters": [
+        {
+          "name": "sourceRange",
+          "type": "TextRange",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "segmentIndex",
+          "type": "int",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "textRange",
+          "type": "TextRange",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "text",
+          "type": "String",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "navigationRange",
+          "type": "TextRange?",
+          "kind": "named",
+          "required": false
+        }
+      ],
+      "static": false,
+      "abstract": false,
+      "const": true,
+      "factory": false
+    },
+    "IanvsMarkdownReadingMatch/field:segmentIndex": {
+      "kind": "field",
+      "type": "int",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownReadingMatch/field:sourceRange": {
+      "kind": "field",
+      "type": "TextRange",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownReadingMatch/field:text": {
+      "kind": "field",
+      "type": "String",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownReadingMatch/field:textRange": {
+      "kind": "field",
+      "type": "TextRange",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownReadingMatch/getter:navigationRange": {
+      "kind": "getter",
+      "typeParameters": [],
+      "returnType": "TextRange",
+      "parameters": [],
+      "static": false,
+      "abstract": false
+    },
+    "IanvsMarkdownReadingSearch": {
+      "kind": "class",
+      "typeParameters": [],
+      "modifiers": [],
+      "supertype": "Object",
+      "interfaces": [],
+      "mixins": []
+    },
+    "IanvsMarkdownReadingSearch/getter:source": {
+      "kind": "getter",
+      "typeParameters": [],
+      "returnType": "String",
+      "parameters": [],
+      "static": false,
+      "abstract": false
+    },
+    "IanvsMarkdownReadingSearch/method:find": {
+      "kind": "method",
+      "typeParameters": [],
+      "returnType": "List<IanvsMarkdownReadingMatch>",
+      "parameters": [
+        {
+          "name": "query",
+          "type": "String",
+          "kind": "positional",
+          "required": true
+        },
+        {
+          "name": "matchCase",
+          "type": "bool",
+          "kind": "named",
+          "required": false,
+          "default": "false"
+        }
+      ],
+      "static": false,
+      "abstract": false
+    },
+    "IanvsMarkdownReadingSearch/method:parse": {
+      "kind": "method",
+      "typeParameters": [],
+      "returnType": "IanvsMarkdownReadingSearch?",
+      "parameters": [
+        {
+          "name": "source",
+          "type": "String",
+          "kind": "positional",
+          "required": true
+        },
+        {
+          "name": "syntaxPreset",
+          "type": "IanvsMarkdownSyntaxPreset",
+          "kind": "named",
+          "required": false,
+          "default": "IanvsMarkdownSyntaxPreset.obsidian"
+        },
+        {
+          "name": "budget",
+          "type": "IanvsMarkdownRenderBudget?",
+          "kind": "named",
+          "required": false,
+          "default": "const IanvsMarkdownRenderBudget()"
+        }
+      ],
+      "static": true,
+      "abstract": false
+    },
     "IanvsMarkdownRenderBudget": {
       "kind": "class",
       "typeParameters": [],
@@ -9837,6 +10290,83 @@
     "IanvsMarkdownSourceHighlight/field:source": {
       "kind": "field",
       "type": "String",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownSourceNavigation": {
+      "kind": "class",
+      "typeParameters": [],
+      "modifiers": [
+        "final"
+      ],
+      "supertype": "Object",
+      "interfaces": [],
+      "mixins": []
+    },
+    "IanvsMarkdownSourceNavigation/constructor:new": {
+      "kind": "constructor",
+      "typeParameters": [],
+      "returnType": "IanvsMarkdownSourceNavigation",
+      "parameters": [
+        {
+          "name": "source",
+          "type": "String",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "range",
+          "type": "TextRange",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "viewportOffset",
+          "type": "double?",
+          "kind": "named",
+          "required": false
+        },
+        {
+          "name": "targetId",
+          "type": "String?",
+          "kind": "named",
+          "required": false
+        }
+      ],
+      "static": false,
+      "abstract": false,
+      "const": true,
+      "factory": false
+    },
+    "IanvsMarkdownSourceNavigation/field:range": {
+      "kind": "field",
+      "type": "TextRange",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownSourceNavigation/field:source": {
+      "kind": "field",
+      "type": "String",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownSourceNavigation/field:targetId": {
+      "kind": "field",
+      "type": "String?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownSourceNavigation/field:viewportOffset": {
+      "kind": "field",
+      "type": "double?",
       "const": false,
       "final": true,
       "static": false,
@@ -12106,6 +12636,30 @@
           "required": false
         },
         {
+          "name": "sourceNavigation",
+          "type": "ValueListenable<IanvsMarkdownSourceNavigation?>?",
+          "kind": "named",
+          "required": false
+        },
+        {
+          "name": "readingHighlights",
+          "type": "IanvsMarkdownReadingHighlights?",
+          "kind": "named",
+          "required": false
+        },
+        {
+          "name": "initialViewportAnchor",
+          "type": "IanvsMarkdownViewportAnchor?",
+          "kind": "named",
+          "required": false
+        },
+        {
+          "name": "onViewportChanged",
+          "type": "void Function(IanvsMarkdownViewportAnchor)?",
+          "kind": "named",
+          "required": false
+        },
+        {
           "name": "outlineBreakpoint",
           "type": "double",
           "kind": "named",
@@ -12422,6 +12976,14 @@
       "static": false,
       "late": false
     },
+    "IanvsMarkdownView/field:initialViewportAnchor": {
+      "kind": "field",
+      "type": "IanvsMarkdownViewportAnchor?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
     "IanvsMarkdownView/field:mathBuilder": {
       "kind": "field",
       "type": "Widget Function(BuildContext, String, {required bool displayMode})?",
@@ -12478,6 +13040,14 @@
       "static": false,
       "late": false
     },
+    "IanvsMarkdownView/field:onViewportChanged": {
+      "kind": "field",
+      "type": "void Function(IanvsMarkdownViewportAnchor)?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
     "IanvsMarkdownView/field:outlineBreakpoint": {
       "kind": "field",
       "type": "double",
@@ -12505,6 +13075,14 @@
     "IanvsMarkdownView/field:preserveScrollOnUpdate": {
       "kind": "field",
       "type": "bool",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownView/field:readingHighlights": {
+      "kind": "field",
+      "type": "IanvsMarkdownReadingHighlights?",
       "const": false,
       "final": true,
       "static": false,
@@ -12558,6 +13136,14 @@
       "static": false,
       "late": false
     },
+    "IanvsMarkdownView/field:sourceNavigation": {
+      "kind": "field",
+      "type": "ValueListenable<IanvsMarkdownSourceNavigation?>?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
     "IanvsMarkdownView/field:styleSheet": {
       "kind": "field",
       "type": "MarkdownStyleSheet?",
@@ -12603,6 +13189,115 @@
       "typeParameters": [],
       "returnType": "State<IanvsMarkdownView>",
       "parameters": [],
+      "static": false,
+      "abstract": false
+    },
+    "IanvsMarkdownViewportAnchor": {
+      "kind": "class",
+      "typeParameters": [],
+      "modifiers": [
+        "final"
+      ],
+      "supertype": "Object",
+      "interfaces": [],
+      "mixins": []
+    },
+    "IanvsMarkdownViewportAnchor/constructor:new": {
+      "kind": "constructor",
+      "typeParameters": [],
+      "returnType": "IanvsMarkdownViewportAnchor",
+      "parameters": [
+        {
+          "name": "source",
+          "type": "String",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "sourceOffset",
+          "type": "int",
+          "kind": "named",
+          "required": true
+        },
+        {
+          "name": "viewportOffset",
+          "type": "double",
+          "kind": "named",
+          "required": true
+        }
+      ],
+      "static": false,
+      "abstract": false,
+      "const": true,
+      "factory": false
+    },
+    "IanvsMarkdownViewportAnchor/field:source": {
+      "kind": "field",
+      "type": "String",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownViewportAnchor/field:sourceOffset": {
+      "kind": "field",
+      "type": "int",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownViewportAnchor/field:viewportOffset": {
+      "kind": "field",
+      "type": "double",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownViewportAnchor/getter:hashCode": {
+      "kind": "getter",
+      "typeParameters": [],
+      "returnType": "int",
+      "parameters": [],
+      "static": false,
+      "abstract": false
+    },
+    "IanvsMarkdownViewportAnchor/getter:isValid": {
+      "kind": "getter",
+      "typeParameters": [],
+      "returnType": "bool",
+      "parameters": [],
+      "static": false,
+      "abstract": false
+    },
+    "IanvsMarkdownViewportAnchor/method:==": {
+      "kind": "method",
+      "typeParameters": [],
+      "returnType": "bool",
+      "parameters": [
+        {
+          "name": "other",
+          "type": "Object",
+          "kind": "positional",
+          "required": true
+        }
+      ],
+      "static": false,
+      "abstract": false
+    },
+    "IanvsMarkdownViewportAnchor/method:rebase": {
+      "kind": "method",
+      "typeParameters": [],
+      "returnType": "IanvsMarkdownViewportAnchor",
+      "parameters": [
+        {
+          "name": "next",
+          "type": "String",
+          "kind": "positional",
+          "required": true
+        }
+      ],
       "static": false,
       "abstract": false
     },
@@ -15370,6 +16065,27 @@
       "static": true,
       "abstract": false
     },
+    "ianvsMarkdownFootnoteSourceRange": {
+      "kind": "function",
+      "typeParameters": [],
+      "returnType": "TextRange?",
+      "parameters": [
+        {
+          "name": "source",
+          "type": "String",
+          "kind": "positional",
+          "required": true
+        },
+        {
+          "name": "fragment",
+          "type": "String",
+          "kind": "positional",
+          "required": true
+        }
+      ],
+      "static": true,
+      "abstract": false
+    },
     "ianvsMarkdownHighlightMatches": {
       "kind": "function",
       "typeParameters": [],
@@ -15387,6 +16103,27 @@
           "kind": "named",
           "required": false,
           "default": "const <TextRange>[]"
+        }
+      ],
+      "static": true,
+      "abstract": false
+    },
+    "ianvsMarkdownHtmlPasteValue": {
+      "kind": "function",
+      "typeParameters": [],
+      "returnType": "TextEditingValue?",
+      "parameters": [
+        {
+          "name": "value",
+          "type": "TextEditingValue",
+          "kind": "positional",
+          "required": true
+        },
+        {
+          "name": "html",
+          "type": "String",
+          "kind": "positional",
+          "required": true
         }
       ],
       "static": true,

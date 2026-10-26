@@ -17,12 +17,14 @@ import 'editor_diagnostics.dart';
 
 import '../callout.dart';
 import '../code_block.dart';
+import '../code_layout.dart';
 import '../code_surface.dart';
 import '../front_matter.dart';
 import '../front_matter_card.dart';
 import '../heading_folding.dart';
 import '../highlight.dart';
 import '../ianvs_markdown.dart';
+import '../renderer/reading_highlight.dart';
 import '../inline_code.dart';
 import '../inline_link.dart';
 import '../list_guide.dart';
@@ -34,6 +36,7 @@ import '../render_budget.dart';
 import '../budget_notice.dart';
 import '../rich_clipboard.dart';
 import '../renderer/inline_control_height_scope.dart';
+import '../renderer/viewport_geometry.dart';
 import '../task_checkbox.dart';
 import '../task_syntax.dart';
 import '../theme.dart';
@@ -63,6 +66,8 @@ class IanvsMarkdownLiveEditor extends StatefulWidget {
     required this.controller,
     this.focusNode,
     this.scrollController,
+    this.preserveViewport = false,
+    this.readingHighlights,
     this.autofocus = false,
     this.showToolbar = true,
     this.enableModeShortcuts = true,
@@ -105,6 +110,10 @@ class IanvsMarkdownLiveEditor extends StatefulWidget {
   final IanvsMarkdownController controller;
   final FocusNode? focusNode;
   final ScrollController? scrollController;
+
+  /// Opt in to source-anchored viewport restoration across modes and mounts.
+  final bool preserveViewport;
+  final IanvsMarkdownReadingHighlights? readingHighlights;
   final bool autofocus;
   final bool showToolbar;
 
@@ -258,6 +267,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     super.initState();
     _focusNode = widget.focusNode ?? FocusNode();
     _scrollController = widget.scrollController ?? ScrollController();
+    _scrollController.addListener(_scheduleViewportCapture);
     _editingFormatter = IanvsMarkdownEditingFormatter(
       budget: widget.controller.parseBudget,
     );
@@ -268,10 +278,15 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     widget.controller.addListener(_handleDocumentChanged);
     widget.controller.modeListenable.addListener(_handleModeChanged);
     widget.controller.headingNavigation.addListener(_handleHeadingNavigation);
+    widget.controller.sourceNavigation.addListener(_handleSourceNavigation);
+    _schedulePendingSourceNavigation();
     _blockController.addListener(_handleBlockChanged);
     if (widget.autofocus &&
         widget.controller.mode == IanvsMarkdownEditorMode.livePreview) {
       _autofocusLiveSelection();
+    }
+    if (widget.controller.sourceNavigation.value == null) {
+      _scheduleViewportRestore();
     }
   }
 
@@ -370,6 +385,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       oldWidget.controller.headingNavigation.removeListener(
         _handleHeadingNavigation,
       );
+      oldWidget.controller.sourceNavigation.removeListener(
+        _handleSourceNavigation,
+      );
       _blocks = const [];
       _blockKeys.clear();
       _renderedBlockTapKeys.clear();
@@ -383,6 +401,12 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       widget.controller.addListener(_handleDocumentChanged);
       widget.controller.modeListenable.addListener(_handleModeChanged);
       widget.controller.headingNavigation.addListener(_handleHeadingNavigation);
+      widget.controller.sourceNavigation.addListener(_handleSourceNavigation);
+      _schedulePendingSourceNavigation();
+      _restoringViewport = false;
+      if (widget.controller.sourceNavigation.value == null) {
+        _scheduleViewportRestore();
+      }
     }
     if (identical(oldWidget.controller, widget.controller) &&
         oldWidget.renderBudget != widget.renderBudget) {
@@ -393,17 +417,114 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       _focusNode = widget.focusNode ?? FocusNode();
     }
     if (!identical(oldWidget.scrollController, widget.scrollController)) {
+      _scrollController.removeListener(_scheduleViewportCapture);
       if (oldWidget.scrollController == null) _scrollController.dispose();
       _scrollController = widget.scrollController ?? ScrollController();
+      _scrollController.addListener(_scheduleViewportCapture);
+    }
+    if (oldWidget.preserveViewport != widget.preserveViewport) {
+      _viewportRestoreEpoch++;
+      _restoringViewport = false;
+      if (widget.preserveViewport) _scheduleViewportRestore();
     }
   }
 
   int _modeSurfaceEpoch = 0;
+  var _viewportCaptureScheduled = false;
+  var _restoringViewport = false;
+  var _viewportRestoreEpoch = 0;
+
+  void _scheduleViewportCapture() {
+    if (!mounted ||
+        !widget.preserveViewport ||
+        _restoringViewport ||
+        _viewportCaptureScheduled ||
+        widget.controller.mode == IanvsMarkdownEditorMode.preview) {
+      return;
+    }
+    _viewportCaptureScheduled = true;
+    final controller = widget.controller;
+    final epoch = _modeSurfaceEpoch;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _viewportCaptureScheduled = false;
+      if (mounted &&
+          !_restoringViewport &&
+          identical(controller, widget.controller) &&
+          epoch == _modeSurfaceEpoch) {
+        _captureViewport();
+      }
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  void _captureViewport({IanvsMarkdownEditorMode? mode}) {
+    if (!widget.preserveViewport || !_scrollController.hasClients) return;
+    final source = widget.controller.text;
+    mode ??= widget.controller.mode;
+    if (mode == IanvsMarkdownEditorMode.preview) return;
+    IanvsMarkdownViewportAnchor? anchor;
+    if (mode == IanvsMarkdownEditorMode.source || _sourceFallback) {
+      final editable = _activeRenderEditable(key: _sourceEditorKey);
+      if (editable == null || !editable.hasSize) return;
+      final offset = editable
+          .getPositionForPoint(editable.localToGlobal(Offset.zero))
+          .offset;
+      anchor = IanvsMarkdownViewportAnchor(
+        source: source,
+        sourceOffset: offset,
+        viewportOffset: editable
+            .getLocalRectForCaret(TextPosition(offset: offset))
+            .top,
+      );
+    } else {
+      anchor = captureMarkdownViewport(
+        source,
+        _blockKeys.entries.map(
+          (entry) => (offset: entry.key, key: entry.value),
+        ),
+      );
+    }
+    if (anchor != null) _rememberViewport(anchor);
+  }
+
+  void _rememberViewport(IanvsMarkdownViewportAnchor anchor) {
+    if (!mounted || !widget.preserveViewport) return;
+    _restoringViewport = false;
+    widget.controller.rememberViewport(anchor);
+    widget.controller.clearSourceNavigation();
+  }
+
+  void _scheduleViewportRestore() {
+    if (!widget.preserveViewport ||
+        widget.controller.mode == IanvsMarkdownEditorMode.preview) {
+      return;
+    }
+    if (widget.controller.viewportAnchor.value == null) {
+      _scheduleViewportCapture();
+      return;
+    }
+    _restoringViewport = true;
+    final controller = widget.controller;
+    final epoch = _modeSurfaceEpoch;
+    final restoreEpoch = ++_viewportRestoreEpoch;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted ||
+          !identical(controller, widget.controller) ||
+          epoch != _modeSurfaceEpoch ||
+          restoreEpoch != _viewportRestoreEpoch) {
+        return;
+      }
+      controller.restoreViewport();
+    });
+  }
 
   void _handleModeChanged() {
     final controller = widget.controller;
     final next = widget.controller.mode;
     if (next == _lastMode) return;
+    if (!_restoringViewport) _captureViewport(mode: _lastMode);
+    _restoringViewport = false;
     final restoreFocus =
         FocusManager.instance.primaryFocus?.context
             ?.findAncestorStateOfType<_IanvsMarkdownLiveEditorState>() ==
@@ -457,6 +578,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         }
       });
     }
+    _scheduleViewportRestore();
   }
 
   void _handleDocumentChanged() {
@@ -2398,6 +2520,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     widget.controller.headingNavigation.removeListener(
       _handleHeadingNavigation,
     );
+    widget.controller.sourceNavigation.removeListener(_handleSourceNavigation);
     _blockController
       ..removeListener(_handleBlockChanged)
       ..dispose();
@@ -2405,50 +2528,70 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       ..removeListener(_handleHeadingFoldsChanged)
       ..dispose();
     if (_ownsFocusNode) _focusNode.dispose();
+    _scrollController.removeListener(_scheduleViewportCapture);
     if (_ownsScrollController) _scrollController.dispose();
     super.dispose();
+  }
+
+  bool _handleUserViewportScroll(UserScrollNotification notification) {
+    if (notification.direction != ScrollDirection.idle &&
+        notification.context != null &&
+        _scrollController.hasClients &&
+        identical(
+          Scrollable.maybeOf(notification.context!)?.position,
+          _scrollController.position,
+        )) {
+      _viewportRestoreEpoch++;
+      _restoringViewport = false;
+      widget.controller.clearSourceNavigation();
+      _scheduleViewportCapture();
+    }
+    return false;
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = IanvsMarkdownThemeData.resolve(context, widget.theme);
     _blockController.syntaxTheme = _livePreviewSyntaxTheme(colors);
-    return ColoredBox(
-      color: colors.surface,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final showNavigation =
-              widget.showNavigationPane &&
-              constraints.maxWidth >= widget.navigationBreakpoint;
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (showNavigation) ...[
-                SizedBox(
-                  width: widget.navigationWidth,
-                  child: ValueListenableBuilder<IanvsMarkdownEditorMode>(
-                    valueListenable: widget.controller.modeListenable,
-                    builder: (context, mode, _) => _EditorNavigationPane(
-                      mode: mode,
-                      headings: _navigationHeadings,
-                      activeHeadingStart: _activeHeadingStart,
-                      colors: colors,
-                      onModeSelected: (next) => widget.controller.mode = next,
-                      onHeadingSelected: _scrollToNavigationHeading,
+    return NotificationListener<UserScrollNotification>(
+      onNotification: _handleUserViewportScroll,
+      child: ColoredBox(
+        color: colors.surface,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final showNavigation =
+                widget.showNavigationPane &&
+                constraints.maxWidth >= widget.navigationBreakpoint;
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (showNavigation) ...[
+                  SizedBox(
+                    width: widget.navigationWidth,
+                    child: ValueListenableBuilder<IanvsMarkdownEditorMode>(
+                      valueListenable: widget.controller.modeListenable,
+                      builder: (context, mode, _) => _EditorNavigationPane(
+                        mode: mode,
+                        headings: _navigationHeadings,
+                        activeHeadingStart: _activeHeadingStart,
+                        colors: colors,
+                        onModeSelected: (next) => widget.controller.mode = next,
+                        onHeadingSelected: _scrollToNavigationHeading,
+                      ),
                     ),
                   ),
+                  VerticalDivider(width: 1, color: colors.border),
+                ],
+                Expanded(
+                  child: _buildEditorSurface(
+                    colors,
+                    showNavigation: showNavigation,
+                  ),
                 ),
-                VerticalDivider(width: 1, color: colors.border),
               ],
-              Expanded(
-                child: _buildEditorSurface(
-                  colors,
-                  showNavigation: showNavigation,
-                ),
-              ),
-            ],
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
@@ -2497,6 +2640,17 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
                   autofocus: widget.autofocus,
                   data: widget.controller.text,
                   headingNavigation: widget.controller.headingNavigation,
+                  sourceNavigation: widget.controller.sourceNavigation,
+                  readingHighlights: widget.readingHighlights,
+                  onHeadingSelected: (_) =>
+                      widget.controller.rememberNavigationPosition(),
+                  initialViewportAnchor: widget.preserveViewport
+                      ? widget.controller.viewportAnchor.value
+                      : null,
+                  onViewportChanged: widget.preserveViewport
+                      ? _rememberViewport
+                      : null,
+                  preserveScrollOnUpdate: widget.preserveViewport,
                   controller: _scrollController,
                   padding: widget.padding,
                   showFrontMatter: widget.showFrontMatter,
@@ -2551,6 +2705,116 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     onPaste: widget.onPaste,
     theme: colors,
   );
+
+  void _schedulePendingSourceNavigation() {
+    final controller = widget.controller;
+    final request = controller.sourceNavigation.value;
+    if (request == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted &&
+          identical(widget.controller, controller) &&
+          identical(controller.sourceNavigation.value, request)) {
+        _handleSourceNavigation();
+      }
+    });
+  }
+
+  void _handleSourceNavigation() {
+    _viewportRestoreEpoch++;
+    final request = widget.controller.sourceNavigation.value;
+    if (request != null) {
+      if (widget.preserveViewport) _restoringViewport = true;
+      unawaited(_revealSourceRange(request));
+    } else {
+      _restoringViewport = false;
+    }
+  }
+
+  Future<void> _revealSourceRange(IanvsMarkdownSourceNavigation request) async {
+    final controller = widget.controller;
+    final scroll = _scrollController;
+    final mode = controller.mode;
+    final epoch = _modeSurfaceEpoch;
+    bool isCurrent() =>
+        mounted &&
+        identical(controller, widget.controller) &&
+        identical(scroll, _scrollController) &&
+        epoch == _modeSurfaceEpoch &&
+        controller.mode == mode &&
+        controller.text == request.source &&
+        identical(controller.sourceNavigation.value, request);
+    if (!isCurrent() || mode == IanvsMarkdownEditorMode.preview) return;
+    await WidgetsBinding.instance.endOfFrame;
+    if (!isCurrent() || !scroll.hasClients) return;
+    if (mode == IanvsMarkdownEditorMode.source || _sourceFallback) {
+      final editable = _activeRenderEditable(key: _sourceEditorKey);
+      if (editable == null) return;
+      final caret = editable.getLocalRectForCaret(
+        TextPosition(offset: request.range.start),
+      );
+      final position = scroll.position;
+      scroll.jumpTo(
+        (position.pixels +
+                caret.top -
+                (request.viewportOffset ?? position.viewportDimension * .08))
+            .clamp(position.minScrollExtent, position.maxScrollExtent)
+            .toDouble(),
+      );
+      _restoringViewport = false;
+      _scheduleViewportCapture();
+      return;
+    }
+    // Whitespace between blocks belongs to the following visible block; EOF
+    // belongs to the last block. Hidden metadata never opens an editing field.
+    var index = _blocks.indexWhere(
+      (block) =>
+          block.end >= request.range.start &&
+          (widget.showFrontMatter ||
+              block.type != IanvsMarkdownBlockType.frontMatter),
+    );
+    if (index < 0 && _blocks.isNotEmpty) index = _blocks.length - 1;
+    if (index < 0 ||
+        _blocks[index].type == IanvsMarkdownBlockType.frontMatter) {
+      return;
+    }
+    if (widget.enableHeadingFolding) {
+      _headingFoldController.expandIdentities(
+        _headingFoldModel.collapsedAncestorIdentities(
+          index,
+          _headingFoldController,
+        ),
+      );
+      await WidgetsBinding.instance.endOfFrame;
+      if (!isCurrent()) return;
+    }
+    await _revealLiveBlock(
+      index,
+      _blocks[index].start,
+      isCurrent: isCurrent,
+      duration: Duration.zero,
+    );
+    if (!isCurrent()) return;
+    final target = _blockKeys[_blocks[index].start]?.currentContext;
+    if (request.viewportOffset != null && target != null && target.mounted) {
+      restoreMarkdownViewport(target, scroll, request.viewportOffset!);
+    }
+    if (request.viewportOffset == null) {
+      final root = target?.findRenderObject();
+      void reveal(RenderObject object) {
+        if (object is RenderMarkdownReadingHighlight &&
+            object.activeRect != null) {
+          object.revealActiveText();
+          return;
+        }
+        object.visitChildren(reveal);
+      }
+
+      if (root != null) reveal(root);
+    }
+
+    _restoringViewport = false;
+    _scheduleViewportCapture();
+  }
 
   void _scrollToNavigationHeading(_EditorNavigationHeading heading) {
     widget.controller.revealHeading(heading.blockStart);
@@ -2686,6 +2950,51 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     return isCurrent();
   }
 
+  Widget _highlightLiveBlock(IanvsMarkdownBlock block, Widget child) {
+    final flows = markdownReadingHighlightFlowsForRange(
+      widget.readingHighlights,
+      widget.controller.text,
+      block.start,
+      _activeBlockStart == block.start
+          ? math.max(block.end, _editingEnd)
+          : block.end,
+    );
+    if (flows.isEmpty) return child;
+    final active = _activeBlockStart == block.start;
+    final sourceText = active ? _blockController.text : null;
+    return MarkdownReadingHighlightOverlay(
+      flows: flows,
+      sourceText: sourceText,
+      sourceRanges: sourceText == null
+          ? null
+          : markdownInlineVisibleSourceRanges(
+              sourceText,
+              linkReferenceLabels: _linkReferences.labels,
+            ),
+      child: child,
+    );
+  }
+
+  bool _handleLiveLayout(SizeChangedLayoutNotification notification) {
+    if (!widget.preserveViewport ||
+        _restoringViewport ||
+        _viewportCaptureScheduled ||
+        widget.controller.mode != IanvsMarkdownEditorMode.livePreview ||
+        widget.controller.viewportAnchor.value == null ||
+        !_scrollController.hasClients ||
+        _scrollController.position.isScrollingNotifier.value) {
+      return false;
+    }
+    _scheduleViewportRestore();
+    return false;
+  }
+
+  Widget _trackLiveLayout(Widget child) =>
+      NotificationListener<SizeChangedLayoutNotification>(
+        onNotification: _handleLiveLayout,
+        child: SizeChangedLayoutNotifier(child: child),
+      );
+
   Widget _buildLiveMode(IanvsMarkdownThemeData colors) {
     final blockIndices = <Key, int>{
       for (var i = 0; i < _blocks.length; i++) _blockKeys[_blocks[i].start]!: i,
@@ -2762,43 +3071,48 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
                   return MarkdownBlockRegion(
                     key: _blockKeys[block.start],
                     block: block,
-                    child: Align(
-                      alignment: Alignment.topLeft,
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: widget.contentMaxWidth,
-                        ),
-                        child: Padding(
-                          padding: EdgeInsetsDirectional.only(
-                            start: listNestingLevel * listIndentStep,
-                          ),
-                          child: Column(
-                            key: ValueKey(block.type),
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              if (_activeBlockStart == block.start &&
-                                  !activeGapLine)
-                                _buildActiveBlock(
-                                  block,
-                                  colors,
-                                  listNestingLevel: listNestingLevel,
-                                  headingSection: headingSection,
-                                )
-                              else
-                                _buildRenderedBlock(
-                                  block,
-                                  colors,
-                                  listNestingLevel: listNestingLevel,
-                                  headingSection: headingSection,
-                                ),
-                              if (activeGapLine)
-                                _buildActiveGapLine(colors)
-                              else if (_activeBlockStart == block.start &&
-                                  _editingEnd > block.end)
-                                const SizedBox.shrink()
-                              else
-                                _buildBlockGap(block, gapLines: gapLines),
-                            ],
+                    child: _trackLiveLayout(
+                      _highlightLiveBlock(
+                        block,
+                        Align(
+                          alignment: Alignment.topLeft,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: widget.contentMaxWidth,
+                            ),
+                            child: Padding(
+                              padding: EdgeInsetsDirectional.only(
+                                start: listNestingLevel * listIndentStep,
+                              ),
+                              child: Column(
+                                key: ValueKey(block.type),
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  if (_activeBlockStart == block.start &&
+                                      !activeGapLine)
+                                    _buildActiveBlock(
+                                      block,
+                                      colors,
+                                      listNestingLevel: listNestingLevel,
+                                      headingSection: headingSection,
+                                    )
+                                  else
+                                    _buildRenderedBlock(
+                                      block,
+                                      colors,
+                                      listNestingLevel: listNestingLevel,
+                                      headingSection: headingSection,
+                                    ),
+                                  if (activeGapLine)
+                                    _buildActiveGapLine(colors)
+                                  else if (_activeBlockStart == block.start &&
+                                      _editingEnd > block.end)
+                                    const SizedBox.shrink()
+                                  else
+                                    _buildBlockGap(block, gapLines: gapLines),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -3196,7 +3510,16 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         contentPadding: EdgeInsets.zero,
       ),
     );
-    final Widget editor = textEditor;
+    final Widget editor = codeBlock
+        ? MarkdownCodeViewport(
+            text: _blockController.buildTextSpan(
+              context: context,
+              style: activeTextStyle,
+              withComposing: true,
+            ),
+            child: textEditor,
+          )
+        : textEditor;
     Widget activeListEditor(double markerExtent) {
       return Expanded(
         child: _ActiveTextLineRail(

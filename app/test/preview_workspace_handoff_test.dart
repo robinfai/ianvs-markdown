@@ -344,6 +344,7 @@ void main() {
       reply = Completer<Map<String, dynamic>?>();
       await tester.pumpWidget(
         LinefoldPreviewApp(
+          readingPositions: memoryPreviewReadingPositions(),
           controller: controller,
           platform: MemoryPreviewPlatform()..initial = [],
           draftStore: MemoryPreviewDraftStore(),

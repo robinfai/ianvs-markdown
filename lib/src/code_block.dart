@@ -38,6 +38,7 @@ import 'package:re_highlight/languages/yaml.dart';
 import 'package:re_highlight/re_highlight.dart';
 
 import 'code_surface.dart';
+import 'code_layout.dart';
 import 'scroll_fade_region.dart';
 import 'theme.dart';
 
@@ -290,23 +291,17 @@ class _IanvsMarkdownCodeBlockState extends State<IanvsMarkdownCodeBlock> {
         ? 58.0 + (_lineCount - 1) * 20
         : 34.0 + (_lineCount - 1) * 31;
 
-    final codeViewport = LayoutBuilder(
-      builder: (context, constraints) {
-        return SizedBox(
-          width: constraints.maxWidth,
-          child: SelectableText.rich(
-            contextMenuBuilder: (_, state) =>
-                buildMarkdownSelectableContextMenu(context, state),
-            span,
-            style: baseStyle,
-            // Measure the highlighted runs themselves, as the live editor
-            // does when its fence markers occupy the existing card inset.
-            strutStyle: StrutStyle.disabled,
-            textWidthBasis: TextWidthBasis.parent,
-            onTap: widget.onTap,
-          ),
-        );
-      },
+    final codeViewport = MarkdownCodeViewport(
+      text: span,
+      child: SelectableText.rich(
+        contextMenuBuilder: (_, state) =>
+            buildMarkdownSelectableContextMenu(context, state),
+        span,
+        style: baseStyle,
+        strutStyle: StrutStyle.disabled,
+        textWidthBasis: TextWidthBasis.parent,
+        onTap: widget.onTap,
+      ),
     );
     Widget body = Container(
       key: const ValueKey('ianvs-markdown-code-canvas'),

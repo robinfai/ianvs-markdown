@@ -128,7 +128,7 @@ final class CloudWorkspace {
       }
       #endif
       guard ["defaultDirectory", "listDirectory", "readDocument", "readDocumentBytes", "writeDocument", "writeDocumentGuarded",
-             "listAttachments", "readAttachmentBytes", "readAttachmentImportSettings", "normalizeAttachmentPaths", "createWorkspaceAttachment",
+             "listAttachments", "readAttachmentBytes", "listBundleAssets", "readBundleAssetBytes", "readAttachmentImportSettings", "normalizeAttachmentPaths", "createWorkspaceAttachment",
              "listWorkspaceDirectory", "readWorkspaceTextBytes", "createWorkspaceNote", "writeWorkspaceNoteGuarded", "resolveWorkspacePath", "readDocumentSyncMetadata"].contains(method) else {
         result(FlutterMethodNotImplemented)
         return
@@ -196,7 +196,7 @@ final class CloudWorkspace {
         return
       }
       let isSearch = method == "listWorkspaceDirectory" || method == "readWorkspaceTextBytes" || method == "createWorkspaceNote" || method == "writeWorkspaceNoteGuarded" || method == "resolveWorkspacePath"
-      let isAttachment = method == "listAttachments" || method == "readAttachmentBytes" || method == "readAttachmentImportSettings" || method == "createWorkspaceAttachment"
+      let isAttachment = method == "listBundleAssets" || method == "readBundleAssetBytes" || method == "listAttachments" || method == "readAttachmentBytes" || method == "readAttachmentImportSettings" || method == "createWorkspaceAttachment"
       let workQueue = (method == "createWorkspaceNote" || method == "writeWorkspaceNoteGuarded") ? self.noteWriteQueue : (isSearch ? self.searchQueue : (isAttachment ? self.attachmentQueue : self.queue))
       let admittedWrite = writeLease
       workQueue.async {
@@ -256,9 +256,9 @@ final class CloudWorkspace {
               )]
             case "readAttachmentImportSettings":
               value = FlutterStandardTypedData(bytes: try Self.readAttachmentImportSettings(url))
-            case "listAttachments":
-              value = try Self.listAttachments(url)
-            case "readAttachmentBytes":
+            case "listAttachments", "listBundleAssets":
+              value = try Self.listAttachments(url, forBundle: method == "listBundleAssets")
+            case "readAttachmentBytes", "readBundleAssetBytes":
               guard let relativePath = arguments["relativePath"] as? String,
                     let number = arguments["maximumBytes"] as? NSNumber,
                     CFGetTypeID(number) != CFBooleanGetTypeID(),
@@ -266,7 +266,7 @@ final class CloudWorkspace {
                 throw AttachmentError.invalid
               }
               value = FlutterStandardTypedData(bytes: try Self.readAttachmentBytes(
-                url, relativePath: relativePath, maximumBytes: maximumBytes
+                url, relativePath: relativePath, maximumBytes: maximumBytes, forBundle: method == "readBundleAssetBytes"
               ))
             case "writeDocumentGuarded":
               try Self.writeGuarded(url, arguments: arguments)
@@ -641,8 +641,8 @@ extension CloudWorkspace {
     return paths.map { $0.precomposedStringWithCanonicalMapping.lowercased() }
   }
 
-  static func listAttachments(_ root: URL) throws -> [[String: Any]] {
-    do { return try AttachmentScope.withoutMaterialization { try AttachmentScope(root).list() } }
+  static func listAttachments(_ root: URL, forBundle: Bool = false) throws -> [[String: Any]] {
+    do { return try AttachmentScope.withoutMaterialization { try AttachmentScope(root).list(forBundle: forBundle) } }
     catch { throw AttachmentError.classify(error) }
   }
 
@@ -666,10 +666,10 @@ extension CloudWorkspace {
     }
   }
 
-  static func readAttachmentBytes(_ root: URL, relativePath: String, maximumBytes: Int) throws -> Data {
+  static func readAttachmentBytes(_ root: URL, relativePath: String, maximumBytes: Int, forBundle: Bool = false) throws -> Data {
     do {
       return try AttachmentScope.withoutMaterialization {
-        try AttachmentScope(root).read(relativePath: relativePath, maximumBytes: maximumBytes)
+        try AttachmentScope(root).read(relativePath: relativePath, maximumBytes: maximumBytes, forBundle: forBundle)
       }
     }
     catch { throw AttachmentError.classify(error) }
@@ -979,11 +979,11 @@ final class AttachmentScope: WorkspaceFileScope {
   static let maximumDepth = 64
   static let coordinationTimeout: TimeInterval = 5
 
-  static func components(_ path: String) throws -> [String] {
+  static func components(_ path: String, forBundle: Bool = false) throws -> [String] {
     let components = try relativeComponents(path)
-    if path == ".obsidian/app.json" { return components }
+    if !forBundle && path == ".obsidian/app.json" { return components }
     guard !components.contains(where: { $0.hasPrefix(".") }),
-          imageExtensions.contains((path as NSString).pathExtension.lowercased()) else {
+          (forBundle || imageExtensions.contains((path as NSString).pathExtension.lowercased())) else {
       throw AttachmentError.invalid
     }
     return components
@@ -991,7 +991,7 @@ final class AttachmentScope: WorkspaceFileScope {
 
   /// Descriptor-based, metadata-only enumeration: no image/config bytes, file
   /// coordination, downloading, or symlink traversal occurs while indexing.
-  func list() throws -> [[String: Any]] {
+  func list(forBundle: Bool = false) throws -> [[String: Any]] {
     try verifyRootLocation()
     struct Entry {
       let relativePath: String
@@ -1054,7 +1054,7 @@ final class AttachmentScope: WorkspaceFileScope {
         let relativePath = prefix + logicalName
         guard relativePath.utf16.count <= 4096 else { throw AttachmentError.indexLimit }
         guard !logicalName.isEmpty, !logicalName.hasPrefix("."),
-              Self.imageExtensions.contains((logicalName as NSString).pathExtension.lowercased()),
+              (forBundle || Self.imageExtensions.contains((logicalName as NSString).pathExtension.lowercased())),
               !relativePath.contains("\\"), !relativePath.contains(":") else { continue }
         // A real file wins if an iCloud provider temporarily leaves both forms.
         let identity = Data(relativePath.utf8)
@@ -1083,8 +1083,8 @@ final class AttachmentScope: WorkspaceFileScope {
     }
   }
 
-  func read(relativePath: String, maximumBytes: Int) throws -> Data {
-    let components = try Self.components(relativePath)
+  func read(relativePath: String, maximumBytes: Int, forBundle: Bool = false) throws -> Data {
+    let components = try Self.components(relativePath, forBundle: forBundle)
     guard maximumBytes > 0 else { throw AttachmentError.invalid }
     let hardLimit = relativePath == ".obsidian/app.json" ? Self.maximumSettingsBytes : Self.maximumImageBytes
     let limit = min(maximumBytes, hardLimit)
@@ -1092,6 +1092,7 @@ final class AttachmentScope: WorkspaceFileScope {
     let placeholder = try isPlaceholder(components)
     let target = rootURL.appendingPathComponent(relativePath)
     if placeholder {
+      if forBundle { throw AttachmentError.offline }
       // Request only this logical file, then let the UI retry. Never wait for an
       // offline provider's download on the serialized attachment queue.
       do { try FileManager.default.startDownloadingUbiquitousItem(at: target) }
@@ -1112,7 +1113,7 @@ final class AttachmentScope: WorkspaceFileScope {
     defer { timeout.cancel() }
     coordinator.coordinate(readingItemAt: target, options: [], error: &coordinationError) { coordinated in
       outcome = Result {
-        try self.readCoordinated(coordinated, relativePath: relativePath, maximumBytes: limit)
+        try self.readCoordinated(coordinated, relativePath: relativePath, maximumBytes: limit, forBundle: forBundle)
       }
     }
     if let coordinationError { throw AttachmentError.classify(coordinationError, placeholder: placeholder) }
@@ -1122,20 +1123,20 @@ final class AttachmentScope: WorkspaceFileScope {
 
   /// Kept separate so the production accessor's redirect and replacement checks
   /// can be tested deterministically, without relying on a winning race.
-  func readCoordinated(_ coordinated: URL, relativePath: String, maximumBytes: Int) throws -> Data {
+  func readCoordinated(_ coordinated: URL, relativePath: String, maximumBytes: Int, forBundle: Bool = false) throws -> Data {
     try Self.withoutMaterialization {
-      try readLocal(coordinated, relativePath: relativePath, maximumBytes: maximumBytes)
+      try readLocal(coordinated, relativePath: relativePath, maximumBytes: maximumBytes, forBundle: forBundle)
     }
   }
 
-  private func readLocal(_ coordinated: URL, relativePath: String, maximumBytes: Int) throws -> Data {
-    let components = try Self.components(relativePath)
+  private func readLocal(_ coordinated: URL, relativePath: String, maximumBytes: Int, forBundle: Bool = false) throws -> Data {
+    let components = try Self.components(relativePath, forBundle: forBundle)
     let hardLimit = relativePath == ".obsidian/app.json" ? Self.maximumSettingsBytes : Self.maximumImageBytes
     guard maximumBytes > 0 else { throw AttachmentError.invalid }
     let limit = min(maximumBytes, hardLimit)
     let expected = rootURL.appendingPathComponent(relativePath)
     guard coordinated.isFileURL, Data(coordinated.path.utf8) == Data(expected.path.utf8) else { throw AttachmentError.invalid }
-    return try readLocalBytes(components: components, maximumBytes: limit, verifyRevision: false).bytes
+    return try readLocalBytes(components: components, maximumBytes: limit, verifyRevision: forBundle).bytes
   }
 }
 

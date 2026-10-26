@@ -25,6 +25,7 @@ void main() {
   Future<void> launch(WidgetTester tester) async {
     await tester.pumpWidget(
       LinefoldPreviewApp(
+        readingPositions: memoryPreviewReadingPositions(),
         controller: preview,
         platform: platform,
         draftStore: store,
@@ -40,6 +41,70 @@ void main() {
   }
 
   final source = find.byKey(const ValueKey('mobile-source'));
+
+  testWidgets(
+    'Read to Source keeps its paragraph and cancel/save restore reading',
+    (tester) async {
+      library.files['/vault/note.md'] = List.generate(
+        100,
+        (i) => 'Paragraph $i with readable text.\n\n',
+      ).join();
+      await launch(tester);
+      ScrollPosition readerScroll() => tester
+          .state<ScrollableState>(
+            find
+                .descendant(
+                  of: find.byType(IanvsMarkdownView),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          )
+          .position;
+      readerScroll().jumpTo(1200);
+      await tester.pumpAndSettle();
+      final original = preview.contents!;
+      await tester.tap(find.byTooltip('编辑源码'));
+      await tester.pumpAndSettle();
+      final textController = tester.widget<TextField>(source).controller!;
+      final offset = textController.selection.extentOffset;
+      expect(offset, greaterThan(300));
+      final editable = tester
+          .state<EditableTextState>(
+            find.descendant(of: source, matching: find.byType(EditableText)),
+          )
+          .renderEditable;
+      final caret = editable.localToGlobal(
+        editable.getLocalRectForCaret(TextPosition(offset: offset)).topLeft,
+      );
+      final bounds = tester.getRect(source);
+      expect(caret.dy, inInclusiveRange(bounds.top, bounds.bottom));
+      await tester.tap(find.byTooltip('取消编辑'));
+      await tester.pumpAndSettle();
+      expect(readerScroll().pixels, closeTo(1200, 1));
+      await tester.tap(find.byTooltip('编辑源码'));
+      await tester.pumpAndSettle();
+      final field = tester.widget<TextField>(source).controller!;
+      const prefix = 'Inserted paragraph\n\n';
+      field.value = TextEditingValue(
+        text: '$prefix$original',
+        selection: TextSelection.collapsed(offset: offset + prefix.length),
+      );
+      await tester.pump();
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+      expect(source, findsNothing);
+      expect(preview.contents, '$prefix$original');
+      expect(readerScroll().pixels, greaterThan(1200));
+      final paragraph = original.substring(offset).split('\n').first;
+      expect(
+        find.text(paragraph, findRichText: true).hitTestable(),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      await finish(tester);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
 
   testWidgets(
     'foreground native-canonical import enters Source and saves in the selected root',

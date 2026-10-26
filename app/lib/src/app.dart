@@ -123,12 +123,16 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
     if (_settingsOpen || _promptOpen) return;
     _settingsOpen = true;
     try {
-      await _fileAssociation.refresh();
-      if (!mounted) return;
+      // Reading controls must remain available while the OS association query
+      // is pending. The dialog listens to the controller for the later result.
+      unawaited(_fileAssociation.refresh());
       await showDialog<void>(
         context: _navigatorKey.currentContext!,
         barrierDismissible: false,
-        builder: (_) => AppSettingsDialog(fileAssociation: _fileAssociation),
+        builder: (_) => AppSettingsDialog(
+          fileAssociation: _fileAssociation,
+          workspace: _workspace,
+        ),
       );
     } finally {
       _settingsOpen = false;

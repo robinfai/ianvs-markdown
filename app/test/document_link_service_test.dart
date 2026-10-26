@@ -9,6 +9,197 @@ import 'package:linefold/src/services/document_link_service.dart';
 import 'support/fakes.dart';
 
 void main() {
+  testWidgets(
+    'cross document return preserves dirty tabs and orders local jumps',
+    (tester) async {
+      final files = MemoryMarkdownFileService()
+        ..files.addAll({
+          '/notes/a.md': '# A\n\noriginal',
+          '/notes/b.md': '# B\n\n## Target\n\nBody',
+          '/notes/c.md': '# C',
+        });
+      final workspace = WorkspaceController(
+        fileService: files,
+        sessionStore: MemoryWorkspaceSessionStore(),
+      );
+      addTearDown(workspace.dispose);
+      addTearDown(files.dispose);
+      await workspace.initialize();
+      final a = (await workspace.openPath('/notes/a.md'))!;
+      a.controller.text = '# A\n\nunsaved';
+      a.controller.selection = const TextSelection(
+        baseOffset: 5,
+        extentOffset: 8,
+      );
+      a.controller.rememberViewport(
+        IanvsMarkdownViewportAnchor(
+          source: a.controller.text,
+          sourceOffset: 5,
+          viewportOffset: -12,
+        ),
+      );
+      final links = DocumentLinkService(
+        workspace: workspace,
+        openImage: (_) async {},
+      );
+      await links.open(a, 'b.md#target');
+      await tester.pump();
+      final b = workspace.activeDocument!;
+      expect(workspace.canNavigateBack, isTrue);
+      b.controller.rememberViewport(
+        IanvsMarkdownViewportAnchor(
+          source: b.controller.text,
+          sourceOffset: 5,
+          viewportOffset: 4,
+        ),
+      );
+      b.controller.revealHeading(0);
+      expect(workspace.navigateBack(), isTrue);
+      expect(workspace.activeDocument, same(b));
+      await links.open(b, 'c.md');
+      await tester.pump();
+      expect(workspace.activeDocument!.path, '/notes/c.md');
+      expect(workspace.navigateBack(), isTrue);
+      expect(workspace.activeDocument, same(b));
+      expect(workspace.navigateBack(), isTrue);
+      expect(workspace.activeDocument, same(a));
+      expect(a.controller.text, '# A\n\nunsaved');
+      expect(a.controller.isDirty, isTrue);
+      expect(
+        a.controller.selection,
+        const TextSelection(baseOffset: 5, extentOffset: 8),
+      );
+      expect(a.controller.sourceNavigation.value!.viewportOffset, -12);
+      expect(files.files['/notes/a.md'], '# A\n\noriginal');
+      await links.open(a, 'c.md');
+      await tester.pump();
+      workspace.removeDocument(a);
+      expect(workspace.canNavigateBack, isFalse);
+      expect(workspace.navigateBack(), isFalse);
+      await tester.pump(const Duration(milliseconds: 600));
+    },
+  );
+
+  testWidgets(
+    'footnote fragments reveal definitions and references with return history',
+    (tester) async {
+      final source =
+          'Intro[^中文]\n\n${List.generate(80, (i) => 'Paragraph $i\n\n').join()}[^中文]: FOOTNOTE TARGET';
+      final files = MemoryMarkdownFileService()
+        ..files['/notes/doc.md'] = source;
+      final workspace = WorkspaceController(
+        fileService: files,
+        sessionStore: MemoryWorkspaceSessionStore(),
+      );
+      addTearDown(workspace.dispose);
+      addTearDown(files.dispose);
+      await workspace.initialize();
+      final document = (await workspace.openPath('/notes/doc.md'))!;
+      document.controller.mode = IanvsMarkdownEditorMode.preview;
+      final scroll = ScrollController();
+      addTearDown(scroll.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: IanvsMarkdownLiveEditor(
+              controller: document.controller,
+              scrollController: scroll,
+              preserveViewport: true,
+              showToolbar: false,
+              showNavigationPane: false,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final links = DocumentLinkService(
+        workspace: workspace,
+        openImage: (_) async {},
+      );
+      await links.open(document, '#fn-${Uri.encodeComponent('中文')}');
+      await tester.pumpAndSettle();
+      expect(
+        find
+            .textContaining('FOOTNOTE TARGET', findRichText: true)
+            .hitTestable(),
+        findsOneWidget,
+      );
+      expect(scroll.offset, greaterThan(1000));
+      expect(document.controller.navigateBack(), isTrue);
+      await tester.pumpAndSettle();
+      expect(scroll.offset, closeTo(0, 1));
+      await links.open(document, '#fn-${Uri.encodeComponent('中文')}');
+      await tester.pumpAndSettle();
+      await links.open(document, '#fnref-${Uri.encodeComponent('中文')}');
+      await tester.pumpAndSettle();
+      expect(scroll.offset, closeTo(0, 1));
+      expect(document.controller.canUndo, isFalse);
+      expect(document.controller.isDirty, isFalse);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 600));
+    },
+  );
+
+  testWidgets(
+    'inline footnote fragments reveal generated footer and return to marker',
+    (tester) async {
+      final source =
+          'Intro^[FOOTNOTE TARGET]\n\n${List.generate(80, (i) => 'Paragraph $i\n\n').join()}';
+      final files = MemoryMarkdownFileService()
+        ..files['/notes/doc.md'] = source;
+      final workspace = WorkspaceController(
+        fileService: files,
+        sessionStore: MemoryWorkspaceSessionStore(),
+      );
+      addTearDown(workspace.dispose);
+      addTearDown(files.dispose);
+      await workspace.initialize();
+      final document = (await workspace.openPath('/notes/doc.md'))!;
+      document.controller.mode = IanvsMarkdownEditorMode.preview;
+      final scroll = ScrollController();
+      addTearDown(scroll.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: IanvsMarkdownLiveEditor(
+              controller: document.controller,
+              scrollController: scroll,
+              preserveViewport: true,
+              showToolbar: false,
+              showNavigationPane: false,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final links = DocumentLinkService(
+        workspace: workspace,
+        openImage: (_) async {},
+      );
+      await links.open(document, '#fn-ianvs-inline-footnote-1');
+      await tester.pumpAndSettle();
+      expect(
+        find
+            .textContaining('FOOTNOTE TARGET', findRichText: true)
+            .hitTestable(),
+        findsOneWidget,
+      );
+      expect(scroll.offset, greaterThan(1000));
+      expect(document.controller.navigateBack(), isTrue);
+      await tester.pumpAndSettle();
+      expect(scroll.offset, closeTo(0, 1));
+      await links.open(document, '#fn-ianvs-inline-footnote-1');
+      await tester.pumpAndSettle();
+      await links.open(document, '#fnref-ianvs-inline-footnote-1');
+      await tester.pumpAndSettle();
+      expect(scroll.offset, closeTo(0, 1));
+      expect(document.controller.canUndo, isFalse);
+      expect(document.controller.isDirty, isFalse);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 600));
+    },
+  );
+
   testWidgets('SVG external-view action dispatches the local file URL', (
     tester,
   ) async {

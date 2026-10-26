@@ -78,7 +78,14 @@ def validate_text(raw_text: str) -> dict:
         failures.append(f"Expected all 35 unchanged ASCII long-code runs, got {code_runs}")
     if any(count != 1 for count in boundary_counts.values()):
         failures.append("CJK start/end, CODE_END and attachment start/end must each survive exactly once")
+    # Report exact Unicode separately from the legacy ASCII content gate.
+    # In particular U+2Fxx Kangxi radicals are not interchangeable with the
+    # original U+4Exx characters for copying or searching. Never normalize them.
+    phrases = ("中文文档", "文档结束", "中文内容", "中间列", "末列", "长代码")
+    exact_chinese = {phrase: compact.count(phrase) for phrase in phrases}
     return {
+        "exactChinesePhrases": exact_chinese,
+        "exactChinesePhrasesPassed": all(exact_chinese.values()),
         "contentChecksPassed": not failures,
         "failures": failures,
         "expectedTableCells": 600,

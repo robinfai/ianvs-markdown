@@ -7,6 +7,7 @@ import 'package:linefold/src/app.dart';
 import 'package:linefold/src/controllers/file_association_controller.dart';
 import 'package:linefold/src/controllers/workspace_controller.dart';
 import 'package:linefold/src/services/workspace_session_store.dart';
+import 'package:linefold/src/services/file_association_service.dart';
 import 'package:linefold/src/widgets/app_settings_dialog.dart';
 
 import 'support/fakes.dart';
@@ -125,6 +126,7 @@ void main() {
       expect(find.byType(DefaultMarkdownAppPrompt), findsNothing);
       await openSettings(tester);
       expect(find.text('Current default: Linefold'), findsOneWidget);
+      await tester.ensureVisible(find.text('Restore Previous Default'));
       await tester.tap(find.text('Restore Previous Default'));
       await tester.pumpAndSettle();
       expect(find.text('Current default: Other Editor'), findsOneWidget);
@@ -173,14 +175,77 @@ void main() {
       expect(find.textContaining('macOS did not change'), findsOneWidget);
       expect(find.text('Current default: Other Editor'), findsOneWidget);
       expect(
-        tester.widget<CheckboxListTile>(find.byType(CheckboxListTile)).value,
+        tester
+            .widget<CheckboxListTile>(
+              find.byKey(const ValueKey('default-markdown-app-preference')),
+            )
+            .value,
         isTrue,
       );
       preferences.rejectChange = false;
+      await tester.ensureVisible(find.text('Try Again'));
       await tester.tap(find.text('Try Again'));
       await tester.pumpAndSettle();
       expect(find.text('Current default: Linefold'), findsOneWidget);
       expect(find.text('Try Again'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
+  testWidgets(
+    'settings exposes reading controls to accessibility',
+    (tester) async {
+      configure(tester);
+      final semantics = tester.ensureSemantics();
+      try {
+        final preferences = MemoryFileAssociationService()..preference = false;
+        await launch(tester, preferences);
+        await tester.pumpAndSettle();
+        await openSettings(tester);
+        expect(find.bySemanticsLabel('Settings'), findsOneWidget);
+        expect(find.bySemanticsLabel('Reading'), findsOneWidget);
+        expect(
+          tester
+              .getSemantics(find.bySemanticsLabel('14.5 pt'))
+              .getSemanticsData()
+              .value,
+          contains('Text size'),
+        );
+        expect(
+          tester
+              .getSemantics(find.bySemanticsLabel('1.58'))
+              .getSemanticsData()
+              .value,
+          contains('Line spacing'),
+        );
+        expect(tester.takeException(), isNull);
+      } finally {
+        semantics.dispose();
+      }
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
+  testWidgets(
+    'reading settings open while default application refresh is pending',
+    (tester) async {
+      configure(tester);
+      final preferences = _DelayedAssociationService()..preference = false;
+      await launch(tester, preferences);
+      await tester.pumpAndSettle();
+      preferences.pending = Completer<FileAssociationState>();
+      await openSettings(tester);
+      expect(find.byType(AppSettingsDialog), findsOneWidget);
+      expect(find.text('Reading'), findsOneWidget);
+      preferences.pending!.complete(
+        const FileAssociationState(
+          preferLinefold: false,
+          currentApplicationName: 'Refreshed Editor',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Current default: Refreshed Editor'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.macOS),
@@ -250,6 +315,8 @@ void main() {
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await workspace.flushSession();
     },
     variant: TargetPlatformVariant.only(TargetPlatform.macOS),
   );
@@ -260,4 +327,11 @@ class _DelayedSessionStore extends MemoryWorkspaceSessionStore {
 
   @override
   Future<WorkspaceSnapshot?> load() => ready.future;
+}
+
+class _DelayedAssociationService extends MemoryFileAssociationService {
+  Completer<FileAssociationState>? pending;
+
+  @override
+  Future<FileAssociationState> load() => pending?.future ?? super.load();
 }

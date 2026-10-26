@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../controllers/workspace_controller.dart';
 import '../services/attachment_repository.dart';
 import '../services/document_export_service.dart';
+import '../services/math_export_renderer.dart';
+import '../services/markdown_bundle_service.dart';
 
 /// One explicit export at a time. No source save, session mutation, background
 /// export, upload, or third-party send is part of this workflow.
@@ -25,6 +27,7 @@ class DocumentExportFlow {
     DocumentExportAction action, {
     AttachmentSource attachmentSource = const AppleAttachmentSource(),
     DocumentExportPlatform platform = const AppleDocumentExportPlatform(),
+    Future<String> Function(String source)? renderMermaid,
   }) async {
     if (_pending || _disposed) return;
     final current = workspace.activeDocument;
@@ -64,6 +67,7 @@ class DocumentExportFlow {
         DocumentExportAction.html => 'HTML',
         DocumentExportAction.markdown => 'Markdown copy',
         DocumentExportAction.pdf => 'PDF',
+        DocumentExportAction.bundle => 'Markdown + attachments (ZIP)',
       };
       final proceed = await showDialog<bool>(
         context: context,
@@ -71,7 +75,11 @@ class DocumentExportFlow {
           title: Text('Export $label'),
           scrollable: true,
           content: Text(
-            '${action == DocumentExportAction.markdown ? documentExportMarkdownNotice : documentExportFidelityNotice}\n\n'
+            '${action == DocumentExportAction.bundle
+                ? documentExportBundleNotice
+                : action == DocumentExportAction.markdown
+                ? documentExportMarkdownNotice
+                : documentExportFidelityNotice}\n\n'
             '${action == DocumentExportAction.pdf ? '$documentExportPdfNotice\n\n' : ''}'
             'This exports the complete document, including unsaved changes, '
             'as it was when you opened this dialog. Later edits are not included.\n\n'
@@ -91,14 +99,54 @@ class DocumentExportFlow {
         ),
       );
       if (proceed != true || !isCurrent()) return;
-      final service = DocumentExportService(attachmentSource: attachmentSource);
-      final document = action == DocumentExportAction.markdown
-          ? service.buildMarkdown(snapshot, isCurrent: isCurrent)
-          : await service.build(
-              snapshot,
-              isCurrent: isCurrent,
-              forPdf: action == DocumentExportAction.pdf,
-            );
+      final service = DocumentExportService(
+        attachmentSource: attachmentSource,
+        renderMermaid: renderMermaid,
+        renderMath: renderExportMath,
+      );
+      final ExportedDocument document;
+      if (action == DocumentExportAction.bundle) {
+        final bundle = await MarkdownBundleService(
+          source: attachmentSource is AppleAttachmentSource
+              ? const AppleAttachmentSource(forBundle: true)
+              : attachmentSource,
+        ).build(snapshot, isCurrent: isCurrent);
+        document = ExportedDocument.binary(bundle.bytes, bundle.notices);
+        if (!isCurrent() || !context.mounted) return;
+        if (bundle.notices.isNotEmpty) {
+          final proceed = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Some resources were not included'),
+              scrollable: true,
+              content: Text(
+                '${bundle.notices.take(12).join('\n')}\n\n'
+                'The complete list is in manifest.json inside the ZIP. '
+                'References to missing resources remain unchanged.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Export available resources'),
+                ),
+              ],
+            ),
+          );
+          if (proceed != true || !isCurrent()) return;
+        }
+      } else {
+        document = action == DocumentExportAction.markdown
+            ? service.buildMarkdown(snapshot, isCurrent: isCurrent)
+            : await service.build(
+                snapshot,
+                isCurrent: isCurrent,
+                forPdf: action == DocumentExportAction.pdf,
+              );
+      }
       if (!isCurrent()) return;
       // All values below are immutable. Native code never reads the source.
       _cancelNative = () {

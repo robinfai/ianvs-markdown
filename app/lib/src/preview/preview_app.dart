@@ -8,11 +8,13 @@ import 'package:ianvs_mermaid/ianvs_mermaid.dart';
 import 'package:path/path.dart' as p;
 
 import '../widgets/document_diagram.dart';
+import '../controllers/document_find_controller.dart';
 import '../widgets/document_sync_indicator.dart';
 import '../widgets/document_attachment_scope.dart';
 import '../services/attachment_repository.dart';
 import '../services/apple_workspace_service.dart';
 import 'preview_controller.dart';
+import 'preview_reading_positions.dart';
 import 'preview_library.dart';
 import 'preview_platform.dart';
 import 'preview_draft_store.dart';
@@ -25,12 +27,14 @@ class LinefoldPreviewApp extends StatefulWidget {
     this.controller,
     this.platform,
     this.draftStore,
+    this.readingPositions,
     this.attachmentSource = const AppleAttachmentSource(),
   });
 
   final PreviewController? controller;
   final PreviewPlatform? platform;
   final PreviewDraftStore? draftStore;
+  final PreviewReadingPositions? readingPositions;
   final AttachmentSource attachmentSource;
 
   @override
@@ -50,13 +54,87 @@ class _LinefoldPreviewAppState extends State<LinefoldPreviewApp>
     library: _controller.library,
     store: widget.draftStore ?? ReliablePreviewDraftStore(),
   );
+  late final _positions = widget.readingPositions ?? PreviewReadingPositions();
   late final _platform = widget.platform ?? PreviewPlatform();
   late final _renderer = NativeMermanRenderer();
   final _navigator = GlobalKey<NavigatorState>();
   StreamSubscription<void>? _cloudChanges;
   bool _prompting = false;
   String? _fragment;
+  (String, int, String)? _fragmentTarget;
   int _fragmentRequest = 0;
+  final _documentReturns =
+      <
+        ({
+          String root,
+          int generation,
+          String origin,
+          String target,
+          int arrivalRequest,
+          IanvsMarkdownViewportAnchor? anchor,
+        })
+      >[];
+
+  final _readingSessions = <(String?, int?, String?), _PreviewReadingSession>{};
+
+  _PreviewReadingSession _activeReadingSession() {
+    final key = (
+      _controller.activeRoot,
+      _controller.activeWorkspaceGeneration,
+      _controller.activePath,
+    );
+    final session =
+        _readingSessions.remove(key) ??
+        _PreviewReadingSession(_controller.contents!);
+    _readingSessions[key] = session;
+    var units = _readingSessions.values.fold(
+      0,
+      (sum, value) => sum + value.controller.text.length,
+    );
+    // Keep the active reader even when a single document exceeds the cache
+    // budget. Dispose evicted controllers after their widgets unmount.
+    while (_readingSessions.length > 1 &&
+        (_readingSessions.length > 24 ||
+            units > 8 * 1024 * 1024 ||
+            _readingSessions.keys.first.$2 != key.$2)) {
+      final removed = _readingSessions.remove(_readingSessions.keys.first)!;
+      units -= removed.controller.text.length;
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => removed.controller.dispose(),
+      );
+    }
+    return session;
+  }
+
+  int get _returnIndex => _documentReturns.lastIndexWhere(
+    (entry) =>
+        entry.root == _controller.activeRoot &&
+        entry.generation == _controller.library.workspaceGeneration &&
+        entry.target == _controller.activePath,
+  );
+
+  Future<void> _returnToDocument() async {
+    if (_controller.busy || _controller.navigating || _editor.editing) return;
+    final index = _returnIndex;
+    if (index < 0) return;
+    final entry = _documentReturns[index];
+    _fragment = null;
+    ++_fragmentRequest;
+    // Install the saved origin before mounting its reader. Failed reads retain
+    // the return entry so the user can retry after restoring file access.
+    if (entry.anchor case final anchor?) {
+      _positions.remember(entry.root, entry.origin, anchor);
+    }
+    await _controller.open(entry.origin);
+    if (!mounted ||
+        _controller.activePath != entry.origin ||
+        _controller.activeRoot != entry.root ||
+        _controller.library.workspaceGeneration != entry.generation) {
+      return;
+    }
+    setState(() => _documentReturns.removeAt(index));
+  }
+
   bool get _canStartEditing =>
       _editor.canBegin &&
       !_controller.busy &&
@@ -77,6 +155,8 @@ class _LinefoldPreviewAppState extends State<LinefoldPreviewApp>
 
   Future<void> _initialize() async {
     unawaited(_editor.initialize());
+    await _positions.load();
+    if (!mounted) return;
     await _controller.initialize();
     if (!mounted) return;
     await _platform.start(_controller.receive, _controller.reportError);
@@ -91,6 +171,25 @@ class _LinefoldPreviewAppState extends State<LinefoldPreviewApp>
         state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       unawaited(_editor.flushDraft());
+      unawaited(_positions.flush());
+    }
+  }
+
+  Future<void> _beginReadingEdit() async {
+    final path = _controller.activePath;
+    final root = _controller.activeRoot;
+    if (path == null || !_canStartEditing) return;
+    if (!await _editor.begin(path) ||
+        !mounted ||
+        _editor.path != path ||
+        _editor.root != root) {
+      return;
+    }
+    final anchor = _positions.lookup(root, path, _editor.source.text);
+    if (anchor != null) {
+      _editor.source.selection = TextSelection.collapsed(
+        offset: anchor.sourceOffset,
+      );
     }
   }
 
@@ -309,6 +408,7 @@ class _LinefoldPreviewAppState extends State<LinefoldPreviewApp>
   }
 
   Future<void> _followLocal(IanvsMarkdownLinkTarget link) async {
+    if (_controller.busy || _controller.navigating || _editor.editing) return;
     final root = _controller.activeRoot;
     final origin = _controller.activePath;
     final generation = _controller.library.workspaceGeneration;
@@ -351,9 +451,41 @@ class _LinefoldPreviewAppState extends State<LinefoldPreviewApp>
           origin != _controller.activePath) {
         return;
       }
+      final anchor = _positions.lookup(
+        root,
+        origin,
+        _controller.contents ?? '',
+      );
       _fragment = destination.fragment;
+      _fragmentTarget = (root, generation, path);
       ++_fragmentRequest;
-      if (path != origin) await _controller.open(path);
+      final arrivalRequest = _fragmentRequest;
+      if (path != origin) {
+        await _controller.open(path);
+        if (mounted &&
+            _controller.activePath == path &&
+            _controller.activeRoot == root &&
+            _controller.library.workspaceGeneration == generation) {
+          _documentReturns.removeWhere(
+            (entry) => entry.generation != generation,
+          );
+          _documentReturns.add((
+            root: root,
+            generation: generation,
+            origin: origin,
+            target: path,
+            arrivalRequest: arrivalRequest,
+            anchor: anchor,
+          ));
+          var units = _documentReturns.fold(
+            0,
+            (sum, entry) => sum + (entry.anchor?.source.length ?? 0),
+          );
+          while (_documentReturns.length > 64 || units > 8 * 1024 * 1024) {
+            units -= _documentReturns.removeAt(0).anchor?.source.length ?? 0;
+          }
+        }
+      }
       if (mounted) setState(() {});
     } on FormatException catch (error) {
       _controller.reportError(error.message);
@@ -369,7 +501,16 @@ class _LinefoldPreviewAppState extends State<LinefoldPreviewApp>
     _platform.dispose();
     _cloudChanges?.cancel();
     _renderer.dispose();
+    for (final session in _readingSessions.values) {
+      session.controller.dispose();
+    }
+    _readingSessions.clear();
     _editor.dispose();
+    if (widget.readingPositions == null) {
+      _positions.dispose();
+    } else {
+      unawaited(_positions.flush());
+    }
     if (widget.controller == null) _controller.dispose();
     super.dispose();
   }
@@ -458,9 +599,7 @@ class _LinefoldPreviewAppState extends State<LinefoldPreviewApp>
                       IconButton(
                         tooltip: '编辑源码',
                         icon: const Icon(CupertinoIcons.pencil),
-                        onPressed: _canStartEditing
-                            ? () => _editor.begin(_controller.activePath!)
-                            : null,
+                        onPressed: _canStartEditing ? _beginReadingEdit : null,
                       ),
                     if (_controller.busy && !_controller.selectingWorkspace)
                       IconButton(
@@ -656,6 +795,11 @@ class _LinefoldPreviewAppState extends State<LinefoldPreviewApp>
                               _controller.activeWorkspaceGeneration,
                               _controller.activePath,
                             )),
+                            session: _activeReadingSession(),
+                            returnBoundaryRequest: _returnIndex >= 0
+                                ? _documentReturns[_returnIndex].arrivalRequest
+                                : null,
+                            positions: _positions,
                             contents: _controller.contents!,
                             documentPath: _controller.activePath,
                             root: _controller.activeRoot,
@@ -664,7 +808,21 @@ class _LinefoldPreviewAppState extends State<LinefoldPreviewApp>
                             platform: _platform,
                             onError: _controller.reportError,
                             onLocalLink: _followLocal,
-                            fragment: _fragment,
+                            onReturnDocument:
+                                _returnIndex >= 0 &&
+                                    !_controller.busy &&
+                                    !_controller.navigating
+                                ? _returnToDocument
+                                : null,
+                            fragment:
+                                _fragmentTarget ==
+                                    (
+                                      _controller.activeRoot,
+                                      _controller.activeWorkspaceGeneration,
+                                      _controller.activePath,
+                                    )
+                                ? _fragment
+                                : null,
                             fragmentRequest: _fragmentRequest,
                           ),
                   ),
@@ -889,10 +1047,30 @@ class _PreviewLibraryViewState extends State<_PreviewLibraryView> {
   );
 }
 
+class _PreviewReadingSession {
+  _PreviewReadingSession(String text)
+    : controller = IanvsMarkdownController(
+        text: text,
+        mode: IanvsMarkdownEditorMode.preview,
+      );
+  final IanvsMarkdownController controller;
+  int? lastFragmentRequest;
+  final arrivals = <int, Object?>{};
+  void rememberArrival(int request) {
+    arrivals[request] = controller.navigationHistoryToken;
+    while (arrivals.length > 64) {
+      arrivals.remove(arrivals.keys.first);
+    }
+  }
+}
+
 class _PreviewReader extends StatefulWidget {
   const _PreviewReader({
     super.key,
     required this.contents,
+    required this.session,
+    this.returnBoundaryRequest,
+    required this.positions,
     required this.documentPath,
     required this.root,
     required this.attachmentSource,
@@ -900,11 +1078,15 @@ class _PreviewReader extends StatefulWidget {
     required this.platform,
     required this.onError,
     required this.onLocalLink,
+    this.onReturnDocument,
     this.fragment,
     required this.fragmentRequest,
   });
 
+  final _PreviewReadingSession session;
+  final int? returnBoundaryRequest;
   final String contents;
+  final PreviewReadingPositions positions;
   final String? documentPath;
   final String? root;
   final AttachmentSource attachmentSource;
@@ -912,6 +1094,7 @@ class _PreviewReader extends StatefulWidget {
   final PreviewPlatform platform;
   final ValueChanged<String> onError;
   final Future<void> Function(IanvsMarkdownLinkTarget) onLocalLink;
+  final Future<void> Function()? onReturnDocument;
   final String? fragment;
   final int fragmentRequest;
 
@@ -920,11 +1103,115 @@ class _PreviewReader extends StatefulWidget {
 }
 
 class _PreviewReaderState extends State<_PreviewReader> {
-  final _navigation = ValueNotifier<IanvsMarkdownHeadingNavigation?>(null);
+  IanvsMarkdownController get _reader => widget.session.controller;
+  DocumentFindController? _find;
+  final _queryFocus = FocusNode();
 
-  void _revealRequestedFragment() {
+  void _findChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _openFind() {
+    if (_find != null) {
+      _queryFocus.requestFocus();
+      return;
+    }
+    setState(() {
+      _find = DocumentFindController(
+        document: _reader,
+        readOnly: true,
+        scope: DocumentFindScope.body,
+      )..addListener(_findChanged);
+    });
+    _queryFocus.requestFocus();
+  }
+
+  void _closeFind() {
+    final find = _find;
+    if (find == null || find.isComposing) return;
+    find.removeListener(_findChanged);
+    setState(() => _find = null);
+    _reader.clearSourceNavigation();
+    _queryFocus.unfocus();
+    find.dispose();
+  }
+
+  Widget _buildFindBar(DocumentFindController find) => ConstrainedBox(
+    constraints: BoxConstraints(
+      maxHeight: MediaQuery.sizeOf(context).height * .3,
+    ),
+    child: SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    key: const ValueKey('preview-find-query'),
+                    controller: find.query,
+                    focusNode: _queryFocus,
+                    decoration: const InputDecoration(labelText: '查找正文'),
+                    textInputAction: TextInputAction.search,
+                    onSubmitted: (_) {
+                      if (!find.isComposing) find.next();
+                    },
+                  ),
+                ),
+                IconButton(
+                  key: const ValueKey('preview-find-close'),
+                  tooltip: '关闭查找',
+                  onPressed: find.isComposing ? null : _closeFind,
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 4,
+              children: [
+                Text(
+                  find.isSearching
+                      ? '正在查找…'
+                      : find.bodyUnavailable
+                      ? '正文超出搜索范围'
+                      : find.count == 0
+                      ? '无匹配'
+                      : '${find.currentIndex + 1} / ${find.count}',
+                  key: const ValueKey('preview-find-status'),
+                ),
+                IconButton(
+                  key: const ValueKey('preview-find-previous'),
+                  tooltip: '上一个匹配',
+                  onPressed: find.canNavigate
+                      ? () => find.next(backwards: true)
+                      : null,
+                  icon: const Icon(Icons.keyboard_arrow_up),
+                ),
+                IconButton(
+                  key: const ValueKey('preview-find-next'),
+                  tooltip: '下一个匹配',
+                  onPressed: find.canNavigate ? () => find.next() : null,
+                  icon: const Icon(Icons.keyboard_arrow_down),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  void _revealRequestedFragment({bool arriving = false}) {
+    if (widget.session.lastFragmentRequest == widget.fragmentRequest) return;
+    widget.session.lastFragmentRequest = widget.fragmentRequest;
     final fragment = widget.fragment;
-    if (fragment == null || fragment.isEmpty) return;
+    if (fragment == null || fragment.isEmpty) {
+      if (arriving) widget.session.rememberArrival(widget.fragmentRequest);
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         unawaited(
@@ -934,7 +1221,11 @@ class _PreviewReaderState extends State<_PreviewReader> {
               href: Uri(fragment: fragment).toString(),
               kind: IanvsMarkdownLinkKind.markdown,
             ),
-          ),
+          ).then((_) {
+            if (mounted && arriving) {
+              widget.session.rememberArrival(widget.fragmentRequest);
+            }
+          }),
         );
       }
     });
@@ -943,12 +1234,32 @@ class _PreviewReaderState extends State<_PreviewReader> {
   @override
   void initState() {
     super.initState();
-    _revealRequestedFragment();
+    if (_reader.text != widget.contents) {
+      _reader.text = widget.contents;
+      _reader.clearHistory();
+      _reader.markSaved();
+    }
+    _reader.clearSourceNavigation();
+    final path = widget.documentPath;
+    if (path != null) {
+      final anchor = widget.positions.lookup(
+        widget.root,
+        path,
+        widget.contents,
+      );
+      if (anchor != null) _reader.rememberViewport(anchor);
+    }
+    _revealRequestedFragment(arriving: true);
   }
 
   @override
   void didUpdateWidget(covariant _PreviewReader oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.contents != widget.contents) {
+      _reader.text = widget.contents;
+      _reader.clearHistory();
+      _reader.markSaved();
+    }
     if (oldWidget.fragmentRequest != widget.fragmentRequest) {
       _revealRequestedFragment();
     }
@@ -978,6 +1289,19 @@ class _PreviewReaderState extends State<_PreviewReader> {
       return;
     }
     if (uri.path.isEmpty && uri.fragment.isNotEmpty && !uri.hasScheme) {
+      final footnote = ianvsMarkdownFootnoteSourceRange(
+        widget.contents,
+        fragment,
+      );
+      if (footnote != null) {
+        _reader.rememberNavigationPosition();
+        _reader.revealSourceRange(
+          footnote,
+          targetId: fragment.startsWith('fn-') ? fragment : null,
+        );
+        WidgetsBinding.instance.scheduleFrame();
+        return;
+      }
       final counts = <String, int>{};
       for (final (offset, title) in _headings) {
         final slug = title
@@ -987,7 +1311,7 @@ class _PreviewReaderState extends State<_PreviewReader> {
         final count = counts.update(slug, (n) => n + 1, ifAbsent: () => 0);
         if (fragment == title ||
             fragment.toLowerCase() == (count == 0 ? slug : '$slug-$count')) {
-          _navigation.value = IanvsMarkdownHeadingNavigation(offset);
+          _reader.revealHeading(offset);
           return;
         }
       }
@@ -1025,20 +1349,24 @@ class _PreviewReaderState extends State<_PreviewReader> {
       ),
     );
     if (mounted && offset != null) {
-      _navigation.value = IanvsMarkdownHeadingNavigation(offset);
+      _reader.revealHeading(offset);
     }
   }
 
   @override
   void dispose() {
-    _navigation.dispose();
+    _find?.removeListener(_findChanged);
+    _find?.dispose();
+    _queryFocus.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) => Column(
     children: [
+      if (_find case final find?) _buildFindBar(find),
       Expanded(
+        key: const ValueKey('preview-reading-surface'),
         child: widget.contents.isEmpty
             ? const Center(child: Text('这是一个空文档'))
             : DocumentAttachmentScope(
@@ -1049,13 +1377,29 @@ class _PreviewReaderState extends State<_PreviewReader> {
                   imageBuilder: images.image,
                   wikiEmbedBuilder: images.wiki,
                   data: widget.contents,
+                  readingHighlights: _find == null
+                      ? null
+                      : IanvsMarkdownReadingHighlights(
+                          source: widget.contents,
+                          matches: _find!.bodyMatches,
+                          activeIndex: _find!.currentIndex,
+                        ),
                   preserveScrollOnUpdate: true,
                   clipboardWriter: (data) => writeIanvsMarkdownRichClipboard(
                     markdown: data.markdown,
                     html: data.html,
                   ),
                   showOutline: false,
-                  headingNavigation: _navigation,
+                  headingNavigation: _reader.headingNavigation,
+                  sourceNavigation: _reader.sourceNavigation,
+                  initialViewportAnchor: _reader.viewportAnchor.value,
+                  onViewportChanged: (anchor) {
+                    _reader.rememberViewport(anchor);
+                    final path = widget.documentPath;
+                    if (path != null) {
+                      widget.positions.remember(widget.root, path, anchor);
+                    }
+                  },
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
                   contentMaxWidth: 720,
                   onTapLinkTarget: (target) => unawaited(_openLink(target)),
@@ -1066,23 +1410,53 @@ class _PreviewReaderState extends State<_PreviewReader> {
                 ),
               ),
       ),
-      const Divider(height: 1),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-        child: Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 12,
-          children: [
-            const Text('阅读预览', style: TextStyle(fontSize: 13)),
-            TextButton.icon(
-              onPressed: _showOutline,
-              icon: const Icon(CupertinoIcons.list_bullet, size: 20),
-              label: const Text('目录'),
-            ),
-          ],
+      if (_find == null) ...[
+        const Divider(height: 1),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+          child: Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            children: [
+              TextButton.icon(
+                key: const ValueKey('preview-find-button'),
+                onPressed: _openFind,
+                icon: const Icon(CupertinoIcons.search, size: 20),
+                label: const Text('查找'),
+              ),
+              ValueListenableBuilder<bool>(
+                valueListenable: _reader.canNavigateBack,
+                builder: (context, canGoBack, _) => TextButton.icon(
+                  key: const ValueKey('preview-navigation-back-button'),
+                  onPressed: canGoBack || widget.onReturnDocument != null
+                      ? () {
+                          if (widget.onReturnDocument != null &&
+                              (!canGoBack ||
+                                  identical(
+                                    widget.session.arrivals[widget
+                                        .returnBoundaryRequest],
+                                    _reader.navigationHistoryToken,
+                                  ))) {
+                            unawaited(widget.onReturnDocument!());
+                          } else {
+                            _reader.navigateBack();
+                          }
+                        }
+                      : null,
+                  icon: const Icon(CupertinoIcons.arrow_left, size: 20),
+                  label: const Text('返回'),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: _showOutline,
+                icon: const Icon(CupertinoIcons.list_bullet, size: 20),
+                label: const Text('目录'),
+              ),
+            ],
+          ),
         ),
-      ),
+      ],
     ],
   );
 }

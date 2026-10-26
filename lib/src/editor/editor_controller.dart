@@ -1,3 +1,4 @@
+import '../task_syntax.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -159,6 +160,20 @@ class IanvsMarkdownController extends TextEditingController {
   final ValueNotifier<bool> _dirty = ValueNotifier<bool>(false);
   final ValueNotifier<IanvsMarkdownHeadingNavigation?> _headingNavigation =
       ValueNotifier<IanvsMarkdownHeadingNavigation?>(null);
+  final ValueNotifier<IanvsMarkdownSourceNavigation?> _sourceNavigation =
+      ValueNotifier<IanvsMarkdownSourceNavigation?>(null);
+  final ValueNotifier<IanvsMarkdownViewportAnchor?> _viewportAnchor =
+      ValueNotifier<IanvsMarkdownViewportAnchor?>(null);
+  final _navigationBack =
+      <
+        ({
+          IanvsMarkdownViewportAnchor anchor,
+          TextSelection selection,
+          Object token,
+        })
+      >[];
+  final ValueNotifier<bool> _canNavigateBack = ValueNotifier(false);
+
   final List<TextEditingValue> _history = <TextEditingValue>[];
 
   late TextEditingValue _lastObservedValue;
@@ -199,8 +214,110 @@ class IanvsMarkdownController extends TextEditingController {
   ValueListenable<IanvsMarkdownHeadingNavigation?> get headingNavigation =>
       _headingNavigation;
 
+  ValueListenable<IanvsMarkdownSourceNavigation?> get sourceNavigation =>
+      _sourceNavigation;
+
+  ValueListenable<IanvsMarkdownViewportAnchor?> get viewportAnchor =>
+      _viewportAnchor;
+
+  /// Whether this document has a recorded jump origin. Independent of undo.
+  ValueListenable<bool> get canNavigateBack => _canNavigateBack;
+
+  /// Opaque identity of the current local return point, stable across rebasing.
+  /// Hosts can use it to order document-local and cross-document navigation.
+  Object? get navigationHistoryToken =>
+      _navigationBack.isEmpty ? null : _navigationBack.last.token;
+
+  /// Records an explicit jump origin, not ordinary scrolling or search.
+  /// Retains at most 64 positions, rebased to the current source after edits.
+  void rememberNavigationPosition() {
+    if (_disposed) return;
+    final anchor =
+        _viewportAnchor.value ??
+        IanvsMarkdownViewportAnchor(
+          source: text,
+          sourceOffset: selection.isValid ? selection.extentOffset : 0,
+          viewportOffset: 0,
+        );
+    if (_navigationBack.isNotEmpty && _navigationBack.last.anchor == anchor) {
+      return;
+    }
+    _navigationBack.add((
+      anchor: anchor,
+      selection: selection,
+      token: Object(),
+    ));
+    if (_navigationBack.length > 64) _navigationBack.removeAt(0);
+    _canNavigateBack.value = true;
+  }
+
+  /// Returns to the last explicit jump origin without modifying source/undo.
+  /// Composition must finish before restoring the saved editing selection.
+  bool navigateBack() {
+    if (_disposed ||
+        _navigationBack.isEmpty ||
+        (value.composing.isValid && !value.composing.isCollapsed)) {
+      return false;
+    }
+    final entry = _navigationBack.removeLast();
+    _canNavigateBack.value = _navigationBack.isNotEmpty;
+    _headingNavigation.value = null;
+    if (entry.selection.isValid) selection = entry.selection;
+    rememberViewport(entry.anchor);
+    restoreViewport();
+    return true;
+  }
+
+  /// Records viewport state without notifying text/selection listeners.
+  void rememberViewport(IanvsMarkdownViewportAnchor anchor) {
+    if (!_disposed && anchor.isValid && anchor.source == text) {
+      _viewportAnchor.value = anchor;
+    }
+  }
+
+  void restoreViewport() {
+    final anchor = _viewportAnchor.value;
+    if (anchor == null || _disposed) return;
+    revealSourceRange(
+      TextRange.collapsed(anchor.sourceOffset),
+      source: anchor.source,
+      viewportOffset: anchor.viewportOffset,
+    );
+  }
+
+  /// Requests positioning without changing selection, composing, or history.
+  /// Returns false for invalid/stale requests. Repeated calls navigate again.
+  bool revealSourceRange(
+    TextRange range, {
+    String? source,
+    double? viewportOffset,
+    String? targetId,
+  }) {
+    if (_disposed ||
+        (source != null && source != text) ||
+        !range.isValid ||
+        !range.isNormalized ||
+        range.end > text.length ||
+        (viewportOffset != null && !viewportOffset.isFinite)) {
+      return false;
+    }
+    _sourceNavigation.value = IanvsMarkdownSourceNavigation(
+      source: text,
+      range: range,
+      viewportOffset: viewportOffset,
+      targetId: targetId,
+    );
+    return true;
+  }
+
+  void clearSourceNavigation() {
+    if (!_disposed) _sourceNavigation.value = null;
+  }
+
   /// Reveals a heading without changing the current editor mode or source.
   void revealHeading(int sourceOffset) {
+    if (_disposed) return;
+    rememberNavigationPosition();
     final offset = sourceOffset.clamp(0, text.length);
     selection = TextSelection.collapsed(offset: offset);
     _headingNavigation.value = IanvsMarkdownHeadingNavigation(offset);
@@ -729,6 +846,28 @@ class IanvsMarkdownController extends TextEditingController {
     final previous = _lastObservedValue;
     _lastObservedValue = current;
     if (current.text != previous.text) {
+      _sourceNavigation.value = null;
+      _viewportAnchor.value = _viewportAnchor.value?.rebase(current.text);
+      for (var i = 0; i < _navigationBack.length; i++) {
+        final entry = _navigationBack[i];
+        int rebaseOffset(int offset) => IanvsMarkdownViewportAnchor(
+          source: entry.anchor.source,
+          sourceOffset: offset,
+          viewportOffset: 0,
+        ).rebase(current.text).sourceOffset;
+        _navigationBack[i] = (
+          token: entry.token,
+          anchor: entry.anchor.rebase(current.text),
+          selection: entry.selection.isValid
+              ? TextSelection(
+                  baseOffset: rebaseOffset(entry.selection.baseOffset),
+                  extentOffset: rebaseOffset(entry.selection.extentOffset),
+                  affinity: entry.selection.affinity,
+                  isDirectional: entry.selection.isDirectional,
+                )
+              : entry.selection,
+        );
+      }
       _refreshParseState(current.text);
     }
     _setDirty(current.text != _savedText);
@@ -850,6 +989,10 @@ class IanvsMarkdownController extends TextEditingController {
     _historyState.dispose();
     _dirty.dispose();
     _headingNavigation.dispose();
+    _sourceNavigation.dispose();
+    _viewportAnchor.dispose();
+    _canNavigateBack.dispose();
+    _navigationBack.clear();
     super.dispose();
   }
 }
@@ -2501,6 +2644,84 @@ List<TextRange> ianvsMarkdownInlineLinkSources(
     inlineLinkSources: matches,
   );
   return List<TextRange>.unmodifiable(matches);
+}
+
+/// Internal geometry projection for body-search decoration on source editors.
+/// Uses the same delimiter recognition as Live rendering, with no caret reveal.
+List<TextRange> markdownInlineVisibleSourceRanges(
+  String source, {
+  Set<String>? linkReferenceLabels,
+}) {
+  final span = buildMarkdownSourceTextSpan(
+    TextEditingValue(text: source),
+    style: null,
+    syntaxTheme: const IanvsMarkdownSyntaxTheme(
+      heading: TextStyle(),
+      marker: TextStyle(color: Colors.transparent),
+      link: TextStyle(),
+      code: TextStyle(),
+      comment: TextStyle(color: Colors.transparent),
+    ),
+    withComposing: false,
+    hideInactiveInlineMarkers: true,
+    hideInactiveEscapeMarkers: true,
+    linkReferenceLabels: linkReferenceLabels,
+  );
+  final ranges = <TextRange>[];
+  var offset = 0;
+  void walk(InlineSpan span, TextStyle inherited) {
+    if (span is! TextSpan) return;
+    final style = inherited.merge(span.style);
+    final text = span.text ?? '';
+    if (text.isNotEmpty && style.color != Colors.transparent) {
+      ranges.add(TextRange(start: offset, end: offset + text.length));
+    }
+    offset += text.length;
+    for (final child in span.children ?? const <InlineSpan>[]) {
+      walk(child, style);
+    }
+  }
+
+  walk(span, const TextStyle());
+  final tasks = projectObsidianTaskMarkers(source).tasks;
+  final codeRanges = ianvsMarkdownBlockCodeRanges(source);
+  final excluded = [
+    // The opening fence's line break is structural. Matching this isolated
+    // newline against a code flow would consume its terminal newline before
+    // the actual code text is visited.
+    if (codeRanges.isNotEmpty)
+      for (final block in parseMarkdownBlocks(source))
+        if (block.type == IanvsMarkdownBlockType.fencedCode)
+          if (RegExp(r'\r\n|\n|\r').firstMatch(block.source)
+              case final newline?)
+            TextRange(start: block.start, end: block.start + newline.end),
+    for (final task in tasks)
+      TextRange(start: task.offset - 1, end: task.offset + 2),
+    for (final quote in RegExp(
+      r'^(?: {0,3}>[ \t]?)+',
+      multiLine: true,
+    ).allMatches(source))
+      if (!_overlapsAnyRange(quote.start, quote.end, codeRanges))
+        TextRange(start: quote.start, end: quote.end),
+  ]..sort((a, b) => a.start.compareTo(b.start));
+  final visible = <TextRange>[];
+  for (final range in ranges) {
+    var start = range.start;
+    for (final marker in excluded) {
+      if (marker.end <= start || marker.start >= range.end) continue;
+      if (marker.start > start) {
+        visible.add(TextRange(start: start, end: marker.start));
+      }
+      start = marker.end.clamp(start, range.end);
+      while (start < range.end &&
+          (source.codeUnitAt(start) == 0x20 ||
+              source.codeUnitAt(start) == 0x09)) {
+        start++;
+      }
+    }
+    if (start < range.end) visible.add(TextRange(start: start, end: range.end));
+  }
+  return visible;
 }
 
 const _inlineRangeProbeTheme = IanvsMarkdownSyntaxTheme(

@@ -23,12 +23,14 @@ TextEditingValue? _tablePlainPasteValue(
 class _TablePasteAction extends ContextAction<PasteTextIntent> {
   _TablePasteAction({
     required this.controller,
+    required this.focusNode,
     required this.commitHistoryGroup,
     required this.isCurrent,
     required this.onChanged,
   });
 
   final TextEditingController controller;
+  final FocusNode focusNode;
   final VoidCallback commitHistoryGroup;
   final bool Function() isCurrent;
   final ValueChanged<TextEditingValue> onChanged;
@@ -40,27 +42,50 @@ class _TablePasteAction extends ContextAction<PasteTextIntent> {
     if (!selection.isValid) {
       return defaultAction?.invoke(intent);
     }
-    unawaited(_pasteSelectedText());
+    unawaited(_pasteSelectedText(plain: intent is MarkdownPlainPasteIntent));
     return null;
   }
 
-  Future<void> _pasteSelectedText() async {
-    final data = await readPlainTextClipboardSafely();
-    if (!isCurrent()) return;
-    final pastedText = data?.text;
-    if (pastedText == null) return;
-    final replacement =
-        smartUrlPasteValue(
-          controller.value,
-          pastedText,
-          escapeTablePipes: true,
-        ) ??
-        _tablePlainPasteValue(controller.value, pastedText);
-    if (replacement == null) return;
-    commitHistoryGroup();
-    controller.value = replacement;
-    onChanged(replacement);
-    commitHistoryGroup();
+  Future<void> _pasteSelectedText({required bool plain}) async {
+    final before = controller.value;
+    if (!isCurrent() ||
+        !focusNode.hasFocus ||
+        (before.composing.isValid && !before.composing.isCollapsed)) {
+      return;
+    }
+    var stale = false;
+    void invalidate() => stale = true;
+    controller.addListener(invalidate);
+    focusNode.addListener(invalidate);
+    try {
+      final data = await readPlainTextClipboardSafely();
+      await WidgetsBinding.instance.endOfFrame;
+      if (stale ||
+          !isCurrent() ||
+          !focusNode.hasFocus ||
+          controller.value != before) {
+        return;
+      }
+      final pastedText = data?.text;
+      if (pastedText == null) return;
+      final replacement =
+          (plain
+              ? null
+              : smartUrlPasteValue(
+                  before,
+                  pastedText,
+                  escapeTablePipes: true,
+                )) ??
+          _tablePlainPasteValue(before, pastedText);
+      if (replacement == null) return;
+      commitHistoryGroup();
+      controller.value = replacement;
+      onChanged(replacement);
+      commitHistoryGroup();
+    } finally {
+      controller.removeListener(invalidate);
+      focusNode.removeListener(invalidate);
+    }
   }
 }
 
@@ -893,23 +918,28 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                                     _handleCellKey(cell, event),
                                 child: Actions(
                                   actions: <Type, Action<Intent>>{
-                                    PasteTextIntent: _TablePasteAction(
-                                      controller: controller,
-                                      commitHistoryGroup:
-                                          widget.onCommitHistoryGroup,
-                                      isCurrent: () =>
-                                          mounted &&
-                                          identical(
-                                            _controllers[cell.key],
-                                            controller,
-                                          ),
-                                      onChanged: (value) =>
-                                          _handleFormattedCellAction(
-                                            cell.key,
-                                            controller,
-                                            value,
-                                          ),
-                                    ),
+                                    for (final type in [
+                                      PasteTextIntent,
+                                      MarkdownPlainPasteIntent,
+                                    ])
+                                      type: _TablePasteAction(
+                                        controller: controller,
+                                        focusNode: focusNode,
+                                        commitHistoryGroup:
+                                            widget.onCommitHistoryGroup,
+                                        isCurrent: () =>
+                                            mounted &&
+                                            identical(
+                                              _controllers[cell.key],
+                                              controller,
+                                            ),
+                                        onChanged: (value) =>
+                                            _handleFormattedCellAction(
+                                              cell.key,
+                                              controller,
+                                              value,
+                                            ),
+                                      ),
                                     DeleteToNextWordBoundaryIntent:
                                         _TableWordDeletionAction(
                                           controller: controller,

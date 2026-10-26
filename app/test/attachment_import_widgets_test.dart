@@ -58,6 +58,7 @@ void main() {
           dark: false,
           onToggleTheme: () {},
           enableFileDrop: false,
+          readClipboardText: () async => null,
           attachmentSource: source,
           attachmentImportPlatform: native,
         ),

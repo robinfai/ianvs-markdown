@@ -1,5 +1,5 @@
 name: ianvs_markdown_clipboard
-description: Optional native Markdown and HTML clipboard writer for Flutter hosts.
+description: Optional native Markdown and HTML clipboard reader and writer for Flutter hosts.
 publish_to: none
 version: 0.1.0
 

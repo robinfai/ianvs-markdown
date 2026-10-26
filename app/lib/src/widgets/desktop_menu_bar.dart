@@ -24,6 +24,7 @@ class DesktopMenuBar extends StatelessWidget {
     this.onImportImage,
     this.onExportHtml,
     this.onExportMarkdown,
+    this.onExportBundle,
     this.onExportPdf,
     this.onFind,
     this.onFindNext,
@@ -43,6 +44,7 @@ class DesktopMenuBar extends StatelessWidget {
   final VoidCallback? onImportImage;
   final VoidCallback? onExportHtml;
   final VoidCallback? onExportMarkdown;
+  final VoidCallback? onExportBundle;
   final VoidCallback? onExportPdf;
   final VoidCallback? onFind;
   final VoidCallback? onFindNext;
@@ -161,6 +163,10 @@ class DesktopMenuBar extends StatelessWidget {
                   label: 'Export Markdown Copy…',
                   onSelected: onExportMarkdown,
                 ),
+                PlatformMenuItem(
+                  label: 'Export Markdown + Attachments…',
+                  onSelected: onExportBundle,
+                ),
                 PlatformMenuItem(label: 'Export PDF…', onSelected: onExportPdf),
               ],
             ),
@@ -215,6 +221,13 @@ class DesktopMenuBar extends StatelessWidget {
               ),
             ),
             PlatformMenuItem(
+              label: 'Paste as Plain Text',
+              onSelected: () => _edit(
+                IanvsMarkdownCommand.pastePlainText,
+                const PasteTextIntent(SelectionChangedCause.keyboard),
+              ),
+            ),
+            PlatformMenuItem(
               label: 'Select All',
               onSelected: () => _edit(
                 IanvsMarkdownCommand.selectAll,
@@ -257,6 +270,14 @@ class DesktopMenuBar extends StatelessWidget {
           label: 'View',
           menus: [
             PlatformMenuItem(
+              label: 'Back to Previous Position',
+              shortcut: const SingleActivator(
+                LogicalKeyboardKey.bracketLeft,
+                meta: true,
+              ),
+              onSelected: () => navigateBack(workspace),
+            ),
+            PlatformMenuItem(
               label: workspace.sidebarVisible ? 'Hide Sidebar' : 'Show Sidebar',
               shortcut: const SingleActivator(
                 LogicalKeyboardKey.keyS,
@@ -287,6 +308,36 @@ class DesktopMenuBar extends StatelessWidget {
                   label: 'Read',
                   onSelected: () =>
                       setEditorMode(workspace, IanvsMarkdownEditorMode.preview),
+                ),
+              ],
+            ),
+            PlatformMenuItemGroup(
+              members: [
+                PlatformMenuItem(
+                  label: 'Larger Reading Text',
+                  shortcut: const SingleActivator(
+                    LogicalKeyboardKey.equal,
+                    meta: true,
+                  ),
+                  onSelected: () =>
+                      changeReadingTextSize(workspace, delta: 0.5),
+                ),
+                PlatformMenuItem(
+                  label: 'Smaller Reading Text',
+                  shortcut: const SingleActivator(
+                    LogicalKeyboardKey.minus,
+                    meta: true,
+                  ),
+                  onSelected: () =>
+                      changeReadingTextSize(workspace, delta: -0.5),
+                ),
+                PlatformMenuItem(
+                  label: 'Actual Reading Text Size',
+                  shortcut: const SingleActivator(
+                    LogicalKeyboardKey.digit0,
+                    meta: true,
+                  ),
+                  onSelected: () => changeReadingTextSize(workspace),
                 ),
               ],
             ),

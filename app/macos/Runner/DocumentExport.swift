@@ -80,7 +80,7 @@ final class ExportCoordinationDeadline: @unchecked Sendable {
 enum DocumentExportFileWriter {
   static func validate(_ url: URL, format: String, sourcePath: String?, protectedPaths: [String] = []) throws {
     guard url.isFileURL, url.pathExtension.lowercased() == format,
-          ["html", "md", "pdf"].contains(format) else {
+          ["html", "md", "pdf", "zip"].contains(format) else {
       throw DocumentExportError(message: "Use a .\(format) filename. Open source documents cannot be replaced by export.")
     }
     _ = try ExportDestinationVersion.read(url)
@@ -260,7 +260,7 @@ final class DocumentExportPrintLease {
   }
 }
 
-/// One transient, offline rendering job. No scripts, file URL load, browser
+/// One transient, offline rendering job. No document scripts, file URL load, browser
 /// profile, arbitrary URL navigation, or user-document read is permitted.
 @MainActor
 final class OfflineDocumentPrintJob: NSObject, WKNavigationDelegate {
@@ -348,7 +348,7 @@ final class OfflineDocumentPrintJob: NSObject, WKNavigationDelegate {
   }
 
   func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-    guard !didBeginPrint, let window, lifecycle?.isActive == true else { return }
+    guard !didBeginPrint, window != nil, lifecycle?.isActive == true else { return }
     didBeginPrint = true
     lifecycle?.beginPrinting(interactive: pdfDestination == nil)
     guard NSPrintOperation.current == nil else {
@@ -359,6 +359,87 @@ final class OfflineDocumentPrintJob: NSObject, WKNavigationDelegate {
     // Reject a held worker lease BEFORE invoking that stateful factory.
     guard DocumentExportPrintLease.shared.acquire(printLeaseToken) else {
       finish(.failure(DocumentExportError(message: "A previous print operation is still stopping. Retry, or restart the app if it does not stop.")))
+      return
+    }
+    let printableWidth = (595.276 - 2 * 51.024) * 96 / 72
+    let printableHeight = (841.89 - 2 * 51.024) * 96 / 72
+    webView.frame.size = NSSize(width: printableWidth, height: printableHeight)
+    // Page scripts remain disabled. This fixed, application-owned script runs
+    // in an isolated world and only lays out the already-sanitized document.
+    webView.callAsyncJavaScript(Self.paginateTables,
+      arguments: ["pageWidth": printableWidth, "pageHeight": printableHeight],
+      in: nil, in: .defaultClient) { [weak self, weak webView] result in
+        guard let self, let webView, self.lifecycle?.isActive == true else { return }
+        switch result {
+        case .success:
+          self.startPrintOperation(webView)
+        case .failure(let error):
+          self.finish(.failure(DocumentExportError(message: "PDF table layout failed: \(error.localizedDescription)")))
+        }
+      }
+  }
+
+  private static let paginateTables = #"""
+    await document.fonts.ready;
+    await Promise.all(Array.from(document.images, image => image.decode()));
+    const style = document.createElement('style');
+    style.textContent = `html { width: ${pageWidth}px; } body { width:100%; max-width:none; margin:0; padding:1px; }`;
+    document.head.appendChild(style);
+    let extraPageSpace = 0, chunks = 0;
+    for (const table of Array.from(document.querySelectorAll('table'))) {
+      const header = table.tHead;
+      if (!header || !table.tBodies.length) continue;
+      const rows = Array.from(table.tBodies).flatMap(body => Array.from(body.rows));
+      if (!rows.length) continue;
+      if (rows.length > 5000) throw new Error('Table exceeds the 5000-row pagination limit.');
+      const box = table.getBoundingClientRect();
+      if (box.height <= pageHeight - 4) {
+        table.style.breakInside = 'avoid';
+        continue;
+      }
+      const headerHeight = header.getBoundingClientRect().height;
+      const heights = rows.map(row => row.getBoundingClientRect().height);
+      const capacity = pageHeight - headerHeight - 4;
+      if (capacity <= 0 || heights.some(height => height > capacity)) {
+        throw new Error('A table row is taller than a PDF page. Reduce its content before exporting.');
+      }
+      const widths = Array.from(header.rows[0].cells, cell => cell.getBoundingClientRect().width);
+      let available = pageHeight - ((box.top + extraPageSpace) % pageHeight) - headerHeight - 4;
+      let newPage = available < heights[0];
+      if (newPage) available = capacity;
+      let start = 0;
+      while (start < rows.length) {
+        if (++chunks > 256) throw new Error('Table pagination exceeds the 256-page limit.');
+        const part = table.cloneNode(false);
+        part.removeAttribute('id');
+        part.style.width = box.width + 'px';
+        part.style.margin = '0';
+        part.style.breakInside = 'avoid';
+        if (newPage) part.style.breakBefore = 'page';
+        const cols = document.createElement('colgroup');
+        for (const width of widths) {
+          const col = document.createElement('col'); col.style.width = width + 'px'; cols.appendChild(col);
+        }
+        part.appendChild(cols);
+        part.appendChild(header.cloneNode(true));
+        const body = document.createElement('tbody'); part.appendChild(body);
+        let used = 0;
+        while (start < rows.length && used + heights[start] <= available) {
+          used += heights[start]; body.appendChild(rows[start++]);
+        }
+        table.before(part);
+        if (start < rows.length) extraPageSpace += available - used;
+        available = capacity; newPage = true;
+      }
+      table.remove();
+    }
+    return chunks;
+    """#
+
+  private func startPrintOperation(_ webView: WKWebView) {
+    guard let window, lifecycle?.isActive == true else { return }
+    guard NSPrintOperation.current == nil else {
+      finish(.failure(DocumentExportError(message: "Another print operation started during PDF layout.")))
       return
     }
     let info = NSPrintInfo()
@@ -439,6 +520,7 @@ final class OfflineDocumentPrintJob: NSObject, WKNavigationDelegate {
     // Cancellation is a request, not proof that the worker stopped. Its view,
     // operation and lease remain alive until the actual terminal callback.
     guard retainedUntilPrintReturn == nil else { return }
+    DocumentExportPrintLease.shared.release(printLeaseToken)
     webView?.stopLoading()
     webView?.navigationDelegate = nil
     webView = nil
@@ -555,8 +637,8 @@ final class DocumentExportCoordinator {
     }
     self.pickDestination = pickDestination ?? { window, title, format, selected in
       let panel = NSSavePanel()
-      panel.title = format == "md" ? "Export Markdown Copy" : format == "pdf" ? "Export PDF" : "Export HTML"
-      panel.allowedContentTypes = format == "html" ? [.html] : format == "pdf" ? [.pdf] :
+      panel.title = format == "zip" ? "Export Markdown + Attachments" : format == "md" ? "Export Markdown Copy" : format == "pdf" ? "Export PDF" : "Export HTML"
+      panel.allowedContentTypes = format == "zip" ? [.zip] : format == "html" ? [.html] : format == "pdf" ? [.pdf] :
         [UTType(filenameExtension: "md") ?? UTType(importedAs: "net.daringfireball.markdown", conformingTo: .plainText)]
       panel.allowsOtherFileTypes = false
       panel.canCreateDirectories = true
@@ -581,8 +663,11 @@ final class DocumentExportCoordinator {
       completion(.success(cancelled))
       return
     }
-    guard pending == nil, let window, ["html", "markdown", "pdf"].contains(action),
-          let content = arguments["content"] as? String, content.utf8.count <= 32 * 1024 * 1024,
+    let content = arguments["content"] as? String
+    let bytes = action == "bundle" ? arguments["bytes"] as? Data : content.map { Data($0.utf8) }
+    guard pending == nil, let window, ["html", "markdown", "pdf", "bundle"].contains(action),
+          let bytes, bytes.count <= 32 * 1024 * 1024,
+          action != "bundle" || bytes.starts(with: [0x50, 0x4b, 0x03, 0x04]),
           let title = arguments["title"] as? String else {
       completion(.failure(DocumentExportError(message: "Export is unavailable or already in progress.")))
       return
@@ -592,7 +677,7 @@ final class DocumentExportCoordinator {
       completion(value)
     }
     pending = request
-    let format = action == "markdown" ? "md" : action
+    let format = action == "bundle" ? "zip" : action == "markdown" ? "md" : action
     let dismiss = pickDestination(window, title, format) { [weak self, weak request] url in
       guard let self, let request, !request.finished, self.pending === request, request.acceptSelection() else { return }
       guard let url else { request.finish(.success(false)); return }
@@ -611,7 +696,7 @@ final class DocumentExportCoordinator {
           try FileManager.default.createDirectory(at: temporaryDirectory,
             withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
           let temporary = temporaryDirectory.appendingPathComponent("output.pdf")
-          let cancel = self.renderPDF(content, window, temporary, {
+          let cancel = self.renderPDF(content!, window, temporary, {
             // This closure is owned by the renderer until its actual terminal
             // callback. A logical cancellation must not remove an active output.
             try? FileManager.default.removeItem(at: temporaryDirectory)
@@ -632,7 +717,7 @@ final class DocumentExportCoordinator {
           // cancellation closure after its result has already been handled.
           if !request.finished && !request.hasHandledRenderResult { request.cancelRendering = cancel }
         } else {
-          self.requestApproval(request, bytes: Data(content.utf8), url: url, format: format,
+          self.requestApproval(request, bytes: bytes, url: url, format: format,
             sourcePath: sourcePath, protectedPaths: protectedPaths, expected: expected)
         }
       } catch { request.finish(.failure(error)) }

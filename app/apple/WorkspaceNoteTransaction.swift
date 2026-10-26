@@ -84,6 +84,7 @@ final class WorkspaceNoteTransaction {
     let owner: UInt32
     let group: UInt32
     let protectionClass: Int32?
+    let provenance: Data?
     let artifactPath: String?
     var stagedIdentity: String?
     var stagedRevision: String?
@@ -197,6 +198,7 @@ final class WorkspaceNoteTransaction {
     let bytes: Data; let revision: String; let identity: String
     let permissions: UInt32; let owner: UInt32; let group: UInt32
     let protectionClass: Int32?
+    let provenance: Data?
   }
 
   /// Call only on CloudWorkspace's serial transaction queue.
@@ -443,7 +445,7 @@ final class WorkspaceNoteTransaction {
   private func matchesMetadata(_ snapshot: Snapshot?, entry: Entry) -> Bool {
     guard let snapshot else { return false }
     return snapshot.permissions == entry.permissions && snapshot.owner == entry.owner && snapshot.group == entry.group &&
-      snapshot.protectionClass == entry.protectionClass
+      snapshot.protectionClass == entry.protectionClass && snapshot.provenance == entry.provenance
   }
 
   private func revokeUnpersisted(_ record: Record) {
@@ -488,7 +490,7 @@ final class WorkspaceNoteTransaction {
         let bytes = entry.writeRevision != nil ? entry.replacement : entry.original
         guard snapshot.revision == expected, snapshot.identity == Self.identity(expected), snapshot.bytes == bytes,
               snapshot.permissions == entry.permissions, snapshot.owner == entry.owner, snapshot.group == entry.group,
-              snapshot.protectionClass == entry.protectionClass else {
+              snapshot.protectionClass == entry.protectionClass && snapshot.provenance == entry.provenance else {
           throw Failure("file_conflict")
         }
         if let path = entry.artifactPath, let revision = entry.displacedRevision ?? entry.stagedRevision {
@@ -507,6 +509,7 @@ final class WorkspaceNoteTransaction {
   }
   /// The initial executor preserves ordinary POSIX access metadata, but does
   /// not silently discard ACLs, xattrs/resource forks, compression or flags.
+  /// The bounded macOS provenance attribute is retained byte-for-byte.
   /// Unknown metadata and inability to inspect it fail closed before staging.
   /// These descriptor APIs are read-only (unlike fcopyfile's destination setup).
   private func protectionClass(_ descriptor: Int32) throws -> Int32? {
@@ -521,6 +524,22 @@ final class WorkspaceNoteTransaction {
 
   private func preserveMetadata(_ descriptor: Int32, entry: Entry, privateCopy: Bool = false) throws {
     try requirePlainMetadata(descriptor)
+    let currentProvenance = try readProvenance(descriptor)
+    if currentProvenance != entry.provenance {
+      #if os(macOS)
+      guard let original = entry.provenance, !original.isEmpty, original.count <= 4096 else {
+        throw Failure("metadata_preservation_failed")
+      }
+      let status = original.withUnsafeBytes {
+        fsetxattr(descriptor, "com.apple.provenance", $0.baseAddress, $0.count, 0, 0)
+      }
+      guard status == 0, try readProvenance(descriptor) == original else {
+        throw Failure("metadata_preservation_failed")
+      }
+      #else
+      throw Failure("metadata_preservation_failed")
+      #endif
+    }
     // Change access metadata only on the new exclusive artifact or copy.
     guard fchown(descriptor, entry.owner, entry.group) == 0,
           fchmod(descriptor, privateCopy ? mode_t(0o600) : mode_t(entry.permissions)) == 0 else {
@@ -540,9 +559,36 @@ final class WorkspaceNoteTransaction {
           attributes.st_mode & mode_t(S_ISUID | S_ISGID | S_ISVTX) == 0 else {
       throw Failure("unsupported_metadata")
     }
-    let extended = flistxattr(descriptor, nil, 0, 0)
-    guard extended == 0 else { throw Failure("unsupported_metadata") }
+    _ = try readProvenance(descriptor)
     try requireEmptyACL(descriptor)
+  }
+
+  /// Preserve the one OS-generated extended attribute observed on ordinary
+  /// macOS files. Unknown attributes still fail closed. Never remove provenance.
+  private func readProvenance(_ descriptor: Int32) throws -> Data? {
+    let count = flistxattr(descriptor, nil, 0, 0)
+    guard count >= 0, count <= 256 else { throw Failure("unsupported_metadata") }
+    if count == 0 { return nil }
+    #if os(macOS)
+    var names = [CChar](repeating: 0, count: count)
+    let actual = names.withUnsafeMutableBufferPointer {
+      flistxattr(descriptor, $0.baseAddress, $0.count, 0)
+    }
+    let expected = Array("com.apple.provenance\0".utf8)
+    guard actual == count, names.map({ UInt8(bitPattern: $0) }) == expected else {
+      throw Failure("unsupported_metadata")
+    }
+    let size = fgetxattr(descriptor, "com.apple.provenance", nil, 0, 0, 0)
+    guard size > 0, size <= 4096 else { throw Failure("unsupported_metadata") }
+    var data = Data(count: size)
+    let read = data.withUnsafeMutableBytes {
+      fgetxattr(descriptor, "com.apple.provenance", $0.baseAddress, $0.count, 0, 0)
+    }
+    guard read == size else { throw Failure("unsupported_metadata") }
+    return data
+    #else
+    throw Failure("unsupported_metadata")
+    #endif
   }
 
   private func requireEmptyACL(_ descriptor: Int32, failureCode: String = "unsupported_metadata") throws {
@@ -570,6 +616,7 @@ final class WorkspaceNoteTransaction {
     defer { close(descriptor) }
     try requirePlainMetadata(descriptor)
     let dataProtection = try protectionClass(descriptor)
+    let sourceProvenance = try readProvenance(descriptor)
     var inspected = stat()
     guard fstat(descriptor, &inspected) == 0,
           WorkspaceFileScope.revision(inspected) == WorkspaceFileScope.revision(attributes) else { throw Failure("file_conflict") }
@@ -579,7 +626,7 @@ final class WorkspaceNoteTransaction {
     }
     return Snapshot(bytes: data.bytes, revision: data.revision, identity: Self.identity(attributes),
                     permissions: UInt32(attributes.st_mode & 0o777), owner: attributes.st_uid, group: attributes.st_gid,
-                    protectionClass: dataProtection)
+                    protectionClass: dataProtection, provenance: sourceProvenance)
   }
   private func destinationAbsent(_ scope: WorkspaceTextScope, path: String) throws {
     let parts = try components(path)
@@ -665,7 +712,7 @@ final class WorkspaceNoteTransaction {
         original: original.data, replacement: replacement.data,
         originalHash: Self.hash(original.data), replacementHash: Self.hash(replacement.data),
         permissions: snapshot.permissions, owner: snapshot.owner, group: snapshot.group,
-        protectionClass: snapshot.protectionClass, artifactPath: original.data == replacement.data ? nil :
+        protectionClass: snapshot.protectionClass, provenance: snapshot.provenance, artifactPath: original.data == replacement.data ? nil :
           (Array(try components(path).dropLast()) + [".linefold-note-move-\(id)-\(entries.count).md"]).joined(separator: "/"),
         actualPath: path, actualRevision: revision))
     }
@@ -863,7 +910,7 @@ final class WorkspaceNoteTransaction {
   private func sameSnapshot(_ a: Snapshot, _ b: Snapshot) -> Bool {
     a.revision == b.revision && a.identity == b.identity && a.bytes == b.bytes &&
       a.permissions == b.permissions && a.owner == b.owner && a.group == b.group &&
-      a.protectionClass == b.protectionClass
+      a.protectionClass == b.protectionClass && a.provenance == b.provenance
   }
 
   /// Called inside coordination. Flush the actual observed objects and all
@@ -940,7 +987,7 @@ final class WorkspaceNoteTransaction {
       let staged = try read(session.scope, path: artifact, artifact: true)
       guard staged.identity == Self.identity(created), staged.bytes == initial.replacement,
             staged.permissions == initial.permissions, staged.owner == initial.owner, staged.group == initial.group,
-            staged.protectionClass == initial.protectionClass else { throw Failure("stage_uncertain") }
+            staged.protectionClass == initial.protectionClass, staged.provenance == initial.provenance else { throw Failure("stage_uncertain") }
       record.entries[index].stagedRevision = staged.revision
       record.entries[index].artifactState = "staged"; record.entries[index].intent = nil
       try point("beforeStageReceipt"); try save(record); try point("afterStageReceipt")
@@ -980,7 +1027,7 @@ final class WorkspaceNoteTransaction {
       let displaced = try read(session.scope, path: artifact, artifact: true)
       guard observed.identity == staged.identity, observed.bytes == entry.replacement,
             observed.permissions == entry.permissions, observed.owner == entry.owner, observed.group == entry.group,
-            observed.protectionClass == entry.protectionClass,
+            observed.protectionClass == entry.protectionClass, observed.provenance == entry.provenance,
             displaced.identity == entry.expectedIdentity, displaced.bytes == entry.original,
             matchesMetadata(displaced, entry: entry) else { throw Failure("swap_uncertain") }
       try syncObserved(session.scope,
@@ -1171,7 +1218,7 @@ final class WorkspaceNoteTransaction {
         if entry.intent == nil, current.identity == Self.identity(expectedRevision),
            current.revision == expectedRevision, current.bytes == expectedBytes,
            current.permissions == entry.permissions, current.owner == entry.owner, current.group == entry.group,
-           current.protectionClass == entry.protectionClass,
+           current.protectionClass == entry.protectionClass, current.provenance == entry.provenance,
            (entry.moveRevision == nil || (try? pathAbsent(scope, path: entry.path)) == true) {
           entry.state = entry.writeRevision != nil || entry.moveRevision != nil ? "applied" : "pending"
         } else { entry.state = entry.intent == nil ? "conflict" : "uncertain" }
@@ -1246,7 +1293,10 @@ final class WorkspaceNoteTransaction {
         } else {
           let observed = try read(scope, path: item.path)
           guard item.state == "applied", observed.identity == item.identity,
-                observed.revision == item.revision, observed.bytes == entry.original else { throw Failure("recovery_uncertain") }
+                observed.revision == item.revision, observed.bytes == entry.original,
+                observed.permissions == 0o600, observed.owner == entry.owner, observed.group == entry.group,
+                observed.protectionClass == entry.protectionClass,
+                observed.provenance == entry.provenance else { throw Failure("recovery_uncertain") }
         }
       } catch { record.recoveries[index].state = "uncertain" }
     }
@@ -1319,7 +1369,7 @@ final class WorkspaceNoteTransaction {
           try verifyParent(scope: scope, path: item.path, parent: parent)
           let observed = try read(scope, path: item.path)
           guard observed.identity == Self.identity(created), observed.bytes == entry.original,
-                observed.permissions == 0o600, observed.protectionClass == entry.protectionClass else { throw Failure("recovery_uncertain") }
+                observed.permissions == 0o600, observed.protectionClass == entry.protectionClass, observed.provenance == entry.provenance else { throw Failure("recovery_uncertain") }
           record.recoveries[recoveryIndex].revision = observed.revision
           record.recoveries[recoveryIndex].state = "applied"
           try point("beforeRecoveryReceipt"); try save(record); try point("afterRecoveryReceipt")
@@ -1744,6 +1794,9 @@ final class WorkspaceNoteTransaction {
       _ = try components(record.sourcePath); _ = try components(record.destinationPath)
     }
     for entry in record.entries {
+      if let provenance = entry.provenance {
+        guard !provenance.isEmpty, provenance.count <= 4096 else { throw Failure("journal_invalid") }
+      }
       let parts = try components(entry.path); _ = try components(entry.destinationPath)
       if let artifact = entry.artifactPath {
         let artifactParts = try artifactComponents(artifact)
@@ -1967,7 +2020,7 @@ final class WorkspaceNoteTransaction {
         parentIdentity: parent.identity, destinationParentIdentity: parent.identity,
         original: original.data, replacement: replacement.data, originalHash: Self.hash(original.data),
         replacementHash: Self.hash(replacement.data), permissions: snapshot.permissions, owner: snapshot.owner,
-        group: snapshot.group, protectionClass: snapshot.protectionClass, artifactPath: artifact,
+        group: snapshot.group, protectionClass: snapshot.protectionClass, provenance: snapshot.provenance, artifactPath: artifact,
         actualPath: path, actualRevision: revision))
     }
     guard movedNotes.isSubset(of: seen), actualMembers.filter({ $0.kind == "note" }).allSatisfy({ member in
@@ -2391,7 +2444,7 @@ final class WorkspaceNoteTransaction {
       entries.append(Entry(path: path, destinationPath: to, expectedRevision: revision, expectedIdentity: snapshot.identity,
         parentIdentity: parent.identity, destinationParentIdentity: destinationParent.identity,
         original: original.data, replacement: replacement.data, originalHash: Self.hash(original.data), replacementHash: Self.hash(replacement.data),
-        permissions: snapshot.permissions, owner: snapshot.owner, group: snapshot.group, protectionClass: snapshot.protectionClass,
+        permissions: snapshot.permissions, owner: snapshot.owner, group: snapshot.group, protectionClass: snapshot.protectionClass, provenance: snapshot.provenance,
         artifactPath: artifact, actualPath: path, actualRevision: revision))
     }
     // Construct the immutable digest only after the complete shared entry set is known.

@@ -165,6 +165,50 @@ Live 初次挂载的 `autofocus:true` 尊重 Controller 现有源码光标或选
 
 ## Source 范围导航与只读展示（R4-05 P1a）
 
+新增 `controller.revealSourceRange(TextRange, source: snapshot)` 发出独立于
+编辑选区的定位请求，返回是否接受。范围采用 UTF-16，可折叠到文末；无效、反向、
+越界或快照不匹配返回 false，不夹紧。每次调用产生新请求，文本修改会清除请求，
+undo 回到旧文本也不复活；`clearSourceNavigation()` 可主动取消。
+`sourceNavigation` 为只读 listenable，供宿主订阅。
+
+当前 `IanvsMarkdownLiveEditor` 的 Source 表面定位到起始光标，Live 表面定位到
+包含范围起点的块并展开折叠祖先；不改变文本、选区、composing、dirty、历史或焦点。
+纯空白定位到后续块，文末定位到最后一块。异步布局期间再次请求、修改文本、切换
+模式或替换 Controller/ScrollController 会使旧导航失效。Read 表面按解析器实际
+生成的块定位；独立 View 可传入 `sourceNavigation: controller.sourceNavigation`。
+YAML、折叠投影和渲染前的行内语法变换不会将正文位置当作源码字符偏移；定位到
+被折叠的正文时只展开它的祖先。源码中没有独立可见块的内容定位到邻近可见块。
+该接口本身不绘制搜索高亮。View 默认预算降级纯文本通过实际文字几何定位并采集阅读锚点，
+保留原有单一文本选择表面，不修改选区或编辑历史；支持 LF、CRLF、CR 和隐藏 front matter。
+降级显示仍遵守原有前缀预算：请求落在未显示的后缀时仅滚动到已显示内容末端，
+不表示目标已显示，也不绕过预算加载全文。宿主 `fallbackBuilder` 返回自定义组件时，
+默认几何桥接不接管该组件；宿主负责自己的定位和位置保存能力。
+
+`IanvsMarkdownLiveEditor(preserveViewport: true)` 选择性开启正文锚点采集与恢复；
+默认 false，现有宿主滚动策略不变。`controller.viewportAnchor` 是独立 listenable，
+记录原文快照、UTF-16 位置和块/光标相对视口顶部的像素偏移。它不改变选区、dirty
+或历史；宿主可通过 `rememberViewport` 载入已保存的锚点，并通过 `restoreViewport`
+显式请求恢复。`revealSourceRange` 的可选 `viewportOffset` 可指定相同的相对位置。
+文本修改时锚点跟随未变前后缀或唯一匹配的后续片段，歧义或替换内容退回修改起点。
+
+启用后，三模式编辑器在挂载、Controller 替换和模式切换后恢复正文位置。
+用户滚动会取消迟到恢复；离屏保活编辑块不作为可见位置。独立 View 可传入
+`initialViewportAnchor` 和 `onViewportChanged`；同一文档更新可组合
+`preserveScrollOnUpdate: true`。Read 及 Live 已布局的正文块在异步图片尺寸或排版导致
+内容尺寸变化时安排恢复当前段落；用户正在滚动、已有定位或位置采集待处理时不另行恢复。
+Read 预算降级按可见前缀保存位置，Live 超预算的完整源码表面按光标几何保存位置。
+自动测试覆盖图片高度与字号变化、默认降级、重新挂载及用户滚动取消；
+真实平台的长会话、原生 IME 和性能验收仍待完成。
+位置采集每帧至多一次；持久化应由宿主节流，不能在每个滚动回调写入原文件。
+
+显式文档跳转可使用 `rememberNavigationPosition()` 保存返回点，`navigateBack()` 返回
+最近位置；`canNavigateBack` 是独立的只读 listenable。`revealHeading` 自动记录原点，
+LiveEditor 内嵌 Read 的大纲操作也记录；普通滚动、`revealSourceRange` 搜索和恢复不入栈。
+历史只在当前 Controller 生命周期内保留，最多 64 项，相邻相同锚点合并；不写入会话文件。
+返回恢复源码选区和视口，不改原文、dirty 或撤销栈；组合输入期间返回 false 且不消费记录。
+文本变化时返回点和选区端点按锚点重定位规则调整。跨文档跳转、脚注和独立 View 的返回入口
+不由此 Controller 历史自动管理，仍需宿主接入。
+
 `IanvsMarkdownEditor` 新增可选的 `highlightedRange`（默认 null）与 `readOnly`（默认 false）。
 默认编辑行为和 Controller API 不变；查找查询、结果集与替换仍由宿主管理。
 
@@ -419,3 +463,77 @@ final legacy = IanvsMarkdownController(text: initialMarkdown, historyPolicy: nul
 Read 本身不持有可编辑输入连接。使用 mode 快捷键或原生菜单返回 Source / Live 后无需额外点击
 即可继续输入；异步回调检查模式代次、controller 和 FocusNode 身份。两个主应用的输入协议回归
 覆盖组合确认、候选取消、Read 往返和撤销/重做；真实 macOS 候选窗口需另外留证。
+
+### 正文搜索快照（新增可选接口）
+
+`IanvsMarkdownReadingSearch.parse(source)` 创建正文索引，预算拒绝时返回 null；
+`find(query, matchCase: ...)` 返回不可变的 `IanvsMarkdownReadingMatch` 列表。
+`textRange` 属于命中的正文文本流 `text`；`sourceRange` 仅为原文块的导航锚点，
+不能用于替换。使用前需核对索引 `source` 与当前文档一致。
+现有调用无须修改。当前覆盖基本 Markdown、Wiki 标签和显式 callout 文本；
+不包含图片 alt、图表源码、外部嵌入内容或宿主本地化的默认 callout 标题。
+
+`IanvsMarkdownView.readingHighlights` 可选接收 `IanvsMarkdownReadingHighlights`，
+按源码块绘制命中与当前命中；原文快照不匹配时不绘制。高亮不修改文本、选区或焦点，
+布局变化后按实际文字重新计算。此接口不自动发起定位，宿主仍使用 `sourceNavigation`。
+
+`IanvsMarkdownLiveEditor.readingHighlights` 将同一可选快照转交给 Read 模式；
+Live 已支持完整的渲染块及普通段落活动块的粗体、链接、行内代码映射；
+标题、单个列表项、任务标记与嵌套引用的活动块映射已支持；多项列表拆分映射仍待补齐；
+Source 不使用正文高亮。Read 定位命中时优先显示当前高亮文字的矩形，
+无可用文字几何时沿用源码块定位。
+
+正文命中新增可选 `navigationRange`：默认等于 `sourceRange`，列表可细化到单个源码列表项。
+`sourceRange` 仍标识 Read 渲染块，不用于替换；宿主应将 `navigationRange` 用于滚动请求。
+当渲染解析与 Live 分块的列表项数量无法对应时，保留整列表定位，避免猜测重复文本位置。
+
+### 代码块显示换行
+
+`IanvsMarkdownCodeLayout(softWrap: ..., child: ...)` 为子树中的围栏与缩进 Markdown
+代码块提供显示偏好，覆盖 Read 预览与 Live 活动代码块。未提供作用域时默认 `true`，
+保持既有自动换行；`false` 按文字布局宽度展开，并提供横向滚动。
+切换不改源码中的换行、选区、复制载荷或撤销历史，文本组件保持身份。
+它不改变整篇 Source 编辑器、宿主自定义代码 builder、HTML pre 或 Mermaid 图形布局。
+
+### TSV 粘贴
+
+编辑快捷键的文本回退路径将至少两行两列的矩形 TSV 转为 Markdown 表格，首行作为表头；
+支持引号字段、空单元格、字段内换行和 Markdown 转义。单行、不规则、格式错误或超过 1 MiB
+的输入不自动转换。代码、既有表格、属性和其他结构块保留原生粘贴；正文插入补齐块间空行。
+转换提交到完整源码 Controller，前后划分历史组，单步撤销恢复原文和选区。
+宿主 `onPaste` 仍优先处理；返回 false 或未提供时读文本一次，异步等待期间原文、选区、
+焦点、模式或钩子存在性变化均取消旧请求。该转换没有新增公共 API。
+
+`IanvsMarkdownCommand.pastePlainText` 提供显式纯文本入口，跳过宿主钩子及自动转换；
+默认快捷键为 Command/Ctrl+Shift+V。普通正文按独立历史组替换选区并将光标移至插入末尾，
+表格/属性保留局部输入和字段过滤规则；共享异步过期请求与组合输入保护。
+
+### HTML 粘贴准备
+
+`ianvsMarkdownHtmlPasteValue(value, html)` 是无副作用的 HTML→Markdown 插入准备接口。
+成功返回完整新编辑值；不支持的 HTML、预算拒绝或代码/结构块位置返回 null，宿主应使用
+同一剪贴板项的纯文本。函数不读取剪贴板、不操作 Controller，也不校验异步请求是否过期。
+宿主负责在应用前核验原选区与文档，前后提交历史组。当前按完整块插入并补齐块间空行。
+应用以普通粘贴调用原生读取适配器；纯文本命令绕过该读取，图片导入仍在无 HTML 时继续处理。
+
+### 标准脚注 fragment 定位
+
+`ianvsMarkdownFootnoteSourceRange(source, fragment)` 接收已经 URL 解码一次的 `fn-label` /
+`fnref-label[-N]`，返回原文 UTF-16 范围或 null。采用 Obsidian 标准脚注规则：
+排除 front matter、注释和代码；重复定义以最后一个为准；回链按引用次数定位。
+LF、CRLF、CR 均保留源码偏移。完整标签优先于 `-N` 后缀解释，避免误拆数字结尾标签。
+此接口也通过同一内联展开器解析生成的内联脚注 ID，返回原文内联标记范围，
+包含嵌套脚注并遵守保留标签的编号避让。函数本身不触发滚动。
+`IanvsMarkdownSourceNavigation` / `revealSourceRange` 新增可选 `targetId`，
+使用已 URL 解码的渲染目标 ID；Read 优先定位实际脚注 footer，目标未挂载或不存在时
+按原源码范围回退。Live/Source 仍定位源码范围。应用定义跳转传入 ID，回链使用源码范围，
+并记录返回点；帧回调前后的文档快照不一致时忽略迟到请求。
+
+### 文内/跨文档返回顺序
+
+`controller.navigationHistoryToken` 是当前文内返回点的可空、不透明身份标识。
+同一条目随内容重定位时标识不变；新的返回点获得新标识，条目上限淘汰也不会复用。
+宿主可以记录抵达某文档时的标识，区分其后发生的文内跳转与跨文档返回；不要解析或持久化它。
+桌面 Workspace 的跨文档历史仅记录显式 Markdown/Wiki 链接，不记录普通标签选择；
+返回优先处理到达目标之后的文内跳转，再切回已打开的来源会话并恢复选区和锚点。
+关闭会话会移除相关跨文档条目，返回不自动重开文件、不触发磁盘写入。

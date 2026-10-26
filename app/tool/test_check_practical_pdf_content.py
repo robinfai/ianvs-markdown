@@ -53,6 +53,17 @@ def write_pdf(path: Path, text: str, pages: int = 3, *, first_page_only: bool = 
 
 
 class ContentAssertionsTests(unittest.TestCase):
+    def test_chinese_diagnostics_require_original_codepoints(self):
+        original = "中文文档 文档结束 中文内容 中间列 末列 长代码"
+        report = checker.validate_text(complete_text() + original)
+        self.assertTrue(report["exactChinesePhrasesPassed"])
+        corrupted = checker.validate_text(complete_text() + original.replace("文", "⽂"))
+        self.assertFalse(corrupted["exactChinesePhrasesPassed"])
+        self.assertEqual(corrupted["exactChinesePhrases"]["中文文档"], 0)
+        # Preserve the distinction from the pre-existing ASCII content gate.
+        self.assertTrue(corrupted["contentChecksPassed"])
+
+
     def test_all_600_cells_35_runs_and_boundaries_pass(self):
         result = checker.validate_text(complete_text())
         self.assertTrue(result["contentChecksPassed"])

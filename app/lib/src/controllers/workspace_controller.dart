@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
@@ -12,6 +11,7 @@ import '../models/document_sync_status.dart';
 import 'document_sync_controller.dart';
 import 'file_browser_controller.dart';
 import '../models/workspace_layout.dart';
+import '../models/reading_preferences.dart';
 import '../services/markdown_file_service.dart';
 import '../services/workspace_session_store.dart';
 import '../services/workspace_index.dart';
@@ -168,6 +168,16 @@ class WorkspaceController extends ChangeNotifier {
   String? _workspaceAccessToken;
   bool _sidebarVisible = true;
   double _sidebarWidth = WorkspaceLayout.defaultSidebarWidth;
+  ReadingPreferences _readingPreferences = ReadingPreferences.defaults;
+  ReadingPreferences get readingPreferences => _readingPreferences;
+
+  void setReadingPreferences(ReadingPreferences value) {
+    if (value == _readingPreferences) return;
+    _readingPreferences = value;
+    notifyListeners();
+    _schedulePersist();
+  }
+
   bool _outlineVisible = true;
 
   List<DocumentSession> get documents => List.unmodifiable(_documents);
@@ -258,6 +268,7 @@ class WorkspaceController extends ChangeNotifier {
               await fileService.restorePersistentAccess(token) ??
               _workspaceRoot;
         }
+        _readingPreferences = snapshot.readingPreferences;
         _sidebarVisible = snapshot.sidebarVisible;
         _sidebarWidth = WorkspaceLayout.normalizeSidebarWidth(
           snapshot.sidebarWidth,
@@ -589,6 +600,103 @@ class WorkspaceController extends ChangeNotifier {
     _schedulePersist();
   }
 
+  final _documentJumps =
+      <
+        ({
+          DocumentSession origin,
+          DocumentSession target,
+          IanvsMarkdownViewportAnchor? anchor,
+          TextSelection selection,
+          String source,
+          Object? targetToken,
+        })
+      >[];
+
+  bool get canNavigateBack =>
+      activeDocument?.controller.canNavigateBack.value == true ||
+      _documentJumps.any(
+        (entry) =>
+            identical(entry.target, activeDocument) &&
+            _documents.contains(entry.origin),
+      );
+
+  /// Record only an explicit link, after its destination fragment was applied.
+  void rememberDocumentJump(
+    DocumentSession origin,
+    DocumentSession target, {
+    required IanvsMarkdownViewportAnchor? anchor,
+    required TextSelection selection,
+    required String source,
+  }) {
+    if (_disposed ||
+        identical(origin, target) ||
+        !_documents.contains(origin) ||
+        !_documents.contains(target) ||
+        !identical(activeDocument, target)) {
+      return;
+    }
+    _documentJumps.add((
+      origin: origin,
+      target: target,
+      anchor: anchor,
+      selection: selection,
+      source: source,
+      targetToken: target.controller.navigationHistoryToken,
+    ));
+    var units = _documentJumps.fold(
+      0,
+      (sum, entry) => sum + entry.source.length,
+    );
+    while (_documentJumps.length > 64 || units > 8 * 1024 * 1024) {
+      units -= _documentJumps.removeAt(0).source.length;
+    }
+    notifyListeners();
+  }
+
+  bool navigateBack() {
+    final document = activeDocument;
+    if (document == null) return false;
+    final composing = document.controller.value.composing;
+    if (composing.isValid && !composing.isCollapsed) return false;
+    _documentJumps.removeWhere(
+      (entry) =>
+          !_documents.contains(entry.origin) ||
+          !_documents.contains(entry.target),
+    );
+    final index = _documentJumps.lastIndexWhere(
+      (entry) => identical(entry.target, document),
+    );
+    if (index < 0 ||
+        (document.controller.canNavigateBack.value &&
+            !identical(
+              document.controller.navigationHistoryToken,
+              _documentJumps[index].targetToken,
+            ))) {
+      return document.controller.navigateBack();
+    }
+    final entry = _documentJumps.removeAt(index);
+    final target = entry.origin.controller;
+    int rebase(int offset) => IanvsMarkdownViewportAnchor(
+      source: entry.source,
+      sourceOffset: offset,
+      viewportOffset: 0,
+    ).rebase(target.text).sourceOffset;
+    if (entry.selection.isValid) {
+      target.selection = TextSelection(
+        baseOffset: rebase(entry.selection.baseOffset),
+        extentOffset: rebase(entry.selection.extentOffset),
+        affinity: entry.selection.affinity,
+        isDirectional: entry.selection.isDirectional,
+      );
+    }
+    if (entry.anchor case final anchor?) {
+      target.rememberViewport(anchor.rebase(target.text));
+    }
+    selectDocument(_documents.indexOf(entry.origin));
+    target.restoreViewport();
+    return true;
+  }
+
   void selectDocument(int index) {
     if (index < 0 || index >= _documents.length || index == _activeIndex) {
       return;
@@ -706,7 +814,15 @@ class WorkspaceController extends ChangeNotifier {
           notifyListeners();
         }
         final choice =
-            await onConflict?.call(conflict) ?? SaveConflictChoice.cancel;
+            await onConflict?.call(
+              MarkdownSaveConflict(
+                path: conflict.path,
+                expectedContents: conflict.expectedContents,
+                currentContents: conflict.currentContents,
+                localContents: savedText,
+              ),
+            ) ??
+            SaveConflictChoice.cancel;
         if (!_documents.contains(document) ||
             choice == SaveConflictChoice.cancel) {
           return false;
@@ -824,6 +940,11 @@ class WorkspaceController extends ChangeNotifier {
     final index = _documents.indexOf(document);
     if (index < 0) return;
     _documents.removeAt(index);
+    _documentJumps.removeWhere(
+      (entry) =>
+          identical(entry.origin, document) ||
+          identical(entry.target, document),
+    );
     _dirtyStates.remove(document.id);
     _saveFailures.remove(document.id);
     _recoveryCopies.remove(document.id);
@@ -832,6 +953,7 @@ class WorkspaceController extends ChangeNotifier {
     if (listener != null) document.controller.removeListener(listener);
     this.index.removeBuffer(document.id);
     document.controller.modeListenable.removeListener(_schedulePersist);
+    document.controller.viewportAnchor.removeListener(_schedulePersist);
     document.dispose();
     if (_documents.isEmpty) {
       _documents.add(
@@ -1962,6 +2084,7 @@ class WorkspaceController extends ChangeNotifier {
     document.controller.addListener(listener);
     _indexDocument(document);
     document.controller.modeListenable.addListener(_schedulePersist);
+    document.controller.viewportAnchor.addListener(_schedulePersist);
     if (document.path != null) _watch(document);
   }
 
@@ -2113,6 +2236,7 @@ class WorkspaceController extends ChangeNotifier {
       workspaceAccessToken: _workspaceAccessToken,
       sidebarVisible: _sidebarVisible,
       sidebarWidth: _sidebarWidth,
+      readingPreferences: _readingPreferences,
       outlineVisible: _outlineVisible,
       browserState: browser.toJson(),
       operationGrants: Map.of(_operationGrants),
@@ -2168,6 +2292,7 @@ class WorkspaceController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _documentJumps.clear();
     for (final preview in _movePreviewCancellations.toList()) {
       preview.cancel();
     }
@@ -2185,6 +2310,7 @@ class WorkspaceController extends ChangeNotifier {
       if (listener != null) document.controller.removeListener(listener);
       index.removeBuffer(document.id);
       document.controller.modeListenable.removeListener(_schedulePersist);
+      document.controller.viewportAnchor.removeListener(_schedulePersist);
       document.dispose();
     }
     references.dispose();

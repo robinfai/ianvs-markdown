@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linefold/src/services/attachment_resolver.dart';
 import 'package:linefold/src/services/document_export_service.dart';
+import 'package:linefold/src/services/math_export_renderer.dart';
 
 import 'attachment_test_support.dart';
 
@@ -21,6 +22,152 @@ DocumentExportSnapshot snapshot(String source, {String? root = '/vault'}) =>
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'math export embeds inline and display results with source and offline assets',
+    () async {
+      final modes = <bool>[];
+      final png = base64Decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      );
+      final result =
+          await DocumentExportService(
+            renderMath: (source, display) async {
+              modes.add(display);
+              return MathExportImage(png, 20, 12);
+            },
+          ).build(
+            snapshot(
+              r'Inline $x^2$.'
+              '\n\n'
+              r'$$\frac{a}{b}$$',
+            ),
+            isCurrent: () => true,
+          );
+      expect(modes, [false, true]);
+      expect('data:image/png;base64,'.allMatches(result.content).length, 2);
+      expect(result.content, contains('alt="x^2"'));
+      expect(result.content, contains('Formula source'));
+      expect(result.content, isNot(contains('<script')));
+      expect(
+        result.content,
+        isNot(contains('<span class="math-rendered"><details>')),
+      );
+    },
+  );
+
+  test(
+    'math failures and shared resource limits preserve readable source',
+    () async {
+      for (final service in [
+        DocumentExportService(
+          renderMath: (_, _) async => throw StateError('failed'),
+        ),
+        DocumentExportService(
+          maximumImages: 0,
+          renderMath: (_, _) async => throw StateError('must not render'),
+        ),
+        DocumentExportService(
+          maximumImageBytes: 0,
+          renderMath: (_, _) async =>
+              MathExportImage(base64Decode('AAAA'), 20, 12),
+        ),
+      ]) {
+        final result = await service.build(
+          snapshot(r'$x^2$'),
+          isCurrent: () => true,
+        );
+        expect(result.content, contains('<code class="math-source">'));
+        expect(result.content, isNot(contains('data:image/png;base64,')));
+        expect(
+          result.notices.any((notice) => notice.startsWith('Math:')),
+          isTrue,
+        );
+      }
+    },
+  );
+
+  test('math completion cannot publish an obsolete export', () async {
+    var current = true;
+    final service = DocumentExportService(
+      renderMath: (_, _) async {
+        current = false;
+        return MathExportImage(base64Decode('AAAA'), 20, 12);
+      },
+    );
+    await expectLater(
+      service.build(snapshot(r'$x$'), isCurrent: () => current),
+      throwsA(isA<DocumentExportFailure>()),
+    );
+  });
+
+  test('Mermaid export embeds generated SVG and preserves source', () async {
+    const svg =
+        '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50"><text x="0" y="20">Diagram</text></svg>';
+    final output =
+        await DocumentExportService(
+          renderMermaid: (source) async {
+            expect(source, contains('A-->B'));
+            return svg;
+          },
+        ).build(
+          snapshot('```mermaid\nflowchart LR; A-->B\n```'),
+          isCurrent: () => true,
+        );
+    expect(
+      output.content,
+      contains('data:image/svg+xml;base64,${base64Encode(utf8.encode(svg))}'),
+    );
+    expect(output.content, contains('Diagram source'));
+    expect(output.content, contains('A--&gt;B'));
+  });
+  test(
+    'Mermaid render failure and external resources retain readable source',
+    () async {
+      for (final svg in [
+        null,
+        '<svg><image href="https://example.test/image.png"/></svg>',
+        '<svg><use href="x#external"/></svg>',
+      ]) {
+        final output =
+            await DocumentExportService(
+              renderMermaid: (_) async {
+                if (svg == null) throw StateError('render failed');
+                return svg;
+              },
+            ).build(
+              snapshot('```mermaid\nflowchart LR; A-->B\n```'),
+              isCurrent: () => true,
+            );
+        expect(output.content, contains('mermaid-source'));
+        expect(output.content, isNot(contains('data:image/svg+xml')));
+        expect(
+          output.notices.any((notice) => notice.contains('Source retained')),
+          isTrue,
+        );
+      }
+    },
+  );
+  test(
+    'Mermaid budgets prevent embedding and cancelled render never exports',
+    () async {
+      final output = await DocumentExportService(
+        maximumImages: 0,
+        renderMermaid: (_) async => throw StateError('must not render'),
+      ).build(snapshot('```mermaid\na-->b\n```'), isCurrent: () => true);
+      expect(output.notices.any((n) => n.contains('count limit')), isTrue);
+      var current = true;
+      await expectLater(
+        DocumentExportService(
+          renderMermaid: (_) async {
+            current = false;
+            return '<svg/>';
+          },
+        ).build(snapshot('```mermaid\na-->b\n```'), isCurrent: () => current),
+        throwsA(isA<DocumentExportFailure>()),
+      );
+    },
+  );
 
   test(
     'Markdown copy preserves raw Unicode, CRLF, BOM and attachments without I/O',
@@ -488,6 +635,37 @@ void main() {
   );
 
   test(
+    'bundle platform channel carries binary bytes without text encoding',
+    () async {
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      MethodCall? received;
+      messenger.setMockMethodCallHandler(AppleDocumentExportPlatform.channel, (
+        call,
+      ) async {
+        received = call;
+        return false;
+      });
+      addTearDown(
+        () => messenger.setMockMethodCallHandler(
+          AppleDocumentExportPlatform.channel,
+          null,
+        ),
+      );
+      final bytes = Uint8List.fromList([0x50, 0x4b, 3, 4, 0, 255, 128]);
+      await const AppleDocumentExportPlatform().output(
+        action: DocumentExportAction.bundle,
+        document: ExportedDocument.binary(bytes, const []),
+        snapshot: snapshot('source'),
+        isCurrent: () => true,
+      );
+      expect(received!.method, 'bundle');
+      expect((received!.arguments as Map)['bytes'], bytes);
+      expect((received!.arguments as Map).containsKey('content'), isFalse);
+    },
+  );
+
+  test(
     'native command contains immutable source result and cancellation is false',
     () async {
       final messenger =
@@ -520,6 +698,34 @@ void main() {
       expect((received!.arguments as Map).containsKey('source'), isFalse);
     },
   );
+
+  test('emit variable-height and multiple-table production fixture', () async {
+    final source = StringBuffer('# Mixed table pagination\n\n');
+    for (final group in ['A', 'B']) {
+      source.writeln(
+        List.filled(8, 'Paragraph before table $group.').join('\n\n'),
+      );
+      source.writeln(
+        '\n| ${group}_HEAD_ONE | ${group}_HEAD_TWO |\n| --- | --- |',
+      );
+      for (var i = 0; i < 40; i++) {
+        source.writeln(
+          '| ${group}_ROW_${i}_START | ${List.filled(2 + (i % 6) * 8, '变化高度文字').join(' ')} ${group}_ROW_${i}_END |',
+        );
+      }
+      source.writeln('\nAfter table $group.\n');
+      source.writeln(
+        '| Short header | Value |\n| --- | --- |\n| SHORT_${group}_START | SHORT_${group}_END |\n',
+      );
+    }
+    final document = await const DocumentExportService().build(
+      snapshot(source.toString()),
+      isCurrent: () => true,
+      forPdf: true,
+    );
+    final directory = Directory('build/export-qa')..createSync(recursive: true);
+    await File('${directory.path}/tables.html').writeAsString(document.content);
+  });
 
   test(
     'emit complete synthetic HTML and Markdown fixtures from the actual generator',

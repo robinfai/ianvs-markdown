@@ -35,13 +35,70 @@ class LocalPerformanceFiles extends DesktopMarkdownFileService {
       writeMs = watch.elapsedMicroseconds / 1000;
     }
   }
+
+  @override
+  Future<void> writeMarkdownFileGuarded(
+    String path,
+    String contents, {
+    required String? expectedContents,
+  }) async {
+    final watch = Stopwatch()..start();
+    try {
+      await super.writeMarkdownFileGuarded(
+        path,
+        contents,
+        expectedContents: expectedContents,
+      );
+    } finally {
+      writeMs = watch.elapsedMicroseconds / 1000;
+    }
+  }
+}
+
+/// Counts recovery writes started during the measured save callback only.
+/// Durations include IO waits and must not be interpreted as CPU time.
+class LocalPerformanceSessionStore implements WorkspaceSessionStore {
+  LocalPerformanceSessionStore(this.delegate);
+
+  final WorkspaceSessionStore delegate;
+  double saveMs = 0;
+  int saveCount = 0;
+  int? _capture;
+  int _generation = 0;
+
+  void beginSaveCapture() {
+    saveMs = 0;
+    saveCount = 0;
+    _capture = ++_generation;
+  }
+
+  void endSaveCapture() => _capture = null;
+
+  @override
+  Future<WorkspaceSnapshot?> load() => delegate.load();
+
+  @override
+  Future<void> save(WorkspaceSnapshot snapshot) async {
+    final capture = _capture;
+    final watch = Stopwatch()..start();
+    try {
+      await delegate.save(snapshot);
+    } finally {
+      if (capture != null && capture == _capture) {
+        saveMs += watch.elapsedMicroseconds / 1000;
+        saveCount++;
+      }
+    }
+  }
 }
 
 WorkspaceController localPerformanceWorkspace(LocalPerformanceFiles files) =>
     WorkspaceController(
       fileService: files,
-      sessionStore: DesktopWorkspaceSessionStore(
-        directory: Directory.systemTemp.createTempSync('ianvs-r402-session-'),
+      sessionStore: LocalPerformanceSessionStore(
+        DesktopWorkspaceSessionStore(
+          directory: Directory.systemTemp.createTempSync('ianvs-r402-session-'),
+        ),
       ),
     );
 
@@ -76,8 +133,22 @@ LocalPerformanceHost localPerformanceHost(
     }
   },
   save: () async {
-    if (!await workspace.saveActive()) throw StateError('Save cancelled');
+    final store = workspace.sessionStore;
+    if (store is LocalPerformanceSessionStore) store.beginSaveCapture();
+    try {
+      if (!await workspace.saveActive()) throw StateError('Save cancelled');
+    } finally {
+      if (store is LocalPerformanceSessionStore) store.endSaveCapture();
+    }
   },
   flush: workspace.flushSession,
-  ioMetrics: () => {'read': files.readMs, 'write': files.writeMs},
+  ioMetrics: () => {
+    'read': files.readMs,
+    'write': files.writeMs,
+    if (workspace.sessionStore
+        case final LocalPerformanceSessionStore store) ...{
+      'recoverySave': store.saveMs,
+      'recoverySaveCount': store.saveCount.toDouble(),
+    },
+  },
 );

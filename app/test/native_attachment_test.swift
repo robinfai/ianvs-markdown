@@ -155,6 +155,25 @@ struct AttachmentTests {
     let documentRead = try CloudWorkspace.read(document)
     precondition(Data(documentRead.utf8) == Data(source.utf8))
     try verifyWorkspaceText(fixture: fixture)
+    try write("exports/document.pdf", bytes)
+    try write("exports/data.bin", bytes)
+    try write("exports/LICENSE", bytes)
+    try write("exports/.offline.pdf.icloud")
+    let bundleIndex = try CloudWorkspace.listAttachments(root, forBundle: true)
+    let bundlePaths = bundleIndex.compactMap { $0["relativePath"] as? String }
+    for path in ["exports/document.pdf", "exports/data.bin", "exports/LICENSE", "not-an-image.svg"] {
+      precondition(bundlePaths.contains(path))
+      let data = try CloudWorkspace.readAttachmentBytes(root, relativePath: path, maximumBytes: 1024, forBundle: true)
+      precondition(!data.isEmpty)
+    }
+    precondition(!bundlePaths.contains(".obsidian/app.json") && !bundlePaths.contains("linked.png"))
+    rejects(.invalid) { _ = try read("exports/document.pdf") }
+    rejects(.invalid) { _ = try CloudWorkspace.readAttachmentBytes(root, relativePath: ".obsidian/app.json", maximumBytes: 1024, forBundle: true) }
+    rejects(.invalid) { _ = try CloudWorkspace.readAttachmentBytes(root, relativePath: "linked.png", maximumBytes: 1024, forBundle: true) }
+    rejects(.invalid) { _ = try CloudWorkspace.readAttachmentBytes(root, relativePath: "../outside/secret.png", maximumBytes: 1024, forBundle: true) }
+    rejects(.tooLarge) { _ = try CloudWorkspace.readAttachmentBytes(root, relativePath: "exports/document.pdf", maximumBytes: 1, forBundle: true) }
+    rejects(.offline) { _ = try CloudWorkspace.readAttachmentBytes(root, relativePath: "exports/offline.pdf", maximumBytes: 1024, forBundle: true) }
+    print("PASS: bundle-only arbitrary file reads retain preview restrictions, scope, hidden-file, offline and byte limits")
     print("PASS: scoped binary reads, metadata index, Unicode, iCloud stubs, config scope, symlinks, limits, permissions and replacement checks")
   }
 

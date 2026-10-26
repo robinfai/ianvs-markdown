@@ -128,8 +128,7 @@ void main() {
       expect(
         view.menus
             .whereType<PlatformMenuItemGroup>()
-            .single
-            .members
+            .expand((group) => group.members)
             .singleWhere((item) => item.label == 'Source')
             .shortcut,
         isNull,

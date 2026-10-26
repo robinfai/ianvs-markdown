@@ -139,7 +139,7 @@ bool isSafeAttachmentRelativePath(String path, {bool allowHidden = false}) =>
 enum AttachmentLinkKind { markdown, wiki }
 
 class AttachmentReference {
-  AttachmentReference(String source, this.kind) {
+  AttachmentReference(String source, this.kind, {bool allowAnyFile = false}) {
     if (source.length > 4096 ||
         source.contains(RegExp(r'[\\\x00-\x1f]')) ||
         source.startsWith('//')) {
@@ -172,7 +172,8 @@ class AttachmentReference {
     if (path.isEmpty || path.contains(RegExp(r'[\\:\x00-\x1f\x7f]'))) {
       throw const AttachmentFailure(AttachmentFailureKind.invalid);
     }
-    if (!attachmentExtensions.contains(p.posix.extension(path).toLowerCase())) {
+    if (!allowAnyFile &&
+        !attachmentExtensions.contains(p.posix.extension(path).toLowerCase())) {
       throw const AttachmentFailure(AttachmentFailureKind.unsupported);
     }
   }
@@ -184,15 +185,18 @@ class AttachmentReference {
 /// Pure resolver. Normalization is supplied by the platform adapter, not by
 /// filesystem reads, and filenames returned here always come from the index.
 class AttachmentIndex {
-  AttachmentIndex(Iterable<AttachmentMetadata> entries)
-    : entries = List.unmodifiable(entries) {
+  AttachmentIndex(
+    Iterable<AttachmentMetadata> entries, {
+    bool allowAnyFile = false,
+  }) : entries = List.unmodifiable(entries) {
     if (this.entries.length > 10000 ||
         this.entries.any(
           (entry) =>
               !isSafeAttachmentRelativePath(entry.relativePath) ||
-              !attachmentExtensions.contains(
-                p.posix.extension(entry.relativePath).toLowerCase(),
-              ) ||
+              (!allowAnyFile &&
+                  !attachmentExtensions.contains(
+                    p.posix.extension(entry.relativePath).toLowerCase(),
+                  )) ||
               entry.size < 0,
         )) {
       throw const AttachmentFailure(AttachmentFailureKind.invalid);

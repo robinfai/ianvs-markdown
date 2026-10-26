@@ -214,6 +214,7 @@ struct NativeNoteTransactionAcceptance {
     try run("preflight", preflight)
     try run("journalFaultsAndBounds", journalFaultsAndBounds)
     try run("metadataProtection", metadataProtection)
+    try run("provenancePreservation", provenancePreservation)
     try run("successAndRestart", successAndRestart)
     try run("finalDependencyChanges", finalDependencyChanges)
     try run("lostSemanticReceipt", lostSemanticReceipt)
@@ -410,6 +411,61 @@ struct NativeNoteTransactionAcceptance {
       try require(chmod.terminationStatus == 0, "Synthetic ACL must be installed")
       let result = try f.prepare(executor, f.request())
       try require(result["code"] as? String == "unsupported_metadata", "Unsupported ACL must block instead of changing shared access")
+      try f.expectOriginals()
+    }
+  }
+
+  private static func provenancePreservation() throws {
+    func get(_ url: URL) throws -> Data? {
+      let fd = open(url.path, O_RDONLY | O_NOFOLLOW); defer { if fd >= 0 { close(fd) } }
+      try require(fd >= 0, "Provenance target must open")
+      let count = fgetxattr(fd, "com.apple.provenance", nil, 0, 0, 0)
+      if count == -1 && errno == ENOATTR { return nil }
+      try require(count > 0 && count <= 4096, "Provenance must remain bounded")
+      var bytes = Data(count: count)
+      let actual = bytes.withUnsafeMutableBytes { fgetxattr(fd, "com.apple.provenance", $0.baseAddress, $0.count, 0, 0) }
+      try require(actual == count, "Provenance must be read exactly")
+      return bytes
+    }
+    do {
+      let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      // Some macOS versions ignore fsetxattr even when it reports success.
+      // Observe real OS metadata; never invent a marker and assume it was stored.
+      let first = try get(f.url(f.source)); let second = try get(f.url(f.incoming))
+      let request = try f.request(); let prepared = try f.prepare(executor, request)
+      try require(prepared["phase"] as? String == "prepared", "Bounded provenance must be supported")
+      let completed = try f.invoke(executor, "executeWorkspaceNoteMove", f.command(request, token: prepared["token"]))
+      try require(completed["phase"] as? String == "completed", "Provenance transaction must complete: \(completed)")
+      try require(try get(f.url(f.destination)) == first, "Moved replacement must retain exact source provenance")
+      try require(try get(f.url(f.incoming)) == second, "Inbound replacement must retain its own provenance")
+      let restart = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      var recovery = f.command(request); recovery["relativeDirectory"] = "archive"
+      let recovered = try f.invoke(restart, "recoverWorkspaceNoteMove", recovery)
+      let copies = recovered["recoveryPaths"] as? [String] ?? []
+      try require(copies.count == 2, "Restarted recovery must create both originals")
+      for (index, path) in copies.enumerated() {
+        try require(try get(f.url(path)) == (index == 0 ? first : second), "Recovery must restore journaled provenance")
+      }
+    }
+    for count in [1, 4097] {
+      let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let request = try f.request(); let prepared = try f.prepare(executor, request)
+      try require(prepared["phase"] as? String == "prepared", "Initial snapshot must prepare")
+      let journal = f.journal.appendingPathComponent((request["transactionId"] as! String).lowercased() + ".json")
+      var json = try JSONSerialization.jsonObject(with: Data(contentsOf: journal)) as! [String: Any]
+      var entries = json["entries"] as! [[String: Any]]
+      entries[0]["provenance"] = Data(repeating: 0x31, count: count).base64EncodedString()
+      json["entries"] = entries
+      try JSONSerialization.data(withJSONObject: json).write(to: journal)
+      let restart = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let changed = try f.invoke(restart, "reconcileWorkspaceNoteMove", f.command(request))
+      try require(changed["phase"] as? String != "completed", "Mismatched or oversized journal metadata must not verify")
+      if count > 4096 {
+        try require(changed["code"] as? String == "journal_invalid", "Oversized provenance must be rejected at decode")
+      } else {
+        let entries = changed["entries"] as? [[String: Any]] ?? []
+        try require(entries.first?["state"] as? String == "conflict", "Mismatched provenance must be an explicit conflict")
+      }
       try f.expectOriginals()
     }
   }

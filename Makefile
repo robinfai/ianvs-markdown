@@ -133,7 +133,7 @@ check-integrations: check-document-export check-integrations-rest ## Validate th
 check-document-export: deps-integrations test-document-export-fixture test-native-document-export ## Validate HTML/Markdown/PDF export with bounded native destination tests
 
 test-document-export-fixture: ## Validate snapshot/export generation and create the production HTML fixture
-	cd app && $(FLUTTER) test test/document_export_service_test.dart test/document_export_flow_test.dart
+	cd app && $(FLUTTER) test test/document_export_service_test.dart test/document_export_flow_test.dart test/math_export_renderer_test.dart test/markdown_bundle_service_test.dart
 
 # CI invokes export and this remainder separately so a failed native export
 # has a visible stage. check-integrations still includes every original gate.
