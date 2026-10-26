@@ -798,6 +798,25 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
     };
   }
 
+  void _focusCellAtPosition(String key, Offset position) {
+    final root = _cellGeometryKeys[key]?.currentContext?.findRenderObject();
+    RenderEditable? editable;
+    void visit(RenderObject object) {
+      if (editable != null) return;
+      if (object is RenderEditable) {
+        editable = object;
+      } else {
+        object.visitChildren(visit);
+      }
+    }
+
+    if (root != null) visit(root);
+    final offset = editable?.getPositionForPoint(position).offset;
+    if (offset == null) return;
+    _clearTableSelection();
+    _focusCell(key, placement: _TableFocusPlacement.preserve, offset: offset);
+  }
+
   BoxDecoration? _tableCellDecoration(
     _EditableTableCell cell,
     TextDirection direction,
@@ -888,7 +907,8 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
               padding: const EdgeInsets.all(_handleExtent),
               child: Table(
                 key: _tableGeometryKey,
-                defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                defaultVerticalAlignment:
+                    TableCellVerticalAlignment.intrinsicHeight,
                 defaultColumnWidth: const IntrinsicColumnWidth(),
                 columnWidths: _obsidianTableColumnWidths(
                   _model,
@@ -1068,6 +1088,23 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                                   direction,
                                 ),
                                 child: surface,
+                              );
+                              // The editor keeps its natural height, while the
+                              // cell surface also accepts taps in tall-row gaps.
+                              // TextField wins gestures inside its own bounds.
+                              surface = TextFieldTapRegion(
+                                child: MouseRegion(
+                                  cursor: SystemMouseCursors.text,
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    excludeFromSemantics: true,
+                                    onTapUp: (details) => _focusCellAtPosition(
+                                      cell.key,
+                                      details.globalPosition,
+                                    ),
+                                    child: surface,
+                                  ),
+                                ),
                               );
                               surface = KeyedSubtree(
                                 key: _cellGeometryKey(cell.key),

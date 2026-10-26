@@ -1,5 +1,9 @@
 # 从 0.3.1 升级到当前 Unreleased
 
+2026-10-27 增补：Live Preview 新增嵌套列表折叠，折叠仅影响显示，不修改原文。
+`IanvsMarkdownMessage` 在末尾新增 `expandList`、`collapseList`，已有枚举值顺序不变。
+自定义文案 resolver 若使用穷尽 switch，需要处理这两个新值；其余宿主无需调整。
+
 2026-10-25 增补：Controller 新增可选的 `revealSourceRange`、
 `sourceNavigation`、`clearSourceNavigation`，并导出不可变请求类型
 `IanvsMarkdownSourceNavigation`。现有宿主无需迁移；需要无选区副作用定位的宿主

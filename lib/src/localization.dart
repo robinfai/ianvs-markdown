@@ -167,7 +167,9 @@ enum IanvsMarkdownMessage {
   taskSavings('储蓄任务', 'Savings task', legacyEnglish: true),
   taskUp('向上任务', 'Up task', legacyEnglish: true),
   taskDown('向下任务', 'Down task', legacyEnglish: true),
-  taskChecked('已勾选任务 {marker}', 'Checked task {marker}', legacyEnglish: true);
+  taskChecked('已勾选任务 {marker}', 'Checked task {marker}', legacyEnglish: true),
+  expandList('展开子列表', 'Expand nested list'),
+  collapseList('折叠子列表', 'Collapse nested list');
 
   const IanvsMarkdownMessage(
     this._chinese,

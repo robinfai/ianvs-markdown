@@ -402,6 +402,9 @@ final legacy = IanvsMarkdownController(text: initialMarkdown, historyPolicy: nul
 
 ### [lib/src/localization.dart](../lib/src/localization.dart)
 
+- `IanvsMarkdownMessage.expandList` / `collapseList` 为 Live Preview 子列表折叠控件提供可覆盖文案，追加于枚举末尾以保留已有索引。
+- 列表折叠状态属于当前编辑器视图，不写入 Markdown；各层独立保留状态，定位隐藏子项时展开对应祖先。
+
 `IanvsMarkdownLocalization`、`IanvsMarkdownStrings`、`IanvsMarkdownMessage`
 
 ### [lib/src/math.dart](../lib/src/math.dart)

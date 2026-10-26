@@ -1228,7 +1228,7 @@ class _IanvsMarkdownListMarker extends StatelessWidget {
       return IanvsMarkdownUnorderedListMarker(
         key: ValueKey('ianvs-markdown-unordered-marker-$nestLevel'),
         nestLevel: nestLevel,
-        color: theme.textSecondary,
+        color: IanvsMarkdownListMarkerColor.of(context) ?? theme.textSecondary,
       );
     }
     return Text(
@@ -1238,7 +1238,11 @@ class _IanvsMarkdownListMarker extends StatelessWidget {
       maxLines: 1,
       softWrap: false,
       overflow: TextOverflow.visible,
-      style: TextStyle(color: theme.textPrimary, fontSize: 14.5, height: 1.58),
+      style: TextStyle(
+        color: IanvsMarkdownListMarkerColor.of(context) ?? theme.textPrimary,
+        fontSize: 14.5,
+        height: 1.58,
+      ),
     );
   }
 }
