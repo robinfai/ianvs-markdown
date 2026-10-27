@@ -59,6 +59,10 @@ class MainFlutterWindow: NSWindow {
   }
 
 
+  private var windowChannel: FlutterMethodChannel?
+  private var windowMouseDown: NSEvent?
+  private var draggingWindow = false
+
   private var exportChannel: FlutterMethodChannel?
   private lazy var documentExport = DocumentExportCoordinator(window: self, approveCommit: { [weak self] id, approved in
     guard let channel = self?.exportChannel else { approved(false); return }
@@ -112,6 +116,31 @@ class MainFlutterWindow: NSWindow {
     CloudWorkspace.shared.attach(to: flutterViewController.engine.binaryMessenger)
     registerFileAccessChannel(with: flutterViewController)
     registerDesktopIntegration(with: flutterViewController)
+    windowChannel = FlutterMethodChannel(
+      name: "work.ianvs.linefold/window",
+      binaryMessenger: flutterViewController.engine.binaryMessenger)
+    windowChannel?.setMethodCallHandler { [weak self] call, result in
+      guard call.method == "startDrag" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      guard let self, let event = self.windowMouseDown,
+            NSEvent.pressedMouseButtons & 1 != 0,
+            !self.styleMask.contains(.fullScreen), !self.draggingWindow else {
+        result(nil)
+        return
+      }
+      // Flutter explicitly identifies blank header space. Use the original
+      // mouse-down, never a stale currentEvent from the async channel callback.
+      self.windowMouseDown = nil
+      let wasMovable = self.isMovable
+      self.draggingWindow = true
+      self.isMovable = true
+      self.performDrag(with: event)
+      self.isMovable = wasMovable
+      self.draggingWindow = false
+      result(nil)
+    }
     exportChannel = FlutterMethodChannel(name: "work.ianvs.linefold/document_export",
       binaryMessenger: flutterViewController.engine.binaryMessenger)
     exportChannel?.setMethodCallHandler { [weak self] call, result in
@@ -169,13 +198,18 @@ class MainFlutterWindow: NSWindow {
     // AppKit otherwise consumes clicks in Flutter's top row as titlebar drags.
     // Update before mouse-down so WindowServer uses the correct drag region.
     // The first 168 points retain the native buttons and app-name drag area.
+    if event.type == .leftMouseDown {
+      windowMouseDown = event
+    } else if event.type == .leftMouseUp {
+      windowMouseDown = nil
+    }
     let point = event.locationInWindow
     let isHeaderControl = NSRect(
       x: 168, y: frame.height - 44, width: frame.width - 168, height: 44
     ).contains(point)
     switch event.type {
     case .mouseMoved, .mouseEntered, .mouseExited, .leftMouseDown, .rightMouseDown:
-      isMovable = !isHeaderControl
+      if !draggingWindow { isMovable = !isHeaderControl }
     default:
       break
     }

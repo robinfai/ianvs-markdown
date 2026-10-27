@@ -16,6 +16,7 @@ import '../app_icons.dart';
 import 'file_context_menu.dart';
 import 'middle_ellipsis_text.dart';
 import 'window_app_title.dart';
+import 'window_drag_region.dart';
 
 class TitleTabsBar extends StatelessWidget {
   const TitleTabsBar({
@@ -78,6 +79,10 @@ class TitleTabsBar extends StatelessWidget {
                       onSave: onSave,
                       onClose: onClose,
                     ),
+                  ),
+                  const WindowDragRegion(
+                    key: ValueKey('window-drag-handle'),
+                    child: SizedBox(width: 32, height: double.infinity),
                   ),
                   _OpenDocumentsMenu(workspace: workspace),
                   _HeaderIconButton(
@@ -369,6 +374,20 @@ class _DocumentTabsState extends State<_DocumentTabs> {
           scrollDirection: Axis.horizontal,
           buildDefaultDragHandles: false,
           itemCount: widget.workspace.documents.length,
+          footer: WindowDragRegion(
+            key: const ValueKey('window-drag-tab-space'),
+            child: SizedBox(
+              width: math.max(
+                0,
+                constraints.maxWidth -
+                    widget.workspace.documents.fold<double>(
+                      0,
+                      (total, document) => total + _tabWidth(context, document),
+                    ),
+              ),
+              height: constraints.maxHeight,
+            ),
+          ),
           onReorderStart: (_) {
             Tooltip.dismissAllToolTips();
             setState(() => _reordering = true);

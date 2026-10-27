@@ -70,6 +70,65 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets(
+    'blank header regions drag the window without stealing buttons',
+    (tester) async {
+      tester.view.physicalSize = const Size(1200, 780);
+      const channel = MethodChannel('work.ianvs.linefold/window');
+      final calls = <MethodCall>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+        call,
+      ) async {
+        calls.add(call);
+        return null;
+      });
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          channel,
+          null,
+        ),
+      );
+      await pumpShell(tester);
+      Future<void> mouseDown(
+        Finder target, {
+        int buttons = kPrimaryMouseButton,
+      }) async {
+        final mouse = await tester.startGesture(
+          tester.getCenter(target),
+          kind: PointerDeviceKind.mouse,
+          buttons: buttons,
+        );
+        await mouse.up();
+        await tester.pump();
+      }
+
+      await mouseDown(find.byKey(const ValueKey('window-drag-tab-space')));
+      await mouseDown(find.byKey(const ValueKey('window-drag-handle')));
+      await mouseDown(find.byKey(const ValueKey('window-app-title')));
+      expect(calls.map((call) => call.method), [
+        'startDrag',
+        'startDrag',
+        'startDrag',
+      ]);
+      calls.clear();
+      await mouseDown(
+        find.byKey(const ValueKey('window-drag-handle')),
+        buttons: kSecondaryMouseButton,
+      );
+      final count = workspace.documents.length;
+      await tester.tap(find.byKey(const ValueKey('new-document-button')));
+      await tester.pumpAndSettle();
+      expect(workspace.documents, hasLength(count + 1));
+      expect(calls, isEmpty);
+      workspace.toggleSidebar();
+      await tester.pumpAndSettle();
+      await mouseDown(find.byKey(const ValueKey('window-app-title')));
+      expect(calls.map((call) => call.method), ['startDrag']);
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
   testWidgets('window return button follows active document history', (
     tester,
   ) async {
