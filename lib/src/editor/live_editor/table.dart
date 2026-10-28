@@ -1069,9 +1069,13 @@ class _EditableMarkdownTableState extends State<_EditableMarkdownTable> {
                                         placement:
                                             _TableFocusPlacement.selectAll,
                                       ),
-                                child: focusNode.hasFocus
-                                    ? editor
-                                    : ExcludeSemantics(child: editor),
+                                // Keep the editor mounted across focus changes;
+                                // replacing it closes its text input connection
+                                // and can cancel the in-progress mouse gesture.
+                                child: ExcludeSemantics(
+                                  excluding: !focusNode.hasFocus,
+                                  child: editor,
+                                ),
                               );
                               surface = Container(
                                 key: ValueKey(
