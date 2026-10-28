@@ -70,6 +70,20 @@ void main() {
     return editable!;
   }
 
+  void expectOnlyOuterCodeLineMarker() {
+    expect(
+      find.byKey(const ValueKey('ianvs-markdown-active-code-line-rail')),
+      findsOneWidget,
+    );
+    for (final key in [
+      'ianvs-markdown-active-line-rail',
+      'ianvs-markdown-active-indented-code-line-rail',
+      'ianvs-markdown-active-indented-code-line-marker',
+    ]) {
+      expect(find.byKey(ValueKey(key)), findsNothing);
+    }
+  }
+
   Finder selectableTextWithPlainText(String text) => find.byWidgetPredicate(
     (widget) =>
         widget is SelectableText &&
@@ -12729,7 +12743,7 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
       const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
     );
     expect(container.foregroundDecoration, isNotNull);
-    expect(container.padding, const EdgeInsets.symmetric(horizontal: 16));
+    expect(container.padding, EdgeInsets.zero);
     final pattern = tester.widget<CustomPaint>(
       find.byKey(const ValueKey('ianvs-markdown-active-code-pattern')),
     );
@@ -12737,6 +12751,18 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     expect(patternPainter.tileSize, 4);
     expect(patternPainter.dotSize, 1);
     expect(patternPainter.color, Colors.black.withValues(alpha: .12));
+    expect(
+      tester.getRect(
+        find.byKey(const ValueKey('ianvs-markdown-active-code-pattern')),
+      ),
+      container.margin!
+          .resolve(TextDirection.ltr)
+          .deflateRect(tester.getRect(active)),
+    );
+    expect(
+      (pattern.child! as Padding).padding,
+      const EdgeInsets.symmetric(horizontal: 16),
+    );
     expect(
       find.byKey(const ValueKey('ianvs-markdown-code-language-badge')),
       findsNothing,
@@ -12746,6 +12772,7 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
       findsNothing,
     );
     expect(find.text('Dart'), findsNothing);
+    expectOnlyOuterCodeLineMarker();
     final codeLineRail = find.byKey(
       const ValueKey('ianvs-markdown-active-code-line-rail'),
     );
@@ -13448,7 +13475,7 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     expect(controller.isDirty, isFalse);
   });
 
-  testWidgets('active indented code keeps exact source and current-line rail', (
+  testWidgets('active indented code keeps exact source and outer line rail', (
     tester,
   ) async {
     const source = '    const first = 1;\n\n\treturn first;';
@@ -13474,18 +13501,7 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     expect(tester.takeException(), isNull);
     final active = find.byKey(const ValueKey('ianvs-markdown-active-block'));
     expect(active, findsOneWidget);
-    expect(
-      find.byKey(
-        const ValueKey('ianvs-markdown-active-indented-code-line-rail'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(
-        const ValueKey('ianvs-markdown-active-indented-code-line-marker'),
-      ),
-      findsOneWidget,
-    );
+    expectOnlyOuterCodeLineMarker();
     final container = tester.widget<Container>(active);
     // Indented code retains its rendered surface when activated.
     expect(
@@ -13530,7 +13546,7 @@ Code `^[code]`, escaped \^[escaped], and %% hidden ^[comment] %%.
     await tester.pumpAndSettle();
 
     final rail = find.byKey(
-      const ValueKey('ianvs-markdown-active-indented-code-line-rail'),
+      const ValueKey('ianvs-markdown-active-code-line-rail'),
     );
     final firstTop = tester.getTopLeft(rail).dy;
     final wrappedHeight = tester.getSize(rail).height;

@@ -3853,16 +3853,11 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     } else {
       activeChild = editor;
     }
-    final decoratedActiveChild = indentedCode
-        ? _ActiveIndentedCodeLineRail(
-            controller: _blockController,
-            textStyle: activeTextStyle,
-            colors: colors,
-            child: activeChild,
-          )
-        : quoteMarker != null ||
-              headingLevel != null ||
-              (hiddenMarker != null && !revealHiddenMarker)
+    final decoratedActiveChild =
+        codeBlock ||
+            quoteMarker != null ||
+            headingLevel != null ||
+            (hiddenMarker != null && !revealHiddenMarker)
         ? activeChild
         : _ActiveTextLineRail(
             controller: _blockController,
@@ -3879,7 +3874,18 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
             painter: IanvsMarkdownCodePatternPainter(
               color: activeCodePatternColor,
             ),
-            child: decoratedActiveChild,
+            // Paint through the content insets, matching the inactive canvas.
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: indentedCode
+                    ? 12
+                    : blankCodeMinHeight != null
+                    ? 3
+                    : 0,
+              ),
+              child: decoratedActiveChild,
+            ),
           )
         : quoteMarker != null
         ? CustomPaint(
@@ -3925,21 +3931,12 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
               radius: activeCodeRadius,
             )
           : null,
-      padding: codeBlock
-          ? EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: indentedCode
-                  ? 12
-                  : blankCodeMinHeight != null
-                  ? 3
-                  : 0,
-            )
-          : quoteBlock
+      padding: codeBlock || quoteBlock
           ? EdgeInsets.zero
           : const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
       child: surfacedActiveChild,
     );
-    final framedActiveBlock = fencedCode
+    final framedActiveBlock = codeBlock
         ? _ActiveCodeLineRail(
             controller: _blockController,
             textStyle: activeTextStyle,
@@ -5214,109 +5211,6 @@ class _RenderActiveTextLineRail extends RenderBox
       defaultHitTestChildren(result, position: position);
 }
 
-class _ActiveIndentedCodeLineRail extends StatelessWidget {
-  const _ActiveIndentedCodeLineRail({
-    required this.controller,
-    required this.textStyle,
-    required this.colors,
-    required this.child,
-  });
-
-  final TextEditingController controller;
-  final TextStyle textStyle;
-  final IanvsMarkdownThemeData colors;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final selection = controller.selection;
-        final caretOffset = selection.isValid
-            ? selection.extentOffset.clamp(0, controller.text.length)
-            : 0;
-        final lineStart = caretOffset == 0
-            ? 0
-            : controller.text.lastIndexOf('\n', caretOffset - 1) + 1;
-        final nextBreak = controller.text.indexOf('\n', caretOffset);
-        final lineEnd = nextBreak < 0 ? controller.text.length : nextBreak;
-        final painter =
-            TextPainter(
-              text: controller.buildTextSpan(
-                context: context,
-                style: textStyle,
-                withComposing: false,
-              ),
-              textDirection: Directionality.of(context),
-              textScaler: MediaQuery.textScalerOf(context),
-              textWidthBasis: TextWidthBasis.parent,
-            )..layout(
-              maxWidth: constraints.hasBoundedWidth
-                  ? constraints.maxWidth
-                  : MediaQuery.sizeOf(context).width,
-            );
-        const markerSize = Size(7, 6);
-        final lineHeight = painter.preferredLineHeight;
-        final logicalStart = painter.getOffsetForCaret(
-          TextPosition(offset: lineStart),
-          Rect.zero,
-        );
-        final logicalEnd = painter.getOffsetForCaret(
-          TextPosition(offset: lineEnd),
-          Rect.zero,
-        );
-        final caret = painter.getOffsetForCaret(
-          TextPosition(offset: caretOffset),
-          Rect.zero,
-        );
-        final railHeight = (logicalEnd.dy - logicalStart.dy + lineHeight)
-            .clamp(lineHeight, double.infinity)
-            .toDouble();
-        final markerTop =
-            3 + caret.dy + ((lineHeight - markerSize.height) / 2) + 1;
-        final markerColor = Color.lerp(
-          colors.textTertiary,
-          colors.accent,
-          .28,
-        )!.withValues(alpha: .78);
-
-        return Stack(
-          clipBehavior: Clip.none,
-          children: [
-            child,
-            Positioned(
-              key: const ValueKey(
-                'ianvs-markdown-active-indented-code-line-rail',
-              ),
-              left: -10,
-              top: 3 + logicalStart.dy,
-              child: Container(
-                width: 2,
-                height: railHeight,
-                decoration: BoxDecoration(
-                  color: colors.accent,
-                  borderRadius: BorderRadius.circular(1),
-                ),
-              ),
-            ),
-            Positioned(
-              key: const ValueKey(
-                'ianvs-markdown-active-indented-code-line-marker',
-              ),
-              left: -5,
-              top: markerTop,
-              child: CustomPaint(
-                size: markerSize,
-                painter: _CodeCaretMarkerPainter(markerColor),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
 class _ActiveCodeLineRail extends StatefulWidget {
   const _ActiveCodeLineRail({
     required this.controller,
@@ -5433,26 +5327,6 @@ class _ActiveCodeLineRailState extends State<_ActiveCodeLineRail> {
       ],
     );
   }
-}
-
-class _CodeCaretMarkerPainter extends CustomPainter {
-  const _CodeCaretMarkerPainter(this.color);
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final path = Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width, 0)
-      ..lineTo(size.width / 2, size.height)
-      ..close();
-    canvas.drawPath(path, Paint()..color = color);
-  }
-
-  @override
-  bool shouldRepaint(covariant _CodeCaretMarkerPainter oldDelegate) =>
-      color != oldDelegate.color;
 }
 
 class _IanvsHeadingRail extends StatelessWidget {
