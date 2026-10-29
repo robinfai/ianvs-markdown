@@ -7,16 +7,15 @@ import 'workspace_reference_index.dart';
 
 class CollectionNote {
   CollectionNote(this.note, this.relativePath)
-      : properties = {
-          for (final entry in parseMarkdownFrontMatter(note.source.text).entries)
-            entry.key: entry,
-        };
+    : properties = {
+        for (final entry in parseMarkdownFrontMatter(note.source.text).entries)
+          entry.key: entry,
+      };
   final WorkspaceSemanticNote note;
   final String relativePath;
   final Map<String, MarkdownMetadataEntry> properties;
-  String value(String key) => key == 'filename'
-      ? relativePath
-      : properties[key]?.value ?? '';
+  String value(String key) =>
+      key == 'filename' ? relativePath : properties[key]?.value ?? '';
 }
 
 List<CollectionNote> collectionNotes(
@@ -31,7 +30,8 @@ List<CollectionNote> collectionNotes(
 }) {
   final rows = <CollectionNote>[];
   final tagPaths = {
-    for (final occurrence in snapshot.tags[tag.replaceFirst(RegExp(r'^#'), '')] ?? [])
+    for (final occurrence
+        in snapshot.tags[tag.replaceFirst(RegExp(r'^#'), '')] ?? [])
       occurrence.note.source.path,
   };
   final prefix = folder.replaceAll(RegExp(r'^/+|/+$'), '');
@@ -71,12 +71,20 @@ String editCollectionProperty(String source, String key, String value) {
     final line = '$key: ${jsonEncode(value)}$newline';
     if (parsed.hasFrontMatter) {
       if (parsed.entries.length >= markdownFrontMatterEntryLimit) {
-        throw const FormatException('This note has more properties than this view can safely edit. Use Source mode.');
+        throw const FormatException(
+          'This note has more properties than this view can safely edit. Use Source mode.',
+        );
       }
-      return source.replaceRange(source.indexOf('\n') + 1, source.indexOf('\n') + 1, line);
+      return source.replaceRange(
+        source.indexOf('\n') + 1,
+        source.indexOf('\n') + 1,
+        line,
+      );
     }
     if (source.startsWith('---')) {
-      throw const FormatException('Repair the front matter in Source mode first.');
+      throw const FormatException(
+        'Repair the front matter in Source mode first.',
+      );
     }
     return '---$newline$line---$newline$source';
   }
@@ -86,10 +94,24 @@ String editCollectionProperty(String source, String key, String value) {
       'false' => replaceMarkdownFrontMatterBooleanValue(source, entry, false),
       _ => throw const FormatException('Enter true or false.'),
     },
-    MarkdownMetadataValueType.number => replaceMarkdownFrontMatterNumberValue(source, entry, num.parse(value)),
-    MarkdownMetadataValueType.date => replaceMarkdownFrontMatterDateValue(source, entry, value),
-    MarkdownMetadataValueType.list => replaceMarkdownFrontMatterListValue(source, entry, (jsonDecode(value) as List).cast<String>()),
-    MarkdownMetadataValueType.object => throw const FormatException('Edit nested objects in Source mode.'),
+    MarkdownMetadataValueType.number => replaceMarkdownFrontMatterNumberValue(
+      source,
+      entry,
+      num.parse(value),
+    ),
+    MarkdownMetadataValueType.date => replaceMarkdownFrontMatterDateValue(
+      source,
+      entry,
+      value,
+    ),
+    MarkdownMetadataValueType.list => replaceMarkdownFrontMatterListValue(
+      source,
+      entry,
+      (jsonDecode(value) as List).cast<String>(),
+    ),
+    MarkdownMetadataValueType.object => throw const FormatException(
+      'Edit nested objects in Source mode.',
+    ),
     _ => replaceMarkdownFrontMatterTextValue(source, entry, value),
   };
 }

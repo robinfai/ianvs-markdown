@@ -31,7 +31,10 @@ class WorkspaceSnapshot {
     final rawDocuments = json['documents'];
     return WorkspaceSnapshot(
       collectionViews: json['collectionViews'] is List
-          ? (json['collectionViews'] as List).whereType<Map>().map((item) => Map<String, Object?>.from(item)).toList()
+          ? (json['collectionViews'] as List)
+                .whereType<Map>()
+                .map((item) => Map<String, Object?>.from(item))
+                .toList()
           : const [],
       recoveryNotice: recoveryNotice,
       readingPreferences: ReadingPreferences.fromJson(

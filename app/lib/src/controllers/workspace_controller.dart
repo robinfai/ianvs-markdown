@@ -186,14 +186,18 @@ class WorkspaceController extends ChangeNotifier {
 
   Future<void> saveCollectionView(Map<String, Object?> view) async {
     final stored = {...view, 'root': workspaceRoot};
-    _collectionViews.removeWhere((item) => item['root'] == workspaceRoot && item['name'] == view['name']);
+    _collectionViews.removeWhere(
+      (item) => item['root'] == workspaceRoot && item['name'] == view['name'],
+    );
     _collectionViews.add(stored);
     notifyListeners();
     await flushSession();
   }
 
   Future<void> deleteCollectionView(String name) async {
-    _collectionViews.removeWhere((item) => item['root'] == workspaceRoot && item['name'] == name);
+    _collectionViews.removeWhere(
+      (item) => item['root'] == workspaceRoot && item['name'] == name,
+    );
     notifyListeners();
     await flushSession();
   }

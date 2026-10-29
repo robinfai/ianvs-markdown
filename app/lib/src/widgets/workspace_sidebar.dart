@@ -274,13 +274,18 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                 ),
                 if (widget.workspace.collectionViews.isNotEmpty)
                   SizedBox(
-                    height: math.min(120, widget.workspace.collectionViews.length * 36.0),
+                    height: math.min(
+                      120,
+                      widget.workspace.collectionViews.length * 36.0,
+                    ),
                     child: ListView(
                       children: [
                         for (final view in widget.workspace.collectionViews)
                           TextButton(
                             onPressed: () => widget.onOpenCollection!(view),
-                            child: Text(view['name'] as String? ?? 'Collection'),
+                            child: Text(
+                              view['name'] as String? ?? 'Collection',
+                            ),
                           ),
                       ],
                     ),

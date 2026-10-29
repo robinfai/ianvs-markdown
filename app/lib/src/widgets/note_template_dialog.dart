@@ -86,7 +86,11 @@ class _NoteTemplateDialogState extends State<NoteTemplateDialog> {
             context,
             NoteTemplateResult(
               _title.text.trim(),
-              expandNoteTemplate(_source.text, _title.text.trim(), DateTime.now()),
+              expandNoteTemplate(
+                _source.text,
+                _title.text.trim(),
+                DateTime.now(),
+              ),
             ),
           );
         },
