@@ -831,6 +831,7 @@ class _EditorShellState extends State<EditorShell> {
     try {
       final resolution = await workspace.references.resolveWiki(
         '/$filename',
+        originPath: workspace.activeDocument?.path,
         refreshMetadata: true,
       );
       if (!current()) return;
@@ -1018,7 +1019,7 @@ class _EditorShellState extends State<EditorShell> {
           );
         }
       }
-      if (!current()) return;
+      if (!mounted || !current()) return;
       final selection = await showDialog<WorkspacePaletteSelection>(
         context: context,
         builder: (_) => WorkspacePalette(
