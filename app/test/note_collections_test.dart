@@ -164,12 +164,22 @@ void main() {
       source.note('reading/c.md', '---\nstatus: done\n---\n# C');
       final entries = source.directories['/vault/']!.entries;
       source.directories['/vault/'] = const WorkspaceDirectorySnapshot([
-        WorkspaceMetadata(relativePath: 'blog', isDirectory: true, revision: 'v1'),
-        WorkspaceMetadata(relativePath: 'reading', isDirectory: true, revision: 'v1'),
+        WorkspaceMetadata(
+          relativePath: 'blog',
+          isDirectory: true,
+          revision: 'v1',
+        ),
+        WorkspaceMetadata(
+          relativePath: 'reading',
+          isDirectory: true,
+          revision: 'v1',
+        ),
       ]);
       for (final folder in ['blog', 'reading']) {
         source.directories['/vault/$folder'] = WorkspaceDirectorySnapshot(
-          entries.where((entry) => entry.relativePath.startsWith('$folder/')).toList(),
+          entries
+              .where((entry) => entry.relativePath.startsWith('$folder/'))
+              .toList(),
         );
       }
       final index = WorkspaceIndex(source: source)..configure('/vault');
