@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
+import '../models/document_analysis.dart';
 
 String paletteNoteTitle(String source, String fallback) {
   final metadata = parseMarkdownFrontMatter(source);
@@ -9,11 +10,10 @@ String paletteNoteTitle(String source, String fallback) {
       return entry.value.trim();
     }
   }
-  final heading = RegExp(
-    r'^# +(.+)$',
-    multiLine: true,
-  ).firstMatch(metadata.body);
-  return heading?.group(1)?.trim() ?? fallback;
+  for (final heading in DocumentAnalysis().headings(metadata.body)) {
+    if (heading.level == 1) return heading.text;
+  }
+  return fallback;
 }
 
 class WorkspacePaletteEntry {
