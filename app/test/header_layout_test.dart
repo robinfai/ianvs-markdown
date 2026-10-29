@@ -8,6 +8,7 @@ import 'package:linefold/src/desktop_theme.dart';
 import 'package:linefold/src/services/apple_workspace_service.dart';
 import 'package:linefold/src/widgets/editor_shell.dart';
 import 'package:linefold/src/widgets/middle_ellipsis_text.dart';
+import 'package:linefold/src/widgets/title_tabs_bar.dart';
 import 'package:linefold/src/widgets/wiki_note_picker.dart';
 
 import 'support/fakes.dart';
@@ -309,10 +310,14 @@ void main() {
         workspace.selectDocument(0);
         await pumpShell(tester);
 
+        final tabStrip = find.descendant(
+          of: find.byType(TitleTabsBar),
+          matching: find.byType(ReorderableListView),
+        );
         void expectActiveTabVisible() {
-          final viewport = tester.getRect(find.byType(ReorderableListView));
+          final viewport = tester.getRect(tabStrip);
           final tab = find.descendant(
-            of: find.byType(ReorderableListView),
+            of: tabStrip,
             matching: find.byKey(ValueKey(workspace.activeDocument!.id)),
           );
           expect(tab, findsOneWidget);
@@ -327,7 +332,7 @@ void main() {
         expectActiveTabVisible();
         final created = workspace.activeDocument!;
         final tab = find.descendant(
-          of: find.byType(ReorderableListView),
+          of: tabStrip,
           matching: find.byKey(ValueKey(created.id)),
         );
         final start = tester.getCenter(tab);

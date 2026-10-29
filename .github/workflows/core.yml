@@ -75,14 +75,17 @@ jobs:
       - name: Install Flutter test runtime library
         run: sudo apt-get update && sudo apt-get install -y libglu1-mesa
       - name: Resolve app dependencies
+        id: app-dependencies
         run: cd app && flutter pub get
       - name: Check app formatting with actionable diff
         run: |
           dart format app/lib app/test
           git diff --exit-code -- app/lib app/test
       - name: Analyze app
+        if: ${{ !cancelled() && steps.app-dependencies.outcome == 'success' }}
         run: cd app && flutter analyze
       - name: Run writing workflow feature tests
+        if: ${{ !cancelled() && steps.app-dependencies.outcome == 'success' }}
         working-directory: app
         run: |
           # Native menu routing depends on dart:io Platform.isMacOS and runs in the unchanged macOS suite.

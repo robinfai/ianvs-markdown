@@ -20,7 +20,7 @@ class ReferenceDock extends StatefulWidget {
 
   final WorkspaceController workspace;
   final VoidCallback onClose;
-  final ValueChanged<String> onInsert;
+  final void Function(String text, String? sourcePath) onInsert;
 
   @override
   State<ReferenceDock> createState() => _ReferenceDockState();
@@ -245,7 +245,9 @@ class _ReferenceDockState extends State<ReferenceDock> {
                 ),
                 trailing: IconButton(
                   tooltip: 'Insert reference at cursor',
-                  onPressed: text == null ? null : () => widget.onInsert(text),
+                  onPressed: text == null
+                      ? null
+                      : () => widget.onInsert(text, open?.path ?? _pinnedPath),
                   icon: const Icon(Icons.playlist_add),
                 ),
               ),
