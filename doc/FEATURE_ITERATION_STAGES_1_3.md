@@ -142,3 +142,13 @@ and all 72 tests in [the next run](https://github.com/robinfai/ianvs-markdown/ac
 that run failed only canonical formatting, whose exact diff is now applied.
 All active branches were then merged with the new main commit to meet the
 up-to-date branch requirement; their new heads must pass CI before further merges.
+
+Fragment extraction review: preflight now preserves the original note target
+for heading/block links left outside the selection, keeps migrated targets
+local, remaps duplicate Markdown heading slugs, and retains literal Wiki
+heading names. Unknown HTML anchors and partially selected target structures
+produce an explicit error before any file is created. Tests cover these cases
+and reference definitions with fragment destinations. At `c490872` (stage 2C)
+all 72 app tests passed; at `c31ad4e` (stage 3) all 78 passed. Their formatter
+and one control-flow lint correction are applied in the following commit;
+new-head CI remains required before merge.
