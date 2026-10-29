@@ -39,12 +39,14 @@ class NoteLinkPreviewBuilder extends MarkdownElementBuilder {
     final href = element.attributes['href'];
     if (child == null ||
         href == null ||
-        element.attributes['data-ianvs-tag'] == 'true')
+        element.attributes['data-ianvs-tag'] == 'true') {
       return child;
+    }
     final wiki = element.attributes['data-ianvs-wiki-link'] == 'true';
     final uri = Uri.tryParse(href);
-    if (!wiki && (uri == null || uri.hasScheme || uri.host.isNotEmpty))
+    if (!wiki && (uri == null || uri.hasScheme || uri.host.isNotEmpty)) {
       return child;
+    }
     return NoteLinkPreview(
       workspace: workspace,
       origin: document.path,
@@ -111,8 +113,9 @@ class _NoteLinkPreviewState extends State<NoteLinkPreview> {
           widget.href,
           originPath: widget.origin,
         );
-        if (result.status == WikiNoteStatus.resolved)
+        if (result.status == WikiNoteStatus.resolved) {
           path = p.posix.join(root, result.candidates.single.relativePath);
+        }
       } else if (widget.origin != null) {
         final uri = Uri.parse(widget.href);
         path = uri.path.isEmpty
