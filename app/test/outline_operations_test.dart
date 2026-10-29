@@ -12,7 +12,10 @@ void main() {
     const source = '[x][target]\n\n[target]: sibling.md#part "Title"\n';
     final extracted = extractedNoteContent(source, 0, 11);
     final references = parseIanvsMarkdownNoteSemantics(extracted).references;
-    expect(references.any((r) => r.target == 'sibling.md' && r.fragment == 'part'), isTrue);
+    expect(
+      references.any((r) => r.target == 'sibling.md' && r.fragment == 'part'),
+      isTrue,
+    );
     expect(extracted, contains('[target]: sibling.md#part "Title"'));
   });
 

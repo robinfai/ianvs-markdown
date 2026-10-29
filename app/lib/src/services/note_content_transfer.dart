@@ -76,8 +76,13 @@ String extractedNoteContent(String source, int start, int end) {
     if (reference.range.start < start || reference.range.end > end) continue;
     final definition = reference.definitionRange;
     if (definition == null ||
-        (definition.start >= start && definition.end <= end)) continue;
-    definitions[definition.start] = source.substring(definition.start, definition.end);
+        (definition.start >= start && definition.end <= end)) {
+      continue;
+    }
+    definitions[definition.start] = source.substring(
+      definition.start,
+      definition.end,
+    );
   }
   final selected = source.substring(start, end);
   if (definitions.isEmpty) return selected;
