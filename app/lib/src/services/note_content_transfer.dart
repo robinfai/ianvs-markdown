@@ -124,6 +124,8 @@ String _preserveExtractedFragments(
     if (originRelativePath == null) {
       throw const FormatException('Save the source note before extracting fragment references.');
     }
+    final wiki = reference.kind == IanvsMarkdownSourceReferenceKind.wikiLink ||
+        reference.kind == IanvsMarkdownSourceReferenceKind.wikiEmbed;
     int? targetStart;
     int? targetEnd;
     int? headingIndex;
@@ -142,7 +144,9 @@ String _preserveExtractedFragments(
     } else {
       for (var i = 0; i < originalHeadings.length; i++) {
         if (originalHeadings[i].text == fragment ||
-            chapterLinkFragment(originalHeadings, i) == fragment.toLowerCase()) {
+            (wiki
+                ? originalHeadings[i].text.toLowerCase() == fragment.toLowerCase()
+                : chapterLinkFragment(originalHeadings, i) == fragment.toLowerCase())) {
           headingIndex = i;
           targetStart = originalHeadings[i].offset;
           targetEnd = blocks.firstWhere((block) => block.start == targetStart).end;
@@ -157,8 +161,6 @@ String _preserveExtractedFragments(
     if (!moved && targetStart < selectionEnd && targetEnd > selectionStart) {
       throw const FormatException('Select the complete referenced heading or block before extracting.');
     }
-    final wiki = reference.kind == IanvsMarkdownSourceReferenceKind.wikiLink ||
-        reference.kind == IanvsMarkdownSourceReferenceKind.wikiEmbed;
     final raw = reference.rawDestination;
     final range = reference.destinationRange;
     final rawEnd = range.start + raw.length;
@@ -175,7 +177,7 @@ String _preserveExtractedFragments(
         throw const FormatException('The selected heading would lose its Markdown structure. Select a complete heading.');
       }
       final slug = chapterLinkFragment(extractedHeadings, index);
-      final target = slug.isEmpty ? extractedHeadings[index].text : slug;
+      final target = wiki || slug.isEmpty ? extractedHeadings[index].text : slug;
       final hash = raw.indexOf('#');
       if (hash < 0 || (hash > 0 && raw[hash - 1] == '&')) {
         throw const FormatException('Unsupported escaped fragment. Use Source mode.');

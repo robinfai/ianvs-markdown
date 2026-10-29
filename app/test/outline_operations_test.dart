@@ -10,6 +10,18 @@ import 'package:linefold/src/services/note_content_transfer.dart';
 import 'package:linefold/src/services/markdown_file_service.dart';
 
 void main() {
+  test('extraction keeps wiki heading names and original note destinations', () {
+    const source = '# Intro Words\n\n[[#Intro Words|jump]]\n';
+    expect(
+      extractedNoteContent(source, source.indexOf('[['), source.length, originRelativePath: 'chapters/source.md'),
+      '[[/chapters/source.md#Intro Words|jump]]\n',
+    );
+    expect(
+      extractedNoteContent(source, 0, source.length, originRelativePath: 'chapters/source.md'),
+      source,
+    );
+  });
+
   test('extraction preserves fragments targeting headings left in the source', () {
     const source = '# Intro\n\n[intro](#intro)\n';
     final start = source.indexOf('[intro]');
