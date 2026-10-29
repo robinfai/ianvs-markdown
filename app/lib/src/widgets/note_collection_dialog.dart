@@ -356,7 +356,11 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
           ),
           subtitle: Text('${row.relativePath} · ${row.value('status')}'),
           onTap: () => _open(row),
-        trailing: IconButton(tooltip: 'Edit status', icon: const Icon(Icons.edit_outlined), onPressed: () => _edit(row, 'status')),
+          trailing: IconButton(
+            tooltip: 'Edit status',
+            icon: const Icon(Icons.edit_outlined),
+            onPressed: () => _edit(row, 'status'),
+          ),
         ),
     ],
   );
@@ -437,7 +441,11 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
                                       : row.value('title'),
                                 ),
                                 onTap: () => _open(row),
-        trailing: IconButton(tooltip: 'Edit status', icon: const Icon(Icons.edit_outlined), onPressed: () => _edit(row, 'status')),
+                                trailing: IconButton(
+                                  tooltip: 'Edit status',
+                                  icon: const Icon(Icons.edit_outlined),
+                                  onPressed: () => _edit(row, 'status'),
+                                ),
                               ),
                             ),
                         ],
