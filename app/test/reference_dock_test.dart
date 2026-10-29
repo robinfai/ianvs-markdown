@@ -1,3 +1,8 @@
+import 'dart:ui' show PointerDeviceKind;
+import 'package:ianvs_markdown/ianvs_markdown.dart';
+import 'package:linefold/src/app.dart';
+import 'package:linefold/src/widgets/note_link_preview.dart';
+import 'wiki_note_navigation_test.dart' show WikiFiles, wikiWorkspace;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linefold/src/controllers/workspace_controller.dart';
@@ -6,6 +11,36 @@ import 'package:linefold/src/widgets/reference_dock.dart';
 import 'support/fakes.dart';
 
 void main() {
+  testWidgets('reading link hover previews local note without navigation', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final files = WikiFiles();
+    files.files['/vault/Origin.md'] = 'Read [[Target]]';
+    files.files['/vault/Target.md'] = 'Preview target content';
+    final workspace = await wikiWorkspace(files);
+    addTearDown(workspace.dispose);
+    addTearDown(files.dispose);
+    final origin = workspace.activeDocument!;
+    origin.controller.mode = IanvsMarkdownEditorMode.preview;
+    await tester.pumpWidget(LinefoldApp(workspaceController: workspace));
+    await tester.pumpAndSettle();
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    await mouse.moveTo(tester.getCenter(find.byType(NoteLinkPreview).first));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
+    expect(find.text('Preview target content'), findsOneWidget);
+    expect(workspace.activeDocument, same(origin));
+    await mouse.removePointer();
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(milliseconds: 600));
+  });
+
   testWidgets(
     'pinned open note follows edits without changing active document',
     (tester) async {
