@@ -19,6 +19,8 @@ class WorkspaceSnapshot {
     this.readingPreferences = ReadingPreferences.defaults,
     this.browserState = const {},
     this.collectionViews = const [],
+    this.recentNotes = const {},
+    this.referenceView = const {},
     this.operationGrants = const {},
     this.favoriteAccessTokens = const {},
     this.recoveryNotice,
@@ -36,6 +38,12 @@ class WorkspaceSnapshot {
                 .map((item) => Map<String, Object?>.from(item))
                 .toList()
           : const [],
+      referenceView: json['referenceView'] is Map
+          ? Map<String, Object?>.from(json['referenceView'] as Map)
+          : const {},
+      recentNotes: json['recentNotes'] is Map
+          ? Map<String, int>.from(json['recentNotes'] as Map)
+          : const {},
       recoveryNotice: recoveryNotice,
       readingPreferences: ReadingPreferences.fromJson(
         json['readingPreferences'],
@@ -79,6 +87,8 @@ class WorkspaceSnapshot {
   final ReadingPreferences readingPreferences;
   final Map<String, Object?> browserState;
   final List<Map<String, Object?>> collectionViews;
+  final Map<String, int> recentNotes;
+  final Map<String, Object?> referenceView;
   final Map<String, String> operationGrants;
   final Map<String, String> favoriteAccessTokens;
 
@@ -88,6 +98,8 @@ class WorkspaceSnapshot {
   Map<String, Object?> toJson() => <String, Object?>{
     'browserState': browserState,
     'collectionViews': collectionViews,
+    'recentNotes': recentNotes,
+    'referenceView': referenceView,
     'operationGrants': operationGrants,
     'favoriteAccessTokens': favoriteAccessTokens,
     'documents': documents,

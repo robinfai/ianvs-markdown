@@ -30,6 +30,7 @@ import 'workspace_palette.dart';
 import 'note_template_dialog.dart';
 import 'reference_dock.dart';
 import 'note_collection_dialog.dart';
+import 'note_link_preview.dart';
 import '../services/note_templates.dart';
 import '../services/slash_insertion.dart';
 import '../services/attachment_repository.dart';
@@ -123,6 +124,7 @@ class _EditorShellState extends State<EditorShell> {
     _attachmentRoot = widget.workspace.workspaceRoot;
     widget.workspace.addListener(_workspaceChanged);
     _bindSlashController();
+    _referencesVisible = widget.workspace.referenceView['visible'] == true;
   }
 
   @override
@@ -142,6 +144,11 @@ class _EditorShellState extends State<EditorShell> {
 
   void _workspaceChanged() {
     _bindSlashController();
+    if ((!_referenceRestoreDone && widget.workspace.initialized) ||
+        _attachmentRoot != widget.workspace.workspaceRoot) {
+      _referenceRestoreDone = true;
+      _referencesVisible = widget.workspace.referenceView['visible'] == true;
+    }
     if (_attachmentRoot != widget.workspace.workspaceRoot) {
       _attachmentRoot = widget.workspace.workspaceRoot;
       ++_attachmentGeneration;
@@ -542,6 +549,16 @@ class _EditorShellState extends State<EditorShell> {
     }
   }
 
+  Future<void> _openDocumentLink(DocumentSession document, IanvsMarkdownLinkTarget link) {
+    if (link.kind == IanvsMarkdownLinkKind.wiki) {
+      return _openWikiLink(document, link.href ?? '');
+    }
+    if (link.kind == IanvsMarkdownLinkKind.tag) {
+      return _openWorkspaceReferences(tag: (link.href ?? '').replaceFirst(RegExp(r'^tag:#?'), ''));
+    }
+    return DocumentLinkService(workspace: widget.workspace, openImage: _openImage).open(document, link.href);
+  }
+
   Future<void> _openWikiLink(DocumentSession origin, String target) async {
     if (!(ModalRoute.of(context)?.isCurrent ?? true) ||
         hasEditorComposition(widget.workspace)) {
@@ -875,7 +892,13 @@ class _EditorShellState extends State<EditorShell> {
     );
   }
 
+  void _setReferencesVisible(bool value) {
+    setState(() => _referencesVisible = value);
+    widget.workspace.setReferenceView({'visible': value});
+  }
+
   bool _referencesVisible = false;
+  bool _referenceRestoreDone = false;
 
   void _insertReference(String text) {
     final document = widget.workspace.activeDocument;
@@ -952,6 +975,7 @@ class _EditorShellState extends State<EditorShell> {
     try {
       final resolution = await workspace.references.resolveWiki(
         '/$filename',
+        originPath: workspace.activeDocument?.path,
         refreshMetadata: true,
       );
       if (!current()) return;
@@ -1077,8 +1101,7 @@ class _EditorShellState extends State<EditorShell> {
       'Search workspace': _openWorkspaceSearch,
       'Find in document': _openFind,
       'Show backlinks': _openWorkspaceReferences,
-      'Toggle reference pane': () =>
-          setState(() => _referencesVisible = !_referencesVisible),
+      'Toggle reference pane': () => _setReferencesVisible(!_referencesVisible),
       'Toggle sidebar': workspace.toggleSidebar,
       'Toggle outline': workspace.toggleOutline,
       'Live preview': () =>
@@ -1127,7 +1150,7 @@ class _EditorShellState extends State<EditorShell> {
                 detail: note.relativePath,
                 searchTerms:
                     snapshot.aliases.byPath[note.relativePath]?.join(' ') ?? '',
-                recency: document?.lastActivated ?? 0,
+                recency: document?.lastActivated ?? workspace.recentNoteActivation(absolute),
               ),
             );
           }
@@ -1143,7 +1166,7 @@ class _EditorShellState extends State<EditorShell> {
           );
         }
       }
-      if (!current()) return;
+      if (!mounted || !current()) return;
       final selection = await showDialog<WorkspacePaletteSelection>(
         context: context,
         builder: (_) => WorkspacePalette(
@@ -1982,6 +2005,13 @@ class _EditorShellState extends State<EditorShell> {
                                                                 .currentIndex,
                                                           )
                                                         : null,
+                                                    builders: {
+                                                      'a': NoteLinkPreviewBuilder(
+                                                        workspace: workspace,
+                                                        document: document,
+                                                        onTap: (link) => _guard(() => _openDocumentLink(document, link)),
+                                                      ),
+                                                    },
                                                     imageBuilder: images.image,
                                                     onPaste:
                                                         _pasteFromClipboard,
@@ -2094,8 +2124,7 @@ class _EditorShellState extends State<EditorShell> {
                           child: ReferenceDock(
                             key: ValueKey(workspace.workspaceRoot),
                             workspace: workspace,
-                            onClose: () =>
-                                setState(() => _referencesVisible = false),
+                            onClose: () => _setReferencesVisible(false),
                             onInsert: _insertReference,
                           ),
                         ),

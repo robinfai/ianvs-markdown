@@ -154,6 +154,7 @@ class _WorkspacePaletteState extends State<WorkspacePalette> {
                 itemExtent: 64,
                 itemCount: entries.length,
                 itemBuilder: (context, i) => ListTile(
+                  key: ValueKey('palette-entry-${entries[i].id}'),
                   selected: i == _selected,
                   title: Text(entries[i].title, maxLines: 1),
                   subtitle: Text(entries[i].detail, maxLines: 1),
