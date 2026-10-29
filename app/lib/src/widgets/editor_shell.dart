@@ -29,6 +29,7 @@ import 'wiki_note_picker.dart';
 import 'workspace_palette.dart';
 import 'note_template_dialog.dart';
 import 'reference_dock.dart';
+import 'note_collection_dialog.dart';
 import '../services/note_templates.dart';
 import '../services/slash_insertion.dart';
 import '../services/attachment_repository.dart';
@@ -832,6 +833,21 @@ class _EditorShellState extends State<EditorShell> {
     }
   }
 
+  Future<void> _openCollection([Map<String, Object?> view = const {}]) async {
+    if (widget.workspace.workspaceRoot == null) {
+      _showError('Open a workspace folder to view note collections.');
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (_) => NoteCollectionDialog(
+        workspace: widget.workspace,
+        onSave: _saveDocument,
+        view: view,
+      ),
+    );
+  }
+
   bool _referencesVisible = false;
 
   void _insertReference(String text) {
@@ -1013,6 +1029,7 @@ class _EditorShellState extends State<EditorShell> {
         identical(origin, workspace.activeDocument);
     final actions = <String, VoidCallback>{
       'Extract selection to note': _extractSelection,
+      'Open collections': _openCollection,
       'New note': () => workspace.newDocument(),
       'New note from template': _useTemplate,
       'Insert template': () => _useTemplate(insert: true),
@@ -1654,6 +1671,7 @@ class _EditorShellState extends State<EditorShell> {
                                 workspace: workspace,
                                 onSave: _saveDocument,
                                 onSearchSource: _openWorkspaceSearch,
+                                onOpenCollection: _openCollection,
                                 width: sidebarWidth,
                                 onError: _showError,
                               ),
