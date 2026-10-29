@@ -29,6 +29,7 @@ import 'wiki_note_picker.dart';
 import 'workspace_palette.dart';
 import 'note_template_dialog.dart';
 import '../services/note_templates.dart';
+import '../services/slash_insertion.dart';
 import '../services/attachment_repository.dart';
 import '../services/attachment_import_service.dart';
 import '../services/attachment_resolver.dart';
@@ -119,6 +120,7 @@ class _EditorShellState extends State<EditorShell> {
     _wikiActiveDocumentId = widget.workspace.activeDocument?.id;
     _attachmentRoot = widget.workspace.workspaceRoot;
     widget.workspace.addListener(_workspaceChanged);
+    _bindSlashController();
   }
 
   @override
@@ -131,11 +133,13 @@ class _EditorShellState extends State<EditorShell> {
       ++_wikiGeneration;
       _wikiActiveDocumentId = widget.workspace.activeDocument?.id;
       widget.workspace.addListener(_workspaceChanged);
+      _bindSlashController();
       _closeFind(restoreFocus: false, restoreScroll: false);
     }
   }
 
   void _workspaceChanged() {
+    _bindSlashController();
     if (_attachmentRoot != widget.workspace.workspaceRoot) {
       _attachmentRoot = widget.workspace.workspaceRoot;
       ++_attachmentGeneration;
@@ -679,6 +683,91 @@ class _EditorShellState extends State<EditorShell> {
     }
   }
 
+  IanvsMarkdownController? _slashController;
+  String _slashPrevious = '';
+  bool _slashOpen = false;
+
+  void _bindSlashController() {
+    final next = widget.workspace.activeDocument?.controller;
+    if (identical(next, _slashController)) return;
+    _slashController?.removeListener(_slashChanged);
+    _slashController = next;
+    _slashPrevious = next?.text ?? '';
+    next?.addListener(_slashChanged);
+  }
+
+  void _slashChanged() {
+    final controller = _slashController;
+    if (controller == null) return;
+    final value = controller.value;
+    final start = slashInsertionStart(_slashPrevious, value);
+    _slashPrevious = value.text;
+    if (start == null ||
+        _slashOpen ||
+        _paletteOpen ||
+        _documentInputTarget.isLocal ||
+        controller.mode == IanvsMarkdownEditorMode.preview) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          !identical(controller, _slashController) ||
+          controller.value != value ||
+          !(ModalRoute.of(context)?.isCurrent ?? true)) {
+        return;
+      }
+      unawaited(_showSlashMenu(controller, value, start));
+    });
+  }
+
+  Future<void> _showSlashMenu(
+    IanvsMarkdownController controller,
+    TextEditingValue value,
+    int start,
+  ) async {
+    _slashOpen = true;
+    final mode = controller.mode;
+    try {
+      final choice = await showDialog<WorkspacePaletteSelection>(
+        context: context,
+        builder: (_) => WorkspacePalette(
+          title: 'Insert block',
+          entries: [
+            for (final title in [...slashSnippets.keys, 'Image', 'Template'])
+              WorkspacePaletteEntry(id: title, title: title),
+          ],
+        ),
+      );
+      if (!mounted ||
+          choice == null ||
+          !identical(controller, _slashController) ||
+          controller.value != value ||
+          controller.mode != mode) {
+        return;
+      }
+      final selected = value.copyWith(
+        selection: TextSelection(baseOffset: start, extentOffset: start + 1),
+      );
+      controller.value = selected;
+      final snippet = slashSnippets[choice.id];
+      if (snippet != null) {
+        CapturedNoteInsertion(selected, mode).apply(controller, snippet);
+      } else if (choice.id == 'Template') {
+        await _useTemplate(insert: true);
+      } else if (choice.id == 'Image') {
+        await _importImage();
+      }
+      if (mounted &&
+          identical(controller, _slashController) &&
+          controller.value == selected) {
+        controller.value = value;
+      }
+      if (mounted) _editorFocus.requestFocus();
+    } finally {
+      _slashOpen = false;
+    }
+  }
+
   bool _captureBusy = false;
 
   Future<void> _useTemplate({bool insert = false}) async {
@@ -1189,6 +1278,7 @@ class _EditorShellState extends State<EditorShell> {
 
   @override
   void dispose() {
+    _slashController?.removeListener(_slashChanged);
     _documentExport.dispose();
     _documentInputTarget.dispose();
     widget.workspace.removeListener(_workspaceChanged);
