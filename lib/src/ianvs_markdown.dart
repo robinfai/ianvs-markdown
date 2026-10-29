@@ -321,6 +321,7 @@ class IanvsMarkdown extends StatelessWidget {
     );
     if (syntaxPreset == IanvsMarkdownSyntaxPreset.standard) {
       return _buildStandardMarkdown(
+        context,
         constraints,
         decision.text,
         effectiveStyleSheet,
@@ -804,7 +805,54 @@ class IanvsMarkdown extends StatelessWidget {
     );
   }
 
+  // The released renderer has one listIndent per document. Reserve the actual
+  // widest ordered marker, retaining one aligned text column at each depth.
+  // Parse lists rather than scanning source numbers: fences, start attributes,
+  // repeated "1." numbering and nested lists must follow Markdown semantics.
+  double _standardListIndent(
+    BuildContext context,
+    String source,
+    MarkdownStyleSheet sheet,
+  ) {
+    var width = sheet.listIndent ?? 24;
+    final document = md.Document(
+      blockSyntaxes: blockSyntaxes,
+      inlineSyntaxes: inlineSyntaxes,
+      extensionSet: extensionSet ?? md.ExtensionSet.gitHubFlavored,
+    );
+    final painter = TextPainter(
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      locale: Localizations.maybeLocaleOf(context),
+    );
+    final style = DefaultTextStyle.of(context).style.merge(sheet.listBullet);
+    void visit(List<md.Node> nodes) {
+      for (final node in nodes.whereType<md.Element>()) {
+        final children = node.children ?? const <md.Node>[];
+        if (node.tag == 'ol') {
+          var number = int.tryParse(node.attributes['start'] ?? '') ?? 1;
+          for (final _ in children.whereType<md.Element>().where(
+            (e) => e.tag == 'li',
+          )) {
+            painter.text = TextSpan(text: '${number++}.', style: style);
+            painter.layout();
+            if (painter.width > width) width = painter.width.ceilToDouble();
+          }
+        }
+        visit(children);
+      }
+    }
+
+    try {
+      visit(document.parseLines(source.split('\n')));
+    } finally {
+      painter.dispose();
+    }
+    return width;
+  }
+
   Widget _buildStandardMarkdown(
+    BuildContext context,
     BoxConstraints constraints,
     String source,
     MarkdownStyleSheet effectiveStyleSheet,
@@ -815,7 +863,9 @@ class IanvsMarkdown extends StatelessWidget {
       key: ValueKey((syntaxPreset, softLineBreak)),
       data: source,
       selectable: blockSelectable,
-      styleSheet: effectiveStyleSheet,
+      styleSheet: effectiveStyleSheet.copyWith(
+        listIndent: _standardListIndent(context, source, effectiveStyleSheet),
+      ),
       styleSheetTheme: styleSheetTheme,
       onSelectionChanged: blockSelectable ? onSelectionChanged : null,
       onTapLink: onTapLink,
