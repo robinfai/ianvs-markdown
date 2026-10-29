@@ -80,7 +80,7 @@ void main() {
       addTearDown(files.dispose);
       final origin = workspace.activeDocument!;
       origin.controller.mode = IanvsMarkdownEditorMode.source;
-      origin.controller.selection = const TextSelection(
+      origin.controller.selection = TextSelection(
         baseOffset: 7,
         extentOffset: 7 + selected.length,
       );
