@@ -842,8 +842,9 @@ class _EditorShellState extends State<EditorShell> {
     if (!current() ||
         title == null ||
         title.isEmpty ||
-        origin.controller.value != value)
+        origin.controller.value != value) {
       return;
+    }
     final path = title.toLowerCase().endsWith('.md') ? title : '$title.md';
     if (!WikiLinkInsertion.canRepresent(path)) {
       _showError('Use a Markdown filename without link delimiters.');
@@ -854,8 +855,9 @@ class _EditorShellState extends State<EditorShell> {
         path,
         epoch: epoch,
         isCurrent: current,
-      ))
+      )) {
         return;
+      }
       final created = await workspace.openIndexedNote(
         path,
         epoch: epoch,
@@ -877,10 +879,11 @@ class _EditorShellState extends State<EditorShell> {
       }
       workspace.selectDocument(workspace.documents.indexOf(origin));
     } on Object catch (error) {
-      if (current())
+      if (current()) {
         _showError(
           'Extraction did not finish: $error. Original text is retained until the new note is saved.',
         );
+      }
     }
   }
 

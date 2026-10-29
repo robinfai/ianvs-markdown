@@ -47,8 +47,9 @@ String changeChapterLevel(String source, int index, int delta) {
   final selected = headings.where(
     (h) => h.offset >= range.start && h.offset < range.end,
   );
-  if (selected.any((h) => h.level + delta < 1 || h.level + delta > 6))
+  if (selected.any((h) => h.level + delta < 1 || h.level + delta > 6)) {
     return source;
+  }
   var result = source;
   final blocks = parseMarkdownBlocks(source);
   for (final heading in selected.toList().reversed) {
@@ -101,4 +102,16 @@ bool applyOutlineEdit(
   );
   controller.commitHistoryGroup();
   return true;
+}
+
+String chapterLinkFragment(List<DocumentHeading> headings, int index) {
+  final counts = <String, int>{};
+  for (var i = 0; i <= index; i++) {
+    final slug = headings[i].text.toLowerCase()
+        .replaceAll(RegExp(r'[^\p{L}\p{N}\p{M}_\-\s]', unicode: true), '')
+        .replaceAll(RegExp(r'\s'), '-');
+    final count = counts.update(slug, (value) => value + 1, ifAbsent: () => 0);
+    if (i == index) return count == 0 ? slug : '$slug-$count';
+  }
+  throw RangeError.index(index, headings);
 }

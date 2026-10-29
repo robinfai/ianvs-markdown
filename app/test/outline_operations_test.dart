@@ -30,7 +30,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('palette-entry-Extract selection to note')));
     await tester.pumpAndSettle();
     await tester.enterText(find.widgetWithText(TextField, 'New note filename'), 'Extract');
-    await tester.tap(find.text('Extract'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Extract'));
     await tester.pumpAndSettle();
     expect(files.files['/vault/Extract.md'], 'selected');
     expect(origin.controller.text, 'before [[/Extract.md]] after');
