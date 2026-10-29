@@ -85,6 +85,18 @@ class WorkspaceController extends ChangeNotifier {
   @override
   void notifyListeners() {
     if (_disposed) return;
+    final active = activeDocument;
+    if (active != null && active.id != _lastRecentDocument) {
+      _lastRecentDocument = active.id;
+      active.lastActivated = DateTime.now().millisecondsSinceEpoch;
+      if (active.path != null) {
+        _recentNotes.remove(active.path);
+        _recentNotes[active.path!] = active.lastActivated;
+        while (_recentNotes.length > 128) {
+          _recentNotes.remove(_recentNotes.keys.first);
+        }
+      }
+    }
     sync.configure(
       path: activeDocument?.path,
       identity: (_workspaceRoot, activeDocument?.id),
@@ -187,6 +199,9 @@ class WorkspaceController extends ChangeNotifier {
     _referenceView = {...referenceView, ...changes, 'root': workspaceRoot};
     _schedulePersist();
   }
+  final _recentNotes = <String, int>{};
+  String? _lastRecentDocument;
+  int recentNoteActivation(String path) => _recentNotes[path] ?? 0;
 
   bool _outlineVisible = true;
 
@@ -279,6 +294,7 @@ class WorkspaceController extends ChangeNotifier {
               _workspaceRoot;
         }
         _referenceView = Map.of(snapshot.referenceView);
+        _recentNotes.addAll(snapshot.recentNotes);
         _readingPreferences = snapshot.readingPreferences;
         _sidebarVisible = snapshot.sidebarVisible;
         _sidebarWidth = WorkspaceLayout.normalizeSidebarWidth(
@@ -2252,6 +2268,7 @@ class WorkspaceController extends ChangeNotifier {
       outlineVisible: _outlineVisible,
       browserState: browser.toJson(),
       referenceView: Map.of(_referenceView),
+      recentNotes: Map.of(_recentNotes),
       operationGrants: Map.of(_operationGrants),
       favoriteAccessTokens: Map.of(_favoriteAccessTokens),
     );
