@@ -16,12 +16,15 @@ String transferNoteContent(
   final edits = <int, ({int end, String text})>{};
   for (final reference in semantics.references) {
     final target = reference.target;
-    final wiki = reference.kind == IanvsMarkdownSourceReferenceKind.wikiLink ||
+    final wiki =
+        reference.kind == IanvsMarkdownSourceReferenceKind.wikiLink ||
         reference.kind == IanvsMarkdownSourceReferenceKind.wikiEmbed;
     if (wiki) {
       final resolved = wikiTargets[target];
       if (resolved == null) {
-        throw const FormatException('Resolve wiki references before inserting this note.');
+        throw const FormatException(
+          'Resolve wiki references before inserting this note.',
+        );
       }
       final range = reference.destinationRange;
       edits[range.start] = (end: range.end, text: resolved);
@@ -30,7 +33,8 @@ String transferNoteContent(
     if (target.startsWith('/') || Uri.tryParse(target)?.hasScheme == true) {
       continue;
     }
-    if (p.dirname(originPath) == p.dirname(destinationPath) && target.isNotEmpty) {
+    if (p.dirname(originPath) == p.dirname(destinationPath) &&
+        target.isNotEmpty) {
       continue;
     }
     final absolute = target.isEmpty
@@ -52,10 +56,14 @@ String transferNoteContent(
 
 String extractionRelativePath(String title, String originPath, String root) {
   if (p.basename(title) != title || title == '.' || title == '..') {
-    throw const FormatException('Use a filename; extracted notes stay beside the original.');
+    throw const FormatException(
+      'Use a filename; extracted notes stay beside the original.',
+    );
   }
   if (!p.isWithin(root, originPath)) {
-    throw const FormatException('Save the source note in this workspace first.');
+    throw const FormatException(
+      'Save the source note in this workspace first.',
+    );
   }
   final name = title.toLowerCase().endsWith('.md') ? title : '$title.md';
   return p.relative(p.join(p.dirname(originPath), name), from: root);

@@ -107,7 +107,8 @@ bool applyOutlineEdit(
 String chapterLinkFragment(List<DocumentHeading> headings, int index) {
   final counts = <String, int>{};
   for (var i = 0; i <= index; i++) {
-    final slug = headings[i].text.toLowerCase()
+    final slug = headings[i].text
+        .toLowerCase()
         .replaceAll(RegExp(r'[^\p{L}\p{N}\p{M}_\-\s]', unicode: true), '')
         .replaceAll(RegExp(r'\s'), '-');
     final count = counts.update(slug, (value) => value + 1, ifAbsent: () => 0);

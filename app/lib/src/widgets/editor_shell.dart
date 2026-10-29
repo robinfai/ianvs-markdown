@@ -848,7 +848,11 @@ class _EditorShellState extends State<EditorShell> {
     }
     final String path;
     try {
-      path = extractionRelativePath(title, origin.path!, workspace.workspaceRoot!);
+      path = extractionRelativePath(
+        title,
+        origin.path!,
+        workspace.workspaceRoot!,
+      );
     } on FormatException catch (error) {
       _showError(error.message);
       return;
@@ -911,32 +915,42 @@ class _EditorShellState extends State<EditorShell> {
     final epoch = workspace.index.epoch;
     try {
       final references = parseIanvsMarkdownNoteSemantics(text).references;
-      if (references.isNotEmpty && (sourcePath == null || document.path == null)) {
-        throw const FormatException('Save both notes before transferring references.');
+      if (references.isNotEmpty &&
+          (sourcePath == null || document.path == null)) {
+        throw const FormatException(
+          'Save both notes before transferring references.',
+        );
       }
       final targets = <String, String>{};
       for (final reference in references) {
         if (reference.kind != IanvsMarkdownSourceReferenceKind.wikiLink &&
-            reference.kind != IanvsMarkdownSourceReferenceKind.wikiEmbed) continue;
+            reference.kind != IanvsMarkdownSourceReferenceKind.wikiEmbed)
+          continue;
         final result = await workspace.references.resolveWiki(
           reference.target,
           originPath: sourcePath,
         );
         if (result.status != WikiNoteStatus.resolved) {
-          throw const FormatException('Resolve missing or ambiguous wiki references before inserting.');
+          throw const FormatException(
+            'Resolve missing or ambiguous wiki references before inserting.',
+          );
         }
         targets[reference.target] = '/${result.candidates.single.relativePath}';
       }
-      final transferred = references.isEmpty ? text : transferNoteContent(
-        text,
-        originPath: sourcePath!,
-        destinationPath: document.path!,
-        wikiTargets: targets,
-      );
-      if (!mounted || epoch != workspace.index.epoch ||
+      final transferred = references.isEmpty
+          ? text
+          : transferNoteContent(
+              text,
+              originPath: sourcePath!,
+              destinationPath: document.path!,
+              wikiTargets: targets,
+            );
+      if (!mounted ||
+          epoch != workspace.index.epoch ||
           workspace.activeDocument != document ||
           !captured.apply(controller, transferred)) {
-        if (mounted) _showError('The destination changed. Insert the reference again.');
+        if (mounted)
+          _showError('The destination changed. Insert the reference again.');
       }
     } on Object catch (error) {
       if (mounted) _showError('Unable to insert reference: $error');
@@ -1005,11 +1019,17 @@ class _EditorShellState extends State<EditorShell> {
     final filename = inbox ? 'Inbox.md' : '${noteDate(DateTime.now())}.md';
     try {
       final catalog = await workspace.index.catalog(refresh: true);
-      final candidates = await WikiNoteResolver(workspace.index).candidates(catalog);
+      final candidates = await WikiNoteResolver(
+        workspace.index,
+      ).candidates(catalog);
       if (!current()) return;
-      final matches = candidates.where((note) => note.comparisonPath == filename.toLowerCase()).toList();
+      final matches = candidates
+          .where((note) => note.comparisonPath == filename.toLowerCase())
+          .toList();
       if (matches.length > 1 || (matches.isEmpty && !catalog.complete)) {
-        _showError('The capture note cannot be resolved uniquely. Refresh the workspace and retry.');
+        _showError(
+          'The capture note cannot be resolved uniquely. Refresh the workspace and retry.',
+        );
         return;
       }
       final target = matches.isEmpty ? filename : matches.single.relativePath;
