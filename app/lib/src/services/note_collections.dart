@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:path/path.dart' as p;
+import 'package:yaml/yaml.dart';
 
 import 'workspace_reference_index.dart';
 
@@ -57,6 +58,27 @@ List<CollectionNote> collectionNotes(
   return rows;
 }
 
+// Read the original YAML, never the bounded display metadata, for edits.
+({YamlNode node, int offset})? _collectionYaml(String source) {
+  if (!parseMarkdownFrontMatter(source).hasFrontMatter) return null;
+  final offset = source.indexOf('\n') + 1;
+  final closing = RegExp(r'^---\r?$', multiLine: true)
+      .allMatches(source)
+      .firstWhere((match) => match.start >= offset);
+  return (node: loadYamlNode(source.substring(offset, closing.start)), offset: offset);
+}
+
+String collectionPropertyEditValue(String source, String key) {
+  final yaml = _collectionYaml(source)?.node;
+  if (yaml is! YamlMap) return '';
+  final value = yaml[key];
+  if (value is List) return jsonEncode(value);
+  if (value is Map) {
+    throw const FormatException('Edit nested objects in Source mode.');
+  }
+  return value?.toString() ?? '';
+}
+
 String editCollectionProperty(String source, String key, String value) {
   if (!RegExp(r'^[A-Za-z_][A-Za-z0-9_-]*$').hasMatch(key)) {
     throw const FormatException('Use a simple property name.');
@@ -66,6 +88,9 @@ String editCollectionProperty(String source, String key, String value) {
   for (final candidate in parsed.entries) {
     if (candidate.key == key) entry = candidate;
   }
+  if (entry != null && value == collectionPropertyEditValue(source, key)) {
+    return source;
+  }
   if (entry == null) {
     final newline = source.contains('\r\n') ? '\r\n' : '\n';
     final line = '$key: ${jsonEncode(value)}$newline';
@@ -73,6 +98,16 @@ String editCollectionProperty(String source, String key, String value) {
       if (parsed.entries.length >= markdownFrontMatterEntryLimit) {
         throw const FormatException(
           'This note has more properties than this view can safely edit. Use Source mode.',
+        );
+      }
+      final yaml = _collectionYaml(source)!;
+      final node = yaml.node;
+      if (node is YamlMap && node.span.text.startsWith('{')) {
+        final offset = yaml.offset + node.span.start.offset + 1;
+        return source.replaceRange(
+          offset,
+          offset,
+          '${jsonEncode(key)}: ${jsonEncode(value)}${node.isEmpty ? '' : ', '}',
         );
       }
       return source.replaceRange(

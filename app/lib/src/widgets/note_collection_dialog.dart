@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
@@ -128,9 +127,7 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
     if (value == null) {
       final entry = row.properties[key];
       final input = TextEditingController(
-        text: entry?.items.isNotEmpty == true
-            ? jsonEncode(entry!.items)
-            : row.value(key),
+        text: collectionPropertyEditValue(row.note.source.text, key),
       );
       try {
         value = await showDialog<String>(
@@ -171,8 +168,8 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
     try {
       final before = row.note.source.text;
       final after = editCollectionProperty(before, key, value);
-      if (after == before && value == row.value(key)) return;
-      if (after == before && value != row.value(key)) {
+      if (after == before && value == collectionPropertyEditValue(before, key)) return;
+      if (after == before && value != collectionPropertyEditValue(before, key)) {
         throw const FormatException(
           'This value cannot be edited safely. Use Source mode.',
         );
