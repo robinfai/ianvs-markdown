@@ -124,6 +124,7 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
           builder: (context) => AlertDialog(
             title: Text('Edit $key'),
             content: TextField(
+              key: const ValueKey('collection-property-input'),
               controller: input,
               autofocus: true,
               decoration: InputDecoration(
