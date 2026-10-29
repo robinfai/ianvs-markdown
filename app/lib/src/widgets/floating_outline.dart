@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../services/outline_operations.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 
 import '../models/document_session.dart';
@@ -77,7 +79,13 @@ class FloatingOutline extends StatelessWidget {
                         ),
                       );
                     }
-                    return ListView.builder(
+                    return ReorderableListView.builder(
+                      buildDefaultDragHandles: false,
+                      onReorder: (oldIndex, newIndex) => applyOutlineEdit(
+                        document.controller,
+                        value.text,
+                        moveChapter(value.text, oldIndex, newIndex),
+                      ),
                       padding: const EdgeInsets.fromLTRB(8, 2, 8, 12),
                       itemCount: headings.length,
                       itemBuilder: (context, index) {
@@ -87,11 +95,42 @@ class FloatingOutline extends StatelessWidget {
                           index,
                           value.selection.extentOffset,
                         );
-                        return _OutlineTile(
-                          heading: heading,
-                          selected: selected,
-                          onTap: () =>
-                              document.controller.revealHeading(heading.offset),
+                        return Row(
+                          key: ValueKey('outline-${heading.offset}'),
+                          children: [
+                            ReorderableDragStartListener(
+                              index: index,
+                              child: const Icon(Icons.drag_indicator, size: 14),
+                            ),
+                            Expanded(
+                              child: _OutlineTile(
+                                heading: heading,
+                                selected: selected,
+                                onTap: () => document.controller.revealHeading(heading.offset),
+                              ),
+                            ),
+                            PopupMenuButton<String>(
+                              tooltip: 'Chapter actions',
+                              iconSize: 14,
+                              onSelected: (action) {
+                                if (action == 'copy') {
+                                  final target = Uri(path: document.path ?? document.name, fragment: heading.text);
+                                  Clipboard.setData(ClipboardData(text: '[Chapter](<$target>)'));
+                                } else {
+                                  applyOutlineEdit(
+                                    document.controller,
+                                    value.text,
+                                    changeChapterLevel(value.text, index, action == 'promote' ? -1 : 1),
+                                  );
+                                }
+                              },
+                              itemBuilder: (_) => const [
+                                PopupMenuItem(value: 'promote', child: Text('Promote chapter')),
+                                PopupMenuItem(value: 'demote', child: Text('Demote chapter')),
+                                PopupMenuItem(value: 'copy', child: Text('Copy chapter link')),
+                              ],
+                            ),
+                          ],
                         );
                       },
                     );

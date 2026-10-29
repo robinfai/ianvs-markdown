@@ -769,6 +769,69 @@ class _EditorShellState extends State<EditorShell> {
     }
   }
 
+  Future<void> _extractSelection() async {
+    final workspace = widget.workspace;
+    final origin = workspace.activeDocument;
+    if (origin == null ||
+        workspace.workspaceRoot == null ||
+        _documentInputTarget.isLocal ||
+        hasEditorComposition(workspace)) {
+      _showError('Select body text in a workspace note first.');
+      return;
+    }
+    final value = origin.controller.value;
+    if (!value.selection.isValid || value.selection.isCollapsed) return;
+    final edit = CapturedNoteInsertion(value, origin.controller.mode);
+    final epoch = workspace.index.epoch;
+    final name = TextEditingController();
+    final String? title;
+    try {
+      title = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Extract selection to note'),
+          content: TextField(
+            controller: name,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: 'New note filename'),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(context, name.text.trim()), child: const Text('Extract')),
+          ],
+        ),
+      );
+    } finally {
+      name.dispose();
+    }
+    bool current() => mounted && identical(workspace, widget.workspace) && epoch == workspace.index.epoch;
+    if (!current() || title == null || title.isEmpty || origin.controller.value != value) return;
+    final path = title.toLowerCase().endsWith('.md') ? title : '$title.md';
+    if (!WikiLinkInsertion.canRepresent(path)) {
+      _showError('Use a Markdown filename without link delimiters.');
+      return;
+    }
+    try {
+      if (!await workspace.createWikiNote(path, epoch: epoch, isCurrent: current)) return;
+      final created = await workspace.openIndexedNote(path, epoch: epoch, isCurrent: current);
+      if (!current() || created == null) return;
+      final contents = value.selection.textInside(value.text);
+      created.controller.value = TextEditingValue(
+        text: contents,
+        selection: TextSelection.collapsed(offset: contents.length),
+      );
+      if (!await _saveDocument(created) || !current()) return;
+      if (!workspace.documents.contains(origin) ||
+          !edit.apply(origin.controller, '[[/$path]]')) {
+        _showError('The extracted note was saved; the original changed and was left intact.');
+        return;
+      }
+      workspace.selectDocument(workspace.documents.indexOf(origin));
+    } on Object catch (error) {
+      if (current()) _showError('Extraction did not finish: $error. Original text is retained until the new note is saved.');
+    }
+  }
+
   bool _referencesVisible = false;
 
   void _insertReference(String text) {
@@ -949,6 +1012,7 @@ class _EditorShellState extends State<EditorShell> {
         epoch == workspace.index.epoch &&
         identical(origin, workspace.activeDocument);
     final actions = <String, VoidCallback>{
+      'Extract selection to note': _extractSelection,
       'New note': () => workspace.newDocument(),
       'New note from template': _useTemplate,
       'Insert template': () => _useTemplate(insert: true),
@@ -1927,6 +1991,7 @@ class _EditorShellState extends State<EditorShell> {
                                                     placeholder:
                                                         'Start writing Markdown…',
                                                     enableModeShortcuts: false,
+                                                    enableHeadingFolding: true,
                                                     showNavigationPane: false,
                                                     showOutlineInPreview: false,
                                                     showFrontMatter: false,
