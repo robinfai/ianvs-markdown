@@ -190,6 +190,17 @@ class WorkspaceController extends ChangeNotifier {
     _schedulePersist();
   }
 
+  Map<String, Object?> _referenceView = {};
+  Map<String, Object?> get referenceView =>
+      _referenceView['root'] == workspaceRoot
+      ? Map.unmodifiable(_referenceView)
+      : const {};
+
+  void setReferenceView(Map<String, Object?> changes) {
+    _referenceView = {...referenceView, ...changes, 'root': workspaceRoot};
+    _schedulePersist();
+  }
+
   final _recentNotes = <String, int>{};
   String? _lastRecentDocument;
   int recentNoteActivation(String path) => _recentNotes[path] ?? 0;
@@ -284,6 +295,7 @@ class WorkspaceController extends ChangeNotifier {
               await fileService.restorePersistentAccess(token) ??
               _workspaceRoot;
         }
+        _referenceView = Map.of(snapshot.referenceView);
         _recentNotes.addAll(snapshot.recentNotes);
         _readingPreferences = snapshot.readingPreferences;
         _sidebarVisible = snapshot.sidebarVisible;
@@ -2257,6 +2269,7 @@ class WorkspaceController extends ChangeNotifier {
       readingPreferences: _readingPreferences,
       outlineVisible: _outlineVisible,
       browserState: browser.toJson(),
+      referenceView: Map.of(_referenceView),
       recentNotes: Map.of(_recentNotes),
       operationGrants: Map.of(_operationGrants),
       favoriteAccessTokens: Map.of(_favoriteAccessTokens),

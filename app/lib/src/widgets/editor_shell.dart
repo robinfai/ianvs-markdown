@@ -28,6 +28,8 @@ import '../services/wiki_link_insertion.dart';
 import 'wiki_note_picker.dart';
 import 'workspace_palette.dart';
 import 'note_template_dialog.dart';
+import 'reference_dock.dart';
+import 'note_link_preview.dart';
 import 'note_text_dialog.dart';
 import '../services/note_templates.dart';
 import '../services/slash_insertion.dart';
@@ -122,6 +124,7 @@ class _EditorShellState extends State<EditorShell> {
     _attachmentRoot = widget.workspace.workspaceRoot;
     widget.workspace.addListener(_workspaceChanged);
     _bindSlashController();
+    _referencesVisible = widget.workspace.referenceView['visible'] == true;
   }
 
   @override
@@ -141,6 +144,11 @@ class _EditorShellState extends State<EditorShell> {
 
   void _workspaceChanged() {
     _bindSlashController();
+    if ((!_referenceRestoreDone && widget.workspace.initialized) ||
+        _attachmentRoot != widget.workspace.workspaceRoot) {
+      _referenceRestoreDone = true;
+      _referencesVisible = widget.workspace.referenceView['visible'] == true;
+    }
     if (_attachmentRoot != widget.workspace.workspaceRoot) {
       _attachmentRoot = widget.workspace.workspaceRoot;
       ++_attachmentGeneration;
@@ -541,6 +549,24 @@ class _EditorShellState extends State<EditorShell> {
     }
   }
 
+  Future<void> _openDocumentLink(
+    DocumentSession document,
+    IanvsMarkdownLinkTarget link,
+  ) {
+    if (link.kind == IanvsMarkdownLinkKind.wiki) {
+      return _openWikiLink(document, link.href ?? '');
+    }
+    if (link.kind == IanvsMarkdownLinkKind.tag) {
+      return _openWorkspaceReferences(
+        tag: (link.href ?? '').replaceFirst(RegExp(r'^tag:#?'), ''),
+      );
+    }
+    return DocumentLinkService(
+      workspace: widget.workspace,
+      openImage: _openImage,
+    ).open(document, link.href);
+  }
+
   Future<void> _openWikiLink(DocumentSession origin, String target) async {
     if (!(ModalRoute.of(context)?.isCurrent ?? true) ||
         hasEditorComposition(widget.workspace)) {
@@ -769,6 +795,26 @@ class _EditorShellState extends State<EditorShell> {
     }
   }
 
+  void _setReferencesVisible(bool value) {
+    setState(() => _referencesVisible = value);
+    widget.workspace.setReferenceView({'visible': value});
+  }
+
+  bool _referencesVisible = false;
+  bool _referenceRestoreDone = false;
+
+  void _insertReference(String text) {
+    final document = widget.workspace.activeDocument;
+    if (document == null || _documentInputTarget.isLocal) return;
+    final controller = document.controller;
+    if (!CapturedNoteInsertion(
+      controller.value,
+      controller.mode,
+    ).apply(controller, text)) {
+      _showError('Place the cursor in an editable document body first.');
+    }
+  }
+
   bool _captureBusy = false;
 
   Future<void> _useTemplate({bool insert = false}) async {
@@ -952,6 +998,7 @@ class _EditorShellState extends State<EditorShell> {
       'Search workspace': _openWorkspaceSearch,
       'Find in document': _openFind,
       'Show backlinks': _openWorkspaceReferences,
+      'Toggle reference pane': () => _setReferencesVisible(!_referencesVisible),
       'Toggle sidebar': workspace.toggleSidebar,
       'Toggle outline': workspace.toggleOutline,
       'Live preview': () =>
@@ -1553,11 +1600,18 @@ class _EditorShellState extends State<EditorShell> {
             child: Scaffold(
               body: LayoutBuilder(
                 builder: (context, constraints) {
-                  final inspectorWidth = workspace.outlineVisible
+                  final showOutline =
+                      workspace.outlineVisible && !_referencesVisible;
+                  final referenceWidth = _referencesVisible
+                      ? math.min(360.0, constraints.maxWidth * 0.4)
+                      : 0.0;
+                  final inspectorWidth = showOutline
                       ? DesktopMetrics.inspectorWidth
                       : 0.0;
                   final minContentWidth = math.max(
-                    inspectorWidth + WorkspaceLayout.minEditorWidth,
+                    inspectorWidth +
+                        WorkspaceLayout.minEditorWidth +
+                        referenceWidth,
                     WorkspaceLayout.minContentWidth,
                   );
                   final maxSidebarWidth =
@@ -1572,7 +1626,8 @@ class _EditorShellState extends State<EditorShell> {
                   final content = Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (workspace.sidebarVisible)
+                      if (workspace.sidebarVisible &&
+                          (!_referencesVisible || constraints.maxWidth >= 1100))
                         SizedBox(
                           width: sidebarWidth,
                           child: Stack(
@@ -1856,6 +1911,19 @@ class _EditorShellState extends State<EditorShell> {
                                                                 .currentIndex,
                                                           )
                                                         : null,
+                                                    builders: {
+                                                      'a': NoteLinkPreviewBuilder(
+                                                        workspace: workspace,
+                                                        document: document,
+                                                        onTap: (link) => _guard(
+                                                          () =>
+                                                              _openDocumentLink(
+                                                                document,
+                                                                link,
+                                                              ),
+                                                        ),
+                                                      ),
+                                                    },
                                                     imageBuilder: images.image,
                                                     onPaste:
                                                         _pasteFromClipboard,
@@ -1945,7 +2013,7 @@ class _EditorShellState extends State<EditorShell> {
                                             },
                                           ),
                                         ),
-                                        if (workspace.outlineVisible)
+                                        if (showOutline)
                                           FloatingOutline(document: document),
                                       ],
                                     ),
@@ -1961,6 +2029,16 @@ class _EditorShellState extends State<EditorShell> {
                           ],
                         ),
                       ),
+                      if (_referencesVisible)
+                        SizedBox(
+                          width: referenceWidth,
+                          child: ReferenceDock(
+                            key: ValueKey(workspace.workspaceRoot),
+                            workspace: workspace,
+                            onClose: () => _setReferencesVisible(false),
+                            onInsert: _insertReference,
+                          ),
+                        ),
                     ],
                   );
                   return Focus(
