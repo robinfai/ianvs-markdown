@@ -3,6 +3,7 @@ import 'package:path/path.dart' as p;
 
 import '../models/document_analysis.dart';
 import 'outline_operations.dart';
+import 'wiki_link_insertion.dart';
 
 /// Preserve relative Markdown destinations when copying between note folders.
 /// Source ranges avoid changing code samples, labels, titles or fragments.
@@ -169,10 +170,14 @@ String _preserveExtractedFragments(
     }
     String replacement;
     if (!moved) {
+      if (wiki && !WikiLinkInsertion.canRepresent(originRelativePath)) {
+        throw const FormatException('The original filename cannot be represented in a wiki link. Use Source mode.');
+      }
       final path = wiki ? '/$originRelativePath' : Uri.encodeComponent(p.basename(originRelativePath));
       replacement = '$path$raw';
     } else if (headingIndex != null) {
-      final index = extractedHeadings.indexWhere((heading) => heading.offset == targetStart! - selectionStart);
+      final movedHeadingOffset = targetStart - selectionStart;
+      final index = extractedHeadings.indexWhere((heading) => heading.offset == movedHeadingOffset);
       if (index < 0) {
         throw const FormatException('The selected heading would lose its Markdown structure. Select a complete heading.');
       }
