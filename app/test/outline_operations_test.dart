@@ -66,16 +66,24 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       final files = WikiFiles();
       files.files['/vault/Origin.md'] = 'Root';
-    const selected = '[x](sibling.md#heading) ![](assets/a.png)';
-    files.files['/vault/chapters/source.md'] = 'before $selected after';
+      const selected = '[x](sibling.md#heading) ![](assets/a.png)';
+      files.files['/vault/chapters/source.md'] = 'before $selected after';
       final workspace = await wikiWorkspace(files);
-    files.directories['/vault']!.add(const WorkspaceEntry(
-      path: '/vault/chapters', name: 'chapters', isDirectory: true,
-    ));
-    files.directories['/vault/chapters'] = [const WorkspaceEntry(
-      path: '/vault/chapters/source.md', name: 'source.md', isDirectory: false,
-    )];
-    await workspace.openPath('/vault/chapters/source.md');
+      files.directories['/vault']!.add(
+        const WorkspaceEntry(
+          path: '/vault/chapters',
+          name: 'chapters',
+          isDirectory: true,
+        ),
+      );
+      files.directories['/vault/chapters'] = [
+        const WorkspaceEntry(
+          path: '/vault/chapters/source.md',
+          name: 'source.md',
+          isDirectory: false,
+        ),
+      ];
+      await workspace.openPath('/vault/chapters/source.md');
       addTearDown(workspace.dispose);
       addTearDown(files.dispose);
       final origin = workspace.activeDocument!;
