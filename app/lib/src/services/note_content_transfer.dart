@@ -156,11 +156,14 @@ String _preserveExtractedFragments(
           targetEnd = block.end;
           // A standalone ID belongs to the preceding structured block.
           if (block.source.trim() == fragment) {
-            final preceding = blocks.take(blocks.indexOf(block)).where(
-              (candidate) => candidate.source.trim().isNotEmpty,
-            ).toList();
+            final preceding = blocks
+                .take(blocks.indexOf(block))
+                .where((candidate) => candidate.source.trim().isNotEmpty)
+                .toList();
             if (preceding.isEmpty) {
-              throw const FormatException('This standalone block ID has no target. Use Source mode.');
+              throw const FormatException(
+                'This standalone block ID has no target. Use Source mode.',
+              );
             }
             targetStart = preceding.last.start;
           }
