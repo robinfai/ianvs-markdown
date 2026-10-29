@@ -143,6 +143,11 @@ class _EditorShellState extends State<EditorShell> {
 
   void _workspaceChanged() {
     _bindSlashController();
+    if ((!_referenceRestoreDone && widget.workspace.initialized) ||
+        _attachmentRoot != widget.workspace.workspaceRoot) {
+      _referenceRestoreDone = true;
+      _referencesVisible = widget.workspace.referenceView['visible'] == true;
+    }
     if (_attachmentRoot != widget.workspace.workspaceRoot) {
       _attachmentRoot = widget.workspace.workspaceRoot;
       ++_attachmentGeneration;
@@ -787,6 +792,7 @@ class _EditorShellState extends State<EditorShell> {
   }
 
   bool _referencesVisible = false;
+  bool _referenceRestoreDone = false;
 
   void _insertReference(String text) {
     final document = widget.workspace.activeDocument;

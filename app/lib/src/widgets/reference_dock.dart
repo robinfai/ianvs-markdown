@@ -34,6 +34,7 @@ class _ReferenceDockState extends State<ReferenceDock> {
   final _scroll = ScrollController();
   String? _readingKey;
   bool _refreshing = false;
+  bool _positionRestored = false;
 
   @override
   void initState() {
@@ -78,7 +79,17 @@ class _ReferenceDockState extends State<ReferenceDock> {
     _refreshing = true;
     try {
       await widget.workspace.references.refresh();
-      if (mounted) setState(() => _error = null);
+      if (mounted) {
+        setState(() => _error = null);
+        if (!_positionRestored) {
+          _positionRestored = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _scroll.hasClients) {
+              _scroll.jumpTo((_positions[_readingKey] ?? 0).clamp(0, _scroll.position.maxScrollExtent));
+            }
+          });
+        }
+      }
     } on Object catch (error) {
       if (mounted) setState(() => _error = 'References unavailable: $error');
     } finally {
