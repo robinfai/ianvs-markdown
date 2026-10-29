@@ -83,7 +83,8 @@ class _NoteLinkPreviewState extends State<NoteLinkPreview> {
   @override
   void didUpdateWidget(covariant NoteLinkPreview oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.href != widget.href || oldWidget.origin != widget.origin ||
+    if (oldWidget.href != widget.href ||
+        oldWidget.origin != widget.origin ||
         !identical(oldWidget.workspace, widget.workspace)) {
       _request++;
       _hovering = false;

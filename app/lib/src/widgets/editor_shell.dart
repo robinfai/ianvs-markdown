@@ -1603,13 +1603,18 @@ class _EditorShellState extends State<EditorShell> {
             child: Scaffold(
               body: LayoutBuilder(
                 builder: (context, constraints) {
-                  final showOutline = workspace.outlineVisible && !_referencesVisible;
-                  final referenceWidth = _referencesVisible ? math.min(360.0, constraints.maxWidth * 0.4) : 0.0;
+                  final showOutline =
+                      workspace.outlineVisible && !_referencesVisible;
+                  final referenceWidth = _referencesVisible
+                      ? math.min(360.0, constraints.maxWidth * 0.4)
+                      : 0.0;
                   final inspectorWidth = showOutline
                       ? DesktopMetrics.inspectorWidth
                       : 0.0;
                   final minContentWidth = math.max(
-                    inspectorWidth + WorkspaceLayout.minEditorWidth + referenceWidth,
+                    inspectorWidth +
+                        WorkspaceLayout.minEditorWidth +
+                        referenceWidth,
                     WorkspaceLayout.minContentWidth,
                   );
                   final maxSidebarWidth =
@@ -1624,7 +1629,8 @@ class _EditorShellState extends State<EditorShell> {
                   final content = Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (workspace.sidebarVisible && (!_referencesVisible || constraints.maxWidth >= 1100))
+                      if (workspace.sidebarVisible &&
+                          (!_referencesVisible || constraints.maxWidth >= 1100))
                         SizedBox(
                           width: sidebarWidth,
                           child: Stack(
