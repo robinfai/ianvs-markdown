@@ -707,7 +707,8 @@ class _EditorShellState extends State<EditorShell> {
             context,
             workspace,
             action,
-            renderMermaid: (source) async => (await _mermaidRenderer.render(source)).svg,
+            renderMermaid: (source) async =>
+                (await _mermaidRenderer.render(source)).svg,
             attachmentSource: widget.attachmentSource,
           ),
         ),
@@ -762,7 +763,9 @@ class _EditorShellState extends State<EditorShell> {
                 detail: note.relativePath,
                 searchTerms:
                     snapshot.aliases.byPath[note.relativePath]?.join(' ') ?? '',
-                recency: document?.lastActivated ?? workspace.recentNoteActivation(absolute),
+                recency:
+                    document?.lastActivated ??
+                    workspace.recentNoteActivation(absolute),
               ),
             );
           }
