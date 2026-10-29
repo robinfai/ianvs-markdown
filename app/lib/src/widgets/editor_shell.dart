@@ -28,6 +28,7 @@ import '../services/wiki_link_insertion.dart';
 import 'wiki_note_picker.dart';
 import 'workspace_palette.dart';
 import 'note_template_dialog.dart';
+import 'note_text_dialog.dart';
 import '../services/note_templates.dart';
 import '../services/attachment_repository.dart';
 import '../services/attachment_import_service.dart';
@@ -800,45 +801,23 @@ class _EditorShellState extends State<EditorShell> {
   Future<void> _quickAppend({required bool inbox}) async {
     final workspace = widget.workspace;
     final epoch = workspace.index.epoch;
-    final text = TextEditingController();
-    try {
-      final result = await showDialog<String>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text(inbox ? 'Append to Inbox' : 'Append to today'),
-          content: SizedBox(
-            width: 520,
-            child: TextField(
-              controller: text,
-              autofocus: true,
-              minLines: 4,
-              maxLines: 10,
-              decoration: const InputDecoration(labelText: 'Capture text'),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, text.text),
-              child: const Text('Append'),
-            ),
-          ],
-        ),
-      );
-      if (!mounted ||
-          result == null ||
-          result.trim().isEmpty ||
-          !identical(workspace, widget.workspace) ||
-          epoch != workspace.index.epoch) {
-        return;
-      }
-      await _openCaptureNote(inbox: inbox, append: result);
-    } finally {
-      text.dispose();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (_) => NoteTextDialog(
+        title: inbox ? 'Append to Inbox' : 'Append to today',
+        label: 'Capture text',
+        submit: 'Append',
+        multiline: true,
+      ),
+    );
+    if (!mounted ||
+        result == null ||
+        result.trim().isEmpty ||
+        !identical(workspace, widget.workspace) ||
+        epoch != workspace.index.epoch) {
+      return;
     }
+    await _openCaptureNote(inbox: inbox, append: result);
   }
 
   bool _paletteOpen = false;
