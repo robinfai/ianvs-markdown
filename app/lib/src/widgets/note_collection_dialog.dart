@@ -142,7 +142,8 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
           submit: 'Save property',
           initialValue: originalValue,
           inputKey: const ValueKey('collection-property-input'),
-          helperText: 'Type: ${entry?.type.name ?? 'text'}. Lists use a JSON string array.',
+          helperText:
+              'Type: ${entry?.type.name ?? 'text'}. Lists use a JSON string array.',
         ),
       );
     }
@@ -364,8 +365,13 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
                   cells: [
                     for (final column in columns)
                       DataCell(
-                        Text(
-                          row.value(column).isEmpty ? '—' : row.value(column),
+                        SizedBox(
+                          width: 180,
+                          child: Text(
+                            row.value(column).isEmpty ? '—' : row.value(column),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         onTap: column == 'filename'
                             ? () => _open(row)
