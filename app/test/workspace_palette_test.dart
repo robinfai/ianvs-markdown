@@ -9,6 +9,31 @@ import 'package:linefold/src/widgets/workspace_palette.dart';
 import 'support/fakes.dart';
 
 void main() {
+  test('closed notes retain recent rank after workspace recovery', () async {
+    final files = MemoryMarkdownFileService();
+    files.files['/notes/recent.md'] = '# Recent';
+    final store = MemoryWorkspaceSessionStore();
+    final workspace = WorkspaceController(
+      fileService: files,
+      sessionStore: store,
+    );
+    await workspace.initialize();
+    final note = (await workspace.openPath('/notes/recent.md'))!;
+    workspace.removeDocument(note);
+    await workspace.flushSession();
+    final rank = workspace.recentNoteActivation('/notes/recent.md');
+    expect(rank, greaterThan(0));
+    workspace.dispose();
+    final restored = WorkspaceController(
+      fileService: files,
+      sessionStore: store,
+    );
+    await restored.initialize();
+    expect(restored.recentNoteActivation('/notes/recent.md'), rank);
+    restored.dispose();
+    await files.dispose();
+  });
+
   test(
     'note titles prefer metadata and fall back to headings and filenames',
     () {
@@ -18,6 +43,7 @@ void main() {
       );
       expect(paletteNoteTitle('# Heading\nBody', 'a'), 'Heading');
       expect(paletteNoteTitle('Body', 'a.md'), 'a.md');
+      expect(paletteNoteTitle('```\n# fake\n```\n# Real', 'a'), 'Real');
     },
   );
 
