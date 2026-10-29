@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import '../controllers/workspace_controller.dart';
 import '../models/document_session.dart';
 import '../services/workspace_reference_index.dart';
+import 'document_attachment_scope.dart';
 
 /// A persistent, independently scrollable reference reading surface.
 class ReferenceDock extends StatefulWidget {
@@ -32,19 +33,67 @@ class _ReferenceDockState extends State<ReferenceDock> {
   final _positions = <String, double>{};
   final _scroll = ScrollController();
   String? _readingKey;
+  bool _refreshing = false;
+  bool _positionRestored = false;
 
   @override
   void initState() {
     super.initState();
+    final active = widget.workspace.activeDocument;
+    final saved = widget.workspace.referenceView;
+    _pinnedPath = saved['path'] as String? ?? active?.path;
+    _pinnedSession = saved['session'] as String? ?? active?.id;
+    final positions = saved['positions'];
+    if (positions is Map) {
+      for (final entry in positions.entries) {
+        if (entry.key is String && entry.value is num) {
+          _positions[entry.key as String] = (entry.value as num).toDouble();
+        }
+      }
+    }
+    _scroll.addListener(_savePosition);
+    _readingKey = _pinnedSession ?? _pinnedPath;
+    widget.workspace.references.addListener(_referencesChanged);
     unawaited(_refresh());
   }
 
+  void _savePosition() {
+    if (_readingKey != null && _scroll.hasClients) {
+      _positions[_readingKey!] = _scroll.offset;
+      widget.workspace.setReferenceView({
+        'path': _pinnedPath,
+        'session': _pinnedSession,
+        'positions': Map.of(_positions),
+      });
+    }
+  }
+
+  void _referencesChanged() {
+    if (widget.workspace.references.stale && !_refreshing) {
+      scheduleMicrotask(() { if (mounted) unawaited(_refresh()); });
+    }
+  }
+
   Future<void> _refresh() async {
+    if (_refreshing) return;
+    _refreshing = true;
     try {
       await widget.workspace.references.refresh();
-      if (mounted) setState(() => _error = null);
+      if (mounted) {
+        setState(() => _error = null);
+        if (!_positionRestored) {
+          _positionRestored = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _scroll.hasClients) {
+              _scroll.jumpTo((_positions[_readingKey] ?? 0).clamp(0, _scroll.position.maxScrollExtent));
+            }
+          });
+        }
+      }
     } on Object catch (error) {
       if (mounted) setState(() => _error = 'References unavailable: $error');
+    } finally {
+      _refreshing = false;
     }
   }
 
@@ -57,10 +106,18 @@ class _ReferenceDockState extends State<ReferenceDock> {
       _pinnedSession = session;
       _readingKey = session ?? path;
     });
+    widget.workspace.setReferenceView({
+      'path': path,
+      'session': session,
+      'positions': Map.of(_positions),
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _scroll.hasClients) {
         _scroll.jumpTo(
-          (_positions[_readingKey] ?? 0).clamp(0, _scroll.position.maxScrollExtent),
+          (_positions[_readingKey] ?? 0).clamp(
+            0,
+            _scroll.position.maxScrollExtent,
+          ),
         );
       }
     });
@@ -68,6 +125,7 @@ class _ReferenceDockState extends State<ReferenceDock> {
 
   @override
   void dispose() {
+    widget.workspace.references.removeListener(_referencesChanged);
     _scroll.dispose();
     super.dispose();
   }
@@ -85,7 +143,8 @@ class _ReferenceDockState extends State<ReferenceDock> {
       final root = workspace.workspaceRoot;
       final active = workspace.activeDocument;
       final activePath = active?.path;
-      final relative = root != null && activePath != null && p.isWithin(root, activePath)
+      final relative =
+          root != null && activePath != null && p.isWithin(root, activePath)
           ? p.relative(activePath, from: root)
           : null;
       DocumentSession? open;
@@ -130,7 +189,9 @@ class _ReferenceDockState extends State<ReferenceDock> {
             Wrap(
               children: [
                 TextButton(
-                  onPressed: active == null ? null : () => _pin(active.path, active.id),
+                  onPressed: active == null
+                      ? null
+                      : () => _pin(active.path, active.id),
                   child: const Text('Pin current note'),
                 ),
                 TextButton(onPressed: _refresh, child: const Text('Refresh')),
@@ -156,7 +217,8 @@ class _ReferenceDockState extends State<ReferenceDock> {
                         onTap: () => _pin(entry.key, null),
                       ),
                     ),
-                  if (related.isEmpty) const ListTile(title: Text('No known links')),
+                  if (related.isEmpty)
+                    const ListTile(title: Text('No known links')),
                   for (final document in workspace.documents)
                     ListTile(
                       dense: true,
@@ -170,7 +232,9 @@ class _ReferenceDockState extends State<ReferenceDock> {
             const Divider(),
             if (_readingKey != null)
               ListTile(
-                title: Text(open?.name ?? p.basename(_pinnedPath ?? 'Reference')),
+                title: Text(
+                  open?.name ?? p.basename(_pinnedPath ?? 'Reference'),
+                ),
                 trailing: IconButton(
                   tooltip: 'Insert reference at cursor',
                   onPressed: text == null ? null : () => widget.onInsert(text),
@@ -179,11 +243,21 @@ class _ReferenceDockState extends State<ReferenceDock> {
               ),
             Expanded(
               child: text == null
-                  ? const Center(child: Text('Pin a note to read beside your draft.'))
+                  ? const Center(
+                      child: Text('Pin a note to read beside your draft.'),
+                    )
                   : SingleChildScrollView(
                       controller: _scroll,
                       padding: const EdgeInsets.all(16),
-                      child: IanvsMarkdown(data: text),
+                      child: DocumentAttachmentScope(
+                        root: root,
+                        documentPath: open?.path ?? _pinnedPath,
+                        builder: (context, images) => IanvsMarkdown(
+                          data: text,
+                          imageBuilder: images.image,
+                          wikiEmbedBuilder: images.wiki,
+                        ),
+                      ),
                     ),
             ),
           ],

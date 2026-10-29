@@ -18,6 +18,8 @@ class WorkspaceSnapshot {
     this.sidebarWidth = WorkspaceLayout.defaultSidebarWidth,
     this.readingPreferences = ReadingPreferences.defaults,
     this.browserState = const {},
+    this.recentNotes = const {},
+    this.referenceView = const {},
     this.operationGrants = const {},
     this.favoriteAccessTokens = const {},
     this.recoveryNotice,
@@ -29,6 +31,12 @@ class WorkspaceSnapshot {
   }) {
     final rawDocuments = json['documents'];
     return WorkspaceSnapshot(
+      referenceView: json['referenceView'] is Map
+          ? Map<String, Object?>.from(json['referenceView'] as Map)
+          : const {},
+      recentNotes: json['recentNotes'] is Map
+          ? Map<String, int>.from(json['recentNotes'] as Map)
+          : const {},
       recoveryNotice: recoveryNotice,
       readingPreferences: ReadingPreferences.fromJson(
         json['readingPreferences'],
@@ -71,6 +79,8 @@ class WorkspaceSnapshot {
   final double sidebarWidth;
   final ReadingPreferences readingPreferences;
   final Map<String, Object?> browserState;
+  final Map<String, int> recentNotes;
+  final Map<String, Object?> referenceView;
   final Map<String, String> operationGrants;
   final Map<String, String> favoriteAccessTokens;
 
@@ -79,6 +89,8 @@ class WorkspaceSnapshot {
 
   Map<String, Object?> toJson() => <String, Object?>{
     'browserState': browserState,
+    'recentNotes': recentNotes,
+    'referenceView': referenceView,
     'operationGrants': operationGrants,
     'favoriteAccessTokens': favoriteAccessTokens,
     'documents': documents,

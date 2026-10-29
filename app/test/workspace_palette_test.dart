@@ -9,11 +9,17 @@ import 'package:linefold/src/widgets/workspace_palette.dart';
 import 'support/fakes.dart';
 
 void main() {
-  test('note titles prefer metadata and fall back to headings and filenames', () {
-    expect(paletteNoteTitle('---\ntitle: Reading\n---\n# Other', 'a'), 'Reading');
-    expect(paletteNoteTitle('# Heading\nBody', 'a'), 'Heading');
-    expect(paletteNoteTitle('Body', 'a.md'), 'a.md');
-  });
+  test(
+    'note titles prefer metadata and fall back to headings and filenames',
+    () {
+      expect(
+        paletteNoteTitle('---\ntitle: Reading\n---\n# Other', 'a'),
+        'Reading',
+      );
+      expect(paletteNoteTitle('# Heading\nBody', 'a'), 'Heading');
+      expect(paletteNoteTitle('Body', 'a.md'), 'a.md');
+    },
+  );
 
   test('recent activation survives session serialization', () {
     final document = DocumentSession(id: 'one', name: 'one.md', text: 'body');
@@ -46,11 +52,7 @@ void main() {
                       searchTerms: 'project launch',
                       detail: 'work/Alpha.md',
                     ),
-                    WorkspacePaletteEntry(
-                      id: 'b',
-                      title: 'Beta',
-                      recency: 10,
-                    ),
+                    WorkspacePaletteEntry(id: 'b', title: 'Beta', recency: 10),
                   ],
                 ),
               );
@@ -123,7 +125,7 @@ void main() {
       'Source mode',
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Source mode'));
+    await tester.tap(find.byKey(const ValueKey('palette-entry-Source mode')));
     await tester.pumpAndSettle();
     expect(workspace.activeDocument?.controller.mode.name, 'source');
     await tester.pumpWidget(const SizedBox());

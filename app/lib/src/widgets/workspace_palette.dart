@@ -9,7 +9,10 @@ String paletteNoteTitle(String source, String fallback) {
       return entry.value.trim();
     }
   }
-  final heading = RegExp(r'^# +(.+)$', multiLine: true).firstMatch(metadata.body);
+  final heading = RegExp(
+    r'^# +(.+)$',
+    multiLine: true,
+  ).firstMatch(metadata.body);
   return heading?.group(1)?.trim() ?? fallback;
 }
 
@@ -95,7 +98,9 @@ class _WorkspacePaletteState extends State<WorkspacePalette> {
     if (_composing) return;
     final entries = _matches;
     if (entries.isEmpty) return;
-    setState(() => _selected = (_selected + delta).clamp(0, entries.length - 1));
+    setState(
+      () => _selected = (_selected + delta).clamp(0, entries.length - 1),
+    );
     if (_scroll.hasClients) {
       _scroll.jumpTo(
         (_selected * 64.0).clamp(0, _scroll.position.maxScrollExtent),
@@ -149,6 +154,7 @@ class _WorkspacePaletteState extends State<WorkspacePalette> {
                 itemExtent: 64,
                 itemCount: entries.length,
                 itemBuilder: (context, i) => ListTile(
+                  key: ValueKey('palette-entry-${entries[i].id}'),
                   selected: i == _selected,
                   title: Text(entries[i].title, maxLines: 1),
                   subtitle: Text(entries[i].detail, maxLines: 1),
