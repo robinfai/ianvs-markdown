@@ -60,7 +60,10 @@ class _ReferenceDockState extends State<ReferenceDock> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _scroll.hasClients) {
         _scroll.jumpTo(
-          (_positions[_readingKey] ?? 0).clamp(0, _scroll.position.maxScrollExtent),
+          (_positions[_readingKey] ?? 0).clamp(
+            0,
+            _scroll.position.maxScrollExtent,
+          ),
         );
       }
     });
@@ -85,7 +88,8 @@ class _ReferenceDockState extends State<ReferenceDock> {
       final root = workspace.workspaceRoot;
       final active = workspace.activeDocument;
       final activePath = active?.path;
-      final relative = root != null && activePath != null && p.isWithin(root, activePath)
+      final relative =
+          root != null && activePath != null && p.isWithin(root, activePath)
           ? p.relative(activePath, from: root)
           : null;
       DocumentSession? open;
@@ -130,7 +134,9 @@ class _ReferenceDockState extends State<ReferenceDock> {
             Wrap(
               children: [
                 TextButton(
-                  onPressed: active == null ? null : () => _pin(active.path, active.id),
+                  onPressed: active == null
+                      ? null
+                      : () => _pin(active.path, active.id),
                   child: const Text('Pin current note'),
                 ),
                 TextButton(onPressed: _refresh, child: const Text('Refresh')),
@@ -156,7 +162,8 @@ class _ReferenceDockState extends State<ReferenceDock> {
                         onTap: () => _pin(entry.key, null),
                       ),
                     ),
-                  if (related.isEmpty) const ListTile(title: Text('No known links')),
+                  if (related.isEmpty)
+                    const ListTile(title: Text('No known links')),
                   for (final document in workspace.documents)
                     ListTile(
                       dense: true,
@@ -170,7 +177,9 @@ class _ReferenceDockState extends State<ReferenceDock> {
             const Divider(),
             if (_readingKey != null)
               ListTile(
-                title: Text(open?.name ?? p.basename(_pinnedPath ?? 'Reference')),
+                title: Text(
+                  open?.name ?? p.basename(_pinnedPath ?? 'Reference'),
+                ),
                 trailing: IconButton(
                   tooltip: 'Insert reference at cursor',
                   onPressed: text == null ? null : () => widget.onInsert(text),
@@ -179,7 +188,9 @@ class _ReferenceDockState extends State<ReferenceDock> {
               ),
             Expanded(
               child: text == null
-                  ? const Center(child: Text('Pin a note to read beside your draft.'))
+                  ? const Center(
+                      child: Text('Pin a note to read beside your draft.'),
+                    )
                   : SingleChildScrollView(
                       controller: _scroll,
                       padding: const EdgeInsets.all(16),
