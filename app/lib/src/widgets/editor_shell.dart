@@ -781,7 +781,10 @@ class _EditorShellState extends State<EditorShell> {
     }
     final edit = document == null
         ? null
-        : CapturedNoteInsertion(document.controller.value, document.controller.mode);
+        : CapturedNoteInsertion(
+            document.controller.value,
+            document.controller.mode,
+          );
     final result = await showDialog<NoteTemplateResult>(
       context: context,
       builder: (_) => NoteTemplateDialog(insert: insert),
@@ -795,7 +798,9 @@ class _EditorShellState extends State<EditorShell> {
     if (insert) {
       if (!identical(document, workspace.activeDocument) ||
           !edit!.apply(document!.controller, result.text)) {
-        _showError('The source or selection changed. Insert the template again.');
+        _showError(
+          'The source or selection changed. Insert the template again.',
+        );
         return;
       }
     } else {
@@ -862,7 +867,9 @@ class _EditorShellState extends State<EditorShell> {
         );
         controller.commitHistoryGroup();
         if (!await _saveDocument(document) && current()) {
-          _showError('Capture remains in the open note. Save it before closing.');
+          _showError(
+            'Capture remains in the open note. Save it before closing.',
+          );
         }
       }
     } on Object catch (error) {
@@ -975,7 +982,8 @@ class _EditorShellState extends State<EditorShell> {
           final snapshot = await workspace.references.refresh();
           if (!current()) return;
           if (!snapshot.complete) {
-            notice = 'Some notes or aliases are unavailable. Showing known notes.';
+            notice =
+                'Some notes or aliases are unavailable. Showing known notes.';
           }
           final sources = {
             for (final note in snapshot.notes.values)
@@ -1423,13 +1431,15 @@ class _EditorShellState extends State<EditorShell> {
                   LogicalKeyboardKey.keyP,
                   meta: useMeta,
                   control: !useMeta,
-                ): () => _openPalette(),
+                ): () =>
+                    _openPalette(),
                 SingleActivator(
                   LogicalKeyboardKey.keyP,
                   meta: useMeta,
                   control: !useMeta,
                   shift: true,
-                ): () => _openPalette(commands: true),
+                ): () =>
+                    _openPalette(commands: true),
               },
               const SingleActivator(
                 LogicalKeyboardKey.bracketLeft,
@@ -1607,7 +1617,8 @@ class _EditorShellState extends State<EditorShell> {
                                 ),
                                 IconButton(
                                   key: const ValueKey('command-palette-button'),
-                                  tooltip: 'Command palette (⌘⇧P / Ctrl+Shift+P)',
+                                  tooltip:
+                                      'Command palette (⌘⇧P / Ctrl+Shift+P)',
                                   onPressed: () => _openPalette(commands: true),
                                   icon: const Icon(Icons.terminal, size: 16),
                                 ),
