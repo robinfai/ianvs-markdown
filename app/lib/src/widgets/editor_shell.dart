@@ -700,6 +700,17 @@ class _EditorShellState extends State<EditorShell> {
       'Open workspace folder': () => _guard(workspace.chooseWorkspaceFolder),
       'Save': _saveCommand,
       'Save as': () => _saveCommand(saveAs: true),
+      'Import image': () => unawaited(_importImage()),
+      for (final action in DocumentExportAction.values)
+        'Export ${action.name.toUpperCase()}': () => unawaited(
+          _documentExport.run(
+            context,
+            workspace,
+            action,
+            renderMermaid: (source) async => (await _mermaidRenderer.render(source)).svg,
+            attachmentSource: widget.attachmentSource,
+          ),
+        ),
       'Search workspace': _openWorkspaceSearch,
       'Find in document': _openFind,
       'Show backlinks': _openWorkspaceReferences,

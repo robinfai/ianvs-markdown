@@ -37,6 +37,7 @@ void main() {
       );
       expect(paletteNoteTitle('# Heading\nBody', 'a'), 'Heading');
       expect(paletteNoteTitle('Body', 'a.md'), 'a.md');
+      expect(paletteNoteTitle('```\n# fake\n```\n# Real', 'a'), 'Real');
     },
   );
 
