@@ -741,11 +741,17 @@ class _EditorShellState extends State<EditorShell> {
     final filename = inbox ? 'Inbox.md' : '${noteDate(DateTime.now())}.md';
     try {
       final catalog = await workspace.index.catalog(refresh: true);
-      final candidates = await WikiNoteResolver(workspace.index).candidates(catalog);
+      final candidates = await WikiNoteResolver(
+        workspace.index,
+      ).candidates(catalog);
       if (!current()) return;
-      final matches = candidates.where((note) => note.comparisonPath == filename.toLowerCase()).toList();
+      final matches = candidates
+          .where((note) => note.comparisonPath == filename.toLowerCase())
+          .toList();
       if (matches.length > 1 || (matches.isEmpty && !catalog.complete)) {
-        _showError('The capture note cannot be resolved uniquely. Refresh the workspace and retry.');
+        _showError(
+          'The capture note cannot be resolved uniquely. Refresh the workspace and retry.',
+        );
         return;
       }
       final target = matches.isEmpty ? filename : matches.single.relativePath;
