@@ -13,15 +13,30 @@ void main() {
   test('standalone block IDs move with their preceding structured block', () {
     const source = '> Quoted content\n\n^quote\n\n[jump](#^quote)\n';
     expect(
-      extractedNoteContent(source, 0, source.length, originRelativePath: 'source.md'),
+      extractedNoteContent(
+        source,
+        0,
+        source.length,
+        originRelativePath: 'source.md',
+      ),
       source,
     );
     expect(
-      extractedNoteContent(source, source.indexOf('[jump]'), source.length, originRelativePath: 'source.md'),
+      extractedNoteContent(
+        source,
+        source.indexOf('[jump]'),
+        source.length,
+        originRelativePath: 'source.md',
+      ),
       '[jump](source.md#^quote)\n',
     );
     expect(
-      () => extractedNoteContent(source, source.indexOf('^quote'), source.length, originRelativePath: 'source.md'),
+      () => extractedNoteContent(
+        source,
+        source.indexOf('^quote'),
+        source.length,
+        originRelativePath: 'source.md',
+      ),
       throwsFormatException,
     );
   });
