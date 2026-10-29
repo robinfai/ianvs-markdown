@@ -10,69 +10,132 @@ import 'package:linefold/src/services/note_content_transfer.dart';
 import 'package:linefold/src/services/markdown_file_service.dart';
 
 void main() {
-  test('extraction keeps wiki heading names and original note destinations', () {
-    const source = '# Intro Words\n\n[[#Intro Words|jump]]\n';
-    expect(
-      extractedNoteContent(source, source.indexOf('[['), source.length, originRelativePath: 'chapters/source.md'),
-      '[[/chapters/source.md#Intro Words|jump]]\n',
-    );
-    expect(
-      extractedNoteContent(source, 0, source.length, originRelativePath: 'chapters/source.md'),
-      source,
-    );
-  });
+  test(
+    'extraction keeps wiki heading names and original note destinations',
+    () {
+      const source = '# Intro Words\n\n[[#Intro Words|jump]]\n';
+      expect(
+        extractedNoteContent(
+          source,
+          source.indexOf('[['),
+          source.length,
+          originRelativePath: 'chapters/source.md',
+        ),
+        '[[/chapters/source.md#Intro Words|jump]]\n',
+      );
+      expect(
+        extractedNoteContent(
+          source,
+          0,
+          source.length,
+          originRelativePath: 'chapters/source.md',
+        ),
+        source,
+      );
+    },
+  );
 
-  test('extraction preserves fragments targeting headings left in the source', () {
-    const source = '# Intro\n\n[intro](#intro)\n';
-    final start = source.indexOf('[intro]');
-    expect(
-      extractedNoteContent(source, start, source.length, originRelativePath: 'chapters/source.md'),
-      '[intro](source.md#intro)\n',
-    );
-    expect(
-      extractedNoteContent(source, 0, source.length, originRelativePath: 'chapters/source.md'),
-      source,
-    );
-  });
+  test(
+    'extraction preserves fragments targeting headings left in the source',
+    () {
+      const source = '# Intro\n\n[intro](#intro)\n';
+      final start = source.indexOf('[intro]');
+      expect(
+        extractedNoteContent(
+          source,
+          start,
+          source.length,
+          originRelativePath: 'chapters/source.md',
+        ),
+        '[intro](source.md#intro)\n',
+      );
+      expect(
+        extractedNoteContent(
+          source,
+          0,
+          source.length,
+          originRelativePath: 'chapters/source.md',
+        ),
+        source,
+      );
+    },
+  );
 
   test('extraction remaps duplicate heading anchors moved with the link', () {
-    const source = '# Intro\n\nOld\n\n# Intro\n\n[new](#intro-1) [old](#intro)\n';
+    const source =
+        '# Intro\n\nOld\n\n# Intro\n\n[new](#intro-1) [old](#intro)\n';
     final start = source.indexOf('# Intro', 1);
     expect(
-      extractedNoteContent(source, start, source.length, originRelativePath: 'source.md'),
+      extractedNoteContent(
+        source,
+        start,
+        source.length,
+        originRelativePath: 'source.md',
+      ),
       '# Intro\n\n[new](#intro) [old](source.md#intro)\n',
     );
   });
 
-  test('extraction preserves fragment reference definitions and block identities', () {
-    const definition = '# Intro\n\n[intro][id]\n\n[id]: #intro "Title"\n';
-    final start = definition.indexOf('[intro]');
-    final extracted = extractedNoteContent(definition, start, start + 11, originRelativePath: 'source.md');
-    expect(extracted, contains('[id]: source.md#intro "Title"'));
-    const block = 'Paragraph ^block\n\n[jump](#^block)\n';
-    final linkStart = block.indexOf('[jump]');
-    expect(
-      extractedNoteContent(block, linkStart, block.length, originRelativePath: 'source.md'),
-      '[jump](source.md#^block)\n',
-    );
-    expect(
-      extractedNoteContent(block, 0, block.length, originRelativePath: 'source.md'),
-      block,
-    );
-  });
+  test(
+    'extraction preserves fragment reference definitions and block identities',
+    () {
+      const definition = '# Intro\n\n[intro][id]\n\n[id]: #intro "Title"\n';
+      final start = definition.indexOf('[intro]');
+      final extracted = extractedNoteContent(
+        definition,
+        start,
+        start + 11,
+        originRelativePath: 'source.md',
+      );
+      expect(extracted, contains('[id]: source.md#intro "Title"'));
+      const block = 'Paragraph ^block\n\n[jump](#^block)\n';
+      final linkStart = block.indexOf('[jump]');
+      expect(
+        extractedNoteContent(
+          block,
+          linkStart,
+          block.length,
+          originRelativePath: 'source.md',
+        ),
+        '[jump](source.md#^block)\n',
+      );
+      expect(
+        extractedNoteContent(
+          block,
+          0,
+          block.length,
+          originRelativePath: 'source.md',
+        ),
+        block,
+      );
+    },
+  );
 
-  test('extraction refuses unsupported or partially moved fragment targets', () {
-    const unsupported = '<a id="intro"></a>\n\n[jump](#intro)';
-    expect(
-      () => extractedNoteContent(unsupported, unsupported.indexOf('[jump]'), unsupported.length, originRelativePath: 'source.md'),
-      throwsFormatException,
-    );
-    const partial = '# Intro\n\n[jump](#intro)';
-    expect(
-      () => extractedNoteContent(partial, 2, partial.length, originRelativePath: 'source.md'),
-      throwsFormatException,
-    );
-  });
+  test(
+    'extraction refuses unsupported or partially moved fragment targets',
+    () {
+      const unsupported = '<a id="intro"></a>\n\n[jump](#intro)';
+      expect(
+        () => extractedNoteContent(
+          unsupported,
+          unsupported.indexOf('[jump]'),
+          unsupported.length,
+          originRelativePath: 'source.md',
+        ),
+        throwsFormatException,
+      );
+      const partial = '# Intro\n\n[jump](#intro)';
+      expect(
+        () => extractedNoteContent(
+          partial,
+          2,
+          partial.length,
+          originRelativePath: 'source.md',
+        ),
+        throwsFormatException,
+      );
+    },
+  );
 
   testWidgets('outline drag and chapter menu edit the live document', (
     tester,
