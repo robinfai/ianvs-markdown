@@ -924,8 +924,9 @@ class _EditorShellState extends State<EditorShell> {
       final targets = <String, String>{};
       for (final reference in references) {
         if (reference.kind != IanvsMarkdownSourceReferenceKind.wikiLink &&
-            reference.kind != IanvsMarkdownSourceReferenceKind.wikiEmbed)
+            reference.kind != IanvsMarkdownSourceReferenceKind.wikiEmbed) {
           continue;
+        }
         final result = await workspace.references.resolveWiki(
           reference.target,
           originPath: sourcePath,
@@ -949,8 +950,9 @@ class _EditorShellState extends State<EditorShell> {
           epoch != workspace.index.epoch ||
           workspace.activeDocument != document ||
           !captured.apply(controller, transferred)) {
-        if (mounted)
+        if (mounted) {
           _showError('The destination changed. Insert the reference again.');
+        }
       }
     } on Object catch (error) {
       if (mounted) _showError('Unable to insert reference: $error');
