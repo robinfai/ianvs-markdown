@@ -548,14 +548,22 @@ class _EditorShellState extends State<EditorShell> {
     }
   }
 
-  Future<void> _openDocumentLink(DocumentSession document, IanvsMarkdownLinkTarget link) {
+  Future<void> _openDocumentLink(
+    DocumentSession document,
+    IanvsMarkdownLinkTarget link,
+  ) {
     if (link.kind == IanvsMarkdownLinkKind.wiki) {
       return _openWikiLink(document, link.href ?? '');
     }
     if (link.kind == IanvsMarkdownLinkKind.tag) {
-      return _openWorkspaceReferences(tag: (link.href ?? '').replaceFirst(RegExp(r'^tag:#?'), ''));
+      return _openWorkspaceReferences(
+        tag: (link.href ?? '').replaceFirst(RegExp(r'^tag:#?'), ''),
+      );
     }
-    return DocumentLinkService(workspace: widget.workspace, openImage: _openImage).open(document, link.href);
+    return DocumentLinkService(
+      workspace: widget.workspace,
+      openImage: _openImage,
+    ).open(document, link.href);
   }
 
   Future<void> _openWikiLink(DocumentSession origin, String target) async {
@@ -1133,7 +1141,9 @@ class _EditorShellState extends State<EditorShell> {
                 detail: note.relativePath,
                 searchTerms:
                     snapshot.aliases.byPath[note.relativePath]?.join(' ') ?? '',
-                recency: document?.lastActivated ?? workspace.recentNoteActivation(absolute),
+                recency:
+                    document?.lastActivated ??
+                    workspace.recentNoteActivation(absolute),
               ),
             );
           }
@@ -1991,7 +2001,13 @@ class _EditorShellState extends State<EditorShell> {
                                                       'a': NoteLinkPreviewBuilder(
                                                         workspace: workspace,
                                                         document: document,
-                                                        onTap: (link) => _guard(() => _openDocumentLink(document, link)),
+                                                        onTap: (link) => _guard(
+                                                          () =>
+                                                              _openDocumentLink(
+                                                                document,
+                                                                link,
+                                                              ),
+                                                        ),
                                                       ),
                                                     },
                                                     imageBuilder: images.image,

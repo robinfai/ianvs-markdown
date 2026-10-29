@@ -70,7 +70,9 @@ class _ReferenceDockState extends State<ReferenceDock> {
 
   void _referencesChanged() {
     if (widget.workspace.references.stale && !_refreshing) {
-      scheduleMicrotask(() { if (mounted) unawaited(_refresh()); });
+      scheduleMicrotask(() {
+        if (mounted) unawaited(_refresh());
+      });
     }
   }
 
@@ -85,7 +87,12 @@ class _ReferenceDockState extends State<ReferenceDock> {
           _positionRestored = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted && _scroll.hasClients) {
-              _scroll.jumpTo((_positions[_readingKey] ?? 0).clamp(0, _scroll.position.maxScrollExtent));
+              _scroll.jumpTo(
+                (_positions[_readingKey] ?? 0).clamp(
+                  0,
+                  _scroll.position.maxScrollExtent,
+                ),
+              );
             }
           });
         }
