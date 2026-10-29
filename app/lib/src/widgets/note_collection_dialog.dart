@@ -104,6 +104,20 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
     }
   }
 
+  Future<void> _open(CollectionNote row) async {
+    if (!_current || _busy) return;
+    try {
+      final note = await widget.workspace.openIndexedNote(
+        row.relativePath,
+        epoch: _epoch,
+        isCurrent: () => _current,
+      );
+      if (mounted && _current && note != null) Navigator.pop(context);
+    } on Object catch (error) {
+      if (mounted) setState(() => _notice = 'Unable to open note: $error');
+    }
+  }
+
   Future<void> _edit(
     CollectionNote row,
     String key, {
@@ -157,6 +171,7 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
     try {
       final before = row.note.source.text;
       final after = editCollectionProperty(before, key, value);
+      if (after == before && value == row.value(key)) return;
       if (after == before && value != row.value(key)) {
         throw const FormatException(
           'This value cannot be edited safely. Use Source mode.',
@@ -340,7 +355,8 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
             row.value('title').isEmpty ? row.relativePath : row.value('title'),
           ),
           subtitle: Text('${row.relativePath} · ${row.value('status')}'),
-          onTap: () => _edit(row, 'status'),
+          onTap: () => _open(row),
+        trailing: IconButton(tooltip: 'Edit status', icon: const Icon(Icons.edit_outlined), onPressed: () => _edit(row, 'status')),
         ),
     ],
   );
@@ -420,7 +436,8 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
                                       ? row.relativePath
                                       : row.value('title'),
                                 ),
-                                onTap: () => _edit(row, 'status'),
+                                onTap: () => _open(row),
+        trailing: IconButton(tooltip: 'Edit status', icon: const Icon(Icons.edit_outlined), onPressed: () => _edit(row, 'status')),
                               ),
                             ),
                         ],
