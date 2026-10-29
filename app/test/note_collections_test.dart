@@ -14,33 +14,50 @@ import 'support/workflow_screenshot.dart';
 import 'workspace_index_test.dart' show FakeIndexSource;
 
 void main() {
-  test('long property edits use complete values and preserve unchanged YAML', () {
-    final long = List.filled(1600, 'x').join();
-    final source = '---\nsummary: "$long tail" # keep\n---\nBody';
-    expect(collectionPropertyEditValue(source, 'summary'), '$long tail');
-    expect(editCollectionProperty(source, 'summary', '$long tail'), source);
-    final edited = editCollectionProperty(source, 'summary', '$long tail edited');
-    expect(collectionPropertyEditValue(edited, 'summary'), '$long tail edited');
-    expect(edited, endsWith('---\nBody'));
-    final block = '---\nsummary: |\n  $long\n  tail\n---\nBody';
-    final full = collectionPropertyEditValue(block, 'summary');
-    expect(full, '$long\ntail\n');
-    expect(editCollectionProperty(block, 'summary', full), block);
-  });
+  test(
+    'long property edits use complete values and preserve unchanged YAML',
+    () {
+      final long = List.filled(1600, 'x').join();
+      final source = '---\nsummary: "$long tail" # keep\n---\nBody';
+      expect(collectionPropertyEditValue(source, 'summary'), '$long tail');
+      expect(editCollectionProperty(source, 'summary', '$long tail'), source);
+      final edited = editCollectionProperty(
+        source,
+        'summary',
+        '$long tail edited',
+      );
+      expect(
+        collectionPropertyEditValue(edited, 'summary'),
+        '$long tail edited',
+      );
+      expect(edited, endsWith('---\nBody'));
+      final block = '---\nsummary: |\n  $long\n  tail\n---\nBody';
+      final full = collectionPropertyEditValue(block, 'summary');
+      expect(full, '$long\ntail\n');
+      expect(editCollectionProperty(block, 'summary', full), block);
+    },
+  );
 
-  test('adding properties preserves flow mappings and their original values', () {
-    for (final raw in ['{}', '{title: Post}', '{title: Post, nested: {x: 1}}']) {
-      final source = '---\n$raw # keep\n---\nBody';
-      final edited = editCollectionProperty(source, 'status', 'draft');
-      expect(parseMarkdownFrontMatter(edited).hasFrontMatter, isTrue);
-      expect(collectionPropertyEditValue(edited, 'status'), 'draft');
-      if (raw.contains('Post')) {
-        expect(collectionPropertyEditValue(edited, 'title'), 'Post');
+  test(
+    'adding properties preserves flow mappings and their original values',
+    () {
+      for (final raw in [
+        '{}',
+        '{title: Post}',
+        '{title: Post, nested: {x: 1}}',
+      ]) {
+        final source = '---\n$raw # keep\n---\nBody';
+        final edited = editCollectionProperty(source, 'status', 'draft');
+        expect(parseMarkdownFrontMatter(edited).hasFrontMatter, isTrue);
+        expect(collectionPropertyEditValue(edited, 'status'), 'draft');
+        if (raw.contains('Post')) {
+          expect(collectionPropertyEditValue(edited, 'title'), 'Post');
+        }
+        expect(edited, endsWith('# keep\n---\nBody'));
+        if (raw.contains('nested')) expect(edited, contains('nested: {x: 1}'));
       }
-      expect(edited, endsWith('# keep\n---\nBody'));
-      if (raw.contains('nested')) expect(edited, contains('nested: {x: 1}'));
-    }
-  });
+    },
+  );
 
   testWidgets('table property editing and board dragging persist Markdown', (
     tester,

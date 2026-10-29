@@ -62,10 +62,14 @@ List<CollectionNote> collectionNotes(
 ({YamlNode node, int offset})? _collectionYaml(String source) {
   if (!parseMarkdownFrontMatter(source).hasFrontMatter) return null;
   final offset = source.indexOf('\n') + 1;
-  final closing = RegExp(r'^---\r?$', multiLine: true)
-      .allMatches(source)
-      .firstWhere((match) => match.start >= offset);
-  return (node: loadYamlNode(source.substring(offset, closing.start)), offset: offset);
+  final closing = RegExp(
+    r'^---\r?$',
+    multiLine: true,
+  ).allMatches(source).firstWhere((match) => match.start >= offset);
+  return (
+    node: loadYamlNode(source.substring(offset, closing.start)),
+    offset: offset,
+  );
 }
 
 String collectionPropertyEditValue(String source, String key) {

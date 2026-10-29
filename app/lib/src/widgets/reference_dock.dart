@@ -245,7 +245,9 @@ class _ReferenceDockState extends State<ReferenceDock> {
                 ),
                 trailing: IconButton(
                   tooltip: 'Insert reference at cursor',
-                  onPressed: text == null ? null : () => widget.onInsert(text, open?.path ?? _pinnedPath),
+                  onPressed: text == null
+                      ? null
+                      : () => widget.onInsert(text, open?.path ?? _pinnedPath),
                   icon: const Icon(Icons.playlist_add),
                 ),
               ),

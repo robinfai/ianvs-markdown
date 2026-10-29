@@ -173,8 +173,10 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
     try {
       final before = row.note.source.text;
       final after = editCollectionProperty(before, key, value);
-      if (after == before && value == collectionPropertyEditValue(before, key)) return;
-      if (after == before && value != collectionPropertyEditValue(before, key)) {
+      if (after == before && value == collectionPropertyEditValue(before, key))
+        return;
+      if (after == before &&
+          value != collectionPropertyEditValue(before, key)) {
         throw const FormatException(
           'This value cannot be edited safely. Use Source mode.',
         );

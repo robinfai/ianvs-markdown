@@ -118,7 +118,10 @@ class FloatingOutline extends StatelessWidget {
                                 if (action == 'copy') {
                                   final target = Uri(
                                     path: document.path ?? document.name,
-                                    fragment: chapterLinkFragment(headings, index),
+                                    fragment: chapterLinkFragment(
+                                      headings,
+                                      index,
+                                    ),
                                   );
                                   Clipboard.setData(
                                     ClipboardData(text: '[Chapter](<$target>)'),

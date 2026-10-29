@@ -213,6 +213,7 @@ class WorkspaceController extends ChangeNotifier {
     notifyListeners();
     await flushSession();
   }
+
   Map<String, Object?> _referenceView = {};
   Map<String, Object?> get referenceView =>
       _referenceView['root'] == workspaceRoot
