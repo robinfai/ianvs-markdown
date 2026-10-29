@@ -1,3 +1,4 @@
+import 'note_text_dialog.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -133,37 +134,17 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
         setState(() => _notice = error.message);
         return;
       }
-      final input = TextEditingController(text: originalValue);
-      try {
-        value = await showDialog<String>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text('Edit $key'),
-            content: TextField(
-              key: const ValueKey('collection-property-input'),
-              controller: input,
-              autofocus: true,
-              decoration: InputDecoration(
-                helperText:
-                    'Type: ${entry?.type.name ?? 'text'}. Lists use a JSON string array.',
-              ),
-              onSubmitted: (text) => Navigator.pop(context, text),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, input.text),
-                child: const Text('Save property'),
-              ),
-            ],
-          ),
-        );
-      } finally {
-        input.dispose();
-      }
+      value = await showDialog<String>(
+        context: context,
+        builder: (_) => NoteTextDialog(
+          title: 'Edit $key',
+          label: key,
+          submit: 'Save property',
+          initialValue: originalValue,
+          inputKey: const ValueKey('collection-property-input'),
+          helperText: 'Type: ${entry?.type.name ?? 'text'}. Lists use a JSON string array.',
+        ),
+      );
     }
     if (!_current || value == null) return;
     setState(() => _busy = true);
