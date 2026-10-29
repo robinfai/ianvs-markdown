@@ -125,7 +125,7 @@ void main() {
       'Source mode',
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Source mode'));
+    await tester.tap(find.byKey(const ValueKey('palette-entry-Source mode')));
     await tester.pumpAndSettle();
     expect(workspace.activeDocument?.controller.mode.name, 'source');
     await tester.pumpWidget(const SizedBox());
