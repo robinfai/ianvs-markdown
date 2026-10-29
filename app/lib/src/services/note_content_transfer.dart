@@ -98,10 +98,13 @@ String extractedNoteContent(
       ? selected
       : '$selected\n\n${definitions.values.join('\n')}\n';
   return _preserveExtractedFragments(
-    source, extracted, start, end, originRelativePath,
+    source,
+    extracted,
+    start,
+    end,
+    originRelativePath,
   );
 }
-
 
 String _preserveExtractedFragments(
   String original,
@@ -112,7 +115,9 @@ String _preserveExtractedFragments(
 ) {
   final semantics = parseIanvsMarkdownNoteSemantics(extracted);
   if (!semantics.complete) {
-    throw const FormatException('This selection has unsupported references. Extract it in Source mode manually.');
+    throw const FormatException(
+      'This selection has unsupported references. Extract it in Source mode manually.',
+    );
   }
   final originalHeadings = DocumentAnalysis().headings(original);
   final extractedHeadings = DocumentAnalysis().headings(extracted);
@@ -121,22 +126,32 @@ String _preserveExtractedFragments(
   final edits = <int, ({int end, String text})>{};
   for (final reference in semantics.references) {
     final fragment = reference.fragment;
-    if (reference.target.isNotEmpty || fragment == null || fragment.isEmpty) continue;
-    if (originRelativePath == null) {
-      throw const FormatException('Save the source note before extracting fragment references.');
+    if (reference.target.isNotEmpty || fragment == null || fragment.isEmpty) {
+      continue;
     }
-    final wiki = reference.kind == IanvsMarkdownSourceReferenceKind.wikiLink ||
+    if (originRelativePath == null) {
+      throw const FormatException(
+        'Save the source note before extracting fragment references.',
+      );
+    }
+    final wiki =
+        reference.kind == IanvsMarkdownSourceReferenceKind.wikiLink ||
         reference.kind == IanvsMarkdownSourceReferenceKind.wikiEmbed;
     int? targetStart;
     int? targetEnd;
     int? headingIndex;
     if (fragment.startsWith('^')) {
-      final matching = identifiers.where((range) => range.textInside(original).trim() == fragment).toList();
+      final matching = identifiers
+          .where((range) => range.textInside(original).trim() == fragment)
+          .toList();
       if (matching.length != 1) {
-        throw FormatException('Cannot uniquely resolve block #$fragment. Keep the selection in the original note.');
+        throw FormatException(
+          'Cannot uniquely resolve block #$fragment. Keep the selection in the original note.',
+        );
       }
       for (final block in blocks) {
-        if (block.start <= matching.single.start && block.end >= matching.single.end) {
+        if (block.start <= matching.single.start &&
+            block.end >= matching.single.end) {
           targetStart = block.start;
           targetEnd = block.end;
           break;
@@ -146,48 +161,72 @@ String _preserveExtractedFragments(
       for (var i = 0; i < originalHeadings.length; i++) {
         if (originalHeadings[i].text == fragment ||
             (wiki
-                ? originalHeadings[i].text.toLowerCase() == fragment.toLowerCase()
-                : chapterLinkFragment(originalHeadings, i) == fragment.toLowerCase())) {
+                ? originalHeadings[i].text.toLowerCase() ==
+                      fragment.toLowerCase()
+                : chapterLinkFragment(originalHeadings, i) ==
+                      fragment.toLowerCase())) {
           headingIndex = i;
           targetStart = originalHeadings[i].offset;
-          targetEnd = blocks.firstWhere((block) => block.start == targetStart).end;
+          targetEnd = blocks
+              .firstWhere((block) => block.start == targetStart)
+              .end;
           break;
         }
       }
     }
     if (targetStart == null || targetEnd == null) {
-      throw FormatException('Cannot resolve #$fragment as a heading or block. Extract this format in Source mode manually.');
+      throw FormatException(
+        'Cannot resolve #$fragment as a heading or block. Extract this format in Source mode manually.',
+      );
     }
     final moved = targetStart >= selectionStart && targetEnd <= selectionEnd;
     if (!moved && targetStart < selectionEnd && targetEnd > selectionStart) {
-      throw const FormatException('Select the complete referenced heading or block before extracting.');
+      throw const FormatException(
+        'Select the complete referenced heading or block before extracting.',
+      );
     }
     final raw = reference.rawDestination;
     final range = reference.destinationRange;
     final rawEnd = range.start + raw.length;
-    if (rawEnd > extracted.length || extracted.substring(range.start, rawEnd) != raw) {
-      throw const FormatException('This fragment spelling cannot be moved safely. Use Source mode.');
+    if (rawEnd > extracted.length ||
+        extracted.substring(range.start, rawEnd) != raw) {
+      throw const FormatException(
+        'This fragment spelling cannot be moved safely. Use Source mode.',
+      );
     }
     String replacement;
     if (!moved) {
       if (wiki && !WikiLinkInsertion.canRepresent(originRelativePath)) {
-        throw const FormatException('The original filename cannot be represented in a wiki link. Use Source mode.');
+        throw const FormatException(
+          'The original filename cannot be represented in a wiki link. Use Source mode.',
+        );
       }
-      final path = wiki ? '/$originRelativePath' : Uri.encodeComponent(p.basename(originRelativePath));
+      final path = wiki
+          ? '/$originRelativePath'
+          : Uri.encodeComponent(p.basename(originRelativePath));
       replacement = '$path$raw';
     } else if (headingIndex != null) {
       final movedHeadingOffset = targetStart - selectionStart;
-      final index = extractedHeadings.indexWhere((heading) => heading.offset == movedHeadingOffset);
+      final index = extractedHeadings.indexWhere(
+        (heading) => heading.offset == movedHeadingOffset,
+      );
       if (index < 0) {
-        throw const FormatException('The selected heading would lose its Markdown structure. Select a complete heading.');
+        throw const FormatException(
+          'The selected heading would lose its Markdown structure. Select a complete heading.',
+        );
       }
       final slug = chapterLinkFragment(extractedHeadings, index);
-      final target = wiki || slug.isEmpty ? extractedHeadings[index].text : slug;
+      final target = wiki || slug.isEmpty
+          ? extractedHeadings[index].text
+          : slug;
       final hash = raw.indexOf('#');
       if (hash < 0 || (hash > 0 && raw[hash - 1] == '&')) {
-        throw const FormatException('Unsupported escaped fragment. Use Source mode.');
+        throw const FormatException(
+          'Unsupported escaped fragment. Use Source mode.',
+        );
       }
-      replacement = '${raw.substring(0, hash + 1)}${wiki ? target : Uri.encodeComponent(target)}';
+      replacement =
+          '${raw.substring(0, hash + 1)}${wiki ? target : Uri.encodeComponent(target)}';
     } else {
       replacement = raw;
     }

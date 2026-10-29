@@ -850,7 +850,10 @@ class _EditorShellState extends State<EditorShell> {
         value.text,
         value.selection.start,
         value.selection.end,
-        originRelativePath: p.relative(origin.path!, from: workspace.workspaceRoot!),
+        originRelativePath: p.relative(
+          origin.path!,
+          from: workspace.workspaceRoot!,
+        ),
       );
       if (!await workspace.createWikiNote(
         path,
