@@ -60,6 +60,37 @@ jobs:
             build/processing-budget/
           if-no-files-found: ignore
 
+  app-features:
+    name: App feature checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.44.0'
+          cache: true
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Flutter test runtime library
+        run: sudo apt-get update && sudo apt-get install -y libglu1-mesa
+      - name: Resolve app dependencies
+        run: cd app && flutter pub get
+      - name: Check app formatting with actionable diff
+        run: |
+          dart format app/lib app/test
+          git diff --exit-code -- app/lib app/test
+      - name: Analyze app
+        run: cd app && flutter analyze
+      - name: Run writing workflow feature tests
+        working-directory: app
+        run: |
+          tests=(test/workspace_palette_test.dart)
+          for test in test/note_templates_test.dart test/slash_insertion_test.dart test/reference_dock_test.dart test/outline_operations_test.dart test/note_collections_test.dart; do
+            if [ -f "$test" ]; then tests+=("$test"); fi
+          done
+          flutter test "${tests[@]}"
+
   required:
     name: Core required
     if: always()
