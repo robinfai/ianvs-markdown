@@ -846,6 +846,12 @@ class _EditorShellState extends State<EditorShell> {
       return;
     }
     try {
+      final contents = extractedNoteContent(
+        value.text,
+        value.selection.start,
+        value.selection.end,
+        originRelativePath: p.relative(origin.path!, from: workspace.workspaceRoot!),
+      );
       if (!await workspace.createWikiNote(
         path,
         epoch: epoch,
@@ -859,11 +865,6 @@ class _EditorShellState extends State<EditorShell> {
         isCurrent: current,
       );
       if (!current() || created == null) return;
-      final contents = extractedNoteContent(
-        value.text,
-        value.selection.start,
-        value.selection.end,
-      );
       created.controller.value = TextEditingValue(
         text: contents,
         selection: TextSelection.collapsed(offset: contents.length),
