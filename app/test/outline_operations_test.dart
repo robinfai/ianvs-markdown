@@ -5,6 +5,7 @@ import 'package:linefold/src/app.dart';
 import 'wiki_note_navigation_test.dart' show WikiFiles, wikiWorkspace;
 import 'package:linefold/src/services/outline_operations.dart';
 import 'package:linefold/src/services/note_content_transfer.dart';
+import 'package:linefold/src/services/markdown_file_service.dart';
 
 void main() {
   test(
@@ -64,15 +65,24 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       final files = WikiFiles();
-      files.files['/vault/Origin.md'] = 'before selected after';
+      files.files['/vault/Origin.md'] = 'Root';
+    const selected = '[x](sibling.md#heading) ![](assets/a.png)';
+    files.files['/vault/chapters/source.md'] = 'before $selected after';
       final workspace = await wikiWorkspace(files);
+    files.directories['/vault']!.add(const WorkspaceEntry(
+      path: '/vault/chapters', name: 'chapters', isDirectory: true,
+    ));
+    files.directories['/vault/chapters'] = [const WorkspaceEntry(
+      path: '/vault/chapters/source.md', name: 'source.md', isDirectory: false,
+    )];
+    await workspace.openPath('/vault/chapters/source.md');
       addTearDown(workspace.dispose);
       addTearDown(files.dispose);
       final origin = workspace.activeDocument!;
       origin.controller.mode = IanvsMarkdownEditorMode.source;
       origin.controller.selection = const TextSelection(
         baseOffset: 7,
-        extentOffset: 15,
+        extentOffset: 7 + selected.length,
       );
       await tester.pumpWidget(LinefoldApp(workspaceController: workspace));
       await tester.pumpAndSettle();
@@ -93,8 +103,8 @@ void main() {
       );
       await tester.tap(find.widgetWithText(FilledButton, 'Extract'));
       await tester.pumpAndSettle();
-      expect(files.files['/vault/Extract.md'], 'selected');
-      expect(origin.controller.text, 'before [[/Extract.md]] after');
+      expect(files.files['/vault/chapters/Extract.md'], selected);
+      expect(origin.controller.text, 'before [[/chapters/Extract.md]] after');
       expect(workspace.activeDocument, same(origin));
       await tester.pumpWidget(const SizedBox());
       await tester.pump(const Duration(milliseconds: 600));
