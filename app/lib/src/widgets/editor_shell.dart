@@ -27,6 +27,9 @@ import '../services/wiki_note_resolver.dart';
 import '../services/wiki_link_insertion.dart';
 import 'wiki_note_picker.dart';
 import 'workspace_palette.dart';
+import 'note_template_dialog.dart';
+import 'note_text_dialog.dart';
+import '../services/note_templates.dart';
 import '../services/attachment_repository.dart';
 import '../services/attachment_import_service.dart';
 import '../services/attachment_resolver.dart';
@@ -677,6 +680,146 @@ class _EditorShellState extends State<EditorShell> {
     }
   }
 
+  bool _captureBusy = false;
+
+  Future<void> _useTemplate({bool insert = false}) async {
+    if (hasEditorComposition(widget.workspace)) return;
+    final workspace = widget.workspace;
+    final document = workspace.activeDocument;
+    final epoch = workspace.index.epoch;
+    if (insert && (document == null || _documentInputTarget.isLocal)) {
+      _showError('Place the cursor in the document body to insert a template.');
+      return;
+    }
+    final edit = document == null
+        ? null
+        : CapturedNoteInsertion(
+            document.controller.value,
+            document.controller.mode,
+          );
+    final result = await showDialog<NoteTemplateResult>(
+      context: context,
+      builder: (_) => NoteTemplateDialog(insert: insert),
+    );
+    if (!mounted ||
+        result == null ||
+        !identical(workspace, widget.workspace) ||
+        epoch != workspace.index.epoch) {
+      return;
+    }
+    if (insert) {
+      if (!identical(document, workspace.activeDocument) ||
+          !edit!.apply(document!.controller, result.text)) {
+        _showError(
+          'The source or selection changed. Insert the template again.',
+        );
+        return;
+      }
+    } else {
+      final name = result.title.replaceAll(RegExp(r'[/\\]'), '-');
+      final created = workspace.newDocument(name: '$name.md');
+      created.controller.value = TextEditingValue(
+        text: result.text,
+        selection: TextSelection.collapsed(offset: result.text.length),
+      );
+    }
+    _editorFocus.requestFocus();
+  }
+
+  Future<void> _openCaptureNote({bool inbox = false, String? append}) async {
+    if (_captureBusy || hasEditorComposition(widget.workspace)) return;
+    final workspace = widget.workspace;
+    if (workspace.workspaceRoot == null) {
+      _showError('Open a workspace folder to use daily notes and Inbox.');
+      return;
+    }
+    _captureBusy = true;
+    final epoch = workspace.index.epoch;
+    bool current() =>
+        mounted &&
+        identical(workspace, widget.workspace) &&
+        epoch == workspace.index.epoch;
+    final filename = inbox ? 'Inbox.md' : '${noteDate(DateTime.now())}.md';
+    try {
+      final catalog = await workspace.index.catalog(refresh: true);
+      final candidates = await WikiNoteResolver(
+        workspace.index,
+      ).candidates(catalog);
+      if (!current()) return;
+      final matches = candidates
+          .where((note) => note.comparisonPath == filename.toLowerCase())
+          .toList();
+      if (matches.length > 1 || (matches.isEmpty && !catalog.complete)) {
+        _showError(
+          'The capture note cannot be resolved uniquely. Refresh the workspace and retry.',
+        );
+        return;
+      }
+      final target = matches.isEmpty ? filename : matches.single.relativePath;
+      if (matches.isEmpty) {
+        if (!await workspace.createWikiNote(
+          target,
+          epoch: epoch,
+          isCurrent: current,
+        )) {
+          return;
+        }
+      }
+      final document = await workspace.openIndexedNote(
+        target,
+        epoch: epoch,
+        isCurrent: current,
+      );
+      if (!current() || document == null) return;
+      if (append != null && append.trim().isNotEmpty) {
+        final controller = document.controller;
+        final prefix = controller.text.isEmpty
+            ? ''
+            : controller.text.endsWith('\n')
+            ? '\n'
+            : '\n\n';
+        final text = '${controller.text}$prefix${append.trim()}\n';
+        controller.commitHistoryGroup();
+        controller.value = TextEditingValue(
+          text: text,
+          selection: TextSelection.collapsed(offset: text.length),
+        );
+        controller.commitHistoryGroup();
+        if (!await _saveDocument(document) && current()) {
+          _showError(
+            'Capture remains in the open note. Save it before closing.',
+          );
+        }
+      }
+    } on Object catch (error) {
+      if (current()) _showError('Unable to open capture note: $error');
+    } finally {
+      _captureBusy = false;
+    }
+  }
+
+  Future<void> _quickAppend({required bool inbox}) async {
+    final workspace = widget.workspace;
+    final epoch = workspace.index.epoch;
+    final result = await showDialog<String>(
+      context: context,
+      builder: (_) => NoteTextDialog(
+        title: inbox ? 'Append to Inbox' : 'Append to today',
+        label: 'Capture text',
+        submit: 'Append',
+        multiline: true,
+      ),
+    );
+    if (!mounted ||
+        result == null ||
+        result.trim().isEmpty ||
+        !identical(workspace, widget.workspace) ||
+        epoch != workspace.index.epoch) {
+      return;
+    }
+    await _openCaptureNote(inbox: inbox, append: result);
+  }
+
   bool _paletteOpen = false;
 
   Future<void> _openPalette({bool commands = false}) async {
@@ -696,6 +839,11 @@ class _EditorShellState extends State<EditorShell> {
         identical(origin, workspace.activeDocument);
     final actions = <String, VoidCallback>{
       'New note': () => workspace.newDocument(),
+      'New note from template': _useTemplate,
+      'Insert template': () => _useTemplate(insert: true),
+      'Open today’s note': _openCaptureNote,
+      'Append to today': () => _quickAppend(inbox: false),
+      'Append to Inbox': () => _quickAppend(inbox: true),
       'Open files': () => _guard(workspace.chooseAndOpenFiles),
       'Open workspace folder': () => _guard(workspace.chooseWorkspaceFolder),
       'Save': _saveCommand,
