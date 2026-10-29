@@ -80,6 +80,17 @@ class _NoteLinkPreviewState extends State<NoteLinkPreview> {
   bool _hovering = false;
   int _request = 0;
 
+  @override
+  void didUpdateWidget(covariant NoteLinkPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.href != widget.href || oldWidget.origin != widget.origin ||
+        !identical(oldWidget.workspace, widget.workspace)) {
+      _request++;
+      _hovering = false;
+      _preview = 'Loading note preview…';
+    }
+  }
+
   Future<void> _load() async {
     _hovering = true;
     final request = ++_request;
