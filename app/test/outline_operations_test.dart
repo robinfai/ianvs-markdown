@@ -19,17 +19,24 @@ void main() {
       text: '# A\nA body\n## Child\nChild body\n# B\nB body\n',
     );
     addTearDown(document.dispose);
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(body: FloatingOutline(document: document)),
-    ));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: FloatingOutline(document: document)),
+      ),
+    );
     final handles = find.byType(ReorderableDragStartListener);
     final gesture = await tester.startGesture(tester.getCenter(handles.last));
     await tester.pump(const Duration(milliseconds: 200));
-    await gesture.moveTo(tester.getCenter(handles.first) - const Offset(0, 12));
+    await gesture.moveBy(const Offset(0, -10));
+    await tester.pump();
+    await gesture.moveTo(Offset(tester.getCenter(handles.first).dx, 0));
     await tester.pump(const Duration(milliseconds: 600));
     await gesture.up();
     await tester.pumpAndSettle();
-    expect(document.controller.text, '# B\nB body\n# A\nA body\n## Child\nChild body\n');
+    expect(
+      document.controller.text,
+      '# B\nB body\n# A\nA body\n## Child\nChild body\n',
+    );
     await tester.tap(find.byTooltip('Chapter actions').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Demote chapter'));
