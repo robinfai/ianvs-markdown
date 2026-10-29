@@ -126,9 +126,14 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
     String? value = replacement;
     if (value == null) {
       final entry = row.properties[key];
-      final input = TextEditingController(
-        text: collectionPropertyEditValue(row.note.source.text, key),
-      );
+      final String originalValue;
+      try {
+        originalValue = collectionPropertyEditValue(row.note.source.text, key);
+      } on FormatException catch (error) {
+        setState(() => _notice = error.message);
+        return;
+      }
+      final input = TextEditingController(text: originalValue);
       try {
         value = await showDialog<String>(
           context: context,

@@ -1,7 +1,8 @@
 # Writing and knowledge workflows: stages 1–3
 
 Requested 2026-10-29. Baseline: `dde9bfe06f9f7fea065082236038a59762b8d080`.
-Status: stage 1A is in progress in draft PR #56; no stage is accepted or merged.
+Status: all three stages have UI implementations in stacked draft PRs #56–61.
+Validation and review fixes are in progress; no stage is accepted or merged.
 
 Preserve ordinary local Markdown files and the current editing engine. Reuse
 workspace indexing, note semantics, command routing, guarded saves and session
@@ -66,16 +67,40 @@ Markdown files, editable through table and status board, surviving restart.
   the inspected tool locations (`/opt`, `/usr/local`, `/tmp`, `/home`).
 - Official Flutter download-host access failed before download with proxy
   `403 Forbidden`, `curl: (56) CONNECT tunnel failed`, both normally and with
-  an escalated request. No SDK was installed and no tests were run.
+  an escalated request. No SDK was installed. Tests run through authorized GitHub Actions instead.
 - macOS/Xcode native builds and actual desktop acceptance are unavailable in
   this Linux environment. A suitable validation environment remains required.
 
 Stage 1A adds toolbar entry points and Cmd/Ctrl+P (notes) and
 Cmd/Ctrl+Shift+P (commands). Recent open notes persist their activation time
-in session recovery. Closed-note recency is not yet retained. Existing CI is
+in session recovery. Closed-note recency is retained in the bounded workspace session history. Existing CI is
 being used for toolchain validation; no local Flutter tests or actual desktop
 UI acceptance have been performed. No stage has merged.
 
 Draft PR: https://github.com/robinfai/ianvs-markdown/pull/56
 Initial implementation commit: `b735b6f155fcaf92ab450ab41e46e2273db90dd8`.
 Follow-up commits and their exact-head CI remain to be recorded.
+
+
+## Delivery and verification log (2026-10-29)
+
+| PR | UI entry and implementation | Verification state |
+| --- | --- | --- |
+| [56](https://github.com/robinfai/ianvs-markdown/pull/56) | Toolbar / Cmd+P switcher, Cmd+Shift+P commands; title/path/alias search, persisted recency, create note | Head `5df6dac746dc599b3ca47de28a91aa374d037969`: Core success, including app formatting/analyze and five focused tests. Native workflow queued. |
+| [57](https://github.com/robinfai/ianvs-markdown/pull/57) | Commands: template new/insert, Open today, append today/Inbox | Template UI tests passed in earlier runs; daily capture fix and broader existing regression suites await current-head validation. |
+| [58](https://github.com/robinfai/ianvs-markdown/pull/58) | Type `/` on a blank line: heading/task/quote/code/image/template menu | Slash source insertion and cancellation widget tests passed in earlier run; inherited daily failure fixed, rerun pending. |
+| [59](https://github.com/robinfai/ianvs-markdown/pull/59) | Toggle references command, pin incoming/outgoing/open note, read alongside primary editor | Persistent independent reading position; app analyzer lint fixes committed, tests pending. |
+| [60](https://github.com/robinfai/ianvs-markdown/pull/60) | Outline drag handles and chapter menu; Extract selection command; reference insert button | Extraction now creates a sibling note. Reference insertion rebases Markdown paths and resolves wiki paths; source-fidelity regression tests pending. |
+| [61](https://github.com/robinfai/ianvs-markdown/pull/61) | Collections sidebar: saved filters, list/table/board, property edit and status drag | Long-value preservation and YAML flow-map insertion fixed with regression cases. Current CI and table/board screenshot artifacts pending. |
+
+[Successful stage-1A Core run](https://github.com/robinfai/ianvs-markdown/actions/runs/40833862235).
+The additional Linux app check supplements, and does not replace, existing Core
+and Native integrations jobs. Native jobs have not started at this checkpoint;
+no macOS build or manual UI evidence is claimed. Widget screenshot artifacts,
+when produced, show the Flutter test harness rather than a native desktop run.
+
+Remaining acceptance: current-head passing app checks for stages 1B–3; native
+checks/builds; desktop interaction acceptance; blog/reading scenario review;
+main merges and verification of resulting main commits. Template source can be
+customized per invocation but a persistent custom-template library is not yet
+implemented. The reference pane is read-only; the main pane supplies editing.
