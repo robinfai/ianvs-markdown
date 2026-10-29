@@ -731,7 +731,8 @@ class _EditorShellState extends State<EditorShell> {
           final snapshot = await workspace.references.refresh();
           if (!current()) return;
           if (!snapshot.complete) {
-            notice = 'Some notes or aliases are unavailable. Showing known notes.';
+            notice =
+                'Some notes or aliases are unavailable. Showing known notes.';
           }
           final sources = {
             for (final note in snapshot.notes.values)
@@ -1178,13 +1179,15 @@ class _EditorShellState extends State<EditorShell> {
                   LogicalKeyboardKey.keyP,
                   meta: useMeta,
                   control: !useMeta,
-                ): () => _openPalette(),
+                ): () =>
+                    _openPalette(),
                 SingleActivator(
                   LogicalKeyboardKey.keyP,
                   meta: useMeta,
                   control: !useMeta,
                   shift: true,
-                ): () => _openPalette(commands: true),
+                ): () =>
+                    _openPalette(commands: true),
               },
               const SingleActivator(
                 LogicalKeyboardKey.bracketLeft,
@@ -1362,7 +1365,8 @@ class _EditorShellState extends State<EditorShell> {
                                 ),
                                 IconButton(
                                   key: const ValueKey('command-palette-button'),
-                                  tooltip: 'Command palette (⌘⇧P / Ctrl+Shift+P)',
+                                  tooltip:
+                                      'Command palette (⌘⇧P / Ctrl+Shift+P)',
                                   onPressed: () => _openPalette(commands: true),
                                   icon: const Icon(Icons.terminal, size: 16),
                                 ),
