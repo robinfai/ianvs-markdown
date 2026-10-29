@@ -811,33 +811,14 @@ class _EditorShellState extends State<EditorShell> {
     if (!value.selection.isValid || value.selection.isCollapsed) return;
     final edit = CapturedNoteInsertion(value, origin.controller.mode);
     final epoch = workspace.index.epoch;
-    final name = TextEditingController();
-    final String? title;
-    try {
-      title = await showDialog<String>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Extract selection to note'),
-          content: TextField(
-            controller: name,
-            autofocus: true,
-            decoration: const InputDecoration(labelText: 'New note filename'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, name.text.trim()),
-              child: const Text('Extract'),
-            ),
-          ],
-        ),
-      );
-    } finally {
-      name.dispose();
-    }
+    final title = await showDialog<String>(
+      context: context,
+      builder: (_) => const NoteTextDialog(
+        title: 'Extract selection to note',
+        label: 'New note filename',
+        submit: 'Extract',
+      ),
+    );
     bool current() =>
         mounted &&
         identical(workspace, widget.workspace) &&
