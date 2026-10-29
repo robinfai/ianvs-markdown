@@ -54,7 +54,7 @@ void main() {
     'reference insertion rebases links images definitions and heading targets',
     () {
       const text =
-          '[x](sibling.md#heading "Title") ![](assets/a.png)\n[x][id]\n[id]: sibling.md#part\n[heading](#chapter)\n`[code](same.md)`';
+          '[x](sibling.md#heading "Title") ![](assets/a.png)\n[x][id]\n\n[id]: sibling.md#part\n[heading](#chapter)\n`[code](same.md)`';
       final result = transferNoteContent(
         text,
         originPath: '/vault/chapters/source.md',
