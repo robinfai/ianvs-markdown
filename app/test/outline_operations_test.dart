@@ -1,3 +1,5 @@
+import 'package:linefold/src/models/document_session.dart';
+import 'package:linefold/src/widgets/floating_outline.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
@@ -8,6 +10,36 @@ import 'package:linefold/src/services/note_content_transfer.dart';
 import 'package:linefold/src/services/markdown_file_service.dart';
 
 void main() {
+  testWidgets('outline drag and chapter menu edit the live document', (
+    tester,
+  ) async {
+    final document = DocumentSession(
+      id: 'outline',
+      name: 'Chapters.md',
+      text: '# A\nA body\n## Child\nChild body\n# B\nB body\n',
+    );
+    addTearDown(document.dispose);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: FloatingOutline(document: document)),
+    ));
+    final handles = find.byType(ReorderableDragStartListener);
+    final gesture = await tester.startGesture(tester.getCenter(handles.last));
+    await tester.pump(const Duration(milliseconds: 200));
+    await gesture.moveTo(tester.getCenter(handles.first) - const Offset(0, 12));
+    await tester.pump(const Duration(milliseconds: 600));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(document.controller.text, '# B\nB body\n# A\nA body\n## Child\nChild body\n');
+    await tester.tap(find.byTooltip('Chapter actions').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Demote chapter'));
+    await tester.pumpAndSettle();
+    expect(document.controller.text, startsWith('## B\nB body\n# A'));
+    document.controller.undo();
+    expect(document.controller.text, startsWith('# B\nB body\n# A'));
+    await tester.pumpWidget(const SizedBox());
+  });
+
   test('extraction carries reference definitions outside the selection', () {
     const source = '[x][target]\n\n[target]: sibling.md#part "Title"\n';
     final extracted = extractedNoteContent(source, 0, 11);
