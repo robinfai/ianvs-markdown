@@ -10,6 +10,22 @@ import 'package:linefold/src/services/note_content_transfer.dart';
 import 'package:linefold/src/services/markdown_file_service.dart';
 
 void main() {
+  test('standalone block IDs move with their preceding structured block', () {
+    const source = '> Quoted content\n\n^quote\n\n[jump](#^quote)\n';
+    expect(
+      extractedNoteContent(source, 0, source.length, originRelativePath: 'source.md'),
+      source,
+    );
+    expect(
+      extractedNoteContent(source, source.indexOf('[jump]'), source.length, originRelativePath: 'source.md'),
+      '[jump](source.md#^quote)\n',
+    );
+    expect(
+      () => extractedNoteContent(source, source.indexOf('^quote'), source.length, originRelativePath: 'source.md'),
+      throwsFormatException,
+    );
+  });
+
   test(
     'extraction keeps wiki heading names and original note destinations',
     () {
