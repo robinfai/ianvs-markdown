@@ -41,8 +41,9 @@ class _ReferenceDockState extends State<ReferenceDock> {
     super.initState();
     final active = widget.workspace.activeDocument;
     final saved = widget.workspace.referenceView;
-    _pinnedPath = saved['path'] as String? ?? active?.path;
-    _pinnedSession = saved['session'] as String? ?? active?.id;
+    final hasPin = saved.containsKey('path') || saved.containsKey('session');
+    _pinnedPath = hasPin ? saved['path'] as String? : active?.path;
+    _pinnedSession = hasPin ? saved['session'] as String? : active?.id;
     final positions = saved['positions'];
     if (positions is Map) {
       for (final entry in positions.entries) {

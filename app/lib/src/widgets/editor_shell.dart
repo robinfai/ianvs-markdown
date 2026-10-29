@@ -1089,6 +1089,18 @@ class _EditorShellState extends State<EditorShell> {
       'Open workspace folder': () => _guard(workspace.chooseWorkspaceFolder),
       'Save': _saveCommand,
       'Save as': () => _saveCommand(saveAs: true),
+      'Import image': () => unawaited(_importImage()),
+      for (final action in DocumentExportAction.values)
+        'Export ${action.name.toUpperCase()}': () => unawaited(
+          _documentExport.run(
+            context,
+            workspace,
+            action,
+            renderMermaid: (source) async =>
+                (await _mermaidRenderer.render(source)).svg,
+            attachmentSource: widget.attachmentSource,
+          ),
+        ),
       'Search workspace': _openWorkspaceSearch,
       'Find in document': _openFind,
       'Show backlinks': _openWorkspaceReferences,
@@ -1694,11 +1706,18 @@ class _EditorShellState extends State<EditorShell> {
             child: Scaffold(
               body: LayoutBuilder(
                 builder: (context, constraints) {
-                  final inspectorWidth = workspace.outlineVisible
+                  final showOutline =
+                      workspace.outlineVisible && !_referencesVisible;
+                  final referenceWidth = _referencesVisible
+                      ? math.min(360.0, constraints.maxWidth * 0.4)
+                      : 0.0;
+                  final inspectorWidth = showOutline
                       ? DesktopMetrics.inspectorWidth
                       : 0.0;
                   final minContentWidth = math.max(
-                    inspectorWidth + WorkspaceLayout.minEditorWidth,
+                    inspectorWidth +
+                        WorkspaceLayout.minEditorWidth +
+                        referenceWidth,
                     WorkspaceLayout.minContentWidth,
                   );
                   final maxSidebarWidth =
@@ -1713,7 +1732,8 @@ class _EditorShellState extends State<EditorShell> {
                   final content = Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (workspace.sidebarVisible)
+                      if (workspace.sidebarVisible &&
+                          (!_referencesVisible || constraints.maxWidth >= 1100))
                         SizedBox(
                           width: sidebarWidth,
                           child: Stack(
@@ -2100,7 +2120,7 @@ class _EditorShellState extends State<EditorShell> {
                                             },
                                           ),
                                         ),
-                                        if (workspace.outlineVisible)
+                                        if (showOutline)
                                           FloatingOutline(document: document),
                                       ],
                                     ),
@@ -2118,7 +2138,7 @@ class _EditorShellState extends State<EditorShell> {
                       ),
                       if (_referencesVisible)
                         SizedBox(
-                          width: math.min(360, constraints.maxWidth * 0.4),
+                          width: referenceWidth,
                           child: ReferenceDock(
                             key: ValueKey(workspace.workspaceRoot),
                             workspace: workspace,
