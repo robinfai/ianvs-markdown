@@ -767,7 +767,7 @@ class _EditorShellState extends State<EditorShell> {
           );
         }
       }
-      if (!current()) return;
+      if (!mounted || !current()) return;
       final selection = await showDialog<WorkspacePaletteSelection>(
         context: context,
         builder: (_) => WorkspacePalette(
