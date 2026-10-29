@@ -214,7 +214,8 @@ class WorkspaceController extends ChangeNotifier {
     await flushSession();
   }
   Map<String, Object?> _referenceView = {};
-  Map<String, Object?> get referenceView => _referenceView['root'] == workspaceRoot
+  Map<String, Object?> get referenceView =>
+      _referenceView['root'] == workspaceRoot
       ? Map.unmodifiable(_referenceView)
       : const {};
 
@@ -222,6 +223,7 @@ class WorkspaceController extends ChangeNotifier {
     _referenceView = {...referenceView, ...changes, 'root': workspaceRoot};
     _schedulePersist();
   }
+
   final _recentNotes = <String, int>{};
   String? _lastRecentDocument;
   int recentNoteActivation(String path) => _recentNotes[path] ?? 0;

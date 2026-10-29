@@ -549,14 +549,22 @@ class _EditorShellState extends State<EditorShell> {
     }
   }
 
-  Future<void> _openDocumentLink(DocumentSession document, IanvsMarkdownLinkTarget link) {
+  Future<void> _openDocumentLink(
+    DocumentSession document,
+    IanvsMarkdownLinkTarget link,
+  ) {
     if (link.kind == IanvsMarkdownLinkKind.wiki) {
       return _openWikiLink(document, link.href ?? '');
     }
     if (link.kind == IanvsMarkdownLinkKind.tag) {
-      return _openWorkspaceReferences(tag: (link.href ?? '').replaceFirst(RegExp(r'^tag:#?'), ''));
+      return _openWorkspaceReferences(
+        tag: (link.href ?? '').replaceFirst(RegExp(r'^tag:#?'), ''),
+      );
     }
-    return DocumentLinkService(workspace: widget.workspace, openImage: _openImage).open(document, link.href);
+    return DocumentLinkService(
+      workspace: widget.workspace,
+      openImage: _openImage,
+    ).open(document, link.href);
   }
 
   Future<void> _openWikiLink(DocumentSession origin, String target) async {
@@ -835,8 +843,9 @@ class _EditorShellState extends State<EditorShell> {
     if (!current() ||
         title == null ||
         title.isEmpty ||
-        origin.controller.value != value)
+        origin.controller.value != value) {
       return;
+    }
     final path = title.toLowerCase().endsWith('.md') ? title : '$title.md';
     if (!WikiLinkInsertion.canRepresent(path)) {
       _showError('Use a Markdown filename without link delimiters.');
@@ -847,8 +856,9 @@ class _EditorShellState extends State<EditorShell> {
         path,
         epoch: epoch,
         isCurrent: current,
-      ))
+      )) {
         return;
+      }
       final created = await workspace.openIndexedNote(
         path,
         epoch: epoch,
@@ -870,10 +880,11 @@ class _EditorShellState extends State<EditorShell> {
       }
       workspace.selectDocument(workspace.documents.indexOf(origin));
     } on Object catch (error) {
-      if (current())
+      if (current()) {
         _showError(
           'Extraction did not finish: $error. Original text is retained until the new note is saved.',
         );
+      }
     }
   }
 
@@ -1098,6 +1109,18 @@ class _EditorShellState extends State<EditorShell> {
       'Open workspace folder': () => _guard(workspace.chooseWorkspaceFolder),
       'Save': _saveCommand,
       'Save as': () => _saveCommand(saveAs: true),
+      'Import image': () => unawaited(_importImage()),
+      for (final action in DocumentExportAction.values)
+        'Export ${action.name.toUpperCase()}': () => unawaited(
+          _documentExport.run(
+            context,
+            workspace,
+            action,
+            renderMermaid: (source) async =>
+                (await _mermaidRenderer.render(source)).svg,
+            attachmentSource: widget.attachmentSource,
+          ),
+        ),
       'Search workspace': _openWorkspaceSearch,
       'Find in document': _openFind,
       'Show backlinks': _openWorkspaceReferences,
@@ -1150,7 +1173,9 @@ class _EditorShellState extends State<EditorShell> {
                 detail: note.relativePath,
                 searchTerms:
                     snapshot.aliases.byPath[note.relativePath]?.join(' ') ?? '',
-                recency: document?.lastActivated ?? workspace.recentNoteActivation(absolute),
+                recency:
+                    document?.lastActivated ??
+                    workspace.recentNoteActivation(absolute),
               ),
             );
           }
@@ -1701,11 +1726,18 @@ class _EditorShellState extends State<EditorShell> {
             child: Scaffold(
               body: LayoutBuilder(
                 builder: (context, constraints) {
-                  final inspectorWidth = workspace.outlineVisible
+                  final showOutline =
+                      workspace.outlineVisible && !_referencesVisible;
+                  final referenceWidth = _referencesVisible
+                      ? math.min(360.0, constraints.maxWidth * 0.4)
+                      : 0.0;
+                  final inspectorWidth = showOutline
                       ? DesktopMetrics.inspectorWidth
                       : 0.0;
                   final minContentWidth = math.max(
-                    inspectorWidth + WorkspaceLayout.minEditorWidth,
+                    inspectorWidth +
+                        WorkspaceLayout.minEditorWidth +
+                        referenceWidth,
                     WorkspaceLayout.minContentWidth,
                   );
                   final maxSidebarWidth =
@@ -1720,7 +1752,8 @@ class _EditorShellState extends State<EditorShell> {
                   final content = Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (workspace.sidebarVisible)
+                      if (workspace.sidebarVisible &&
+                          (!_referencesVisible || constraints.maxWidth >= 1100))
                         SizedBox(
                           width: sidebarWidth,
                           child: Stack(
@@ -2009,7 +2042,13 @@ class _EditorShellState extends State<EditorShell> {
                                                       'a': NoteLinkPreviewBuilder(
                                                         workspace: workspace,
                                                         document: document,
-                                                        onTap: (link) => _guard(() => _openDocumentLink(document, link)),
+                                                        onTap: (link) => _guard(
+                                                          () =>
+                                                              _openDocumentLink(
+                                                                document,
+                                                                link,
+                                                              ),
+                                                        ),
                                                       ),
                                                     },
                                                     imageBuilder: images.image,
@@ -2102,7 +2141,7 @@ class _EditorShellState extends State<EditorShell> {
                                             },
                                           ),
                                         ),
-                                        if (workspace.outlineVisible)
+                                        if (showOutline)
                                           FloatingOutline(document: document),
                                       ],
                                     ),
@@ -2120,7 +2159,7 @@ class _EditorShellState extends State<EditorShell> {
                       ),
                       if (_referencesVisible)
                         SizedBox(
-                          width: math.min(360, constraints.maxWidth * 0.4),
+                          width: referenceWidth,
                           child: ReferenceDock(
                             key: ValueKey(workspace.workspaceRoot),
                             workspace: workspace,

@@ -41,8 +41,9 @@ class _ReferenceDockState extends State<ReferenceDock> {
     super.initState();
     final active = widget.workspace.activeDocument;
     final saved = widget.workspace.referenceView;
-    _pinnedPath = saved['path'] as String? ?? active?.path;
-    _pinnedSession = saved['session'] as String? ?? active?.id;
+    final hasPin = saved.containsKey('path') || saved.containsKey('session');
+    _pinnedPath = hasPin ? saved['path'] as String? : active?.path;
+    _pinnedSession = hasPin ? saved['session'] as String? : active?.id;
     final positions = saved['positions'];
     if (positions is Map) {
       for (final entry in positions.entries) {
@@ -70,7 +71,9 @@ class _ReferenceDockState extends State<ReferenceDock> {
 
   void _referencesChanged() {
     if (widget.workspace.references.stale && !_refreshing) {
-      scheduleMicrotask(() { if (mounted) unawaited(_refresh()); });
+      scheduleMicrotask(() {
+        if (mounted) unawaited(_refresh());
+      });
     }
   }
 
@@ -85,7 +88,12 @@ class _ReferenceDockState extends State<ReferenceDock> {
           _positionRestored = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted && _scroll.hasClients) {
-              _scroll.jumpTo((_positions[_readingKey] ?? 0).clamp(0, _scroll.position.maxScrollExtent));
+              _scroll.jumpTo(
+                (_positions[_readingKey] ?? 0).clamp(
+                  0,
+                  _scroll.position.maxScrollExtent,
+                ),
+              );
             }
           });
         }
