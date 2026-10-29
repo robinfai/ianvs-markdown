@@ -858,7 +858,11 @@ class _EditorShellState extends State<EditorShell> {
         isCurrent: current,
       );
       if (!current() || created == null) return;
-      final contents = value.selection.textInside(value.text);
+      final contents = extractedNoteContent(
+        value.text,
+        value.selection.start,
+        value.selection.end,
+      );
       created.controller.value = TextEditingValue(
         text: contents,
         selection: TextSelection.collapsed(offset: contents.length),
