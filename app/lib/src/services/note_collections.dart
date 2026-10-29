@@ -84,6 +84,17 @@ String collectionPropertyEditValue(String source, String key) {
 }
 
 String editCollectionProperty(String source, String key, String value) {
+  final result = _editCollectionProperty(source, key, value);
+  if (result == source) return source;
+  final before = parseMarkdownFrontMatter(source);
+  final after = parseMarkdownFrontMatter(result);
+  if (!after.hasFrontMatter || after.body != before.body) {
+    throw const FormatException('This YAML structure needs editing in Source mode.');
+  }
+  return result;
+}
+
+String _editCollectionProperty(String source, String key, String value) {
   if (!RegExp(r'^[A-Za-z_][A-Za-z0-9_-]*$').hasMatch(key)) {
     throw const FormatException('Use a simple property name.');
   }
