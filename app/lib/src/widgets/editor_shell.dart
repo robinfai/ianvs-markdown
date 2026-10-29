@@ -28,6 +28,7 @@ import '../services/wiki_link_insertion.dart';
 import 'wiki_note_picker.dart';
 import 'workspace_palette.dart';
 import 'note_template_dialog.dart';
+import 'reference_dock.dart';
 import '../services/note_templates.dart';
 import '../services/slash_insertion.dart';
 import '../services/attachment_repository.dart';
@@ -768,6 +769,20 @@ class _EditorShellState extends State<EditorShell> {
     }
   }
 
+  bool _referencesVisible = false;
+
+  void _insertReference(String text) {
+    final document = widget.workspace.activeDocument;
+    if (document == null || _documentInputTarget.isLocal) return;
+    final controller = document.controller;
+    if (!CapturedNoteInsertion(controller.value, controller.mode).apply(
+      controller,
+      text,
+    )) {
+      _showError('Place the cursor in an editable document body first.');
+    }
+  }
+
   bool _captureBusy = false;
 
   Future<void> _useTemplate({bool insert = false}) async {
@@ -947,6 +962,8 @@ class _EditorShellState extends State<EditorShell> {
       'Search workspace': _openWorkspaceSearch,
       'Find in document': _openFind,
       'Show backlinks': _openWorkspaceReferences,
+      'Toggle reference pane': () =>
+          setState(() => _referencesVisible = !_referencesVisible),
       'Toggle sidebar': workspace.toggleSidebar,
       'Toggle outline': workspace.toggleOutline,
       'Live preview': () =>
@@ -1950,6 +1967,16 @@ class _EditorShellState extends State<EditorShell> {
                           ],
                         ),
                       ),
+                      if (_referencesVisible)
+                        SizedBox(
+                          width: math.min(360, constraints.maxWidth * 0.4),
+                          child: ReferenceDock(
+                            key: ValueKey(workspace.workspaceRoot),
+                            workspace: workspace,
+                            onClose: () => setState(() => _referencesVisible = false),
+                            onInsert: _insertReference,
+                          ),
+                        ),
                     ],
                   );
                   return Focus(
