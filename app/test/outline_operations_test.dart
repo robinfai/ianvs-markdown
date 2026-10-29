@@ -8,6 +8,14 @@ import 'package:linefold/src/services/note_content_transfer.dart';
 import 'package:linefold/src/services/markdown_file_service.dart';
 
 void main() {
+  test('extraction carries reference definitions outside the selection', () {
+    const source = '[x][target]\n\n[target]: sibling.md#part "Title"\n';
+    final extracted = extractedNoteContent(source, 0, 11);
+    final references = parseIanvsMarkdownNoteSemantics(extracted).references;
+    expect(references.any((r) => r.target == 'sibling.md' && r.fragment == 'part'), isTrue);
+    expect(extracted, contains('[target]: sibling.md#part "Title"'));
+  });
+
   test(
     'extraction stays beside nested source and rejects another directory',
     () {

@@ -68,3 +68,18 @@ String extractionRelativePath(String title, String originPath, String root) {
   final name = title.toLowerCase().endsWith('.md') ? title : '$title.md';
   return p.relative(p.join(p.dirname(originPath), name), from: root);
 }
+
+/// Carry effective reference definitions when only their uses were selected.
+String extractedNoteContent(String source, int start, int end) {
+  final definitions = <int, String>{};
+  for (final reference in parseIanvsMarkdownNoteSemantics(source).references) {
+    if (reference.range.start < start || reference.range.end > end) continue;
+    final definition = reference.definitionRange;
+    if (definition == null ||
+        (definition.start >= start && definition.end <= end)) continue;
+    definitions[definition.start] = source.substring(definition.start, definition.end);
+  }
+  final selected = source.substring(start, end);
+  if (definitions.isEmpty) return selected;
+  return '$selected\n\n${definitions.values.join('\n')}\n';
+}
