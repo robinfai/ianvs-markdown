@@ -3,7 +3,7 @@
 Requested 2026-10-29. Baseline: `dde9bfe06f9f7fea065082236038a59762b8d080`.
 Status: all three stages have UI implementations in stacked draft PRs #56–61.
 Validation and review fixes are in progress. Stage 1A merged through PR #56;
-the remaining deliveries are still draft PRs.
+stages 1B, 1C and 2A/2B also merged through PRs #57–59. Stages 2C and 3 remain draft PRs.
 
 Preserve ordinary local Markdown files and the current editing engine. Reuse
 workspace indexing, note semantics, command routing, guarded saves and session
@@ -15,15 +15,15 @@ relations, rollups and stage-four capture/export work are outside this scope.
 - [x] 1A: quick switcher and command palette. Search title, path and aliases;
   rank recent notes; create from an unmatched query. Reuse editor command
   routing and expose keyboard and visible menu entry points.
-- [ ] 1B: template creation/insertion, daily notes and quick append. Supply
+- [x] 1B: template creation/insertion, daily notes and quick append. Supply
   meeting, reading, technical proposal and blog templates; expand title/date/
   time in Markdown and YAML. Reopen an existing daily note. Append to Inbox
   or today's note without replacing existing contents.
-- [ ] 1C: slash insertion UI for headings, tasks, quotes, code, images and
+- [x] 1C: slash insertion UI for headings, tasks, quotes, code, images and
   templates. Use the current editor selection and existing image import flow.
-- [ ] 2A: link hover preview and persistent incoming/outgoing links panel;
+- [x] 2A: link hover preview and persistent incoming/outgoing links panel;
   pin a reference note and expose open-beside actions.
-- [ ] 2B: two-note panes and same-note Source/Read panes, independent scroll
+- [x] 2B: two-note panes and same-note Source/Read panes, independent scroll
   positions and explicit active input target. Preserve unsaved shared content.
 - [ ] 2C: outline chapter reordering with descendants, heading promotion and
   demotion, folding and chapter-link copy. Extract selection to a new linked
@@ -152,3 +152,25 @@ and reference definitions with fragment destinations. At `c490872` (stage 2C)
 all 72 app tests passed; at `c31ad4e` (stage 3) all 78 passed. Their formatter
 and one control-flow lint correction are applied in the following commit;
 new-head CI remains required before merge.
+
+
+### Further main deliveries
+
+After complete Core and Native integrations success on each PR head:
+
+- #57 merged as `747867ff5a91c638e1fed0a42988565f48ea5223` (templates, daily notes and capture).
+- #58 merged as `50f5287b975f8e79a17150b046b203723c593078` (slash insertion).
+- #59 merged as `d8f17ab23bf0282e0d41dfca4af0ed8190fafb26` (references and pinned reading).
+
+All used normal protected-branch PR merges without overriding protection.
+The current main commit's [Core](https://github.com/robinfai/ianvs-markdown/actions/runs/40842739729)
+and [Native](https://github.com/robinfai/ianvs-markdown/actions/runs/40842739773)
+checks are pending. Superseded intermediate main runs may be cancelled by the
+repository's existing concurrency policy; per-PR validation remains recorded.
+
+Standalone block IDs now stay associated with the preceding structured block,
+following [Obsidian's block-link format](https://obsidian.md/help/links).
+The extraction suite covers moving the whole target, leaving the target in
+the original note, and rejecting extraction of an ID without its target content.
+At stage 2C `a1cde46`, all 73 app tests passed with full analysis; the only
+remaining formatter diff has been applied. New-head checks remain required.
