@@ -67,7 +67,9 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final files = WikiFiles();
-    files.files['/vault/Post.md'] = '---\ntitle: Post\nstatus: idea\n---\nBody';
+    final longStatus = List.filled(1500, 'x').join();
+    final initial = '---\ntitle: Post\nstatus: $longStatus\n---\nBody';
+    files.files['/vault/Post.md'] = initial;
     files.directories['/vault'] = [
       const WorkspaceEntry(
         path: '/vault/Post.md',
@@ -100,7 +102,15 @@ void main() {
     );
     await tester.pumpAndSettle();
     await captureWorkflowScreenshot(tester, boundary, 'collection-table');
-    await tester.tap(find.text('idea'));
+    final displayedStatus = parseMarkdownFrontMatter(initial).entries
+        .firstWhere((entry) => entry.key == 'status').value;
+    await tester.tap(find.text(displayedStatus));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const ValueKey('collection-property-input'))).controller!.text, longStatus);
+    await tester.tap(find.text('Save property'));
+    await tester.pumpAndSettle();
+    expect(files.files['/vault/Post.md'], initial);
+    await tester.tap(find.text(displayedStatus));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('collection-property-input')),
