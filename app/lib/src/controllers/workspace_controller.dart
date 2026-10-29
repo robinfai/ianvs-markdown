@@ -178,6 +178,16 @@ class WorkspaceController extends ChangeNotifier {
     _schedulePersist();
   }
 
+  Map<String, Object?> _referenceView = {};
+  Map<String, Object?> get referenceView => _referenceView['root'] == workspaceRoot
+      ? Map.unmodifiable(_referenceView)
+      : const {};
+
+  void setReferenceView(Map<String, Object?> changes) {
+    _referenceView = {...referenceView, ...changes, 'root': workspaceRoot};
+    _schedulePersist();
+  }
+
   bool _outlineVisible = true;
 
   List<DocumentSession> get documents => List.unmodifiable(_documents);
@@ -268,6 +278,7 @@ class WorkspaceController extends ChangeNotifier {
               await fileService.restorePersistentAccess(token) ??
               _workspaceRoot;
         }
+        _referenceView = Map.of(snapshot.referenceView);
         _readingPreferences = snapshot.readingPreferences;
         _sidebarVisible = snapshot.sidebarVisible;
         _sidebarWidth = WorkspaceLayout.normalizeSidebarWidth(
@@ -2240,6 +2251,7 @@ class WorkspaceController extends ChangeNotifier {
       readingPreferences: _readingPreferences,
       outlineVisible: _outlineVisible,
       browserState: browser.toJson(),
+      referenceView: Map.of(_referenceView),
       operationGrants: Map.of(_operationGrants),
       favoriteAccessTokens: Map.of(_favoriteAccessTokens),
     );

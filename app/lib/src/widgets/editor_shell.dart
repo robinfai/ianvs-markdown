@@ -123,6 +123,7 @@ class _EditorShellState extends State<EditorShell> {
     _attachmentRoot = widget.workspace.workspaceRoot;
     widget.workspace.addListener(_workspaceChanged);
     _bindSlashController();
+    _referencesVisible = widget.workspace.referenceView['visible'] == true;
   }
 
   @override
@@ -780,6 +781,11 @@ class _EditorShellState extends State<EditorShell> {
     }
   }
 
+  void _setReferencesVisible(bool value) {
+    setState(() => _referencesVisible = value);
+    widget.workspace.setReferenceView({'visible': value});
+  }
+
   bool _referencesVisible = false;
 
   void _insertReference(String text) {
@@ -981,8 +987,7 @@ class _EditorShellState extends State<EditorShell> {
       'Search workspace': _openWorkspaceSearch,
       'Find in document': _openFind,
       'Show backlinks': _openWorkspaceReferences,
-      'Toggle reference pane': () =>
-          setState(() => _referencesVisible = !_referencesVisible),
+      'Toggle reference pane': () => _setReferencesVisible(!_referencesVisible),
       'Toggle sidebar': workspace.toggleSidebar,
       'Toggle outline': workspace.toggleOutline,
       'Live preview': () =>
@@ -2003,8 +2008,7 @@ class _EditorShellState extends State<EditorShell> {
                           child: ReferenceDock(
                             key: ValueKey(workspace.workspaceRoot),
                             workspace: workspace,
-                            onClose: () =>
-                                setState(() => _referencesVisible = false),
+                            onClose: () => _setReferencesVisible(false),
                             onInsert: _insertReference,
                           ),
                         ),

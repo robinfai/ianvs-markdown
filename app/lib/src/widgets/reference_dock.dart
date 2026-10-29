@@ -39,11 +39,32 @@ class _ReferenceDockState extends State<ReferenceDock> {
   void initState() {
     super.initState();
     final active = widget.workspace.activeDocument;
-    _pinnedPath = active?.path;
-    _pinnedSession = active?.id;
+    final saved = widget.workspace.referenceView;
+    _pinnedPath = saved['path'] as String? ?? active?.path;
+    _pinnedSession = saved['session'] as String? ?? active?.id;
+    final positions = saved['positions'];
+    if (positions is Map) {
+      for (final entry in positions.entries) {
+        if (entry.key is String && entry.value is num) {
+          _positions[entry.key as String] = (entry.value as num).toDouble();
+        }
+      }
+    }
+    _scroll.addListener(_savePosition);
     _readingKey = _pinnedSession ?? _pinnedPath;
     widget.workspace.references.addListener(_referencesChanged);
     unawaited(_refresh());
+  }
+
+  void _savePosition() {
+    if (_readingKey != null && _scroll.hasClients) {
+      _positions[_readingKey!] = _scroll.offset;
+      widget.workspace.setReferenceView({
+        'path': _pinnedPath,
+        'session': _pinnedSession,
+        'positions': Map.of(_positions),
+      });
+    }
   }
 
   void _referencesChanged() {
@@ -73,6 +94,11 @@ class _ReferenceDockState extends State<ReferenceDock> {
       _pinnedPath = path;
       _pinnedSession = session;
       _readingKey = session ?? path;
+    });
+    widget.workspace.setReferenceView({
+      'path': path,
+      'session': session,
+      'positions': Map.of(_positions),
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _scroll.hasClients) {
