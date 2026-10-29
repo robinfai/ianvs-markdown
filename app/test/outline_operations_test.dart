@@ -4,8 +4,26 @@ import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:linefold/src/app.dart';
 import 'wiki_note_navigation_test.dart' show WikiFiles, wikiWorkspace;
 import 'package:linefold/src/services/outline_operations.dart';
+import 'package:linefold/src/services/note_content_transfer.dart';
 
 void main() {
+  test('extraction stays beside nested source and rejects another directory', () {
+    expect(extractionRelativePath('Excerpt', '/vault/chapters/source.md', '/vault'), 'chapters/Excerpt.md');
+    expect(() => extractionRelativePath('../Excerpt', '/vault/chapters/source.md', '/vault'), throwsFormatException);
+    const text = '[x](sibling.md#heading "Title") ![](assets/a.png)';
+    expect(transferNoteContent(text, originPath: '/vault/chapters/source.md', destinationPath: '/vault/chapters/Excerpt.md'), text);
+  });
+
+  test('reference insertion rebases links images definitions and heading targets', () {
+    const text = '[x](sibling.md#heading "Title") ![](assets/a.png)\n[x][id]\n[id]: sibling.md#part\n[heading](#chapter)\n`[code](same.md)`';
+    final result = transferNoteContent(text, originPath: '/vault/chapters/source.md', destinationPath: '/vault/notes/draft.md');
+    expect(result, contains('../chapters/sibling.md#heading "Title"'));
+    expect(result, contains('../chapters/assets/a.png'));
+    expect(result, contains('[id]: ../chapters/sibling.md#part'));
+    expect(result, contains('[heading](../chapters/source.md#chapter)'));
+    expect(result, contains('`[code](same.md)`'));
+  });
+
   testWidgets('extract selection saves the new note before linking the original', (
     tester,
   ) async {
