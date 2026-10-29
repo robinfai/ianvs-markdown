@@ -733,13 +733,20 @@ class _EditorShellState extends State<EditorShell> {
           if (!snapshot.complete) {
             notice = 'Some notes or aliases are unavailable. Showing known notes.';
           }
+          final sources = {
+            for (final note in snapshot.notes.values)
+              note.source.path: note.source.text,
+          };
           for (final note in snapshot.noteCandidates) {
             final absolute = p.posix.join(root, note.relativePath);
             final document = sessions.remove(absolute);
             entries.add(
               WorkspacePaletteEntry(
                 id: 'note:${note.relativePath}',
-                title: p.posix.basenameWithoutExtension(note.relativePath),
+                title: paletteNoteTitle(
+                  document?.controller.text ?? sources[absolute] ?? '',
+                  p.posix.basenameWithoutExtension(note.relativePath),
+                ),
                 detail: note.relativePath,
                 searchTerms:
                     snapshot.aliases.byPath[note.relativePath]?.join(' ') ?? '',
@@ -752,7 +759,7 @@ class _EditorShellState extends State<EditorShell> {
           entries.add(
             WorkspacePaletteEntry(
               id: 'session:${document.id}',
-              title: document.name,
+              title: paletteNoteTitle(document.controller.text, document.name),
               detail: document.path ?? 'Unsaved note',
               recency: document.lastActivated,
             ),

@@ -1,5 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:ianvs_markdown/ianvs_markdown.dart';
+
+String paletteNoteTitle(String source, String fallback) {
+  final metadata = parseMarkdownFrontMatter(source);
+  for (final entry in metadata.entries) {
+    if (entry.key == 'title' && entry.value.trim().isNotEmpty) {
+      return entry.value.trim();
+    }
+  }
+  final heading = RegExp(r'^# +(.+)$', multiLine: true).firstMatch(metadata.body);
+  return heading?.group(1)?.trim() ?? fallback;
+}
 
 class WorkspacePaletteEntry {
   const WorkspacePaletteEntry({

@@ -1,7 +1,7 @@
 # Writing and knowledge workflows: stages 1–3
 
 Requested 2026-10-29. Baseline: `dde9bfe06f9f7fea065082236038a59762b8d080`.
-Status: implementation has not started; no stage is accepted or merged.
+Status: stage 1A is in progress in draft PR #56; no stage is accepted or merged.
 
 Preserve ordinary local Markdown files and the current editing engine. Reuse
 workspace indexing, note semantics, command routing, guarded saves and session
@@ -70,5 +70,12 @@ Markdown files, editable through table and status board, surviving restart.
 - macOS/Xcode native builds and actual desktop acceptance are unavailable in
   this Linux environment. A suitable validation environment remains required.
 
-No functional edits, commits, pushes or merges have occurred. This local
-checklist is preparation only, not completion of any requested stage.
+Stage 1A adds toolbar entry points and Cmd/Ctrl+P (notes) and
+Cmd/Ctrl+Shift+P (commands). Recent open notes persist their activation time
+in session recovery. Closed-note recency is not yet retained. Existing CI is
+being used for toolchain validation; no local Flutter tests or actual desktop
+UI acceptance have been performed. No stage has merged.
+
+Draft PR: https://github.com/robinfai/ianvs-markdown/pull/56
+Initial implementation commit: `b735b6f155fcaf92ab450ab41e46e2273db90dd8`.
+Follow-up commits and their exact-head CI remain to be recorded.

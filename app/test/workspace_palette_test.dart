@@ -9,6 +9,12 @@ import 'package:linefold/src/widgets/workspace_palette.dart';
 import 'support/fakes.dart';
 
 void main() {
+  test('note titles prefer metadata and fall back to headings and filenames', () {
+    expect(paletteNoteTitle('---\ntitle: Reading\n---\n# Other', 'a'), 'Reading');
+    expect(paletteNoteTitle('# Heading\nBody', 'a'), 'Heading');
+    expect(paletteNoteTitle('Body', 'a.md'), 'a.md');
+  });
+
   test('recent activation survives session serialization', () {
     final document = DocumentSession(id: 'one', name: 'one.md', text: 'body');
     document.lastActivated = 1234;
@@ -57,8 +63,10 @@ void main() {
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
     final query = find.byKey(const ValueKey('workspace-palette-query'));
-    expect(tester.getTopLeft(find.text('Beta')).dy,
-        lessThan(tester.getTopLeft(find.text('Alpha')).dy));
+    expect(
+      tester.getTopLeft(find.text('Beta')).dy,
+      lessThan(tester.getTopLeft(find.text('Alpha')).dy),
+    );
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
