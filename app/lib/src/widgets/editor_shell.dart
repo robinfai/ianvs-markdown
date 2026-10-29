@@ -32,6 +32,7 @@ import 'reference_dock.dart';
 import 'note_link_preview.dart';
 import 'note_text_dialog.dart';
 import '../services/note_templates.dart';
+import '../services/note_content_transfer.dart';
 import '../services/slash_insertion.dart';
 import '../services/attachment_repository.dart';
 import '../services/attachment_import_service.dart';
