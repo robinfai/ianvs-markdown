@@ -140,8 +140,8 @@ passed app formatting, analysis and all 66 focused/regression tests in
 Stage 3 head `4c0dfd4ec5efbf57edc104028a1b15d4f993c306` passed app analysis
 and all 72 tests in [the next run](https://github.com/robinfai/ianvs-markdown/actions/runs/40837257528/job/123325003294);
 that run failed only canonical formatting, whose exact diff is now applied.
-All active branches were then merged with the new main commit to meet the
-up-to-date branch requirement; their new heads must pass CI before further merges.
+All active branches were then merged with the new main commit to refresh
+their ancestry; their new heads must pass CI before further merges.
 
 Fragment extraction review: preflight now preserves the original note target
 for heading/block links left outside the selection, keeps migrated targets
