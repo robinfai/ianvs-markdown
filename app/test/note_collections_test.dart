@@ -10,6 +10,7 @@ import 'package:linefold/src/services/workspace_index.dart';
 import 'package:linefold/src/services/workspace_reference_index.dart';
 
 import 'support/fakes.dart';
+import 'support/workflow_screenshot.dart';
 import 'workspace_index_test.dart' show FakeIndexSource;
 
 void main() {
@@ -31,11 +32,13 @@ void main() {
     addTearDown(files.dispose);
     await workspace.initialize();
     await workspace.chooseWorkspaceFolder();
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: NoteCollectionDialog(
+    final boundary = GlobalKey();
+    await tester.pumpWidget(RepaintBoundary(key: boundary, child: MaterialApp(home: Scaffold(body: NoteCollectionDialog(
       workspace: workspace,
       onSave: workspace.saveDocument,
-    ))));
+    )))));
     await tester.pumpAndSettle();
+    await captureWorkflowScreenshot(tester, boundary, 'collection-table');
     await tester.tap(find.text('idea'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('collection-property-input')), 'draft');
@@ -45,6 +48,7 @@ void main() {
     expect(files.files['/vault/Post.md'], endsWith('Body'));
     await tester.tap(find.text('board'));
     await tester.pumpAndSettle();
+    await captureWorkflowScreenshot(tester, boundary, 'collection-board');
     final gesture = await tester.startGesture(tester.getCenter(find.text('Post')));
     await tester.pump(const Duration(milliseconds: 600));
     await gesture.moveTo(tester.getCenter(find.text('published')));
