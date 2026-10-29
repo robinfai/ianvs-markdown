@@ -7,6 +7,7 @@ import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:linefold/src/controllers/workspace_controller.dart';
 import 'package:linefold/src/services/note_collections.dart';
 import 'package:linefold/src/services/workspace_index.dart';
+import 'package:linefold/src/services/workspace_index_source.dart';
 import 'package:linefold/src/services/workspace_reference_index.dart';
 
 import 'support/fakes.dart';
@@ -102,11 +103,20 @@ void main() {
     );
     await tester.pumpAndSettle();
     await captureWorkflowScreenshot(tester, boundary, 'collection-table');
-    final displayedStatus = parseMarkdownFrontMatter(initial).entries
-        .firstWhere((entry) => entry.key == 'status').value;
+    final displayedStatus = parseMarkdownFrontMatter(
+      initial,
+    ).entries.firstWhere((entry) => entry.key == 'status').value;
     await tester.tap(find.text(displayedStatus));
     await tester.pumpAndSettle();
-    expect(tester.widget<TextField>(find.byKey(const ValueKey('collection-property-input'))).controller!.text, longStatus);
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const ValueKey('collection-property-input')),
+          )
+          .controller!
+          .text,
+      longStatus,
+    );
     await tester.tap(find.text('Save property'));
     await tester.pumpAndSettle();
     expect(files.files['/vault/Post.md'], initial);
@@ -152,6 +162,16 @@ void main() {
         '---\nstatus: draft\nrank: 2\n---\n# B\n#writing',
       );
       source.note('reading/c.md', '---\nstatus: done\n---\n# C');
+      final entries = source.directories['/vault/']!.entries;
+      source.directories['/vault/'] = const WorkspaceDirectorySnapshot([
+        WorkspaceMetadata(relativePath: 'blog', isDirectory: true, revision: 'v1'),
+        WorkspaceMetadata(relativePath: 'reading', isDirectory: true, revision: 'v1'),
+      ]);
+      for (final folder in ['blog', 'reading']) {
+        source.directories['/vault/$folder'] = WorkspaceDirectorySnapshot(
+          entries.where((entry) => entry.relativePath.startsWith('$folder/')).toList(),
+        );
+      }
       final index = WorkspaceIndex(source: source)..configure('/vault');
       final references = WorkspaceReferenceIndex(index);
       addTearDown(references.dispose);

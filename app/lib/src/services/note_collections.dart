@@ -15,12 +15,18 @@ class CollectionNote {
   final WorkspaceSemanticNote note;
   final String relativePath;
   final Map<String, MarkdownMetadataEntry> properties;
+  final _fullValues = <String, String>{};
   String value(String key) =>
       key == 'filename' ? relativePath : properties[key]?.value ?? '';
   String fullValue(String key) {
     if (key == 'filename') return relativePath;
-    if (properties[key]?.type == MarkdownMetadataValueType.object) return value(key);
-    return collectionPropertyEditValue(note.source.text, key);
+    if (properties[key]?.type == MarkdownMetadataValueType.object) {
+      return value(key);
+    }
+    return _fullValues.putIfAbsent(
+      key,
+      () => collectionPropertyEditValue(note.source.text, key),
+    );
   }
 }
 
@@ -94,7 +100,9 @@ String editCollectionProperty(String source, String key, String value) {
   final before = parseMarkdownFrontMatter(source);
   final after = parseMarkdownFrontMatter(result);
   if (!after.hasFrontMatter || after.body != before.body) {
-    throw const FormatException('This YAML structure needs editing in Source mode.');
+    throw const FormatException(
+      'This YAML structure needs editing in Source mode.',
+    );
   }
   return result;
 }

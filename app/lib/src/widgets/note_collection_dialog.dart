@@ -155,8 +155,9 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
     try {
       final before = row.note.source.text;
       final after = editCollectionProperty(before, key, value);
-      if (after == before && value == collectionPropertyEditValue(before, key))
+      if (after == before && value == collectionPropertyEditValue(before, key)) {
         return;
+      }
       if (after == before &&
           value != collectionPropertyEditValue(before, key)) {
         throw const FormatException(
@@ -182,12 +183,13 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
       );
       document.controller.commitHistoryGroup();
       final saved = await widget.onSave(document);
-      if (_current)
+      if (_current) {
         setState(
           () => _notice = saved
               ? 'Property saved.'
               : 'Property is unsaved in the open note.',
         );
+      }
       await _refresh();
     } on Object catch (error) {
       if (mounted) setState(() => _notice = 'Property was not saved: $error');
@@ -220,13 +222,13 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
   Widget build(BuildContext context) {
     final root = widget.workspace.workspaceRoot;
     final snapshot = _snapshot;
-    final columns = [
+    final columns = {
       'filename',
       ..._columns.text
           .split(',')
           .map((s) => s.trim())
           .where((s) => s.isNotEmpty && s != 'filename'),
-    ].toSet().toList();
+    }.toList();
     final rows = snapshot == null || root == null || !_current
         ? <CollectionNote>[]
         : collectionNotes(
