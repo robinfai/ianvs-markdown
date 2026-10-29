@@ -914,7 +914,9 @@ class _EditorShellState extends State<EditorShell> {
                 detail: note.relativePath,
                 searchTerms:
                     snapshot.aliases.byPath[note.relativePath]?.join(' ') ?? '',
-                recency: document?.lastActivated ?? workspace.recentNoteActivation(absolute),
+                recency:
+                    document?.lastActivated ??
+                    workspace.recentNoteActivation(absolute),
               ),
             );
           }
