@@ -799,6 +799,7 @@ class _EditorShellState extends State<EditorShell> {
     final origin = workspace.activeDocument;
     if (origin == null ||
         workspace.workspaceRoot == null ||
+        origin.path == null ||
         _documentInputTarget.isLocal ||
         hasEditorComposition(workspace)) {
       _showError('Select body text in a workspace note first.');
@@ -845,7 +846,13 @@ class _EditorShellState extends State<EditorShell> {
         origin.controller.value != value) {
       return;
     }
-    final path = title.toLowerCase().endsWith('.md') ? title : '$title.md';
+    final String path;
+    try {
+      path = extractionRelativePath(title, origin.path!, workspace.workspaceRoot!);
+    } on FormatException catch (error) {
+      _showError(error.message);
+      return;
+    }
     if (!WikiLinkInsertion.canRepresent(path)) {
       _showError('Use a Markdown filename without link delimiters.');
       return;
@@ -895,15 +902,44 @@ class _EditorShellState extends State<EditorShell> {
   bool _referencesVisible = false;
   bool _referenceRestoreDone = false;
 
-  void _insertReference(String text) {
-    final document = widget.workspace.activeDocument;
+  Future<void> _insertReference(String text, String? sourcePath) async {
+    final workspace = widget.workspace;
+    final document = workspace.activeDocument;
     if (document == null || _documentInputTarget.isLocal) return;
     final controller = document.controller;
-    if (!CapturedNoteInsertion(
-      controller.value,
-      controller.mode,
-    ).apply(controller, text)) {
-      _showError('Place the cursor in an editable document body first.');
+    final captured = CapturedNoteInsertion(controller.value, controller.mode);
+    final epoch = workspace.index.epoch;
+    try {
+      final references = parseIanvsMarkdownNoteSemantics(text).references;
+      if (references.isNotEmpty && (sourcePath == null || document.path == null)) {
+        throw const FormatException('Save both notes before transferring references.');
+      }
+      final targets = <String, String>{};
+      for (final reference in references) {
+        if (reference.kind != IanvsMarkdownSourceReferenceKind.wikiLink &&
+            reference.kind != IanvsMarkdownSourceReferenceKind.wikiEmbed) continue;
+        final result = await workspace.references.resolveWiki(
+          reference.target,
+          originPath: sourcePath,
+        );
+        if (result.status != WikiNoteStatus.resolved) {
+          throw const FormatException('Resolve missing or ambiguous wiki references before inserting.');
+        }
+        targets[reference.target] = '/${result.candidates.single.relativePath}';
+      }
+      final transferred = references.isEmpty ? text : transferNoteContent(
+        text,
+        originPath: sourcePath!,
+        destinationPath: document.path!,
+        wikiTargets: targets,
+      );
+      if (!mounted || epoch != workspace.index.epoch ||
+          workspace.activeDocument != document ||
+          !captured.apply(controller, transferred)) {
+        if (mounted) _showError('The destination changed. Insert the reference again.');
+      }
+    } on Object catch (error) {
+      if (mounted) _showError('Unable to insert reference: $error');
     }
   }
 

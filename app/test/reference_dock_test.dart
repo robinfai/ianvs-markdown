@@ -33,7 +33,7 @@ void main() {
               child: ReferenceDock(
                 workspace: workspace,
                 onClose: () {},
-                onInsert: (value) => inserted = value,
+                onInsert: (value, path) => inserted = value,
               ),
             ),
           ),
