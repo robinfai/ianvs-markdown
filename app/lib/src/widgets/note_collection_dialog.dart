@@ -379,7 +379,7 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
                           row.value(column).isEmpty ? '—' : row.value(column),
                         ),
                         onTap: column == 'filename'
-                            ? null
+                            ? () => _open(row)
                             : () => _edit(row, column),
                       ),
                   ],
