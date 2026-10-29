@@ -85,6 +85,18 @@ class WorkspaceController extends ChangeNotifier {
   @override
   void notifyListeners() {
     if (_disposed) return;
+    final active = activeDocument;
+    if (active != null && active.id != _lastRecentDocument) {
+      _lastRecentDocument = active.id;
+      active.lastActivated = DateTime.now().millisecondsSinceEpoch;
+      if (active.path != null) {
+        _recentNotes.remove(active.path);
+        _recentNotes[active.path!] = active.lastActivated;
+        while (_recentNotes.length > 128) {
+          _recentNotes.remove(_recentNotes.keys.first);
+        }
+      }
+    }
     sync.configure(
       path: activeDocument?.path,
       identity: (_workspaceRoot, activeDocument?.id),
@@ -178,6 +190,10 @@ class WorkspaceController extends ChangeNotifier {
     _schedulePersist();
   }
 
+  final _recentNotes = <String, int>{};
+  String? _lastRecentDocument;
+  int recentNoteActivation(String path) => _recentNotes[path] ?? 0;
+
   bool _outlineVisible = true;
 
   List<DocumentSession> get documents => List.unmodifiable(_documents);
@@ -268,6 +284,7 @@ class WorkspaceController extends ChangeNotifier {
               await fileService.restorePersistentAccess(token) ??
               _workspaceRoot;
         }
+        _recentNotes.addAll(snapshot.recentNotes);
         _readingPreferences = snapshot.readingPreferences;
         _sidebarVisible = snapshot.sidebarVisible;
         _sidebarWidth = WorkspaceLayout.normalizeSidebarWidth(
@@ -381,9 +398,9 @@ class WorkspaceController extends ChangeNotifier {
     _schedulePersist();
   }
 
-  DocumentSession newDocument() {
+  DocumentSession newDocument({String? name}) {
     final document = _createDocument(
-      name: 'Untitled-$_nextDocumentId.md',
+      name: name ?? 'Untitled-$_nextDocumentId.md',
       text: '',
     );
     _documents.add(document);
@@ -702,6 +719,7 @@ class WorkspaceController extends ChangeNotifier {
       return;
     }
     _activeIndex = index;
+    activeDocument!.lastActivated = DateTime.now().millisecondsSinceEpoch;
     notifyListeners();
     _schedulePersist();
   }
@@ -2239,6 +2257,7 @@ class WorkspaceController extends ChangeNotifier {
       readingPreferences: _readingPreferences,
       outlineVisible: _outlineVisible,
       browserState: browser.toJson(),
+      recentNotes: Map.of(_recentNotes),
       operationGrants: Map.of(_operationGrants),
       favoriteAccessTokens: Map.of(_favoriteAccessTokens),
     );

@@ -26,6 +26,7 @@ import '../services/document_link_service.dart';
 import '../services/wiki_note_resolver.dart';
 import '../services/wiki_link_insertion.dart';
 import 'wiki_note_picker.dart';
+import 'workspace_palette.dart';
 import '../services/attachment_repository.dart';
 import '../services/attachment_import_service.dart';
 import '../services/attachment_resolver.dart';
@@ -676,6 +677,162 @@ class _EditorShellState extends State<EditorShell> {
     }
   }
 
+  bool _paletteOpen = false;
+
+  Future<void> _openPalette({bool commands = false}) async {
+    final workspace = widget.workspace;
+    if (_paletteOpen ||
+        !(ModalRoute.of(context)?.isCurrent ?? true) ||
+        hasEditorComposition(workspace)) {
+      return;
+    }
+    _paletteOpen = true;
+    final epoch = workspace.index.epoch;
+    final origin = workspace.activeDocument;
+    bool current() =>
+        mounted &&
+        identical(workspace, widget.workspace) &&
+        epoch == workspace.index.epoch &&
+        identical(origin, workspace.activeDocument);
+    final actions = <String, VoidCallback>{
+      'New note': () => workspace.newDocument(),
+      'Open files': () => _guard(workspace.chooseAndOpenFiles),
+      'Open workspace folder': () => _guard(workspace.chooseWorkspaceFolder),
+      'Save': _saveCommand,
+      'Save as': () => _saveCommand(saveAs: true),
+      'Import image': () => unawaited(_importImage()),
+      for (final action in DocumentExportAction.values)
+        'Export ${action.name.toUpperCase()}': () => unawaited(
+          _documentExport.run(
+            context,
+            workspace,
+            action,
+            renderMermaid: (source) async =>
+                (await _mermaidRenderer.render(source)).svg,
+            attachmentSource: widget.attachmentSource,
+          ),
+        ),
+      'Search workspace': _openWorkspaceSearch,
+      'Find in document': _openFind,
+      'Show backlinks': _openWorkspaceReferences,
+      'Toggle sidebar': workspace.toggleSidebar,
+      'Toggle outline': workspace.toggleOutline,
+      'Live preview': () =>
+          setEditorMode(workspace, IanvsMarkdownEditorMode.livePreview),
+      'Source mode': () =>
+          setEditorMode(workspace, IanvsMarkdownEditorMode.source),
+      'Reading mode': () =>
+          setEditorMode(workspace, IanvsMarkdownEditorMode.preview),
+    };
+    try {
+      final entries = <WorkspacePaletteEntry>[];
+      final sessions = <String, DocumentSession>{};
+      String? notice;
+      if (commands) {
+        entries.addAll(
+          actions.keys.map(
+            (label) => WorkspacePaletteEntry(id: label, title: label),
+          ),
+        );
+      } else {
+        for (final document in workspace.documents) {
+          sessions[document.path ?? document.id] = document;
+        }
+        final root = workspace.workspaceRoot;
+        if (root != null) {
+          final snapshot = await workspace.references.refresh();
+          if (!current()) return;
+          if (!snapshot.complete) {
+            notice =
+                'Some notes or aliases are unavailable. Showing known notes.';
+          }
+          final sources = {
+            for (final note in snapshot.notes.values)
+              note.source.path: note.source.text,
+          };
+          for (final note in snapshot.noteCandidates) {
+            final absolute = p.posix.join(root, note.relativePath);
+            final document = sessions.remove(absolute);
+            entries.add(
+              WorkspacePaletteEntry(
+                id: 'note:${note.relativePath}',
+                title: paletteNoteTitle(
+                  document?.controller.text ?? sources[absolute] ?? '',
+                  p.posix.basenameWithoutExtension(note.relativePath),
+                ),
+                detail: note.relativePath,
+                searchTerms:
+                    snapshot.aliases.byPath[note.relativePath]?.join(' ') ?? '',
+                recency:
+                    document?.lastActivated ??
+                    workspace.recentNoteActivation(absolute),
+              ),
+            );
+          }
+        }
+        for (final document in sessions.values) {
+          entries.add(
+            WorkspacePaletteEntry(
+              id: 'session:${document.id}',
+              title: paletteNoteTitle(document.controller.text, document.name),
+              detail: document.path ?? 'Unsaved note',
+              recency: document.lastActivated,
+            ),
+          );
+        }
+      }
+      if (!mounted || !current()) return;
+      final selection = await showDialog<WorkspacePaletteSelection>(
+        context: context,
+        builder: (_) => WorkspacePalette(
+          title: commands ? 'Command palette' : 'Quick switcher',
+          entries: entries,
+          allowCreate: !commands,
+          notice: notice,
+        ),
+      );
+      if (!current() || selection == null) return;
+      _editorFocus.requestFocus();
+      if (commands) {
+        actions[selection.id]?.call();
+      } else if (selection.create) {
+        final name = selection.id.toLowerCase().endsWith('.md')
+            ? selection.id
+            : '${selection.id}.md';
+        if (workspace.workspaceRoot == null) {
+          workspace.newDocument(name: name);
+        } else if (await workspace.createWikiNote(
+          name,
+          epoch: epoch,
+          isCurrent: current,
+        )) {
+          if (!current()) return;
+          await workspace.openIndexedNote(
+            name,
+            epoch: epoch,
+            isCurrent: current,
+          );
+        }
+      } else if (selection.id.startsWith('session:')) {
+        workspace.selectDocument(
+          workspace.documents.indexWhere(
+            (document) => document.id == selection.id.substring(8),
+          ),
+        );
+      } else {
+        await workspace.openIndexedNote(
+          selection.id.substring(5),
+          epoch: epoch,
+          isCurrent: current,
+        );
+      }
+    } on Object catch (error) {
+      if (mounted) _showError('Unable to complete palette action: $error');
+    } finally {
+      _paletteOpen = false;
+    }
+  }
+
   Future<void> _openWorkspaceSearch() async {
     if (!(ModalRoute.of(context)?.isCurrent ?? true) ||
         hasEditorComposition(widget.workspace)) {
@@ -1031,6 +1188,21 @@ class _EditorShellState extends State<EditorShell> {
           child: CallbackShortcuts(
             bindings: <ShortcutActivator, VoidCallback>{
               ...readingSizeShortcuts(workspace),
+              for (final useMeta in [true, false]) ...{
+                SingleActivator(
+                  LogicalKeyboardKey.keyP,
+                  meta: useMeta,
+                  control: !useMeta,
+                ): () =>
+                    _openPalette(),
+                SingleActivator(
+                  LogicalKeyboardKey.keyP,
+                  meta: useMeta,
+                  control: !useMeta,
+                  shift: true,
+                ): () =>
+                    _openPalette(commands: true),
+              },
               const SingleActivator(
                 LogicalKeyboardKey.bracketLeft,
                 meta: true,
@@ -1199,6 +1371,19 @@ class _EditorShellState extends State<EditorShell> {
                               onSave: _saveDocument,
                               onClose: _closeDocument,
                               documentActions: [
+                                IconButton(
+                                  key: const ValueKey('quick-switcher-button'),
+                                  tooltip: 'Quick switcher (⌘P / Ctrl+P)',
+                                  onPressed: () => _openPalette(),
+                                  icon: const Icon(Icons.search, size: 16),
+                                ),
+                                IconButton(
+                                  key: const ValueKey('command-palette-button'),
+                                  tooltip:
+                                      'Command palette (⌘⇧P / Ctrl+Shift+P)',
+                                  onPressed: () => _openPalette(commands: true),
+                                  icon: const Icon(Icons.terminal, size: 16),
+                                ),
                                 IconButton(
                                   key: const ValueKey('import-image-button'),
                                   tooltip: _attachmentPending
