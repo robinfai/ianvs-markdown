@@ -742,6 +742,7 @@ class _EditorShellState extends State<EditorShell> {
     try {
       final resolution = await workspace.references.resolveWiki(
         '/$filename',
+        originPath: workspace.activeDocument?.path,
         refreshMetadata: true,
       );
       if (!current()) return;
