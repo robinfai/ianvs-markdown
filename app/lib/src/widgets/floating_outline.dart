@@ -81,10 +81,14 @@ class FloatingOutline extends StatelessWidget {
                     }
                     return ReorderableListView.builder(
                       buildDefaultDragHandles: false,
-                      onReorder: (oldIndex, newIndex) => applyOutlineEdit(
+                      onReorderItem: (oldIndex, newIndex) => applyOutlineEdit(
                         document.controller,
                         value.text,
-                        moveChapter(value.text, oldIndex, newIndex),
+                        moveChapter(
+                          value.text,
+                          oldIndex,
+                          newIndex > oldIndex ? newIndex + 1 : newIndex,
+                        ),
                       ),
                       padding: const EdgeInsets.fromLTRB(8, 2, 8, 12),
                       itemCount: headings.length,
