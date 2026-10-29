@@ -796,24 +796,46 @@ class _EditorShellState extends State<EditorShell> {
             decoration: const InputDecoration(labelText: 'New note filename'),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.pop(context, name.text.trim()), child: const Text('Extract')),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, name.text.trim()),
+              child: const Text('Extract'),
+            ),
           ],
         ),
       );
     } finally {
       name.dispose();
     }
-    bool current() => mounted && identical(workspace, widget.workspace) && epoch == workspace.index.epoch;
-    if (!current() || title == null || title.isEmpty || origin.controller.value != value) return;
+    bool current() =>
+        mounted &&
+        identical(workspace, widget.workspace) &&
+        epoch == workspace.index.epoch;
+    if (!current() ||
+        title == null ||
+        title.isEmpty ||
+        origin.controller.value != value)
+      return;
     final path = title.toLowerCase().endsWith('.md') ? title : '$title.md';
     if (!WikiLinkInsertion.canRepresent(path)) {
       _showError('Use a Markdown filename without link delimiters.');
       return;
     }
     try {
-      if (!await workspace.createWikiNote(path, epoch: epoch, isCurrent: current)) return;
-      final created = await workspace.openIndexedNote(path, epoch: epoch, isCurrent: current);
+      if (!await workspace.createWikiNote(
+        path,
+        epoch: epoch,
+        isCurrent: current,
+      ))
+        return;
+      final created = await workspace.openIndexedNote(
+        path,
+        epoch: epoch,
+        isCurrent: current,
+      );
       if (!current() || created == null) return;
       final contents = value.selection.textInside(value.text);
       created.controller.value = TextEditingValue(
@@ -823,12 +845,17 @@ class _EditorShellState extends State<EditorShell> {
       if (!await _saveDocument(created) || !current()) return;
       if (!workspace.documents.contains(origin) ||
           !edit.apply(origin.controller, '[[/$path]]')) {
-        _showError('The extracted note was saved; the original changed and was left intact.');
+        _showError(
+          'The extracted note was saved; the original changed and was left intact.',
+        );
         return;
       }
       workspace.selectDocument(workspace.documents.indexOf(origin));
     } on Object catch (error) {
-      if (current()) _showError('Extraction did not finish: $error. Original text is retained until the new note is saved.');
+      if (current())
+        _showError(
+          'Extraction did not finish: $error. Original text is retained until the new note is saved.',
+        );
     }
   }
 

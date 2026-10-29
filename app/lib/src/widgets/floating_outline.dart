@@ -106,7 +106,9 @@ class FloatingOutline extends StatelessWidget {
                               child: _OutlineTile(
                                 heading: heading,
                                 selected: selected,
-                                onTap: () => document.controller.revealHeading(heading.offset),
+                                onTap: () => document.controller.revealHeading(
+                                  heading.offset,
+                                ),
                               ),
                             ),
                             PopupMenuButton<String>(
@@ -114,20 +116,38 @@ class FloatingOutline extends StatelessWidget {
                               iconSize: 14,
                               onSelected: (action) {
                                 if (action == 'copy') {
-                                  final target = Uri(path: document.path ?? document.name, fragment: heading.text);
-                                  Clipboard.setData(ClipboardData(text: '[Chapter](<$target>)'));
+                                  final target = Uri(
+                                    path: document.path ?? document.name,
+                                    fragment: heading.text,
+                                  );
+                                  Clipboard.setData(
+                                    ClipboardData(text: '[Chapter](<$target>)'),
+                                  );
                                 } else {
                                   applyOutlineEdit(
                                     document.controller,
                                     value.text,
-                                    changeChapterLevel(value.text, index, action == 'promote' ? -1 : 1),
+                                    changeChapterLevel(
+                                      value.text,
+                                      index,
+                                      action == 'promote' ? -1 : 1,
+                                    ),
                                   );
                                 }
                               },
                               itemBuilder: (_) => const [
-                                PopupMenuItem(value: 'promote', child: Text('Promote chapter')),
-                                PopupMenuItem(value: 'demote', child: Text('Demote chapter')),
-                                PopupMenuItem(value: 'copy', child: Text('Copy chapter link')),
+                                PopupMenuItem(
+                                  value: 'promote',
+                                  child: Text('Promote chapter'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'demote',
+                                  child: Text('Demote chapter'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'copy',
+                                  child: Text('Copy chapter link'),
+                                ),
                               ],
                             ),
                           ],
