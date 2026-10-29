@@ -390,7 +390,7 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
       'idea',
       'draft',
       'published',
-      for (final row in rows) row.value('status'),
+      for (final row in rows) row.fullValue('status'),
     };
     return ListView(
       scrollDirection: Axis.horizontal,
@@ -409,13 +409,17 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
                 child: Column(
                   children: [
                     ListTile(
-                      title: Text(status.isEmpty ? 'No status' : status),
+                      title: Text(
+                        status.isEmpty ? 'No status' : status,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                     Expanded(
                       child: ListView(
                         children: [
                           for (final row in rows.where(
-                            (row) => row.value('status') == status,
+                            (row) => row.fullValue('status') == status,
                           ))
                             LongPressDraggable<CollectionNote>(
                               data: row,

@@ -17,6 +17,11 @@ class CollectionNote {
   final Map<String, MarkdownMetadataEntry> properties;
   String value(String key) =>
       key == 'filename' ? relativePath : properties[key]?.value ?? '';
+  String fullValue(String key) {
+    if (key == 'filename') return relativePath;
+    if (properties[key]?.type == MarkdownMetadataValueType.object) return value(key);
+    return collectionPropertyEditValue(note.source.text, key);
+  }
 }
 
 List<CollectionNote> collectionNotes(
@@ -43,12 +48,12 @@ List<CollectionNote> collectionNotes(
     if (prefix.isNotEmpty && !relative.startsWith('$prefix/')) continue;
     if (tag.isNotEmpty && !tagPaths.contains(path)) continue;
     final row = CollectionNote(note, relative);
-    if (property.isNotEmpty && row.value(property) != equals) continue;
+    if (property.isNotEmpty && row.fullValue(property) != equals) continue;
     rows.add(row);
   }
   rows.sort((a, b) {
-    final av = a.value(sort);
-    final bv = b.value(sort);
+    final av = a.fullValue(sort);
+    final bv = b.fullValue(sort);
     final an = num.tryParse(av);
     final bn = num.tryParse(bv);
     var result = an != null && bn != null ? an.compareTo(bn) : av.compareTo(bv);
