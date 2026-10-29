@@ -85,7 +85,7 @@ jobs:
       - name: Run writing workflow feature tests
         working-directory: app
         run: |
-          tests=(test/workspace_palette_test.dart)
+          tests=(test/workspace_palette_test.dart test/workspace_controller_test.dart test/workspace_session_store_safety_test.dart test/command_routing_main_test.dart test/sidebar_layout_test.dart)
           for test in test/note_templates_test.dart test/slash_insertion_test.dart test/reference_dock_test.dart test/outline_operations_test.dart test/note_collections_test.dart; do
             if [ -f "$test" ]; then tests+=("$test"); fi
           done

@@ -829,26 +829,26 @@ class _EditorShellState extends State<EditorShell> {
         epoch == workspace.index.epoch;
     final filename = inbox ? 'Inbox.md' : '${noteDate(DateTime.now())}.md';
     try {
-      final resolution = await workspace.references.resolveWiki(
-        '/$filename',
-        originPath: workspace.activeDocument?.path,
-        refreshMetadata: true,
-      );
+      final catalog = await workspace.index.catalog(refresh: true);
+      final candidates = await WikiNoteResolver(workspace.index).candidates(catalog);
       if (!current()) return;
-      if (resolution.status == WikiNoteStatus.missing) {
+      final matches = candidates.where((note) => note.comparisonPath == filename.toLowerCase()).toList();
+      if (matches.length > 1 || (matches.isEmpty && !catalog.complete)) {
+        _showError('The capture note cannot be resolved uniquely. Refresh the workspace and retry.');
+        return;
+      }
+      final target = matches.isEmpty ? filename : matches.single.relativePath;
+      if (matches.isEmpty) {
         if (!await workspace.createWikiNote(
-          filename,
+          target,
           epoch: epoch,
           isCurrent: current,
         )) {
           return;
         }
-      } else if (resolution.status != WikiNoteStatus.resolved) {
-        _showError(resolution.message ?? 'The capture note is unavailable.');
-        return;
       }
       final document = await workspace.openIndexedNote(
-        filename,
+        target,
         epoch: epoch,
         isCurrent: current,
       );
