@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import '../controllers/workspace_controller.dart';
 import '../models/document_session.dart';
 import '../services/workspace_reference_index.dart';
+import 'document_attachment_scope.dart';
 
 /// A persistent, independently scrollable reference reading surface.
 class ReferenceDock extends StatefulWidget {
@@ -32,19 +33,35 @@ class _ReferenceDockState extends State<ReferenceDock> {
   final _positions = <String, double>{};
   final _scroll = ScrollController();
   String? _readingKey;
+  bool _refreshing = false;
 
   @override
   void initState() {
     super.initState();
+    final active = widget.workspace.activeDocument;
+    _pinnedPath = active?.path;
+    _pinnedSession = active?.id;
+    _readingKey = _pinnedSession ?? _pinnedPath;
+    widget.workspace.references.addListener(_referencesChanged);
     unawaited(_refresh());
   }
 
+  void _referencesChanged() {
+    if (widget.workspace.references.stale && !_refreshing) {
+      scheduleMicrotask(() { if (mounted) unawaited(_refresh()); });
+    }
+  }
+
   Future<void> _refresh() async {
+    if (_refreshing) return;
+    _refreshing = true;
     try {
       await widget.workspace.references.refresh();
       if (mounted) setState(() => _error = null);
     } on Object catch (error) {
       if (mounted) setState(() => _error = 'References unavailable: $error');
+    } finally {
+      _refreshing = false;
     }
   }
 
@@ -71,6 +88,7 @@ class _ReferenceDockState extends State<ReferenceDock> {
 
   @override
   void dispose() {
+    widget.workspace.references.removeListener(_referencesChanged);
     _scroll.dispose();
     super.dispose();
   }
@@ -194,7 +212,15 @@ class _ReferenceDockState extends State<ReferenceDock> {
                   : SingleChildScrollView(
                       controller: _scroll,
                       padding: const EdgeInsets.all(16),
-                      child: IanvsMarkdown(data: text),
+                      child: DocumentAttachmentScope(
+                        root: root,
+                        documentPath: open?.path ?? _pinnedPath,
+                        builder: (context, images) => IanvsMarkdown(
+                          data: text,
+                          imageBuilder: images.image,
+                          wikiEmbedBuilder: images.wiki,
+                        ),
+                      ),
                     ),
             ),
           ],

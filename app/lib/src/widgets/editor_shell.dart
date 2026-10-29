@@ -29,6 +29,7 @@ import 'wiki_note_picker.dart';
 import 'workspace_palette.dart';
 import 'note_template_dialog.dart';
 import 'reference_dock.dart';
+import 'note_link_preview.dart';
 import '../services/note_templates.dart';
 import '../services/slash_insertion.dart';
 import '../services/attachment_repository.dart';
@@ -539,6 +540,16 @@ class _EditorShellState extends State<EditorShell> {
     } on Object catch (error) {
       if (current()) _showError('Unable to list note links: $error');
     }
+  }
+
+  Future<void> _openDocumentLink(DocumentSession document, IanvsMarkdownLinkTarget link) {
+    if (link.kind == IanvsMarkdownLinkKind.wiki) {
+      return _openWikiLink(document, link.href ?? '');
+    }
+    if (link.kind == IanvsMarkdownLinkKind.tag) {
+      return _openWorkspaceReferences(tag: (link.href ?? '').replaceFirst(RegExp(r'^tag:#?'), ''));
+    }
+    return DocumentLinkService(workspace: widget.workspace, openImage: _openImage).open(document, link.href);
   }
 
   Future<void> _openWikiLink(DocumentSession origin, String target) async {
@@ -1874,6 +1885,13 @@ class _EditorShellState extends State<EditorShell> {
                                                                 .currentIndex,
                                                           )
                                                         : null,
+                                                    builders: {
+                                                      'a': NoteLinkPreviewBuilder(
+                                                        workspace: workspace,
+                                                        document: document,
+                                                        onTap: (link) => _guard(() => _openDocumentLink(document, link)),
+                                                      ),
+                                                    },
                                                     imageBuilder: images.image,
                                                     onPaste:
                                                         _pasteFromClipboard,
