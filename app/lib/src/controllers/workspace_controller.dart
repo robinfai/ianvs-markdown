@@ -381,9 +381,9 @@ class WorkspaceController extends ChangeNotifier {
     _schedulePersist();
   }
 
-  DocumentSession newDocument() {
+  DocumentSession newDocument({String? name}) {
     final document = _createDocument(
-      name: 'Untitled-$_nextDocumentId.md',
+      name: name ?? 'Untitled-$_nextDocumentId.md',
       text: '',
     );
     _documents.add(document);
@@ -702,6 +702,7 @@ class WorkspaceController extends ChangeNotifier {
       return;
     }
     _activeIndex = index;
+    activeDocument!.lastActivated = DateTime.now().millisecondsSinceEpoch;
     notifyListeners();
     _schedulePersist();
   }

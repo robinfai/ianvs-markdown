@@ -78,8 +78,11 @@ class DocumentSession {
         );
       }
     }
+    document.lastActivated = json['lastActivated'] as int? ?? 0;
     return document;
   }
+
+  int lastActivated = DateTime.now().millisecondsSinceEpoch;
 
   final String id;
   String name;
@@ -94,6 +97,7 @@ class DocumentSession {
   final ScrollController scrollController = ScrollController();
 
   Map<String, Object?> toJson() => <String, Object?>{
+    'lastActivated': lastActivated,
     'id': id,
     'name': name,
     'path': path,
