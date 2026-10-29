@@ -18,6 +18,7 @@ class WorkspaceSnapshot {
     this.sidebarWidth = WorkspaceLayout.defaultSidebarWidth,
     this.readingPreferences = ReadingPreferences.defaults,
     this.browserState = const {},
+    this.collectionViews = const [],
     this.recentNotes = const {},
     this.referenceView = const {},
     this.operationGrants = const {},
@@ -31,6 +32,12 @@ class WorkspaceSnapshot {
   }) {
     final rawDocuments = json['documents'];
     return WorkspaceSnapshot(
+      collectionViews: json['collectionViews'] is List
+          ? (json['collectionViews'] as List)
+                .whereType<Map>()
+                .map((item) => Map<String, Object?>.from(item))
+                .toList()
+          : const [],
       referenceView: json['referenceView'] is Map
           ? Map<String, Object?>.from(json['referenceView'] as Map)
           : const {},
@@ -79,6 +86,7 @@ class WorkspaceSnapshot {
   final double sidebarWidth;
   final ReadingPreferences readingPreferences;
   final Map<String, Object?> browserState;
+  final List<Map<String, Object?>> collectionViews;
   final Map<String, int> recentNotes;
   final Map<String, Object?> referenceView;
   final Map<String, String> operationGrants;
@@ -89,6 +97,7 @@ class WorkspaceSnapshot {
 
   Map<String, Object?> toJson() => <String, Object?>{
     'browserState': browserState,
+    'collectionViews': collectionViews,
     'recentNotes': recentNotes,
     'referenceView': referenceView,
     'operationGrants': operationGrants,

@@ -190,6 +190,30 @@ class WorkspaceController extends ChangeNotifier {
     _schedulePersist();
   }
 
+  final _collectionViews = <Map<String, Object?>>[];
+  List<Map<String, Object?>> get collectionViews => [
+    for (final view in _collectionViews)
+      if (view['root'] == workspaceRoot) Map.unmodifiable(view),
+  ];
+
+  Future<void> saveCollectionView(Map<String, Object?> view) async {
+    final stored = {...view, 'root': workspaceRoot};
+    _collectionViews.removeWhere(
+      (item) => item['root'] == workspaceRoot && item['name'] == view['name'],
+    );
+    _collectionViews.add(stored);
+    notifyListeners();
+    await flushSession();
+  }
+
+  Future<void> deleteCollectionView(String name) async {
+    _collectionViews.removeWhere(
+      (item) => item['root'] == workspaceRoot && item['name'] == name,
+    );
+    notifyListeners();
+    await flushSession();
+  }
+
   Map<String, Object?> _referenceView = {};
   Map<String, Object?> get referenceView =>
       _referenceView['root'] == workspaceRoot
@@ -295,6 +319,7 @@ class WorkspaceController extends ChangeNotifier {
               await fileService.restorePersistentAccess(token) ??
               _workspaceRoot;
         }
+        _collectionViews.addAll(snapshot.collectionViews);
         _referenceView = Map.of(snapshot.referenceView);
         _recentNotes.addAll(snapshot.recentNotes);
         _readingPreferences = snapshot.readingPreferences;
@@ -2269,6 +2294,7 @@ class WorkspaceController extends ChangeNotifier {
       readingPreferences: _readingPreferences,
       outlineVisible: _outlineVisible,
       browserState: browser.toJson(),
+      collectionViews: List.of(_collectionViews),
       referenceView: Map.of(_referenceView),
       recentNotes: Map.of(_recentNotes),
       operationGrants: Map.of(_operationGrants),

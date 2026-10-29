@@ -33,12 +33,14 @@ class WorkspaceSidebar extends StatefulWidget {
     required this.onError,
     this.width,
     this.onSearchSource,
+    this.onOpenCollection,
   });
   final WorkspaceController workspace;
   final Future<bool> Function(DocumentSession) onSave;
   final ValueChanged<String> onError;
   final double? width;
   final VoidCallback? onSearchSource;
+  final ValueChanged<Map<String, Object?>>? onOpenCollection;
   @override
   State<WorkspaceSidebar> createState() => _WorkspaceSidebarState();
 }
@@ -265,6 +267,30 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const WindowAppTitle(),
+              if (widget.onOpenCollection != null) ...[
+                TextButton(
+                  onPressed: () => widget.onOpenCollection!(const {}),
+                  child: const Text('Collections'),
+                ),
+                if (widget.workspace.collectionViews.isNotEmpty)
+                  SizedBox(
+                    height: math.min(
+                      120,
+                      widget.workspace.collectionViews.length * 36.0,
+                    ),
+                    child: ListView(
+                      children: [
+                        for (final view in widget.workspace.collectionViews)
+                          TextButton(
+                            onPressed: () => widget.onOpenCollection!(view),
+                            child: Text(
+                              view['name'] as String? ?? 'Collection',
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
               _dropTarget(
                 root,
                 FileContextMenu(

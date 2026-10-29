@@ -1,7 +1,9 @@
 # Writing and knowledge workflows: stages 1–3
 
 Requested 2026-10-29. Baseline: `dde9bfe06f9f7fea065082236038a59762b8d080`.
-Status: stage 1A is in progress in draft PR #56; no stage is accepted or merged.
+Status: all three stages have UI implementations in stacked draft PRs #56–61.
+Validation and review fixes are in progress. Stage 1A merged through PR #56;
+stages 1B, 1C and 2A/2B also merged through PRs #57–59. Stages 2C and 3 remain draft PRs.
 
 Preserve ordinary local Markdown files and the current editing engine. Reuse
 workspace indexing, note semantics, command routing, guarded saves and session
@@ -10,18 +12,18 @@ relations, rollups and stage-four capture/export work are outside this scope.
 
 ## Independently reviewable delivery sequence
 
-- [ ] 1A: quick switcher and command palette. Search title, path and aliases;
+- [x] 1A: quick switcher and command palette. Search title, path and aliases;
   rank recent notes; create from an unmatched query. Reuse editor command
   routing and expose keyboard and visible menu entry points.
-- [ ] 1B: template creation/insertion, daily notes and quick append. Supply
+- [x] 1B: template creation/insertion, daily notes and quick append. Supply
   meeting, reading, technical proposal and blog templates; expand title/date/
   time in Markdown and YAML. Reopen an existing daily note. Append to Inbox
   or today's note without replacing existing contents.
-- [ ] 1C: slash insertion UI for headings, tasks, quotes, code, images and
+- [x] 1C: slash insertion UI for headings, tasks, quotes, code, images and
   templates. Use the current editor selection and existing image import flow.
-- [ ] 2A: link hover preview and persistent incoming/outgoing links panel;
+- [x] 2A: link hover preview and persistent incoming/outgoing links panel;
   pin a reference note and expose open-beside actions.
-- [ ] 2B: two-note panes and same-note Source/Read panes, independent scroll
+- [x] 2B: two-note panes and same-note Source/Read panes, independent scroll
   positions and explicit active input target. Preserve unsaved shared content.
 - [ ] 2C: outline chapter reordering with descendants, heading promotion and
   demotion, folding and chapter-link copy. Extract selection to a new linked
@@ -66,16 +68,109 @@ Markdown files, editable through table and status board, surviving restart.
   the inspected tool locations (`/opt`, `/usr/local`, `/tmp`, `/home`).
 - Official Flutter download-host access failed before download with proxy
   `403 Forbidden`, `curl: (56) CONNECT tunnel failed`, both normally and with
-  an escalated request. No SDK was installed and no tests were run.
+  an escalated request. No SDK was installed. Tests run through authorized GitHub Actions instead.
 - macOS/Xcode native builds and actual desktop acceptance are unavailable in
   this Linux environment. A suitable validation environment remains required.
 
 Stage 1A adds toolbar entry points and Cmd/Ctrl+P (notes) and
 Cmd/Ctrl+Shift+P (commands). Recent open notes persist their activation time
-in session recovery. Closed-note recency is not yet retained. Existing CI is
+in session recovery. Closed-note recency is retained in the bounded workspace session history. Existing CI is
 being used for toolchain validation; no local Flutter tests or actual desktop
-UI acceptance have been performed. No stage has merged.
+UI acceptance have been performed. Stage 1A merged through PR #56.
 
 Draft PR: https://github.com/robinfai/ianvs-markdown/pull/56
 Initial implementation commit: `b735b6f155fcaf92ab450ab41e46e2273db90dd8`.
 Follow-up commits and their exact-head CI remain to be recorded.
+
+
+## Delivery and verification log (2026-10-29)
+
+| PR | UI entry and implementation | Verification state |
+| --- | --- | --- |
+| [56](https://github.com/robinfai/ianvs-markdown/pull/56) | Toolbar / Cmd+P switcher, Cmd+Shift+P commands; title/path/alias search, persisted recency, create note | Head `5df6dac746dc599b3ca47de28a91aa374d037969`: Core success, including app formatting/analyze and five focused tests. All PR Core/macOS/iOS checks passed; merged as `44f88174a0410b31c6d224a4d54dd606d0b936ca`. |
+| [57](https://github.com/robinfai/ianvs-markdown/pull/57) | Commands: template new/insert, Open today, append today/Inbox | Head `1c9b2d6`: Core success; app formatting/analyze and 55 tests passed. Native checks pending. |
+| [58](https://github.com/robinfai/ianvs-markdown/pull/58) | Type `/` on a blank line: heading/task/quote/code/image/template menu | Head `6cf9b22`: Core success, including app checks and slash insertion/cancellation UI tests. Native checks pending. |
+| [59](https://github.com/robinfai/ianvs-markdown/pull/59) | Toggle references command, pin incoming/outgoing/open note, read alongside primary editor | Head `cee2b28`: Core success; app formatting/analyze and 59 tests passed, including actual hover preview and pinned reading. Native checks pending. |
+| [60](https://github.com/robinfai/ianvs-markdown/pull/60) | Outline drag handles and chapter menu; Extract selection command; reference insert button | Extraction now creates a sibling note. Reference insertion rebases Markdown paths and resolves wiki paths; source-fidelity regression tests pending. |
+| [61](https://github.com/robinfai/ianvs-markdown/pull/61) | Collections sidebar: saved filters, list/table/board, property edit and status drag | Long-value preservation and YAML flow-map insertion fixed with regression cases. Current CI and table/board screenshot artifacts pending. |
+
+[Successful stage-1A Core run](https://github.com/robinfai/ianvs-markdown/actions/runs/40833862235).
+The additional Linux app check supplements, and does not replace, existing Core
+and Native integrations jobs. Native jobs have not started at this checkpoint;
+no macOS build or manual UI evidence is claimed. Widget screenshot artifacts,
+when produced, show the Flutter test harness rather than a native desktop run.
+
+Remaining acceptance: current-head passing app checks for stages 1B–3; native
+checks/builds; desktop interaction acceptance; blog/reading scenario review;
+main merges and verification of resulting main commits. Template source can be
+customized per invocation but a persistent custom-template library is not yet
+implemented. The reference pane is read-only; the main pane supplies editing.
+
+
+### First main delivery and review regressions
+
+PR #56 merged as `44f88174a0410b31c6d224a4d54dd606d0b936ca` after all
+Core, macOS regressions/builds and iOS simulator build checks passed on its
+head. Its main-commit checks are [Core](https://github.com/robinfai/ianvs-markdown/actions/runs/40837040670)
+and [Native integrations](https://github.com/robinfai/ianvs-markdown/actions/runs/40837040607),
+currently running/queued. PR #57 is now based on main.
+
+Collection review fixes include complete original YAML editing values,
+unchanged-source no-op commits, valid flow-map additions, full status values
+for grouping/dragging and full scalar values for filtering/sorting. Display
+ellipsis never supplies a property write. The source body must remain unchanged
+and resulting YAML must still parse before a write proceeds.
+
+[Widget screenshot artifact](https://github.com/robinfai/ianvs-markdown/actions/runs/40836827021/artifacts/12880634097)
+contains collection-table.png and collection-board.png. This run exercised
+long-value prefill/no-op save, property editing, status drag and saved-view UI;
+the overall run still failed on a malformed reference fixture, nested-folder
+fixture and lint issues, subsequently corrected. Downloading the artifact into
+this environment returned HTTP 403, so visual inspection is not claimed.
+
+Extracted notes now remain beside their original; reference definitions outside
+the selection are copied into the extracted note. Reference insertion rebases
+Markdown destinations and resolves wiki note paths before replacement. Unknown
+or ambiguous wiki references stop insertion without changing the destination.
+
+
+Latest portable acceptance checkpoint: stage 2C head `0ae6a79382d790460d484df8cf32545160187842`
+passed app formatting, analysis and all 66 focused/regression tests in
+[App feature checks](https://github.com/robinfai/ianvs-markdown/actions/runs/40837253304/job/123324989041).
+Stage 3 head `4c0dfd4ec5efbf57edc104028a1b15d4f993c306` passed app analysis
+and all 72 tests in [the next run](https://github.com/robinfai/ianvs-markdown/actions/runs/40837257528/job/123325003294);
+that run failed only canonical formatting, whose exact diff is now applied.
+All active branches were then merged with the new main commit to refresh
+their ancestry; their new heads must pass CI before further merges.
+
+Fragment extraction review: preflight now preserves the original note target
+for heading/block links left outside the selection, keeps migrated targets
+local, remaps duplicate Markdown heading slugs, and retains literal Wiki
+heading names. Unknown HTML anchors and partially selected target structures
+produce an explicit error before any file is created. Tests cover these cases
+and reference definitions with fragment destinations. At `c490872` (stage 2C)
+all 72 app tests passed; at `c31ad4e` (stage 3) all 78 passed. Their formatter
+and one control-flow lint correction are applied in the following commit;
+new-head CI remains required before merge.
+
+
+### Further main deliveries
+
+After complete Core and Native integrations success on each PR head:
+
+- #57 merged as `747867ff5a91c638e1fed0a42988565f48ea5223` (templates, daily notes and capture).
+- #58 merged as `50f5287b975f8e79a17150b046b203723c593078` (slash insertion).
+- #59 merged as `d8f17ab23bf0282e0d41dfca4af0ed8190fafb26` (references and pinned reading).
+
+All used normal protected-branch PR merges without overriding protection.
+The current main commit's [Core](https://github.com/robinfai/ianvs-markdown/actions/runs/40842739729)
+and [Native](https://github.com/robinfai/ianvs-markdown/actions/runs/40842739773)
+checks are pending. Superseded intermediate main runs may be cancelled by the
+repository's existing concurrency policy; per-PR validation remains recorded.
+
+Standalone block IDs now stay associated with the preceding structured block,
+following [Obsidian's block-link format](https://obsidian.md/help/links).
+The extraction suite covers moving the whole target, leaving the target in
+the original note, and rejecting extraction of an ID without its target content.
+At stage 2C `a1cde46`, all 73 app tests passed with full analysis; the only
+remaining formatter diff has been applied. New-head checks remain required.
