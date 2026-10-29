@@ -13,7 +13,8 @@ String expandNoteTemplate(String source, String title, DateTime now) {
     'title': title,
     'title_yaml': jsonEncode(title),
     'date': noteDate(now),
-    'time': '${now.hour.toString().padLeft(2, '0')}:'
+    'time':
+        '${now.hour.toString().padLeft(2, '0')}:'
         '${now.minute.toString().padLeft(2, '0')}',
   };
   return source.replaceAllMapped(

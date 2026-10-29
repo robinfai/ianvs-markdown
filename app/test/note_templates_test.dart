@@ -11,13 +11,17 @@ void main() {
       final result = expandNoteTemplate(source, 'A: "title"', now);
       final parsed = parseMarkdownFrontMatter(result);
       expect(parsed.hasFrontMatter, isTrue);
-      expect(parsed.entries.firstWhere((e) => e.key == 'title').value,
-          'A: "title"');
+      expect(
+        parsed.entries.firstWhere((e) => e.key == 'title').value,
+        'A: "title"',
+      );
       expect(result, contains('2026-10-29'));
       expect(result, isNot(contains('{{')));
     }
-    expect(expandNoteTemplate('{{time}} {{unknown}}', 'A', now),
-        '09:05 {{unknown}}');
+    expect(
+      expandNoteTemplate('{{time}} {{unknown}}', 'A', now),
+      '09:05 {{unknown}}',
+    );
   });
 
   test('template insertion is undoable and rejects changed source', () {
@@ -60,7 +64,10 @@ void main() {
     );
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const ValueKey('template-title')), 'Plan');
+    await tester.enterText(
+      find.byKey(const ValueKey('template-title')),
+      'Plan',
+    );
     await tester.enterText(
       find.byKey(const ValueKey('template-source')),
       '# {{title}}\nCustom content',
