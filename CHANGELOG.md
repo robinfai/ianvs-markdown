@@ -1,15 +1,5 @@
 ## Unreleased
 
-- Compact short plain-text reading table columns to their measured content
-  width, while keeping long text and embedded controls bounded. Preserve
-  selection, touch scrolling and horizontal mouse-wheel behavior.
-
-- Keep reading table columns at a bounded, text-scale-aware width with a
-  visible horizontal scrollbar when needed. Short words no longer squeeze
-  into equal viewport shares; long prose and link labels wrap without asking
-  embedded controls for unsupported intrinsic dimensions. Explicit host table
-  column widths and scrollbar preferences remain supported.
-
 - Add hover-triggered nested list folding in Live Preview with independent fold
   state, collapsed markers and ellipses, and aligned indentation guides. Add
   `expandList` / `collapseList` interface messages. Expand table cell focus hit
@@ -220,6 +210,10 @@
   handles in profile/release builds on the minimum supported Flutter SDK.
 
 ## 0.3.2
+
+Compatibility release from the `v0.3.1` baseline plus the fixes below. The
+`v0.3.2` tag identifies the published source; the Unreleased changes above
+remain on main and are not part of this package release.
 
 - Measure standard ordered-list markers so multi-digit numbers remain on one
   line, including nested lists and larger text scales.
