@@ -311,8 +311,13 @@ class IanvsMarkdown extends StatelessWidget {
       );
     }
 
-    final effectiveStyleSheet =
-        (styleSheet ?? ianvsMarkdownStyleSheet(context, colors)).copyWith();
+    final baseStyleSheet =
+        styleSheet ?? ianvsMarkdownStyleSheet(context, colors);
+    // flutter_markdown_plus copyWith does not retain this nullable field.
+    final effectiveStyleSheet = baseStyleSheet.copyWith(
+      tableScrollbarThumbVisibility:
+          baseStyleSheet.tableScrollbarThumbVisibility,
+    );
     if (syntaxPreset == IanvsMarkdownSyntaxPreset.standard) {
       return _buildStandardMarkdown(
         constraints,
@@ -2682,6 +2687,14 @@ MarkdownStyleSheet ianvsMarkdownStyleSheet(
       fontSize: 14.5,
       height: 1.58,
     ),
+    // Bound each reading column instead of squeezing it into the viewport or
+    // measuring widget intrinsics (links can contain LayoutBuilder). Keep
+    // ordinary words readable at the host text scale; long cells wrap and the
+    // table scrolls horizontally when its columns exceed the available width.
+    tableColumnWidth: FixedColumnWidth(
+      MediaQuery.textScalerOf(context).scale(140) + 20,
+    ),
+    tableScrollbarThumbVisibility: true,
     tableBorder: TableBorder.all(color: colors.borderSoft),
     tableHead: TextStyle(
       color: colors.textPrimary,

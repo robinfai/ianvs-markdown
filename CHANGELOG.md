@@ -1,5 +1,11 @@
 ## Unreleased
 
+- Keep reading table columns at a bounded, text-scale-aware width with a
+  visible horizontal scrollbar when needed. Short words no longer squeeze
+  into equal viewport shares; long prose and link labels wrap without asking
+  embedded controls for unsupported intrinsic dimensions. Explicit host table
+  column widths and scrollbar preferences remain supported.
+
 - Add hover-triggered nested list folding in Live Preview with independent fold
   state, collapsed markers and ellipses, and aligned indentation guides. Add
   `expandList` / `collapseList` interface messages. Expand table cell focus hit
