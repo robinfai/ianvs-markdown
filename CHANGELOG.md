@@ -1,5 +1,9 @@
 ## Unreleased
 
+- Compact short plain-text reading table columns to their measured content
+  width, while keeping long text and embedded controls bounded. Preserve
+  selection, touch scrolling and horizontal mouse-wheel behavior.
+
 - Keep reading table columns at a bounded, text-scale-aware width with a
   visible horizontal scrollbar when needed. Short words no longer squeeze
   into equal viewport shares; long prose and link labels wrap without asking

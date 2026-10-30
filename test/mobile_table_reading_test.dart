@@ -40,6 +40,11 @@ void main() {
         );
         expect(boxes, hasLength(1), reason: '$word must stay on one line');
       }
+      expect(
+        tester.getSize(find.byType(Table)).width,
+        lessThan(560),
+        reason: 'Short columns must not retain the old 800px total width',
+      );
       final horizontal = find.byWidgetPredicate(
         (widget) =>
             widget is SingleChildScrollView &&
@@ -94,7 +99,16 @@ void main() {
             );
             await tester.pumpAndSettle();
             final table = tester.renderObject<RenderTable>(find.byType(Table));
-            expect(table.size.width, closeTo(3 * (140 * scale + 20), .01));
+            expect(table.size.width, lessThan(3 * (140 * scale + 20)));
+            expect(table.size.width, greaterThan(2 * (140 * scale + 20)));
+            final initialWidth = table.size.width;
+            await tester.pump();
+            expect(
+              table.size.width,
+              initialWidth,
+              reason:
+                  'Embedded links must keep the fallback width after layout',
+            );
             final link = tester.renderObject<RenderBox>(find.text(label));
             final row = table.getRowBox(1);
             final origin = link.localToGlobal(Offset.zero, ancestor: table);
@@ -170,7 +184,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(tester.getSize(find.byType(Table)).width, 800);
+    expect(tester.getSize(find.byType(Table)).width, lessThan(560));
     final horizontal = find.byWidgetPredicate(
       (w) => w is SingleChildScrollView && w.scrollDirection == Axis.horizontal,
     );
