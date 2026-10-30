@@ -8,6 +8,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import 'blocked_image.dart';
+import 'reading_table_width.dart';
 import 'callout.dart';
 import 'code_block.dart';
 import 'code_surface.dart';
@@ -2321,12 +2322,11 @@ MarkdownStyleSheet ianvsMarkdownStyleSheet(
       fontSize: 14.5,
       height: 1.58,
     ),
-    // Bound each reading column instead of squeezing it into the viewport or
-    // measuring widget intrinsics (links can contain LayoutBuilder). Keep
-    // ordinary words readable at the host text scale; long cells wrap and the
-    // table scrolls horizontally when its columns exceed the available width.
-    tableColumnWidth: FixedColumnWidth(
-      MediaQuery.textScalerOf(context).scale(140) + 20,
+    // Compact plain-text columns without querying embedded controls for
+    // intrinsic sizes. Long text and links retain a bounded wrapping width.
+    tableColumnWidth: ReadingTableColumnWidth(
+      maximum: MediaQuery.textScalerOf(context).scale(140) + 20,
+      minimum: MediaQuery.textScalerOf(context).scale(32) + 20,
     ),
     tableScrollbarThumbVisibility: true,
     tableBorder: TableBorder.all(color: colors.borderSoft),

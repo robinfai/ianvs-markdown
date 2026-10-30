@@ -1,5 +1,9 @@
 ## Unreleased
 
+- Compact short plain-text reading table columns to their measured content
+  width, while keeping long text and embedded controls bounded. Preserve
+  selection, touch scrolling and horizontal mouse-wheel behavior.
+
 - Backport bounded, text-scale-aware reading table columns and visible horizontal
   scrollbars. Preserve M05 ordered-marker measurement and host scrollbar overrides;
   long prose and links wrap without intrinsic layout queries.
