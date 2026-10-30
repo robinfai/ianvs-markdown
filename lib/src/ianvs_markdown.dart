@@ -865,6 +865,8 @@ class IanvsMarkdown extends StatelessWidget {
       selectable: blockSelectable,
       styleSheet: effectiveStyleSheet.copyWith(
         listIndent: _standardListIndent(context, source, effectiveStyleSheet),
+        tableScrollbarThumbVisibility:
+            effectiveStyleSheet.tableScrollbarThumbVisibility,
       ),
       styleSheetTheme: styleSheetTheme,
       onSelectionChanged: blockSelectable ? onSelectionChanged : null,
