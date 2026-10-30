@@ -1,4 +1,7 @@
-## Unreleased
+## 0.3.2
+
+- Measure standard ordered-list markers so multi-digit numbers remain on one
+  line, including nested lists and larger text scales.
 
 - Compact short plain-text reading table columns to their measured content
   width, while keeping long text and embedded controls bounded. Preserve
