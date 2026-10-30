@@ -1,3 +1,9 @@
+## Unreleased
+
+- Backport bounded, text-scale-aware reading table columns and visible horizontal
+  scrollbars. Preserve M05 ordered-marker measurement and host scrollbar overrides;
+  long prose and links wrap without intrinsic layout queries.
+
 ## 0.3.1
 
 - Add opt-in `IanvsMarkdownSyntaxPreset.standard` to the standalone
