@@ -219,6 +219,19 @@
 - Avoid reading a debug-only layout getter while synchronizing table drag
   handles in profile/release builds on the minimum supported Flutter SDK.
 
+## 0.3.2
+
+- Measure standard ordered-list markers so multi-digit numbers remain on one
+  line, including nested lists and larger text scales.
+
+- Compact short plain-text reading table columns to their measured content
+  width, while keeping long text and embedded controls bounded. Preserve
+  selection, touch scrolling and horizontal mouse-wheel behavior.
+
+- Backport bounded, text-scale-aware reading table columns and visible horizontal
+  scrollbars. Preserve M05 ordered-marker measurement and host scrollbar overrides;
+  long prose and links wrap without intrinsic layout queries.
+
 ## 0.3.1
 
 - Add opt-in `IanvsMarkdownSyntaxPreset.standard` to the standalone
