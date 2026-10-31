@@ -1,7 +1,7 @@
 # macOS 签名与 GitHub 测试发布
 
-应用版本位于 app/pubspec.yaml，目前为 0.1.0+1。组件库已有 v0.1.0 等标签，
-因此应用使用 linefold-v0.1.0。工作流为 .github/workflows/release.yml。
+应用版本位于 app/pubspec.yaml，当前版本以该文件为准。组件库已有 v0.1.0 等标签，
+因此应用使用 linefold-v<版本>。工作流为 .github/workflows/release.yml。
 
 ## 1. 创建与导出证书
 
@@ -33,6 +33,7 @@ https://github.com/robinfai/ianvs-markdown/settings/secrets/actions
 | APPLE_ID | 开发者 Apple Account 登录邮箱 |
 | APPLE_TEAM_ID | 10 位 Team ID |
 | APPLE_APP_SPECIFIC_PASSWORD | Apple 专用密码，不是账号登录密码 |
+| APPLE_MACOS_PROVISIONING_PROFILE_BASE64 | Linefold Developer ID iCloud 的 .provisionprofile 文件 base64 |
 
 在本机将 base64 编码复制到剪贴板（按实际文件路径替换）：
 
@@ -41,16 +42,19 @@ base64 -i "$HOME/Desktop/DeveloperID.p12" | pbcopy
 ```
 
 密码仅填写到 GitHub Secret，不要写入聊天、提交或日志。Runner 使用随机密码的临时钥匙串，
-任务结束清理证书。当前 local entitlements 不需要 iCloud 描述文件；启用 iCloud 前需另配
-Developer ID provisioning profile、容器和匹配的 entitlements。
+任务结束清理证书。发布构建默认启用专属 iCloud Documents 容器 `iCloud.work.ianvs.linefold`。
+在 Developer Portal 为 `work.ianvs.linefold` 创建 Developer ID 描述文件，选择 CI 的同一证书，
+下载并配置上述 profile secret。签名脚本校验团队、App ID、容器、生产环境和有效期，
+将描述文件嵌入应用并签入对应权限；缺少授权时发布失败，不退回本地模式。
+普通本地构建仍可不配置开发者账号。
 
 ## 4. 发布
 
 先将工作流、签名脚本和发布说明提交并推送到 main，再对该提交创建标签：
 
 ```sh
-git tag -a linefold-v0.1.0 -m 'Linefold 0.1.0 test release'
-git push origin linefold-v0.1.0
+git tag -a linefold-v0.1.1 -m 'Linefold 0.1.1 test release'
+git push origin linefold-v0.1.1
 ```
 
 CI 检查版本和凭据 → 测试 → Release 构建 → 嵌套代码逐层签名 → notarytool 公证 →

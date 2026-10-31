@@ -863,7 +863,9 @@ class _PreviewSourceEditorState extends State<_PreviewSourceEditor> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: Text(
-                widget.editor.busy ? '正在处理，请等待结果。' : 'Source · 本机草稿恢复不会自动保存原文件',
+                widget.editor.busy
+                    ? '正在处理，请等待结果。'
+                    : '编辑 Markdown · 点「保存」写入当前文件，点左上角取消返回预览。本机草稿恢复不会自动保存文件。',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
@@ -969,7 +971,7 @@ class _PreviewLibraryViewState extends State<_PreviewLibraryView> {
           ),
           const SizedBox(height: 12),
           const Text(
-            '分享或打开文件会导入副本，不会修改原来源。选择整个文件夹后，可查找、链接导航与轻编辑。',
+            '分享 .md 到 Linefold，预览后点铅笔编辑、点「保存」。导入只修改副本；选择文件夹可编辑原文件。',
             textAlign: TextAlign.center,
             style: TextStyle(height: 1.6),
           ),

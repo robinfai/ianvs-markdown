@@ -25,8 +25,10 @@ attributes = info['NSExtension']['NSExtensionAttributes']
 assert attributes['QLIsDataBasedPreview'] is True
 assert attributes['QLSupportedContentTypes'] == ['net.daringfireball.markdown']
 binary = extension / 'Contents/MacOS/LinefoldQuickLook'
-libraries = subprocess.check_output(['otool', '-L', str(binary)], text=True).splitlines()[1:]
-dependencies = [line.strip().split(' (')[0] for line in libraries]
+libraries = subprocess.check_output(['otool', '-L', str(binary)], text=True).splitlines()
+# Universal binaries emit one header per architecture; only indented rows are
+# load commands. Validate every architecture's dependencies.
+dependencies = [line.strip().split(' (')[0] for line in libraries if line.startswith('\t')]
 assert '@rpath/libmerman_ffi.dylib' in dependencies
 for dependency in dependencies:
     assert dependency == '@rpath/libmerman_ffi.dylib' or dependency.startswith(('/System/Library/', '/usr/lib/')), dependency
