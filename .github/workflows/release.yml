@@ -1,0 +1,134 @@
+name: Linefold macOS release
+
+on:
+  push:
+    tags: ['linefold-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linefold-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    # Manual runs must select an existing release tag, never a moving branch.
+    if: startsWith(github.ref, 'refs/tags/linefold-v')
+    runs-on: macos-15
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    env:
+      CARGO_PROFILE_RELEASE_STRIP: none
+      COCOAPODS_DISABLE_STATS: 'true'
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validate version and signing configuration
+        env:
+          CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in CERTIFICATE CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_TEAM_ID APPLE_APP_SPECIFIC_PASSWORD; do
+            if [[ -z "${!name}" ]]; then echo "::error::Missing secret: $name"; exit 1; fi
+          done
+          version=$(sed -n 's/^version: \([^+]*\).*/\1/p' app/pubspec.yaml)
+          test "$GITHUB_REF_NAME" = "linefold-v$version"
+          echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
+          echo "RELEASE_ARCH=$(uname -m)" >> "$GITHUB_ENV"
+          test -f "app/releases/$version.md"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.44.8'
+          cache: true
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Resolve dependencies and run app tests
+        run: |
+          make deps-integrations
+          cd app
+          flutter test --concurrency=2
+      - name: Build release app
+        working-directory: app
+        run: FLUTTER_XCODE_ARCHS="$(uname -m)" flutter build macos --release --target lib/main.dart
+      - name: Import Developer ID certificate into temporary keychain
+        env:
+          CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/linefold-signing.keychain-db"
+          password=$(openssl rand -hex 32)
+          echo "::add-mask::$password"
+          echo "SIGNING_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+          printf '%s' "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$RUNNER_TEMP/certificate.p12" -P "$CERTIFICATE_PASSWORD" -k "$keychain" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -k "$password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" "$HOME/Library/Keychains/login.keychain-db"
+          rm "$RUNNER_TEMP/certificate.p12"
+      - name: Sign app, frameworks, native libraries and Quick Look
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          python3 app/tool/sign_macos_release.py app/build/macos/Build/Products/Release/Linefold.app
+          bash app/tool/verify_quicklook_bundle.sh
+          python3 app/tool/check_document_export_entitlements.py --built-apps --build-mode Release
+      - name: Notarize, staple and package
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          set -euo pipefail
+          app="$GITHUB_WORKSPACE/app/build/macos/Build/Products/Release/Linefold.app"
+          ditto -c -k --keepParent "$app" "$RUNNER_TEMP/notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --wait --timeout 45m --output-format json > "$RUNNER_TEMP/notary-result.json"
+          python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print(r); assert r["status"] == "Accepted", "Apple notarization did not accept this build"' "$RUNNER_TEMP/notary-result.json"
+          xcrun stapler staple "$app"
+          xcrun stapler validate "$app"
+          spctl --assess --type execute --verbose=2 "$app"
+          mkdir -p dist
+          ditto -c -k --keepParent "$app" "dist/Linefold-$RELEASE_VERSION-macos-$RELEASE_ARCH.zip"
+          cd dist
+          shasum -a 256 *.zip > SHA256SUMS.txt
+      - name: Fetch notarization diagnostics on failure
+        if: failure()
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          if [[ -s "$RUNNER_TEMP/notary-result.json" ]]; then
+            submission=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("id", ""))' "$RUNNER_TEMP/notary-result.json")
+            if [[ -n "$submission" ]]; then
+              xcrun notarytool log "$submission" --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" "$RUNNER_TEMP/notary-log.json"
+            fi
+          fi
+      - name: Save notarization result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notarization-result
+          path: |
+            ${{ runner.temp }}/notary-result.json
+            ${{ runner.temp }}/notary-log.json
+          if-no-files-found: ignore
+      - name: Publish GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/SHA256SUMS.txt --verify-tag --prerelease --title "Linefold $RELEASE_VERSION — 测试版" --notes-file "app/releases/$RELEASE_VERSION.md"
+      - name: Remove signing material
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/linefold-signing.keychain-db" || true
+          rm -f "$RUNNER_TEMP/certificate.p12" "$RUNNER_TEMP/notarize.zip"
