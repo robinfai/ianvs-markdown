@@ -33,9 +33,10 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          MACOS_PROFILE: ${{ secrets.APPLE_MACOS_PROVISIONING_PROFILE_BASE64 }}
         run: |
           set -euo pipefail
-          for name in CERTIFICATE CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_TEAM_ID APPLE_APP_SPECIFIC_PASSWORD; do
+          for name in CERTIFICATE CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_TEAM_ID APPLE_APP_SPECIFIC_PASSWORD MACOS_PROFILE; do
             if [[ -z "${!name}" ]]; then echo "::error::Missing secret: $name"; exit 1; fi
           done
           version=$(sed -n 's/^version: \([^+]*\).*/\1/p' app/pubspec.yaml)
@@ -56,7 +57,11 @@ jobs:
           flutter test --concurrency=2
       - name: Build release app
         working-directory: app
-        run: FLUTTER_XCODE_ARCHS="$(uname -m)" flutter build macos --release --target lib/main.dart
+        run: |
+          # Build with cloud support; the next step signs with the Developer ID
+          # profile rather than asking Xcode for a development identity on CI.
+          printf 'LINEFOLD_CLOUD_ENABLED = YES\nCODE_SIGNING_ALLOWED = NO\n' > macos/Runner/Configs/Signing.local.xcconfig
+          FLUTTER_XCODE_ARCHS="$(uname -m)" flutter build macos --release --target lib/main.dart
       - name: Import Developer ID certificate into temporary keychain
         env:
           CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
@@ -78,7 +83,12 @@ jobs:
       - name: Sign app, frameworks, native libraries and Quick Look
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          MACOS_PROFILE: ${{ secrets.APPLE_MACOS_PROVISIONING_PROFILE_BASE64 }}
         run: |
+          set -euo pipefail
+          export APPLE_MACOS_PROVISIONING_PROFILE="$RUNNER_TEMP/Linefold.provisionprofile"
+          printf '%s' "$MACOS_PROFILE" | base64 --decode > "$APPLE_MACOS_PROVISIONING_PROFILE"
           python3 app/tool/sign_macos_release.py app/build/macos/Build/Products/Release/Linefold.app
           bash app/tool/verify_quicklook_bundle.sh
           python3 app/tool/check_document_export_entitlements.py --built-apps --build-mode Release
@@ -131,4 +141,4 @@ jobs:
         if: always()
         run: |
           security delete-keychain "$RUNNER_TEMP/linefold-signing.keychain-db" || true
-          rm -f "$RUNNER_TEMP/certificate.p12" "$RUNNER_TEMP/notarize.zip"
+          rm -f "$RUNNER_TEMP/certificate.p12" "$RUNNER_TEMP/notarize.zip" "$RUNNER_TEMP/Linefold.provisionprofile"

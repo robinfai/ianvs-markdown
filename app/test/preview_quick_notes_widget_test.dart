@@ -384,6 +384,8 @@ void main() {
       expect(preview.activePath, '/vault/Target.md');
       await tester.tap(find.byTooltip('最近文档'));
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.widgetWithText(ListTile, 'note.md'));
+      await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(ListTile, 'note.md'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Target').first);
