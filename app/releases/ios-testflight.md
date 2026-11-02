@@ -26,10 +26,10 @@ iOS 会迁移旧的 Imports 副本；本机根目录新建的笔记需要手动�
 ## 重复上传
 
 本机 Xcode Accounts 登录团队后，需要 Apple Distribution 证书及私钥；首次上传已通过自动签名生成对应描述文件。
-在 app 中运行 `flutter build ios --release --no-codesign --config-only`，然后从仓库根目录归档：
+在 app 中运行 `flutter build ios --release --no-codesign --config-only`。首次准备工具链需运行 `rustup toolchain install 1.95.0 --profile minimal --target aarch64-apple-ios`，随后运行 `bash tool/prepare_merman_ios_symbols.sh`（需先完成 CocoaPods 安装以生成插件链接）。该脚本锁定 Merman 0.7.0 源码提交和 Cargo.lock，生成带源码行信息的 dSYM 后再裁剪二进制，不修改 pub 缓存。然后从仓库根目录归档：
 
 ```sh
-CARGO_PROFILE_RELEASE_STRIP=none xcodebuild \
+xcodebuild \
   -workspace app/ios/Runner.xcworkspace -scheme Runner -configuration Release \
   -sdk iphoneos -destination 'generic/platform=iOS' \
   -archivePath app/build/ios/archive/Linefold.xcarchive \
@@ -63,3 +63,19 @@ https://developer.apple.com/documentation/bundleresources/describing-use-of-requ
 - 正常 iCloud 同步静默；只有明确失败或冲突显示处理入口。干净文档自动接收远端内容，未保存草稿仍受保护。
 - 修复系统延迟确认导致的“解决成功却提示失败”，以及内容重新一致后的过期磁盘冲突提示。
 - 使用 Release 配置与 Production iCloud 容器分发；模拟器 QA 夹具不进入真机发布构建。
+
+## MermanFFI 符号归档
+
+从 0.1.1 (4) 起，iPhone Release Archive 在 CocoaPods 嵌入完成后替换为同版本源码重建的 MermanFFI，并将匹配 dSYM 放入 Xcode 的符号输出目录，由 Xcode 正常归档与重新签名。Debug、模拟器及普通非 Archive 构建不受影响。
+
+归档阶段强制核对源码版本、二进制/dSYM 的 UUID 和架构，以及 ABI 入口的真实 DWARF 源码行信息；准备阶段还比较 C 头文件和导出入口。依赖版本升级时检查会失败，必须明确更新源码锁定并重新验证。不能通过关闭 uploadSymbols 或制造空 dSYM 绕过此检查。
+
+归档后再次验证（路径按实际归档名替换）：
+
+```sh
+python3 app/tool/verify_merman_symbols.py \
+  app/build/ios/archive/Linefold.xcarchive/Products/Applications/Runner.app/Frameworks/MermanFFI.framework/MermanFFI \
+  app/build/ios/archive/Linefold.xcarchive/dSYMs/MermanFFI.framework.dSYM
+```
+
+保留对应 xcarchive 和 `app/build/merman-symbols`，用于后续崩溃符号化。旧构建 (3) 的 UUID 与重建库不同，不能用新符号补充旧构建。
