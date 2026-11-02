@@ -33,9 +33,14 @@ void main() {
     workspace.setMode(IanvsMarkdownEditorMode.livePreview);
     await tester.pumpWidget(
       MaterialApp(
-        theme: desktopTheme(Brightness.light),
+        theme: desktopTheme(
+          Brightness.light,
+        ).copyWith(platform: TargetPlatform.macOS),
         home: MediaQuery(
-          data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+          data: MediaQueryData(
+            size: const Size(1100, 850),
+            textScaler: TextScaler.linear(scale),
+          ),
           child: EditorShell(
             workspace: workspace,
             dark: false,
