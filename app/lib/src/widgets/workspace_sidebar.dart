@@ -34,11 +34,13 @@ class WorkspaceSidebar extends StatefulWidget {
     this.width,
     this.onSearchSource,
     this.onOpenCollection,
+    this.onDocumentOpened,
   });
   final WorkspaceController workspace;
   final Future<bool> Function(DocumentSession) onSave;
   final ValueChanged<String> onError;
   final double? width;
+  final VoidCallback? onDocumentOpened;
   final VoidCallback? onSearchSource;
   final ValueChanged<Map<String, Object?>>? onOpenCollection;
   @override
@@ -162,9 +164,16 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
     super.dispose();
   }
 
+  bool get _touchLayout => switch (Theme.of(context).platform) {
+    TargetPlatform.iOS || TargetPlatform.android => true,
+    _ => false,
+  };
+
   // Outline rows are denser than general Ianvs lists, but still grow with text.
-  double get _fileRowHeight =>
-      math.max(28, MediaQuery.textScalerOf(context).scale(16) + 12);
+  double get _fileRowHeight => math.max(
+    _touchLayout ? 44 : 28,
+    MediaQuery.textScalerOf(context).scale(16) + 12,
+  );
   double get _resultRowHeight => math.max(
     48,
     MediaQuery.textScalerOf(context).scale(16) +
@@ -258,7 +267,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
     final root = browser.root;
     final hasFiles = root != null || browser.externalPaths.isNotEmpty;
     return Theme(
-      data: desktopTheme(Brightness.dark),
+      data: desktopTheme(Brightness.dark, platform: Theme.of(context).platform),
       child: Material(
         color: _background,
         child: SizedBox(
@@ -306,9 +315,10 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                         Expanded(
                           child: Text(
                             root != null
-                                ? widget.workspace.isCloudWorkspace
-                                      ? 'iCloud · Linefold'
-                                      : p.basename(root)
+                                ? widget.workspace.workspaceDisplayName ??
+                                      (widget.workspace.isCloudWorkspace
+                                          ? 'iCloud · Linefold'
+                                          : p.basename(root))
                                 : hasFiles
                                 ? 'External Files'
                                 : 'No folder open',
@@ -343,19 +353,19 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                                 value: 'icloud',
                                 child: Text('iCloud · Linefold'),
                               ),
-                            const PopupMenuItem(
-                              height: 32,
+                            PopupMenuItem(
+                              height: _touchLayout ? 48 : 32,
                               value: 'new',
                               child: Text('New Markdown'),
                             ),
-                            const PopupMenuItem(
-                              height: 32,
+                            PopupMenuItem(
+                              height: _touchLayout ? 48 : 32,
                               value: 'folder',
                               child: Text('New Folder'),
                             ),
                             const PopupMenuDivider(),
-                            const PopupMenuItem(
-                              height: 32,
+                            PopupMenuItem(
+                              height: _touchLayout ? 48 : 32,
                               value: 'reveal',
                               child: Text('Reveal Active File'),
                             ),
@@ -365,18 +375,18 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                               checked: browser.preferences.follow,
                               child: const Text('Follow Active File'),
                             ),
-                            const PopupMenuItem(
-                              height: 32,
+                            PopupMenuItem(
+                              height: _touchLayout ? 48 : 32,
                               value: 'collapse',
                               child: Text('Collapse All'),
                             ),
-                            const PopupMenuItem(
-                              height: 32,
+                            PopupMenuItem(
+                              height: _touchLayout ? 48 : 32,
                               value: 'refresh',
                               child: Text('Refresh'),
                             ),
-                            const PopupMenuItem(
-                              height: 32,
+                            PopupMenuItem(
+                              height: _touchLayout ? 48 : 32,
                               value: 'note-move-recovery',
                               child: Text('Note Move Recovery'),
                             ),
@@ -604,7 +614,10 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
     icon: Icon(icon, size: 14, color: _secondary),
     onPressed: action,
     padding: EdgeInsets.zero,
-    constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+    constraints: BoxConstraints.tightFor(
+      width: _touchLayout ? 44 : 28,
+      height: _touchLayout ? 44 : 28,
+    ),
   );
 
   Widget _list() {
@@ -687,9 +700,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
 
   Widget _row(BrowserRow row) {
     final entry = row.entry!;
-    if (entry.path == '__new__' || _editingPath == entry.path) {
-      return _inlineName(row);
-    }
+    final editing = entry.path == '__new__' || _editingPath == entry.path;
     final active = widget.workspace.activeDocument?.path == entry.path;
     final selected = browser.selected.contains(entry.path);
     final focused = browser.focusedPath == entry.path;
@@ -704,7 +715,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
       child: Semantics(
         button: true,
-        selected: selected || active,
+        selected: selected || active || editing,
         label: entry.name,
         hint: '${entry.path}${dirty ? ', unsaved changes' : ''}',
         value: entry.isDirectory
@@ -712,15 +723,16 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                   ? 'Expanded'
                   : 'Collapsed'
             : null,
-        onTap: () => _tap(row),
-        excludeSemantics: true,
+        onTap: editing ? null : () => _tap(row),
+        excludeSemantics: !editing,
         child: Tooltip(
           message: entry.path,
+          triggerMode: TooltipTriggerMode.manual,
           child: Material(
             key: ValueKey(
               'workspace-${entry.isDirectory ? 'directory' : 'file'}-${entry.path}',
             ),
-            color: active
+            color: active || editing
                 ? _selection
                 : selected
                 ? IanvsTokens.dark.raised
@@ -728,7 +740,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(5),
               side: BorderSide(
-                color: _flash == entry.path
+                color: editing || _flash == entry.path
                     ? _accent
                     : focused && _treeFocus.hasFocus
                     ? _accent
@@ -736,7 +748,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
               ),
             ),
             child: InkWell(
-              onTap: () => _tap(row),
+              onTap: editing ? null : () => _tap(row),
               borderRadius: BorderRadius.circular(5),
               hoverColor: const Color(0x12ffffff),
               child: Padding(
@@ -769,11 +781,13 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                     Icon(
                       entry.isDirectory ? AppIcons.folder : AppIcons.document,
                       size: 14,
-                      color: active ? Colors.white : _secondary,
+                      color: active || editing ? Colors.white : _secondary,
                     ),
                     const SizedBox(width: 6),
                     Expanded(
-                      child: _isSearching
+                      child: editing
+                          ? _inlineName()
+                          : _isSearching
                           ? Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -799,7 +813,9 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: DesktopTypography.body.copyWith(
-                                color: active ? Colors.white : _secondary,
+                                color: active || editing
+                                    ? Colors.white
+                                    : _secondary,
                               ),
                             ),
                     ),
@@ -820,6 +836,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
         ),
       ),
     );
+    if (editing) return content;
     content = FileContextMenu(
       path: entry.path,
       onShow: () {
@@ -831,7 +848,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
       actions: _entryActions(entry, row.external),
       child: content,
     );
-    if (!row.external || !entry.isDirectory) {
+    if (!_touchLayout && (!row.external || !entry.isDirectory)) {
       content = Draggable<List<String>>(
         affinity: Axis.horizontal,
         data: _targets(entry.path),
@@ -1079,6 +1096,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
     } else {
       _run(() async {
         await widget.workspace.openPath(entry.path);
+        widget.onDocumentOpened?.call();
       });
     }
   }
@@ -1392,34 +1410,33 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
     _ensureVisible(entry.path);
   }
 
-  Widget _inlineName(BrowserRow row) => Padding(
-    padding: EdgeInsets.only(
-      left: 25 + math.min(row.depth * 14.0, 56),
-      right: 8,
-    ),
-    child: Focus(
-      onKeyEvent: (_, event) {
-        if (event is KeyDownEvent &&
-            event.logicalKey == LogicalKeyboardKey.escape) {
-          _cancelEdit();
-          _treeFocus.requestFocus();
-          return KeyEventResult.handled;
-        }
-        return KeyEventResult.ignored;
-      },
-      child: TextField(
-        key: const ValueKey('file-name-editor'),
-        controller: _name,
-        focusNode: _nameFocus,
-        autofocus: true,
-        enabled: !_committing,
-        style: DesktopTypography.body,
-        onSubmitted: (_) => _run(_commitName),
-        decoration: const InputDecoration(
-          isDense: true,
-          contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-          border: OutlineInputBorder(),
-        ),
+  Widget _inlineName() => Focus(
+    onKeyEvent: (_, event) {
+      if (event is KeyDownEvent &&
+          event.logicalKey == LogicalKeyboardKey.escape) {
+        _cancelEdit();
+        _treeFocus.requestFocus();
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    },
+    child: TextField(
+      key: const ValueKey('file-name-editor'),
+      controller: _name,
+      focusNode: _nameFocus,
+      autofocus: true,
+      enabled: !_committing,
+      style: DesktopTypography.body.copyWith(color: Colors.white),
+      cursorColor: _accent,
+      onSubmitted: (_) => _run(_commitName),
+      decoration: const InputDecoration(
+        isDense: true,
+        filled: false,
+        contentPadding: EdgeInsets.zero,
+        border: InputBorder.none,
+        enabledBorder: InputBorder.none,
+        focusedBorder: InputBorder.none,
+        disabledBorder: InputBorder.none,
       ),
     ),
   );
@@ -1598,6 +1615,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
         context: context,
         sources: sources,
         destinations: destinations,
+        displayRoot: _touchLayout ? root : null,
         preview: preview,
         unavailable: unavailable,
         onMaintain: widget.workspace.executeNoteMove,
@@ -1640,7 +1658,9 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
         title: Text('Move ${paths.length} item(s) to Trash?'),
         content: Text(
           dirty.isEmpty
-              ? 'You can restore these items from Finder’s Trash.'
+              ? (Theme.of(context).platform == TargetPlatform.iOS
+                    ? '项目会移到当前工作区的“最近删除”文件夹，不会自动清理。展开该文件夹，长按项目并选择“Move to…”即可移回原位置。'
+                    : 'You can restore these items from Finder’s Trash.')
               : '${dirty.length} open document(s) have unsaved changes. Save before moving to Trash, or discard those changes.',
         ),
         actions: [
@@ -1730,7 +1750,12 @@ class _MoveFolderDialogState extends State<_MoveFolderDialog> {
                   child: Tooltip(
                     message: _path!,
                     child: Text(
-                      _path!,
+                      Theme.of(context).platform == TargetPlatform.iOS &&
+                              _boundary != null
+                          ? (_path == _boundary
+                                ? p.basename(_boundary!)
+                                : p.relative(_path!, from: _boundary))
+                          : _path!,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),

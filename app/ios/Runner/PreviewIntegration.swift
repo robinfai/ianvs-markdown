@@ -7,7 +7,9 @@ final class PreviewIntegration: NSObject, UIDocumentPickerDelegate {
   private let queue = DispatchQueue(label: "work.ianvs.linefold.imports", qos: .userInitiated)
   private let localDocuments = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
   private var folderResult: FlutterResult?
+  private var selectingOperationFolder = false
   private var scopedFolders: [URL] = []
+  private var exportChannel: FlutterMethodChannel?
   private var channel: FlutterMethodChannel?
   private var pendingPaths: [String] = []
   private var pendingErrors: [String] = []
@@ -16,11 +18,38 @@ final class PreviewIntegration: NSObject, UIDocumentPickerDelegate {
 
   func attach(to messenger: FlutterBinaryMessenger) {
     CloudWorkspace.shared.attach(to: messenger)
+    let exports = FlutterMethodChannel(name: "work.ianvs.linefold/document_export", binaryMessenger: messenger)
+    exportChannel = exports
+    exports.setMethodCallHandler { [weak self] call, result in
+      guard let self else { return }
+      if call.method == "cancel" { result(true); return }
+      guard ["html", "markdown", "pdf", "bundle"].contains(call.method),
+            let arguments = call.arguments as? [String: Any],
+            let operation = arguments["operationId"] as? String else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      exports.invokeMethod("approveCommit", arguments: ["operationId": operation]) { approved in
+        guard approved as? Bool == true else { result(false); return }
+        self.shareExport(call.method, arguments: arguments, result: result)
+      }
+    }
     let channel = FlutterMethodChannel(name: "work.ianvs.linefold/preview", binaryMessenger: messenger)
     self.channel = channel
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self else { return }
       switch call.method {
+      #if DEBUG && targetEnvironment(simulator)
+      case "prepareSimulatorAudit":
+        self.queue.async {
+          do {
+            let fixture = try SimulatorAuditFixture.prepare(self.localDocuments)
+            DispatchQueue.main.async { result(fixture) }
+          } catch {
+            DispatchQueue.main.async { result(FlutterError(code: "fixture_failed", message: error.localizedDescription, details: nil)) }
+          }
+        }
+      #endif
       case "takePendingFiles":
         self.ready = true
         let paths = self.pendingPaths
@@ -28,6 +57,10 @@ final class PreviewIntegration: NSObject, UIDocumentPickerDelegate {
         self.pendingPaths.removeAll()
         self.pendingErrors.removeAll()
         result(["paths": paths, "errors": errors])
+      case "clipboardImage":
+        if let bytes = UIPasteboard.general.image?.pngData(), bytes.count <= 20 * 1024 * 1024 {
+          result(FlutterStandardTypedData(bytes: bytes))
+        } else { result(nil) }
       case "chooseFiles": self.chooseFiles(result: result)
       case "defaultWorkspace":
         self.queue.async {
@@ -41,7 +74,10 @@ final class PreviewIntegration: NSObject, UIDocumentPickerDelegate {
             }
           }
         }
-      case "chooseWorkspace": self.chooseFiles(result: result, folder: true)
+      case "chooseWorkspace":
+        self.chooseFiles(result: result, folder: true)
+      case "chooseOperationFolder":
+        self.chooseFiles(result: result, folder: true, operationFolder: true)
       case "openExternal":
         guard let value = call.arguments as? String, let url = URL(string: value),
               ["http", "https", "mailto"].contains(url.scheme?.lowercased() ?? "") else {
@@ -53,6 +89,61 @@ final class PreviewIntegration: NSObject, UIDocumentPickerDelegate {
         }
       default: result(FlutterMethodNotImplemented)
       }
+    }
+  }
+
+  private func shareExport(_ kind: String, arguments: [String: Any], result: @escaping FlutterResult) {
+    guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first(where: { $0.activationState == .foregroundActive }),
+          var presenter = scene.windows.first(where: { $0.isKeyWindow })?.rootViewController else {
+      result(FlutterError(code: "export_unavailable", message: "无法打开分享面板。", details: nil))
+      return
+    }
+    while let presented = presenter.presentedViewController { presenter = presented }
+    do {
+      let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+      let rawTitle = (arguments["title"] as? String ?? "Document") as NSString
+      let title = (rawTitle.lastPathComponent as NSString).deletingPathExtension
+      let suffix = ["html": "html", "markdown": "md", "pdf": "pdf", "bundle": "zip"][kind]!
+      let url = directory.appendingPathComponent(title.isEmpty ? "Document" : title).appendingPathExtension(suffix)
+      let data: Data
+      if kind == "bundle", let bytes = arguments["bytes"] as? FlutterStandardTypedData {
+        data = bytes.data
+      } else if let content = arguments["content"] as? String {
+        if kind == "pdf" {
+          let renderer = UIPrintPageRenderer()
+          renderer.addPrintFormatter(UIMarkupTextPrintFormatter(markupText: content), startingAtPageAt: 0)
+          let paper = CGRect(x: 0, y: 0, width: 595, height: 842)
+          renderer.setValue(NSValue(cgRect: paper), forKey: "paperRect")
+          renderer.setValue(NSValue(cgRect: paper.insetBy(dx: 36, dy: 36)), forKey: "printableRect")
+          data = UIGraphicsPDFRenderer(bounds: paper).pdfData { context in
+            renderer.prepare(forDrawingPages: NSRange(location: 0, length: renderer.numberOfPages))
+            for page in 0..<renderer.numberOfPages {
+              context.beginPage()
+              renderer.drawPage(at: page, in: paper)
+            }
+          }
+        } else {
+          data = Data(content.utf8)
+        }
+      } else {
+        try? FileManager.default.removeItem(at: directory)
+        result(FlutterError(code: "export_invalid", message: "导出内容不可用。", details: nil))
+        return
+      }
+      try data.write(to: url, options: .atomic)
+      let sheet = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+      sheet.popoverPresentationController?.sourceView = presenter.view
+      sheet.popoverPresentationController?.sourceRect = CGRect(x: presenter.view.bounds.midX, y: presenter.view.bounds.midY, width: 1, height: 1)
+      sheet.completionWithItemsHandler = { _, completed, _, error in
+        try? FileManager.default.removeItem(at: directory)
+        if let error {
+          result(FlutterError(code: "export_failed", message: error.localizedDescription, details: nil))
+        } else { result(completed) }
+      }
+      presenter.present(sheet, animated: true)
+    } catch {
+      result(FlutterError(code: "export_failed", message: error.localizedDescription, details: nil))
     }
   }
 
@@ -141,7 +232,7 @@ final class PreviewIntegration: NSObject, UIDocumentPickerDelegate {
     }
   }
 
-  private func chooseFiles(result: @escaping FlutterResult, folder: Bool = false) {
+  private func chooseFiles(result: @escaping FlutterResult, folder: Bool = false, operationFolder: Bool = false) {
     guard let scene = UIApplication.shared.connectedScenes
       .compactMap({ $0 as? UIWindowScene })
       .first(where: { $0.activationState == .foregroundActive }),
@@ -159,7 +250,7 @@ final class PreviewIntegration: NSObject, UIDocumentPickerDelegate {
     let picker = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: !folder)
     picker.delegate = self
     picker.allowsMultipleSelection = !folder
-    if folder { folderResult = result }
+    if folder { folderResult = result; selectingOperationFolder = operationFolder }
     presenter.present(picker, animated: true)
     if !folder { result(nil) }
   }
@@ -167,6 +258,8 @@ final class PreviewIntegration: NSObject, UIDocumentPickerDelegate {
   func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
     if let result = folderResult {
       folderResult = nil
+      let operationFolder = selectingOperationFolder
+      selectingOperationFolder = false
       guard let url = urls.first else {
         result(FlutterError(code: "folder_unavailable", message: "无法访问文件夹，请重新选择。", details: nil))
         return
@@ -179,7 +272,7 @@ final class PreviewIntegration: NSObject, UIDocumentPickerDelegate {
           return
         }
         do {
-          let access = try CloudWorkspace.shared.previewWriteAuthority.activate(url)
+          let access = try operationFolder ? CloudWorkspace.shared.operationWriteGrants.activate(url) : CloudWorkspace.shared.previewWriteAuthority.activate(url)
           DispatchQueue.main.async {
             // Retain old scopes for readers, never as write authorization. Each
             // explicit selection gets a fresh nonpersistent native capability.

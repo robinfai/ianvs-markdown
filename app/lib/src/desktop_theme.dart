@@ -15,11 +15,16 @@ abstract final class DesktopMetrics {
   static const controlRadius = 6.0;
 }
 
-ThemeData desktopTheme(Brightness brightness) {
+ThemeData desktopTheme(
+  Brightness brightness, {
+  TargetPlatform platform = TargetPlatform.macOS,
+}) {
   final theme = IanvsTheme.build(
     brightness: brightness,
-    density: IanvsDensity.compact,
-    platform: TargetPlatform.macOS,
+    density: platform == TargetPlatform.iOS
+        ? IanvsDensity.touch
+        : IanvsDensity.compact,
+    platform: platform,
     fontFamily: DesktopTypography.fontFamily,
   );
   final tokens = theme.extension<IanvsTokens>()!;

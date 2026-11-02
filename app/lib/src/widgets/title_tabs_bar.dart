@@ -25,8 +25,14 @@ class TitleTabsBar extends StatelessWidget {
     required this.onSave,
     required this.onClose,
     this.documentActions = const [],
+    this.mobile = false,
+    this.onOpenNavigation,
+    this.onOpenOutline,
   });
 
+  final bool mobile;
+  final VoidCallback? onOpenNavigation;
+  final VoidCallback? onOpenOutline;
   final WorkspaceController workspace;
   final Future<bool> Function(DocumentSession, {bool saveAs}) onSave;
   final FutureOr<void> Function(DocumentSession) onClose;
@@ -37,6 +43,61 @@ class TitleTabsBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (mobile) {
+      return Material(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                IconButton(
+                  tooltip: '工作区',
+                  onPressed: onOpenNavigation,
+                  icon: const Icon(Icons.menu),
+                ),
+                Expanded(
+                  child: Text(
+                    workspace.activeDocument!.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                _OpenDocumentsMenu(workspace: workspace),
+                IconButton(
+                  tooltip: '保存',
+                  onPressed: () => onSave(workspace.activeDocument!),
+                  icon: const Icon(Icons.save_outlined),
+                ),
+                IconButton(
+                  tooltip: '新建文档',
+                  onPressed: workspace.newDocument,
+                  icon: const Icon(Icons.add),
+                ),
+              ],
+            ),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _EditorModePicker(workspace: workspace),
+                  ...documentActions,
+                  IconButton(
+                    tooltip: '大纲',
+                    onPressed: onOpenOutline,
+                    icon: const Icon(Icons.list),
+                  ),
+                  IconButton(
+                    tooltip: '关闭文档',
+                    onPressed: () => onClose(workspace.activeDocument!),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     final colors = IanvsMarkdownThemeData.resolve(context);
     return Material(
       color: colors.surfaceMuted,
