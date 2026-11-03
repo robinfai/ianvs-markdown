@@ -1,3 +1,4 @@
+import '../heading_rail.dart';
 import '../link_target.dart';
 import '../localization.dart';
 import '../keyboard.dart';
@@ -5364,27 +5365,18 @@ class _IanvsHeadingRail extends StatelessWidget {
       foldable: foldable,
       collapsed: collapsed,
       onToggle: onToggle,
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border(
-            left: BorderSide(color: colors.headingAccent(level), width: 2),
-          ),
-        ),
-        padding: const EdgeInsets.only(left: 8),
+      child: MarkdownHeadingRail(
+        color: colors.headingAccent(level),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(width: 17, height: 19),
-                const SizedBox(width: 4),
-                Expanded(child: child),
-              ],
+              children: [Expanded(child: child)],
             ),
             if (setextUnderline case final underline?)
               Padding(
-                padding: const EdgeInsets.only(left: 21),
+                padding: EdgeInsets.zero,
                 child: Align(
                   key: const ValueKey('ianvs-markdown-setext-underline-source'),
                   alignment: Alignment.centerLeft,
@@ -5443,6 +5435,7 @@ class _LiveHeadingFoldFrameState extends State<_LiveHeadingFoldFrame> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          Expanded(child: widget.child),
           if (widget.foldable)
             SizedBox(
               width: 22,
@@ -5477,7 +5470,6 @@ class _LiveHeadingFoldFrameState extends State<_LiveHeadingFoldFrame> {
           // Empty sections still share the same rail and text alignment.
           if (widget.foldingEnabled && !widget.foldable)
             const SizedBox(width: 22),
-          Expanded(child: widget.child),
         ],
       ),
     );

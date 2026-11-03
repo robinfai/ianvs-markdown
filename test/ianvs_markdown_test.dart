@@ -1,3 +1,4 @@
+import 'package:ianvs_markdown/src/heading_rail.dart';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -5662,12 +5663,10 @@ Body alpha bravo
       app(const IanvsMarkdown(data: '## Embedded heading')),
     );
 
-    final rail = tester.widget<Container>(
+    final rail = tester.widget<MarkdownHeadingRail>(
       find.byKey(const ValueKey('ianvs-markdown-standalone-heading-rail-2')),
     );
-    final decoration = rail.decoration! as BoxDecoration;
-    final border = decoration.border! as Border;
-    expect(border.left.color, IanvsMarkdownThemeData.light.headingAccent(2));
+    expect(rail.color, IanvsMarkdownThemeData.light.headingAccent(2));
     expect(find.text('Embedded heading'), findsOneWidget);
   });
 

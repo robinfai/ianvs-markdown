@@ -1,3 +1,4 @@
+import 'heading_rail.dart';
 import 'link_target.dart';
 import 'localization.dart';
 import 'keyboard.dart';
@@ -2553,6 +2554,30 @@ class _FoldableViewHeadingState extends State<_FoldableViewHeading> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            Expanded(
+              child: MarkdownHeadingRail(
+                key: ValueKey('ianvs-markdown-heading-rail-${widget.level}'),
+                color: widget.colors.headingAccent(widget.level),
+                child: Row(
+                  children: [
+                    Flexible(
+                      fit: FlexFit.loose,
+                      child: widget.selectable
+                          ? SelectableText(
+                              contextMenuBuilder: (_, state) =>
+                                  buildMarkdownSelectableContextMenu(
+                                    context,
+                                    state,
+                                  ),
+                              widget.text,
+                              style: widget.style,
+                            )
+                          : Text(widget.text, style: widget.style),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             if (widget.foldable)
               SizedBox(
                 width: 22,
@@ -2587,38 +2612,6 @@ class _FoldableViewHeadingState extends State<_FoldableViewHeading> {
             // Match the fold-button gutter even for headings without a body.
             if (widget.foldingEnabled && !widget.foldable)
               const SizedBox(width: 22),
-            Expanded(
-              child: Container(
-                key: ValueKey('ianvs-markdown-heading-rail-${widget.level}'),
-                decoration: BoxDecoration(
-                  border: Border(
-                    left: BorderSide(
-                      color: widget.colors.headingAccent(widget.level),
-                      width: 2,
-                    ),
-                  ),
-                ),
-                padding: const EdgeInsets.only(left: 8),
-                child: Row(
-                  children: [
-                    Flexible(
-                      fit: FlexFit.loose,
-                      child: widget.selectable
-                          ? SelectableText(
-                              contextMenuBuilder: (_, state) =>
-                                  buildMarkdownSelectableContextMenu(
-                                    context,
-                                    state,
-                                  ),
-                              widget.text,
-                              style: widget.style,
-                            )
-                          : Text(widget.text, style: widget.style),
-                    ),
-                  ],
-                ),
-              ),
-            ),
           ],
         ),
       ),
@@ -2651,14 +2644,9 @@ class _IanvsMarkdownStandaloneHeadingBuilder extends MarkdownElementBuilder {
     if (text.isEmpty) return null;
     return Semantics(
       header: true,
-      child: Container(
+      child: MarkdownHeadingRail(
         key: ValueKey('ianvs-markdown-standalone-heading-rail-$level'),
-        decoration: BoxDecoration(
-          border: Border(
-            left: BorderSide(color: colors.headingAccent(level), width: 2),
-          ),
-        ),
-        padding: const EdgeInsets.only(left: 8),
+        color: colors.headingAccent(level),
         child: selectable
             ? SelectableText(
                 contextMenuBuilder: (_, state) =>
