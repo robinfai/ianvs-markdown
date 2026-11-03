@@ -14,7 +14,8 @@ notary_auth=(--apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPL
 mkdir -p "$RELEASE_OUTPUT"
 while IFS= read -r -d '' binary; do
   if file -b "$binary" | grep -q 'Mach-O'; then
-    lipo "$binary" -verify_arch arm64 x86_64
+    lipo "$binary" -verify_arch arm64
+    lipo "$binary" -verify_arch x86_64
   fi
 done < <(find "$app" -type f -print0)
 archive="$RELEASE_OUTPUT/Linefold-$RELEASE_VERSION-macos-universal.zip"
