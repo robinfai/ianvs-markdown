@@ -135,6 +135,8 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v6
+      - name: Validate macOS release helpers
+        run: python3 -m unittest discover -s app/tool -p 'test_*release.py' && python3 -m unittest discover -s app/tool -p 'test_advance_update_feed.py'
       - name: Validate native symbol archive gate
         run: python3 app/tool/test_merman_symbols.py
       - uses: subosito/flutter-action@v2

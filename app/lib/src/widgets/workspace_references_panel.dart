@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -149,8 +150,10 @@ class _WorkspaceReferencesPanelState extends State<WorkspaceReferencesPanel> {
                     Expanded(
                       child: Text(
                         tag == null
-                            ? 'Backlinks · ${p.posix.basename(widget.targetPath!)}'
-                            : 'Tag · #$tag',
+                            ? appText(context, "Backlinks · {0}", [
+                                p.posix.basename(widget.targetPath!),
+                              ])
+                            : appText(context, "Tag · #{0}", [tag]),
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
@@ -160,7 +163,7 @@ class _WorkspaceReferencesPanelState extends State<WorkspaceReferencesPanel> {
                       ),
                     ),
                     IconButton(
-                      tooltip: 'Close references',
+                      tooltip: appText(context, "Close references"),
                       onPressed: () => Navigator.of(context).pop(),
                       icon: const Icon(Icons.close),
                     ),
@@ -173,8 +176,11 @@ class _WorkspaceReferencesPanelState extends State<WorkspaceReferencesPanel> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const Text(
-                              'Local source + open buffers. Cloud-only files are never downloaded.',
+                            Text(
+                              appText(
+                                context,
+                                "Local source + open buffers. Cloud-only files are never downloaded.",
+                              ),
                             ),
                             Align(
                               alignment: Alignment.centerLeft,
@@ -183,7 +189,9 @@ class _WorkspaceReferencesPanelState extends State<WorkspaceReferencesPanel> {
                                     ? null
                                     : () => _refresh(metadata: true),
                                 icon: const Icon(Icons.refresh, size: 16),
-                                label: const Text('Refresh metadata'),
+                                label: Text(
+                                  appText(context, "Refresh metadata"),
+                                ),
                               ),
                             ),
                             if (index.scanning) ...[
@@ -192,22 +200,48 @@ class _WorkspaceReferencesPanelState extends State<WorkspaceReferencesPanel> {
                                 alignment: Alignment.centerLeft,
                                 child: TextButton(
                                   onPressed: index.cancel,
-                                  child: const Text('Cancel indexing'),
+                                  child: Text(
+                                    appText(context, "Cancel indexing"),
+                                  ),
                                 ),
                               ),
                             ],
                             if (scopeChanged)
-                              const Text(
-                                'Workspace changed. Close and reopen references.',
+                              Text(
+                                appText(
+                                  context,
+                                  "Workspace changed. Close and reopen references.",
+                                ),
                               ),
                             if (_error case final error?) Text(error),
                             if (snapshot != null) ...[
                               Text(
-                                '${snapshot.notes.length}/${snapshot.knownDocuments} known documents parsed · $matchCount occurrences in ${matchingNotes.length} notes${matchCount > visible.length ? ' · showing first ${visible.length}' : ''}',
+                                appText(
+                                  context,
+                                  "{0}/{1} known documents parsed · {2} occurrences in {3} notes{4}",
+                                  [
+                                    snapshot.notes.length,
+                                    snapshot.knownDocuments,
+                                    matchCount,
+                                    matchingNotes.length,
+                                    matchCount > visible.length
+                                        ? ' · showing first ${visible.length}'
+                                        : '',
+                                  ],
+                                ),
                               ),
                               if (!snapshot.complete || ambiguous > 0)
                                 Text(
-                                  'Coverage unknown: ${snapshot.issues.length} unavailable, unsupported or limited sources${ambiguous > 0 ? '; $ambiguous ambiguous references need an explicit target' : ''}. This is not a complete absence check.',
+                                  appText(
+                                    context,
+                                    "Coverage unknown: {0} unavailable, unsupported or limited sources{1}. This is not a complete absence check.",
+                                    [
+                                      snapshot.issues.length,
+                                      ambiguous > 0
+                                          ? '; $ambiguous ambiguous references need an explicit target'
+                                          : '',
+                                    ],
+                                  ),
                                   key: const ValueKey(
                                     'workspace-references-partial',
                                   ),
@@ -227,13 +261,29 @@ class _WorkspaceReferencesPanelState extends State<WorkspaceReferencesPanel> {
                             child: Text(
                               snapshot == null
                                   ? scopeChanged
-                                        ? 'References belong to the previous workspace.'
+                                        ? appText(
+                                            context,
+                                            "References belong to the previous workspace.",
+                                          )
                                         : index.cancelled
-                                        ? 'Indexing cancelled.'
-                                        : 'Updating source references…'
+                                        ? appText(
+                                            context,
+                                            "Indexing cancelled.",
+                                          )
+                                        : appText(
+                                            context,
+                                            "Updating source references…",
+                                          )
                                   : snapshot.complete && ambiguous == 0
-                                  ? 'No ${tag == null ? 'backlinks' : 'tag occurrences'}.'
-                                  : 'No confirmed matches in the source that could be indexed.',
+                                  ? appText(context, "No {0}.", [
+                                      tag == null
+                                          ? 'backlinks'
+                                          : 'tag occurrences',
+                                    ])
+                                  : appText(
+                                      context,
+                                      "No confirmed matches in the source that could be indexed.",
+                                    ),
                             ),
                           ),
                         )

@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'package:flutter/material.dart';
 import '../models/conflict_diff.dart';
 
@@ -14,7 +15,7 @@ class SaveConflictDiffDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) => AlertDialog(
     constraints: const BoxConstraints(maxWidth: 1000),
-    title: const Text('Compare Changes'),
+    title: Text(appText(context, "Compare Changes")),
     content: SizedBox(
       width: 900,
       height: 500,
@@ -29,15 +30,27 @@ class SaveConflictDiffDialog extends StatelessWidget {
                 children: [
                   Text(
                     deleted
-                        ? 'Disk file removed. + lines are your captured local version.'
-                        : '− Disk version    + Captured local version',
+                        ? appText(
+                            context,
+                            "Disk file removed. + lines are your captured local version.",
+                          )
+                        : appText(
+                            context,
+                            "− Disk version    + Captured local version",
+                          ),
                   ),
-                  const Text(
-                    'Read-only snapshot. Overwrite will recheck the disk before saving.',
+                  Text(
+                    appText(
+                      context,
+                      "Read-only snapshot. Overwrite will recheck the disk before saving.",
+                    ),
                   ),
                   if (diff.coarse)
-                    const Text(
-                      'Large changed region: showing complete removed and added lines.',
+                    Text(
+                      appText(
+                        context,
+                        "Large changed region: showing complete removed and added lines.",
+                      ),
                     ),
                 ],
               ),
@@ -107,7 +120,7 @@ class SaveConflictDiffDialog extends StatelessWidget {
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: const Text('Back to conflict'),
+        child: Text(appText(context, "Back to conflict")),
       ),
     ],
   );

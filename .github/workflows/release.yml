@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: linefold-release-${{ github.ref }}
+  group: linefold-release
   cancel-in-progress: false
 
 jobs:
@@ -17,14 +17,18 @@ jobs:
     # Manual runs must select an existing release tag, never a moving branch.
     if: startsWith(github.ref, 'refs/tags/linefold-v')
     runs-on: macos-15
-    timeout-minutes: 90
+    timeout-minutes: 150
     permissions:
       contents: write
     env:
       CARGO_PROFILE_RELEASE_STRIP: none
       COCOAPODS_DISABLE_STATS: 'true'
+      SPARKLE_PUBLIC_KEY: ${{ vars.LINEFOLD_SPARKLE_PUBLIC_KEY }}
+      UPDATE_FEED_TAG: linefold-v0.1.2
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - name: Validate version and signing configuration
         env:
           CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
@@ -34,25 +38,40 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           MACOS_PROFILE: ${{ secrets.APPLE_MACOS_PROVISIONING_PROFILE_BASE64 }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.LINEFOLD_SPARKLE_PRIVATE_KEY }}
         run: |
           set -euo pipefail
-          for name in CERTIFICATE CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_TEAM_ID APPLE_APP_SPECIFIC_PASSWORD MACOS_PROFILE; do
+          for name in CERTIFICATE CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_TEAM_ID APPLE_APP_SPECIFIC_PASSWORD MACOS_PROFILE SPARKLE_PRIVATE_KEY SPARKLE_PUBLIC_KEY; do
             if [[ -z "${!name}" ]]; then echo "::error::Missing secret: $name"; exit 1; fi
           done
           version=$(sed -n 's/^version: \([^+]*\).*/\1/p' app/pubspec.yaml)
           test "$GITHUB_REF_NAME" = "linefold-v$version"
           echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
-          echo "RELEASE_ARCH=$(uname -m)" >> "$GITHUB_ENV"
+          echo "RELEASE_OUTPUT=$GITHUB_WORKSPACE/dist" >> "$GITHUB_ENV"
+          umask 077
+          printf '%s' "$SPARKLE_PRIVATE_KEY" > "$RUNNER_TEMP/sparkle-private.key"
+          echo "SPARKLE_KEY_FILE=$RUNNER_TEMP/sparkle-private.key" >> "$GITHUB_ENV"
+          xcrun swift app/tool/update_keys.swift verify "$RUNNER_TEMP/sparkle-private.key" > /dev/null
+          xcrun notarytool history --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --output-format json > /dev/null
           test -f "app/releases/$version.md"
+      - name: Fetch verified Sparkle tools
+        run: |
+          bash app/tool/fetch_sparkle.sh "$RUNNER_TEMP/sparkle"
+          echo "SPARKLE_TOOLS=$RUNNER_TEMP/sparkle/bin" >> "$GITHUB_ENV"
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           flutter-version: '3.44.8'
           cache: true
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
       - name: Resolve dependencies and run app tests
         run: |
           make deps-integrations
+          bash app/tool/prepare_quicklook.sh
+          (cd app/quicklook && flutter analyze lib && flutter test)
+          bash app/tool/test_native_quicklook.sh
           cd app
           flutter test --concurrency=2
       - name: Build release app
@@ -61,7 +80,10 @@ jobs:
           # Build with cloud support; the next step signs with the Developer ID
           # profile rather than asking Xcode for a development identity on CI.
           printf 'LINEFOLD_CLOUD_ENABLED = YES\nCODE_SIGNING_ALLOWED = NO\n' > macos/Runner/Configs/Signing.local.xcconfig
-          FLUTTER_XCODE_ARCHS="$(uname -m)" flutter build macos --release --target lib/main.dart
+          FLUTTER_XCODE_ARCHS="arm64 x86_64" flutter build macos --release --target lib/main.dart
+          python3 tool/macos_release.py configure build/macos/Build/Products/Release/Linefold.app \
+            --public-key "$SPARKLE_PUBLIC_KEY" \
+            --feed "https://github.com/$GITHUB_REPOSITORY/releases/download/$UPDATE_FEED_TAG/appcast.xml"
       - name: Import Developer ID certificate into temporary keychain
         env:
           CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
@@ -92,53 +114,26 @@ jobs:
           python3 app/tool/sign_macos_release.py app/build/macos/Build/Products/Release/Linefold.app
           bash app/tool/verify_quicklook_bundle.sh
           python3 app/tool/check_document_export_entitlements.py --built-apps --build-mode Release
-      - name: Notarize, staple and package
+      - name: Notarize app and DMG; sign ZIP and update feed
         env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-        run: |
-          set -euo pipefail
-          app="$GITHUB_WORKSPACE/app/build/macos/Build/Products/Release/Linefold.app"
-          ditto -c -k --keepParent "$app" "$RUNNER_TEMP/notarize.zip"
-          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --wait --timeout 45m --output-format json > "$RUNNER_TEMP/notary-result.json"
-          python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print(r); assert r["status"] == "Accepted", "Apple notarization did not accept this build"' "$RUNNER_TEMP/notary-result.json"
-          xcrun stapler staple "$app"
-          xcrun stapler validate "$app"
-          spctl --assess --type execute --verbose=2 "$app"
-          mkdir -p dist
-          ditto -c -k --keepParent "$app" "dist/Linefold-$RELEASE_VERSION-macos-$RELEASE_ARCH.zip"
-          cd dist
-          shasum -a 256 *.zip > SHA256SUMS.txt
-      - name: Fetch notarization diagnostics on failure
-        if: failure()
-        env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-        run: |
-          if [[ -s "$RUNNER_TEMP/notary-result.json" ]]; then
-            submission=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("id", ""))' "$RUNNER_TEMP/notary-result.json")
-            if [[ -n "$submission" ]]; then
-              xcrun notarytool log "$submission" --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" "$RUNNER_TEMP/notary-log.json"
-            fi
-          fi
-      - name: Save notarization result
+        run: bash app/tool/package_macos_release.sh
+      - name: Save notarization evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: notarization-result
-          path: |
-            ${{ runner.temp }}/notary-result.json
-            ${{ runner.temp }}/notary-log.json
+          path: dist/notarization*.json
           if-no-files-found: ignore
-      - name: Publish GitHub prerelease
+      - name: Publish complete release and advance signed update channel
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/SHA256SUMS.txt --verify-tag --prerelease --title "Linefold $RELEASE_VERSION — 测试版" --notes-file "app/releases/$RELEASE_VERSION.md"
+        run: bash app/tool/publish_macos_release.sh
       - name: Remove signing material
         if: always()
         run: |
           security delete-keychain "$RUNNER_TEMP/linefold-signing.keychain-db" || true
-          rm -f "$RUNNER_TEMP/certificate.p12" "$RUNNER_TEMP/notarize.zip" "$RUNNER_TEMP/Linefold.provisionprofile"
+          rm -f "$RUNNER_TEMP/certificate.p12" "$RUNNER_TEMP/Linefold.provisionprofile" "$RUNNER_TEMP/sparkle-private.key"

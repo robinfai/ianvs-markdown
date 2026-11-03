@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'package:flutter/material.dart';
 
 import '../controllers/workspace_controller.dart';
@@ -10,18 +11,22 @@ Future<bool?> confirmWorkspaceNoteMoveRecoveryCopies(
   context: context,
   builder: (context) => AlertDialog(
     scrollable: true,
-    title: const Text('Create original recovery copies?'),
+    title: Text(appText(context, "Create original recovery copies?")),
     content: Text(
-      'Create up to $count original note copies in the selected workspace root. Existing notes are never replaced or deleted. Copies consume disk space and may sync with this vault. Copied aliases may introduce new link ambiguities. Partial copies remain separately reported; this does not finish reference maintenance.',
+      appText(
+        context,
+        "Create up to {0} original note copies in the selected workspace root. Existing notes are never replaced or deleted. Copies consume disk space and may sync with this vault. Copied aliases may introduce new link ambiguities. Partial copies remain separately reported; this does not finish reference maintenance.",
+        [count],
+      ),
     ),
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context, false),
-        child: const Text('Cancel'),
+        child: Text(appText(context, "Cancel")),
       ),
       FilledButton(
         onPressed: () => Navigator.pop(context, true),
-        child: const Text('Create original copies'),
+        child: Text(appText(context, "Create original copies")),
       ),
     ],
   ),
@@ -144,15 +149,18 @@ class _NoteMoveRecoveryState extends State<_NoteMoveRecovery> {
     canPop: !_recovering,
     child: AlertDialog(
       scrollable: true,
-      title: const Text('Note move recovery'),
+      title: Text(appText(context, "Note move recovery")),
       content: SizedBox(
         width: 700,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'Storage inspection is read-only. Saved states are historical, not a fresh verification of notes or artifact contents. Nothing is automatically retried, repaired or deleted.',
+            Text(
+              appText(
+                context,
+                "Storage inspection is read-only. Saved states are historical, not a fresh verification of notes or artifact contents. Nothing is automatically retried, repaired or deleted.",
+              ),
             ),
             if (_observing || (_recovering && !_confirmingRecovery))
               const LinearProgressIndicator(),
@@ -160,60 +168,121 @@ class _NoteMoveRecoveryState extends State<_NoteMoveRecovery> {
             if (_storage case final storage?) ...[
               const SizedBox(height: 12),
               Text(
-                'All app-managed recovery journals',
+                appText(context, "All app-managed recovery journals"),
                 style: Theme.of(context).textTheme.titleSmall,
               ),
               Text(
-                'Record slots: ${_count(storage.globalRecordSlotCount)} / ${storage.recordLimit} (${_count(storage.globalJournalCount)} valid journals; ${_count(storage.invalidJournalCount)} invalid)',
+                appText(
+                  context,
+                  "Record slots: {0} / {1} ({2} valid journals; {3} invalid)",
+                  [
+                    _count(storage.globalRecordSlotCount),
+                    storage.recordLimit,
+                    _count(storage.globalJournalCount),
+                    _count(storage.invalidJournalCount),
+                  ],
+                ),
               ),
               Text(
-                'Encoded storage: ${_bytes(storage.globalJournalBytes)} / ${_bytes(storage.journalByteLimit)}',
+                appText(context, "Encoded storage: {0} / {1}", [
+                  _bytes(storage.globalJournalBytes),
+                  _bytes(storage.journalByteLimit),
+                ]),
               ),
               Text(
-                'Pending remnants: ${_count(storage.pendingCount)} files, ${_bytes(storage.pendingBytes)}. They consume bytes, not record slots.',
+                appText(
+                  context,
+                  "Pending remnants: {0} files, {1}. They consume bytes, not record slots.",
+                  [_count(storage.pendingCount), _bytes(storage.pendingBytes)],
+                ),
               ),
               Text(
-                'Artifact reservation: ${_bytes(storage.artifactReservedBytes)} / ${_bytes(storage.artifactReservationLimit)}',
+                appText(context, "Artifact reservation: {0} / {1}", [
+                  _bytes(storage.artifactReservedBytes),
+                  _bytes(storage.artifactReservationLimit),
+                ]),
               ),
               Text(
-                'Journal budget headroom: ${_bytes(storage.availableBudgetBytes)}. This is not free disk space or approval for another move.',
+                appText(
+                  context,
+                  "Journal budget headroom: {0}. This is not free disk space or approval for another move.",
+                  [_bytes(storage.availableBudgetBytes)],
+                ),
               ),
               Text(
-                'Unavailable records: ${_count(storage.unavailableCount)}; unknown entries: ${_count(storage.unknownEntryCount)}',
+                appText(
+                  context,
+                  "Unavailable records: {0}; unknown entries: {1}",
+                  [
+                    _count(storage.unavailableCount),
+                    _count(storage.unknownEntryCount),
+                  ],
+                ),
               ),
               if (!storage.observedComplete)
-                const Text(
-                  'Incomplete observation. Unknown totals are not zero; no recovery data was discarded.',
+                Text(
+                  appText(
+                    context,
+                    "Incomplete observation. Unknown totals are not zero; no recovery data was discarded.",
+                  ),
                 ),
               if (storage.storageLimitReached)
-                const Text(
-                  'Recovery storage limit reached. New maintained moves are blocked rather than deleting recovery evidence.',
+                Text(
+                  appText(
+                    context,
+                    "Recovery storage limit reached. New maintained moves are blocked rather than deleting recovery evidence.",
+                  ),
                 ),
               const SizedBox(height: 12),
               Text(
-                'Selected workspace only',
+                appText(context, "Selected workspace only"),
                 style: Theme.of(context).textTheme.titleSmall,
               ),
-              Text('Journal bytes: ${_bytes(storage.currentRootJournalBytes)}'),
               Text(
-                'Retained artifacts: ${_bytes(storage.currentRootArtifactBytes)}; reported allocation: ${_bytes(storage.currentRootArtifactAllocatedBytes)}',
+                appText(context, "Journal bytes: {0}", [
+                  _bytes(storage.currentRootJournalBytes),
+                ]),
               ),
               Text(
-                'Unverifiable artifacts: ${_count(storage.artifactUnknownCount)}',
+                appText(
+                  context,
+                  "Retained artifacts: {0}; reported allocation: {1}",
+                  [
+                    _bytes(storage.currentRootArtifactBytes),
+                    _bytes(storage.currentRootArtifactAllocatedBytes),
+                  ],
+                ),
               ),
-              const Text(
-                'Allocation is a filesystem metadata sum, not exclusive physical disk usage. Other workspaces and Trash are not scanned. Recovery copies are not included in artifact totals.',
+              Text(
+                appText(context, "Unverifiable artifacts: {0}", [
+                  _count(storage.artifactUnknownCount),
+                ]),
+              ),
+              Text(
+                appText(
+                  context,
+                  "Allocation is a filesystem metadata sum, not exclusive physical disk usage. Other workspaces and Trash are not scanned. Recovery copies are not included in artifact totals.",
+                ),
               ),
               for (final code in storage.blockers.toSet()) Text(_reason(code)),
               const SizedBox(height: 12),
-              const Text(
-                'Cleanup is not available. Original-copy recovery does not release record slots or the storage budget. Keep retained artifacts and journals, especially when a result is partial or unknown.',
+              Text(
+                appText(
+                  context,
+                  "Cleanup is not available. Original-copy recovery does not release record slots or the storage budget. Keep retained artifacts and journals, especially when a result is partial or unknown.",
+                ),
               ),
               if (storage.records.isEmpty)
                 Text(
                   storage.observedComplete && storage.currentRootKnown
-                      ? 'No retained note-move journals for this workspace.'
-                      : 'No readable journals were identified for this workspace; the inventory may be incomplete.',
+                      ? appText(
+                          context,
+                          "No retained note-move journals for this workspace.",
+                        )
+                      : appText(
+                          context,
+                          "No readable journals were identified for this workspace; the inventory may be incomplete.",
+                        ),
                 ),
               for (final record in storage.records) ...[
                 const SizedBox(height: 16),
@@ -221,20 +290,48 @@ class _NoteMoveRecoveryState extends State<_NoteMoveRecovery> {
                   '${record.sourcePath} → ${record.destinationPath}',
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
-                Text('Journal: ${record.transactionId}'),
-                Text('Saved state: ${record.storedPhase} (historical)'),
+                Text(appText(context, "Journal: {0}", [record.transactionId])),
+                Text(
+                  appText(context, "Saved state: {0} (historical)", [
+                    record.storedPhase,
+                  ]),
+                ),
                 for (final root in record.namespaces)
                   Text(workspaceBatchRootStatus(root, historical: true)),
                 if (record.namespace case final root?)
                   Text(
-                    'Last recorded directory: ${root.sourcePath} → ${root.destinationPath}; ${root.actualPath ?? 'unknown location'} (historical, not a current observation).',
+                    appText(
+                      context,
+                      "Last recorded directory: {0} → {1}; {2} (historical, not a current observation).",
+                      [
+                        root.sourcePath,
+                        root.destinationPath,
+                        root.actualPath ?? 'unknown location',
+                      ],
+                    ),
                   ),
                 if (record.storedCode != null) Text(record.storedCode!),
                 Text(
-                  'Journal ${_bytes(record.journalBytes)}; artifacts ${_bytes(record.artifactBytes)}; reported allocation ${_bytes(record.allocatedBytes)}',
+                  appText(
+                    context,
+                    "Journal {0}; artifacts {1}; reported allocation {2}",
+                    [
+                      _bytes(record.journalBytes),
+                      _bytes(record.artifactBytes),
+                      _bytes(record.allocatedBytes),
+                    ],
+                  ),
                 ),
                 Text(
-                  '${_count(record.artifactCount)} planned artifacts; ${_count(record.artifactMissingCount)} unexpectedly absent; ${_count(record.artifactUnknownCount)} unverifiable',
+                  appText(
+                    context,
+                    "{0} planned artifacts; {1} unexpectedly absent; {2} unverifiable",
+                    [
+                      _count(record.artifactCount),
+                      _count(record.artifactMissingCount),
+                      _count(record.artifactUnknownCount),
+                    ],
+                  ),
                 ),
                 for (final code in record.blockers.toSet().where(
                   (code) =>
@@ -250,21 +347,31 @@ class _NoteMoveRecoveryState extends State<_NoteMoveRecovery> {
                           !storage.currentRootKnown
                       ? null
                       : () => _recover(record),
-                  child: const Text('Recover originals as new copies'),
+                  child: Text(
+                    appText(context, "Recover originals as new copies"),
+                  ),
                 ),
               ],
             ],
             if (_recoveryResult case final result?) ...[
               const SizedBox(height: 16),
-              const Text('Last explicit recovery result'),
+              Text(appText(context, "Last explicit recovery result")),
               for (final root in result.namespaces)
                 Text(workspaceBatchRootStatus(root)),
               if (result.code != null) Text(result.code!),
               if (result.message != null) Text(result.message!),
               for (final copy in result.recoveryEntries)
-                Text('Original copy: ${copy.path} (${copy.state})'),
-              const Text(
-                'Copies do not finish reference maintenance or replace current notes.',
+                Text(
+                  appText(context, "Original copy: {0} ({1})", [
+                    copy.path,
+                    copy.state,
+                  ]),
+                ),
+              Text(
+                appText(
+                  context,
+                  "Copies do not finish reference maintenance or replace current notes.",
+                ),
               ),
             ],
           ],
@@ -273,11 +380,11 @@ class _NoteMoveRecoveryState extends State<_NoteMoveRecovery> {
       actions: [
         TextButton(
           onPressed: _recovering ? null : () => Navigator.pop(context),
-          child: const Text('Close'),
+          child: Text(appText(context, "Close")),
         ),
         TextButton(
           onPressed: _observing || _recovering || !_current ? null : _refresh,
-          child: const Text('Refresh'),
+          child: Text(appText(context, "Refresh")),
         ),
       ],
     ),

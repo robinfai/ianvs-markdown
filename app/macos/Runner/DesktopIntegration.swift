@@ -1,5 +1,13 @@
 import Cocoa
+import ServiceManagement
 import UniformTypeIdentifiers
+
+private func desktopText(_ english: String, _ chinese: String) -> String {
+  let language = Bundle.preferredLocalizations(
+    from: ["en", "zh"], forPreferences: Locale.preferredLanguages
+  ).first ?? "en"
+  return language == "zh" ? chinese : english
+}
 
 protocol MarkdownApplicationWorkspace {
   func defaultApplication() -> URL?
@@ -29,9 +37,9 @@ final class MacOSMarkdownApplicationWorkspace: MarkdownApplicationWorkspace {
 
   func chooseApplication(completion: @escaping (URL?) -> Void) {
     let panel = NSOpenPanel()
-    panel.title = "Default Markdown Application"
-    panel.message = "Choose the application that should open .md files."
-    panel.prompt = "Choose"
+    panel.title = desktopText("Default Markdown Application", "默认 Markdown 应用")
+    panel.message = desktopText("Choose the application that should open .md files.", "选择用于打开 .md 文件的应用。")
+    panel.prompt = desktopText("Choose", "选择")
     panel.allowedContentTypes = [.applicationBundle]
     panel.directoryURL = URL(fileURLWithPath: "/Applications", isDirectory: true)
     panel.canChooseDirectories = false
@@ -240,4 +248,33 @@ enum WorkspaceFileOperations {
     }
     return nil
   }
+}
+
+/// Launch Services discovers embedded extensions when the installed app opens.
+/// Election belongs to macOS; never invoke registration tools from the sandbox.
+final class FinderPreviewSetup {
+  private let defaults = UserDefaults.standard
+  private let key = "finderPreview.setupSeen.v1"
+
+  func state() -> [String: Any] {
+    let app = Bundle.main.bundleURL
+    let applicationFolders = FileManager.default.urls(for: .applicationDirectory, in: [.localDomainMask, .userDomainMask])
+    let installed = applicationFolders.contains { app.path.hasPrefix($0.path + "/") }
+    let extensionURL = app.appendingPathComponent("Contents/PlugIns/LinefoldQuickLook.appex")
+    let bundled = FileManager.default.fileExists(atPath: extensionURL.path)
+    return ["needsSetup": !defaults.bool(forKey: key), "installed": installed,
+            "bundled": bundled]
+  }
+
+  func dismissSetup() { defaults.set(true, forKey: key) }
+
+  func openSettings() -> Bool {
+    if #available(macOS 15, *) {
+      SMAppService.openSystemSettingsLoginItems()
+      return true
+    }
+    return NSWorkspace.shared.open(URL(string:
+      "x-apple.systempreferences:com.apple.ExtensionsPreferences?extensionPointIdentifier=com.apple.quicklook.preview")!)
+  }
+
 }

@@ -1,0 +1,20 @@
+name: linefold_quicklook
+publish_to: none
+environment:
+  sdk: ^3.12.0
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  ianvs_design: ^0.4.1
+  ianvs_markdown:
+    path: ../../
+  ianvs_mermaid:
+    path: ../../packages/ianvs_mermaid
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+flutter:
+  uses-material-design: true

@@ -74,6 +74,7 @@ class MainFlutterWindow: NSWindow {
   private var fileAssociationChannel: FlutterMethodChannel?
   private var incomingFilesChannel: FlutterMethodChannel?
   private let fileAssociation = MarkdownFileAssociation()
+  private let finderPreviewSetup = FinderPreviewSetup()
   private var securityScopedURLs: [String: URL] = [:]
 
   // macOS 27: TextKit 2 lays out a full-document selection when Flutter's
@@ -114,6 +115,7 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
     CloudWorkspace.shared.attach(to: flutterViewController.engine.binaryMessenger)
+    SoftwareUpdateController.shared.attach(to: flutterViewController.engine.binaryMessenger)
     registerFileAccessChannel(with: flutterViewController)
     registerDesktopIntegration(with: flutterViewController)
     windowChannel = FlutterMethodChannel(
@@ -223,6 +225,14 @@ class MainFlutterWindow: NSWindow {
     preferences.setMethodCallHandler { [weak self] call, result in
       guard let self else { return }
       switch call.method {
+      case "getFinderPreviewState":
+        result(self.finderPreviewSetup.state())
+      case "dismissFinderPreviewSetup":
+        self.finderPreviewSetup.dismissSetup()
+        result(nil)
+      case "openFinderPreviewSettings":
+        if self.finderPreviewSetup.openSettings() { result(nil) }
+        else { result(FlutterError(code: "settings_unavailable", message: "Open System Settings and search for Extensions, then Quick Look.", details: nil)) }
       case "getState":
         result(self.fileAssociation.state())
       case "setPreference":

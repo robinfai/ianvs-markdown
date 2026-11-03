@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
@@ -59,9 +60,9 @@ class _WorkspaceSearchDialogState extends State<WorkspaceSearchDialog> {
                 children: [
                   Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Text(
-                          'Search Markdown Source',
+                          appText(context, "Search Markdown Source"),
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
@@ -69,7 +70,7 @@ class _WorkspaceSearchDialogState extends State<WorkspaceSearchDialog> {
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Close source search',
+                        tooltip: appText(context, "Close source search"),
                         onPressed: _composing
                             ? null
                             : () => Navigator.of(context).pop(),
@@ -79,8 +80,15 @@ class _WorkspaceSearchDialogState extends State<WorkspaceSearchDialog> {
                   ),
                   Text(
                     root == null
-                        ? 'Open buffers only. No folder is scanned.'
-                        : '${p.basename(root)} + open buffers · local files only',
+                        ? appText(
+                            context,
+                            "Open buffers only. No folder is scanned.",
+                          )
+                        : appText(
+                            context,
+                            "{0} + open buffers · local files only",
+                            [p.basename(root)],
+                          ),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const SizedBox(height: 8),
@@ -88,9 +96,11 @@ class _WorkspaceSearchDialogState extends State<WorkspaceSearchDialog> {
                     key: const ValueKey('workspace-source-query'),
                     controller: _query,
                     autofocus: true,
-                    decoration: const InputDecoration(
-                      hintText:
-                          'Literal text, including code and Markdown syntax',
+                    decoration: InputDecoration(
+                      hintText: appText(
+                        context,
+                        "Literal text, including code and Markdown syntax",
+                      ),
                       border: OutlineInputBorder(),
                       isDense: true,
                     ),
@@ -100,7 +110,7 @@ class _WorkspaceSearchDialogState extends State<WorkspaceSearchDialog> {
                     spacing: 8,
                     children: [
                       FilterChip(
-                        label: const Text('Match case'),
+                        label: Text(appText(context, "Match case")),
                         selected: search.matchCase,
                         onSelected: _composing
                             ? null
@@ -116,23 +126,43 @@ class _WorkspaceSearchDialogState extends State<WorkspaceSearchDialog> {
                                 refresh: true,
                               ),
                         icon: const Icon(Icons.refresh, size: 16),
-                        label: const Text('Refresh metadata'),
+                        label: Text(appText(context, "Refresh metadata")),
                       ),
                       if (search.searching)
                         TextButton(
                           onPressed: search.cancel,
-                          child: const Text('Cancel'),
+                          child: Text(appText(context, "Cancel")),
                         ),
                     ],
                   ),
                   if (_composing)
-                    const Text('Finish composing to search or open a result.'),
+                    Text(
+                      appText(
+                        context,
+                        "Finish composing to search or open a result.",
+                      ),
+                    ),
                   if (search.searching) const LinearProgressIndicator(),
                   const SizedBox(height: 6),
                   Text(
                     search.query.isEmpty
-                        ? 'Searches source, not rendered text. Cloud-only files are not downloaded.'
-                        : '${search.searching ? 'Searching · ' : ''}${search.scanned}/${search.known} known documents searched · ${search.matchCount} matches${search.displayLimited ? ' · showing first ${search.results.length}' : ''}',
+                        ? appText(
+                            context,
+                            "Searches source, not rendered text. Cloud-only files are not downloaded.",
+                          )
+                        : appText(
+                            context,
+                            "{0}{1}/{2} known documents searched · {3} matches{4}",
+                            [
+                              search.searching ? 'Searching · ' : '',
+                              search.scanned,
+                              search.known,
+                              search.matchCount,
+                              search.displayLimited
+                                  ? ' · showing first ${search.results.length}'
+                                  : '',
+                            ],
+                          ),
                     key: const ValueKey('workspace-source-progress'),
                   ),
                   if (search.error case final error?)
@@ -144,7 +174,17 @@ class _WorkspaceSearchDialogState extends State<WorkspaceSearchDialog> {
                     ),
                   if (search.partial)
                     Text(
-                      'Incomplete search: ${[if (search.cancelled) 'cancelled', for (final entry in search.issues.entries) '${entry.value} ${_issueLabel(entry.key)}'].join(', ')}. Results do not include all source.',
+                      appText(
+                        context,
+                        "Incomplete search: {0}. Results do not include all source.",
+                        [
+                          [
+                            if (search.cancelled) 'cancelled',
+                            for (final entry in search.issues.entries)
+                              '${entry.value} ${_issueLabel(entry.key)}',
+                          ].join(', '),
+                        ],
+                      ),
                       key: const ValueKey('workspace-source-partial'),
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.error,
@@ -152,7 +192,10 @@ class _WorkspaceSearchDialogState extends State<WorkspaceSearchDialog> {
                     ),
                   if (root != null)
                     Text(
-                      'Metadata is reconciled on search/refresh. File providers are not guaranteed to update live.',
+                      appText(
+                        context,
+                        "Metadata is reconciled on search/refresh. File providers are not guaranteed to update live.",
+                      ),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   const SizedBox(height: 8),
@@ -161,12 +204,15 @@ class _WorkspaceSearchDialogState extends State<WorkspaceSearchDialog> {
                         ? Center(
                             child: Text(
                               search.query.isEmpty
-                                  ? 'Enter text to search.'
+                                  ? appText(context, "Enter text to search.")
                                   : search.searching
-                                  ? 'Searching local source…'
+                                  ? appText(context, "Searching local source…")
                                   : search.partial
-                                  ? 'No matches in the source that could be searched.'
-                                  : 'No matches.',
+                                  ? appText(
+                                      context,
+                                      "No matches in the source that could be searched.",
+                                    )
+                                  : appText(context, "No matches."),
                             ),
                           )
                         : ListView.builder(

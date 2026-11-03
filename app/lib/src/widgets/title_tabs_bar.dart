@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
@@ -51,7 +52,7 @@ class TitleTabsBar extends StatelessWidget {
             Row(
               children: [
                 IconButton(
-                  tooltip: '工作区',
+                  tooltip: appText(context, "工作区"),
                   onPressed: onOpenNavigation,
                   icon: const Icon(Icons.menu),
                 ),
@@ -64,12 +65,12 @@ class TitleTabsBar extends StatelessWidget {
                 ),
                 _OpenDocumentsMenu(workspace: workspace),
                 IconButton(
-                  tooltip: '保存',
+                  tooltip: appText(context, "保存"),
                   onPressed: () => onSave(workspace.activeDocument!),
                   icon: const Icon(Icons.save_outlined),
                 ),
                 IconButton(
-                  tooltip: '新建文档',
+                  tooltip: appText(context, "新建文档"),
                   onPressed: workspace.newDocument,
                   icon: const Icon(Icons.add),
                 ),
@@ -82,12 +83,12 @@ class TitleTabsBar extends StatelessWidget {
                   _EditorModePicker(workspace: workspace),
                   ...documentActions,
                   IconButton(
-                    tooltip: '大纲',
+                    tooltip: appText(context, "大纲"),
                     onPressed: onOpenOutline,
                     icon: const Icon(Icons.list),
                   ),
                   IconButton(
-                    tooltip: '关闭文档',
+                    tooltip: appText(context, "关闭文档"),
                     onPressed: () => onClose(workspace.activeDocument!),
                     icon: const Icon(Icons.close),
                   ),
@@ -127,8 +128,8 @@ class TitleTabsBar extends StatelessWidget {
                     ),
                   _HeaderIconButton(
                     tooltip: workspace.sidebarVisible
-                        ? 'Hide sidebar'
-                        : 'Show sidebar',
+                        ? appText(context, "Hide sidebar")
+                        : appText(context, "Show sidebar"),
                     icon: AppIcons.sidebar,
                     selected: workspace.sidebarVisible,
                     onPressed: workspace.toggleSidebar,
@@ -148,15 +149,15 @@ class TitleTabsBar extends StatelessWidget {
                   _OpenDocumentsMenu(workspace: workspace),
                   _HeaderIconButton(
                     key: const ValueKey('new-document-button'),
-                    tooltip: 'New document (⌘N)',
+                    tooltip: appText(context, "New document (⌘N)"),
                     icon: AppIcons.add,
                     onPressed: workspace.newDocument,
                   ),
                   const SizedBox(width: 8),
                   _HeaderIconButton(
                     tooltip: workspace.outlineVisible
-                        ? 'Hide outline'
-                        : 'Show outline',
+                        ? appText(context, "Hide outline")
+                        : appText(context, "Show outline"),
                     icon: AppIcons.outline,
                     selected: workspace.outlineVisible,
                     onPressed: workspace.toggleOutline,
@@ -187,7 +188,7 @@ class TitleTabsBar extends StatelessWidget {
                     valueListenable: document.controller.canNavigateBack,
                     builder: (context, canGoBack, _) => IconButton(
                       key: const ValueKey('document-navigation-back-button'),
-                      tooltip: 'Back to previous position',
+                      tooltip: appText(context, "Back to previous position"),
                       onPressed: (canGoBack || workspace.canNavigateBack)
                           ? () => navigateBack(workspace)
                           : null,
@@ -276,7 +277,7 @@ class _OpenDocumentsMenuState extends State<_OpenDocumentsMenu> {
           ),
       ],
       builder: (context, controller, child) => IconButton(
-        tooltip: 'All open documents',
+        tooltip: appText(context, "All open documents"),
         focusNode: _focus,
         icon: const Icon(AppIcons.tabs, size: 16),
         color: context.ianvs.muted,
@@ -309,7 +310,7 @@ class _DocumentLocation extends StatelessWidget {
         : '${p.basename(p.dirname(path))} / ${document.name}';
     final colors = IanvsMarkdownThemeData.resolve(context);
     return Tooltip(
-      message: path ?? 'Unsaved document',
+      message: path ?? appText(context, "Unsaved document"),
       child: Row(
         children: [
           Icon(AppIcons.document, size: 14, color: colors.textSecondary),
@@ -602,7 +603,9 @@ class _DocumentTabState extends State<_DocumentTab> {
                             maintainAnimation: true,
                             maintainSemantics: true,
                             child: IconButton(
-                              tooltip: 'Close ${document.name}',
+                              tooltip: appText(context, "Close {0}", [
+                                document.name,
+                              ]),
                               onPressed: widget.onClose,
                               icon: const Icon(AppIcons.close, size: 12),
                               color: colors.textTertiary,
@@ -694,7 +697,10 @@ class _EditorModePickerState extends State<_EditorModePicker> {
               onPressed: () => setEditorMode(widget.workspace, mode),
               child: Semantics(
                 selected: mode == selected,
-                child: Text(mode.label, semanticsLabel: mode.accessibleLabel),
+                child: Text(
+                  appText(context, mode.label),
+                  semanticsLabel: appText(context, mode.accessibleLabel),
+                ),
               ),
             ),
         ],
@@ -703,7 +709,7 @@ class _EditorModePickerState extends State<_EditorModePicker> {
             const SingleActivator(LogicalKeyboardKey.arrowDown): _openMenu,
           },
           child: Tooltip(
-            message: 'Editor mode',
+            message: appText(context, "Editor mode"),
             excludeFromSemantics: true,
             child: SizedBox(
               height: math.max(
@@ -733,9 +739,10 @@ class _EditorModePickerState extends State<_EditorModePicker> {
                     Icon(selected.icon, size: 16),
                     const SizedBox(width: 8),
                     Text(
-                      selected.label,
-                      semanticsLabel:
-                          'Editor mode: ${selected.accessibleLabel}',
+                      appText(context, selected.label),
+                      semanticsLabel: appText(context, "Editor mode: {0}", [
+                        appText(context, selected.accessibleLabel),
+                      ]),
                     ),
                     const SizedBox(width: 8),
                     const Icon(AppIcons.tabs, size: 14),

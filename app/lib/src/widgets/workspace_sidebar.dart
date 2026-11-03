@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -279,7 +280,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
               if (widget.onOpenCollection != null) ...[
                 TextButton(
                   onPressed: () => widget.onOpenCollection!(const {}),
-                  child: const Text('Collections'),
+                  child: Text(appText(context, "Collections")),
                 ),
                 if (widget.workspace.collectionViews.isNotEmpty)
                   SizedBox(
@@ -293,7 +294,8 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                           TextButton(
                             onPressed: () => widget.onOpenCollection!(view),
                             child: Text(
-                              view['name'] as String? ?? 'Collection',
+                              view[appText(context, "name")] as String? ??
+                                  appText(context, "Collection"),
                             ),
                           ),
                       ],
@@ -317,11 +319,14 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                             root != null
                                 ? widget.workspace.workspaceDisplayName ??
                                       (widget.workspace.isCloudWorkspace
-                                          ? 'iCloud · Linefold'
+                                          ? appText(
+                                              context,
+                                              "iCloud · Linefold",
+                                            )
                                           : p.basename(root))
                                 : hasFiles
-                                ? 'External Files'
-                                : 'No folder open',
+                                ? appText(context, "External Files")
+                                : appText(context, "No folder open"),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: DesktopTypography.emphasizedBody,
@@ -341,7 +346,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                           key: const ValueKey('open-workspace-button'),
                         ),
                         PopupMenuButton<String>(
-                          tooltip: 'Workspace actions',
+                          tooltip: appText(context, "Workspace actions"),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(minWidth: 220),
                           icon: const Icon(Icons.more_horiz, size: 16),
@@ -349,46 +354,54 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                           itemBuilder: (_) => [
                             if (widget.workspace.defaultWorkspaceDirectory !=
                                 null)
-                              const PopupMenuItem(
+                              PopupMenuItem(
                                 value: 'icloud',
-                                child: Text('iCloud · Linefold'),
+                                child: Text(
+                                  appText(context, "iCloud · Linefold"),
+                                ),
                               ),
                             PopupMenuItem(
                               height: _touchLayout ? 48 : 32,
                               value: 'new',
-                              child: Text('New Markdown'),
+                              child: Text(appText(context, "New Markdown")),
                             ),
                             PopupMenuItem(
                               height: _touchLayout ? 48 : 32,
                               value: 'folder',
-                              child: Text('New Folder'),
+                              child: Text(appText(context, "New Folder")),
                             ),
                             const PopupMenuDivider(),
                             PopupMenuItem(
                               height: _touchLayout ? 48 : 32,
                               value: 'reveal',
-                              child: Text('Reveal Active File'),
+                              child: Text(
+                                appText(context, "Reveal Active File"),
+                              ),
                             ),
                             CheckedPopupMenuItem(
                               height: 32,
                               value: 'follow',
                               checked: browser.preferences.follow,
-                              child: const Text('Follow Active File'),
+                              child: Text(
+                                appText(context, "Follow Active File"),
+                              ),
                             ),
                             PopupMenuItem(
                               height: _touchLayout ? 48 : 32,
                               value: 'collapse',
-                              child: Text('Collapse All'),
+                              child: Text(appText(context, "Collapse All")),
                             ),
                             PopupMenuItem(
                               height: _touchLayout ? 48 : 32,
                               value: 'refresh',
-                              child: Text('Refresh'),
+                              child: Text(appText(context, "Refresh")),
                             ),
                             PopupMenuItem(
                               height: _touchLayout ? 48 : 32,
                               value: 'note-move-recovery',
-                              child: Text('Note Move Recovery'),
+                              child: Text(
+                                appText(context, "Note Move Recovery"),
+                              ),
                             ),
                             const PopupMenuDivider(),
                             CheckedPopupMenuItem(
@@ -396,14 +409,16 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                               value: 'name',
                               checked:
                                   browser.preferences.sort == FileSort.name,
-                              child: const Text('Sort by Name'),
+                              child: Text(appText(context, "Sort by Name")),
                             ),
                             CheckedPopupMenuItem(
                               height: 32,
                               value: 'modified',
                               checked:
                                   browser.preferences.sort == FileSort.modified,
-                              child: const Text('Sort by Modified Time'),
+                              child: Text(
+                                appText(context, "Sort by Modified Time"),
+                              ),
                             ),
                           ],
                         ),
@@ -433,7 +448,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                       TextButton(
                         onPressed: () =>
                             _run(widget.workspace.useDefaultWorkspace),
-                        child: const Text('重试 iCloud'),
+                        child: Text(appText(context, "重试 iCloud")),
                       ),
                     ],
                   ),
@@ -445,8 +460,8 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                     key: const ValueKey('workspace-source-search-button'),
                     onPressed: widget.onSearchSource,
                     icon: const Icon(Icons.manage_search, size: 16),
-                    label: const Text(
-                      'Search source',
+                    label: Text(
+                      appText(context, "Search source"),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -481,7 +496,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                         onChanged: browser.search,
                         style: DesktopTypography.body,
                         decoration: InputDecoration(
-                          hintText: 'Search Files',
+                          hintText: appText(context, "Search Files"),
                           isDense: true,
                           prefixIcon: const Icon(AppIcons.search, size: 16),
                           prefixIconConstraints: const BoxConstraints(
@@ -491,7 +506,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                           suffixIcon: _search.text.isEmpty
                               ? null
                               : IconButton(
-                                  tooltip: 'Clear',
+                                  tooltip: appText(context, "Clear"),
                                   onPressed: _clearSearch,
                                   icon: const Icon(AppIcons.close, size: 12),
                                 ),
@@ -527,10 +542,20 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                   ),
                   child: Text(
                     browser.searching
-                        ? 'Searching…'
+                        ? appText(context, "Searching…")
                         : browser.matchCount > 200
-                        ? 'Showing 200 of ${browser.matchCount} — refine search'
-                        : '${browser.matchCount} ${browser.matchCount == 1 ? 'result' : 'results'}',
+                        ? appText(
+                            context,
+                            "Showing 200 of {0} — refine search",
+                            [browser.matchCount],
+                          )
+                        : appText(
+                            context,
+                            browser.matchCount == 1
+                                ? '{0} result'
+                                : '{0} results',
+                            [browser.matchCount],
+                          ),
                     key: const ValueKey('search-count'),
                     style: TextStyle(fontSize: 11, color: _secondary),
                   ),
@@ -538,7 +563,9 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
               if (_isSearching && browser.errors.isNotEmpty)
                 TextButton(
                   onPressed: () => _run(() => browser.refresh()),
-                  child: const Text('Some folders unavailable — Retry'),
+                  child: Text(
+                    appText(context, "Some folders unavailable — Retry"),
+                  ),
                 ),
               if (!_isSearching && browser.preferences.favorites.isNotEmpty)
                 _favorites(),
@@ -550,17 +577,19 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          '${browser.selected.length} selected',
+                          appText(context, "{0} selected", [
+                            browser.selected.length,
+                          ]),
                           style: const TextStyle(fontSize: 11),
                         ),
                       ),
                       _icon(
-                        'Move selected',
+                        appText(context, 'Move selected'),
                         Icons.drive_file_move_outline,
                         () => _run(() => _move(_topLevel(browser.selected))),
                       ),
                       _icon(
-                        'Trash selected',
+                        appText(context, 'Trash selected'),
                         Icons.delete_outline,
                         () => _run(() => _trash(_topLevel(browser.selected))),
                       ),
@@ -575,15 +604,18 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Text(
-                                'Open a folder to browse Markdown files.',
+                              Text(
+                                appText(
+                                  context,
+                                  "Open a folder to browse Markdown files.",
+                                ),
                                 textAlign: TextAlign.center,
                               ),
                               TextButton(
                                 onPressed: () => _run(
                                   widget.workspace.chooseWorkspaceFolder,
                                 ),
-                                child: const Text('Open Folder'),
+                                child: Text(appText(context, "Open Folder")),
                               ),
                             ],
                           ),
@@ -625,7 +657,9 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
     if (_isSearching && rows.isEmpty) {
       return Center(
         child: Text(
-          browser.searching ? 'Searching…' : 'No matching files',
+          browser.searching
+              ? appText(context, "Searching…")
+              : appText(context, "No matching files"),
           style: TextStyle(color: _secondary),
         ),
       );
@@ -820,12 +854,12 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                             ),
                     ),
                     if (dirty)
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.only(left: 4),
                         child: Icon(
                           Icons.circle,
                           size: 6,
-                          semanticLabel: 'Unsaved changes',
+                          semanticLabel: appText(context, "Unsaved changes"),
                         ),
                       ),
                   ],
@@ -863,7 +897,9 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
               padding: const EdgeInsets.all(8),
               child: Text(
                 _targets(entry.path).length > 1
-                    ? '${_targets(entry.path).length} items'
+                    ? appText(context, "{0} items", [
+                        _targets(entry.path).length,
+                      ])
                     : entry.name,
                 key: const ValueKey('workspace-drag-label'),
                 style: const TextStyle(color: Colors.white, fontSize: 13),
@@ -970,7 +1006,9 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
-                                'Move to ${p.basename(path)}',
+                                appText(context, "Move to {0}", [
+                                  p.basename(path),
+                                ]),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: DesktopTypography.body.copyWith(
@@ -1008,7 +1046,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
               ),
               const SizedBox(width: 4),
               Text(
-                'Favorites',
+                appText(context, "Favorites"),
                 style: TextStyle(fontSize: 11, color: _secondary),
               ),
             ],
@@ -1307,18 +1345,22 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
     final grant = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Folder access needed'),
+        title: Text(appText(context, "Folder access needed")),
         content: Text(
-          'Choose "$directory" or a containing folder to manage these files.',
+          appText(
+            context,
+            "Choose \"{0}\" or a containing folder to manage these files.",
+            [directory],
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(appText(context, "Cancel")),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Choose Folder'),
+            child: Text(appText(context, "Choose Folder")),
           ),
         ],
       ),
@@ -1655,27 +1697,43 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
     final choice = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Move ${paths.length} item(s) to Trash?'),
+        title: Text(
+          appText(context, "Move {0} item(s) to Trash?", [paths.length]),
+        ),
         content: Text(
           dirty.isEmpty
               ? (Theme.of(context).platform == TargetPlatform.iOS
-                    ? '项目会移到当前工作区的“最近删除”文件夹，不会自动清理。展开该文件夹，长按项目并选择“Move to…”即可移回原位置。'
-                    : 'You can restore these items from Finder’s Trash.')
-              : '${dirty.length} open document(s) have unsaved changes. Save before moving to Trash, or discard those changes.',
+                    ? appText(
+                        context,
+                        "项目会移到当前工作区的“最近删除”文件夹，不会自动清理。展开该文件夹，长按项目并选择“Move to…”即可移回原位置。",
+                      )
+                    : appText(
+                        context,
+                        "You can restore these items from Finder’s Trash.",
+                      ))
+              : appText(
+                  context,
+                  "{0} open document(s) have unsaved changes. Save before moving to Trash, or discard those changes.",
+                  [dirty.length],
+                ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(appText(context, "Cancel")),
           ),
           if (dirty.isNotEmpty)
             TextButton(
               onPressed: () => Navigator.pop(context, 'discard'),
-              child: const Text('Discard and Trash'),
+              child: Text(appText(context, "Discard and Trash")),
             ),
           FilledButton(
             onPressed: () => Navigator.pop(context, 'save'),
-            child: Text(dirty.isEmpty ? 'Move to Trash' : 'Save and Trash'),
+            child: Text(
+              dirty.isEmpty
+                  ? appText(context, "Move to Trash")
+                  : appText(context, "Save and Trash"),
+            ),
           ),
         ],
       ),
@@ -1729,7 +1787,7 @@ class _MoveFolderDialogState extends State<_MoveFolderDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: const Text('Move to Folder'),
+    title: Text(appText(context, "Move to Folder")),
     content: SizedBox(
       width: 380,
       height: 300,
@@ -1740,7 +1798,7 @@ class _MoveFolderDialogState extends State<_MoveFolderDialog> {
             Row(
               children: [
                 IconButton(
-                  tooltip: 'Parent folder',
+                  tooltip: appText(context, "Parent folder"),
                   onPressed: _path == _boundary
                       ? null
                       : () => setState(() => _navigate(p.dirname(_path!))),
@@ -1765,14 +1823,20 @@ class _MoveFolderDialogState extends State<_MoveFolderDialog> {
             ),
           Expanded(
             child: _entries == null
-                ? const Center(child: Text('Choose a destination folder.'))
+                ? Center(
+                    child: Text(
+                      appText(context, "Choose a destination folder."),
+                    ),
+                  )
                 : FutureBuilder<List<WorkspaceEntry>>(
                     future: _entries,
                     builder: (context, snapshot) {
                       if (snapshot.hasError) {
                         return TextButton(
                           onPressed: () => setState(() => _navigate(_path)),
-                          child: const Text('Unable to read folder — Retry'),
+                          child: Text(
+                            appText(context, "Unable to read folder — Retry"),
+                          ),
                         );
                       }
                       if (!snapshot.hasData) {
@@ -1784,8 +1848,13 @@ class _MoveFolderDialogState extends State<_MoveFolderDialog> {
                               .toList()
                             ..sort((a, b) => naturalCompare(a.name, b.name));
                       if (folders.isEmpty) {
-                        return const Center(
-                          child: Text('No subfolders. You can move here.'),
+                        return Center(
+                          child: Text(
+                            appText(
+                              context,
+                              "No subfolders. You can move here.",
+                            ),
+                          ),
                         );
                       }
                       return ListView.builder(
@@ -1810,7 +1879,7 @@ class _MoveFolderDialogState extends State<_MoveFolderDialog> {
                 });
               }
             },
-            child: const Text('Choose Other Folder…'),
+            child: Text(appText(context, "Choose Other Folder…")),
           ),
         ],
       ),
@@ -1818,11 +1887,11 @@ class _MoveFolderDialogState extends State<_MoveFolderDialog> {
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: const Text('Cancel'),
+        child: Text(appText(context, "Cancel")),
       ),
       FilledButton(
         onPressed: _path == null ? null : () => Navigator.pop(context, _path),
-        child: const Text('Move Here'),
+        child: Text(appText(context, "Move Here")),
       ),
     ],
   );
@@ -1875,7 +1944,11 @@ class _ExternalCreateDialogState extends State<_ExternalCreateDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: Text(widget.folder ? 'New Folder' : 'New Markdown'),
+    title: Text(
+      widget.folder
+          ? appText(context, "New Folder")
+          : appText(context, "New Markdown"),
+    ),
     content: TextField(
       controller: _name,
       autofocus: true,
@@ -1886,11 +1959,11 @@ class _ExternalCreateDialogState extends State<_ExternalCreateDialog> {
     actions: [
       TextButton(
         onPressed: _busy ? null : () => Navigator.pop(context),
-        child: const Text('Cancel'),
+        child: Text(appText(context, "Cancel")),
       ),
       FilledButton(
         onPressed: _busy ? null : _create,
-        child: const Text('Create'),
+        child: Text(appText(context, "Create")),
       ),
     ],
   );

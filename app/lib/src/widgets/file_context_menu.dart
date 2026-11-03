@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -102,7 +103,7 @@ class _FileContextMenuState extends State<FileContextMenu> {
               _ => 32,
             },
             child: Text(
-              entries[i].label,
+              appText(context, entries[i].label),
               style: entries[i].destructive
                   ? TextStyle(color: Theme.of(context).colorScheme.error)
                   : null,

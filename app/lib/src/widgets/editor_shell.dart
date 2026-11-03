@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import '../services/cloud_conflict_service.dart';
 import '../services/mobile_markdown_file_service.dart';
 import 'cloud_conflict_dialog.dart';
@@ -426,7 +427,11 @@ class _EditorShellState extends State<EditorShell> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Imported ${imported.relativePath}. Undo removes the link, not the image file.',
+              appText(
+                context,
+                "Imported {0}. Undo removes the link, not the image file.",
+                [imported.relativePath],
+              ),
             ),
           ),
         );
@@ -467,19 +472,23 @@ class _EditorShellState extends State<EditorShell> {
   ) => showDialog<void>(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('Imported image kept'),
+      title: Text(appText(context, "Imported image kept")),
       content: SizedBox(
         width: 560,
         child: SingleChildScrollView(
           child: SelectableText(
-            'Image: $root/${imported.relativePath}\n\nOriginal note: $documentPath\n\nInsert this link into that note when ready:\n${imported.markdown}',
+            appText(
+              context,
+              "Image: {0}/{1}\n\nOriginal note: {2}\n\nInsert this link into that note when ready:\n{3}",
+              [root, imported.relativePath, documentPath, imported.markdown],
+            ),
           ),
         ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Close'),
+          child: Text(appText(context, "Close")),
         ),
       ],
     ),
@@ -531,11 +540,14 @@ class _EditorShellState extends State<EditorShell> {
         context: context,
         builder: (_) => WikiNotePicker(
           notes: notes,
-          title: 'Insert note link',
+          title: appText(context, "Insert note link"),
           initialQuery: edit.query,
           notice: catalog.complete
               ? null
-              : 'The catalog is incomplete. Only known notes are shown; no missing note is inferred.',
+              : appText(
+                  context,
+                  "The catalog is incomplete. Only known notes are shown; no missing note is inferred.",
+                ),
         ),
       );
       if (!current() || selected == null) return;
@@ -591,9 +603,11 @@ class _EditorShellState extends State<EditorShell> {
       progress = ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           duration: const Duration(minutes: 5),
-          content: const Text('Resolving local note names and aliases…'),
+          content: Text(
+            appText(context, "Resolving local note names and aliases…"),
+          ),
           action: SnackBarAction(
-            label: 'Cancel',
+            label: appText(context, "Cancel"),
             onPressed: () {
               _wikiGeneration++;
               widget.workspace.references.cancel();
@@ -622,7 +636,7 @@ class _EditorShellState extends State<EditorShell> {
           context: context,
           builder: (_) => WikiNotePicker(
             notes: resolution.candidates,
-            title: 'Choose linked note',
+            title: appText(context, "Choose linked note"),
             notice: resolution.message,
           ),
         );
@@ -630,18 +644,18 @@ class _EditorShellState extends State<EditorShell> {
         final create = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Note not found'),
+            title: Text(appText(context, "Note not found")),
             content: Text(resolution.message!),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
+                child: Text(appText(context, "Cancel")),
               ),
               if (resolution.createPath != null)
                 TextButton(
                   key: const ValueKey('wiki-create-note'),
                   onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Create note'),
+                  child: Text(appText(context, "Create note")),
                 ),
             ],
           ),
@@ -764,7 +778,7 @@ class _EditorShellState extends State<EditorShell> {
       final choice = await showDialog<WorkspacePaletteSelection>(
         context: context,
         builder: (_) => WorkspacePalette(
-          title: 'Insert block',
+          title: appText(context, "Insert block"),
           entries: [
             for (final title in [...slashSnippets.keys, 'Image', 'Template'])
               WorkspacePaletteEntry(id: title, title: title),
@@ -818,10 +832,10 @@ class _EditorShellState extends State<EditorShell> {
     final epoch = workspace.index.epoch;
     final title = await showDialog<String>(
       context: context,
-      builder: (_) => const NoteTextDialog(
-        title: 'Extract selection to note',
-        label: 'New note filename',
-        submit: 'Extract',
+      builder: (_) => NoteTextDialog(
+        title: appText(context, "Extract selection to note"),
+        label: appText(context, "New note filename"),
+        submit: appText(context, "Extract"),
       ),
     );
     bool current() =>
@@ -1114,9 +1128,11 @@ class _EditorShellState extends State<EditorShell> {
     final result = await showDialog<String>(
       context: context,
       builder: (_) => NoteTextDialog(
-        title: inbox ? 'Append to Inbox' : 'Append to today',
-        label: 'Capture text',
-        submit: 'Append',
+        title: inbox
+            ? appText(context, "Append to Inbox")
+            : appText(context, "Append to today"),
+        label: appText(context, "Capture text"),
+        submit: appText(context, "Append"),
         multiline: true,
       ),
     );
@@ -1194,7 +1210,12 @@ class _EditorShellState extends State<EditorShell> {
       if (commands) {
         entries.addAll(
           actions.keys.map(
-            (label) => WorkspacePaletteEntry(id: label, title: label),
+            (label) => WorkspacePaletteEntry(
+              id: label,
+              title: label.startsWith('Export ')
+                  ? appText(context, 'Export {0}', [label.substring(7)])
+                  : appText(context, label),
+            ),
           ),
         );
       } else {
@@ -1248,7 +1269,9 @@ class _EditorShellState extends State<EditorShell> {
       final selection = await showDialog<WorkspacePaletteSelection>(
         context: context,
         builder: (_) => WorkspacePalette(
-          title: commands ? 'Command palette' : 'Quick switcher',
+          title: commands
+              ? appText(context, "Command palette")
+              : appText(context, "Quick switcher"),
           entries: entries,
           allowCreate: !commands,
           notice: notice,
@@ -1537,7 +1560,7 @@ class _EditorShellState extends State<EditorShell> {
             ListTile(
               title: Text(p.basename(path)),
               trailing: IconButton(
-                tooltip: 'Close image',
+                tooltip: appText(context, "Close image"),
                 onPressed: () => Navigator.of(context).pop(),
                 icon: const Icon(Icons.close),
               ),
@@ -1579,7 +1602,7 @@ class _EditorShellState extends State<EditorShell> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('Recovery needs attention'),
+                      Text(appText(context, "Recovery needs attention")),
                       const SizedBox(height: 12),
                       SelectableText(workspace.recoveryError!),
                       const SizedBox(height: 16),
@@ -1588,7 +1611,7 @@ class _EditorShellState extends State<EditorShell> {
                           widget.onRetryInitialization ??
                               workspace.retryRecovery,
                         ),
-                        child: const Text('Retry recovery'),
+                        child: Text(appText(context, "Retry recovery")),
                       ),
                     ],
                   ),
@@ -1892,7 +1915,10 @@ class _EditorShellState extends State<EditorShell> {
                                     key: const ValueKey(
                                       'quick-switcher-button',
                                     ),
-                                    tooltip: 'Quick switcher (⌘P / Ctrl+P)',
+                                    tooltip: appText(
+                                      context,
+                                      "Quick switcher (⌘P / Ctrl+P)",
+                                    ),
                                     onPressed: () => _openPalette(),
                                     icon: const Icon(Icons.search, size: 16),
                                   ),
@@ -1900,8 +1926,10 @@ class _EditorShellState extends State<EditorShell> {
                                     key: const ValueKey(
                                       'command-palette-button',
                                     ),
-                                    tooltip:
-                                        'Command palette (⌘⇧P / Ctrl+Shift+P)',
+                                    tooltip: appText(
+                                      context,
+                                      "Command palette (⌘⇧P / Ctrl+Shift+P)",
+                                    ),
                                     onPressed: () =>
                                         _openPalette(commands: true),
                                     icon: const Icon(Icons.terminal, size: 16),
@@ -1909,8 +1937,8 @@ class _EditorShellState extends State<EditorShell> {
                                   IconButton(
                                     key: const ValueKey('import-image-button'),
                                     tooltip: _attachmentPending
-                                        ? 'Importing image…'
-                                        : 'Import image',
+                                        ? appText(context, "Importing image…")
+                                        : appText(context, "Import image"),
                                     onPressed: _attachmentPending
                                         ? null
                                         : () => unawaited(_importImage()),
@@ -1920,8 +1948,8 @@ class _EditorShellState extends State<EditorShell> {
                                           : Icons.add_photo_alternate_outlined,
                                       size: 16,
                                       semanticLabel: _attachmentPending
-                                          ? 'Importing image'
-                                          : 'Import image',
+                                          ? appText(context, "Importing image")
+                                          : appText(context, "Import image"),
                                     ),
                                     style: const ButtonStyle(
                                       minimumSize: WidgetStatePropertyAll(
@@ -1938,12 +1966,15 @@ class _EditorShellState extends State<EditorShell> {
                                     key: const ValueKey(
                                       'workspace-backlinks-button',
                                     ),
-                                    tooltip: 'Backlinks',
+                                    tooltip: appText(context, "Backlinks"),
                                     onPressed: () => _openWorkspaceReferences(),
-                                    icon: const Icon(
+                                    icon: Icon(
                                       Icons.link,
                                       size: 16,
-                                      semanticLabel: 'Backlinks',
+                                      semanticLabel: appText(
+                                        context,
+                                        "Backlinks",
+                                      ),
                                     ),
                                     style: const ButtonStyle(
                                       minimumSize: WidgetStatePropertyAll(
@@ -1960,13 +1991,18 @@ class _EditorShellState extends State<EditorShell> {
                                     key: const ValueKey(
                                       'insert-wiki-link-button',
                                     ),
-                                    tooltip:
-                                        'Insert note link (⌘⇧K / Ctrl+Shift+K)',
+                                    tooltip: appText(
+                                      context,
+                                      "Insert note link (⌘⇧K / Ctrl+Shift+K)",
+                                    ),
                                     onPressed: _insertWikiLink,
-                                    icon: const Icon(
+                                    icon: Icon(
                                       Icons.add_link,
                                       size: 16,
-                                      semanticLabel: 'Insert note link',
+                                      semanticLabel: appText(
+                                        context,
+                                        "Insert note link",
+                                      ),
                                     ),
                                     style: const ButtonStyle(
                                       minimumSize: WidgetStatePropertyAll(
@@ -1985,7 +2021,11 @@ class _EditorShellState extends State<EditorShell> {
                                   case final retained?)
                                 MaterialBanner(
                                   content: Text(
-                                    'Image saved to ${retained.$1}/${retained.$3.relativePath}, but the note or selection changed. The file was kept; no link was inserted.',
+                                    appText(
+                                      context,
+                                      "Image saved to {0}/{1}, but the note or selection changed. The file was kept; no link was inserted.",
+                                      [retained.$1, retained.$3.relativePath],
+                                    ),
                                   ),
                                   actions: [
                                     TextButton(
@@ -1994,13 +2034,15 @@ class _EditorShellState extends State<EditorShell> {
                                         retained.$2,
                                         retained.$3,
                                       ),
-                                      child: const Text('Show link'),
+                                      child: Text(
+                                        appText(context, "Show link"),
+                                      ),
                                     ),
                                     TextButton(
                                       onPressed: () => setState(
                                         () => _retainedImports.removeAt(0),
                                       ),
-                                      child: const Text('Dismiss'),
+                                      child: Text(appText(context, "Dismiss")),
                                     ),
                                   ],
                                 ),
@@ -2024,13 +2066,17 @@ class _EditorShellState extends State<EditorShell> {
                                       TextButton(
                                         onPressed: () =>
                                             _guard(workspace.retryRecovery),
-                                        child: const Text('Retry recovery'),
+                                        child: Text(
+                                          appText(context, "Retry recovery"),
+                                        ),
                                       )
                                     else
                                       TextButton(
                                         onPressed:
                                             workspace.dismissRecoveryNotice,
-                                        child: const Text('Dismiss'),
+                                        child: Text(
+                                          appText(context, "Dismiss"),
+                                        ),
                                       ),
                                   ],
                                 ),
@@ -2359,8 +2405,12 @@ class _EditorShellState extends State<EditorShell> {
           SnackBar(
             content: Text(
               result.resolutionPending
-                  ? '所选内容和 ${result.copies.length} 份副本已保存；等待 iCloud 确认，无需重复操作。'
-                  : '冲突已处理；保留了 ${result.copies.length} 份不同内容的副本。',
+                  ? appText(context, "所选内容和 {0} 份副本已保存；等待 iCloud 确认，无需重复操作。", [
+                      result.copies.length,
+                    ])
+                  : appText(context, "冲突已处理；保留了 {0} 份不同内容的副本。", [
+                      result.copies.length,
+                    ]),
             ),
           ),
         );
@@ -2409,16 +2459,21 @@ class _EditorShellState extends State<EditorShell> {
           context: context,
           builder: (context) => AlertDialog(
             constraints: const BoxConstraints(maxWidth: 520),
-            title: Text('“${p.basename(conflict.path)}” changed on disk'),
+            title: Text(
+              appText(context, "“{0}” changed on disk", [
+                p.basename(conflict.path),
+              ]),
+            ),
             content: Text(
               conflict.currentContents == null
-                  ? 'The file was removed outside Linefold. Keep Both saves your '
-                        'version as a new local copy. Overwrite recreates the original '
-                        'file. Cancel keeps your edits unsaved.'
-                  : 'The disk version differs from the version you opened. Keep Both '
-                        'leaves the disk file untouched and saves your version as a new '
-                        'local copy. Overwrite replaces the disk version with your '
-                        'captured edits. Cancel keeps your edits unsaved.',
+                  ? appText(
+                      context,
+                      "The file was removed outside Linefold. Keep Both saves your version as a new local copy. Overwrite recreates the original file. Cancel keeps your edits unsaved.",
+                    )
+                  : appText(
+                      context,
+                      "The disk version differs from the version you opened. Keep Both leaves the disk file untouched and saves your version as a new local copy. Overwrite replaces the disk version with your captured edits. Cancel keeps your edits unsaved.",
+                    ),
             ),
             actions: [
               if (conflict.localContents != null)
@@ -2430,23 +2485,23 @@ class _EditorShellState extends State<EditorShell> {
                       local: conflict.localContents!,
                     ),
                   ),
-                  child: const Text('Compare Changes'),
+                  child: Text(appText(context, "Compare Changes")),
                 ),
               OutlinedButton(
                 onPressed: () =>
                     Navigator.pop(context, SaveConflictChoice.cancel),
-                child: const Text('Cancel'),
+                child: Text(appText(context, "Cancel")),
               ),
               TextButton(
                 onPressed: () =>
                     Navigator.pop(context, SaveConflictChoice.overwrite),
-                child: const Text('Overwrite'),
+                child: Text(appText(context, "Overwrite")),
               ),
               FilledButton(
                 autofocus: true,
                 onPressed: () =>
                     Navigator.pop(context, SaveConflictChoice.keepBoth),
-                child: const Text('Keep Both'),
+                child: Text(appText(context, "Keep Both")),
               ),
             ],
           ),
@@ -2483,23 +2538,28 @@ class _EditorShellState extends State<EditorShell> {
         context: context,
         builder: (context) => AlertDialog(
           constraints: const BoxConstraints(maxWidth: 420),
-          title: Text('Save changes to “${document.name}”?'),
-          content: const Text(
-            'Unsaved changes will be lost if you discard them.',
+          title: Text(
+            appText(context, "Save changes to “{0}”?", [document.name]),
+          ),
+          content: Text(
+            appText(
+              context,
+              "Unsaved changes will be lost if you discard them.",
+            ),
           ),
           actions: [
             OutlinedButton(
               onPressed: () => Navigator.pop(context, _CloseChoice.cancel),
-              child: const Text('Cancel'),
+              child: Text(appText(context, "Cancel")),
             ),
             TextButton(
               onPressed: () => Navigator.pop(context, _CloseChoice.discard),
-              child: const Text('Don’t Save'),
+              child: Text(appText(context, "Don’t Save")),
             ),
             FilledButton(
               autofocus: true,
               onPressed: () => Navigator.pop(context, _CloseChoice.save),
-              child: const Text('Save'),
+              child: Text(appText(context, "Save")),
             ),
           ],
         ),
@@ -2560,16 +2620,19 @@ class _ExternalChangeBanner extends StatelessWidget {
           children: [
             Icon(AppIcons.info, size: 16, color: colors.accent),
             Text(
-              '${document.name} changed on disk.',
+              appText(context, "{0} changed on disk.", [document.name]),
               style: DesktopTypography.body.copyWith(
                 color: colors.textSecondary,
               ),
             ),
             OutlinedButton(
               onPressed: onResolve,
-              child: const Text('Resolve & Save'),
+              child: Text(appText(context, "Resolve & Save")),
             ),
-            FilledButton(onPressed: onReload, child: const Text('Reload')),
+            FilledButton(
+              onPressed: onReload,
+              child: Text(appText(context, "Reload")),
+            ),
           ],
         ),
       ),
@@ -2599,14 +2662,17 @@ class _DropOverlay extends StatelessWidget {
               const Icon(AppIcons.document, size: 42),
               const SizedBox(height: 12),
               Text(
-                'Open Notes or Import an Image',
+                appText(context, "Open Notes or Import an Image"),
                 style: DesktopTypography.title3.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
-                'Drop one image to insert at the current caret.\nDrop Markdown files to open them in tabs.',
+              Text(
+                appText(
+                  context,
+                  "Drop one image to insert at the current caret.\nDrop Markdown files to open them in tabs.",
+                ),
                 style: DesktopTypography.body,
                 textAlign: TextAlign.center,
               ),
@@ -2655,7 +2721,14 @@ class _DocumentStatusBar extends StatelessWidget {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  Text(workspace.persistenceStatus(document).label),
+                  Text(
+                    workspace
+                        .persistenceStatus(document)
+                        .label
+                        .split(' · ')
+                        .map((part) => appText(context, part))
+                        .join(' · '),
+                  ),
                   const SizedBox(width: 12),
                   DocumentSyncIndicator(
                     controller: workspace.sync,
@@ -2663,9 +2736,11 @@ class _DocumentStatusBar extends StatelessWidget {
                     onResolve: onResolve,
                   ),
                   const SizedBox(width: 16),
-                  Text('${statistics.words} words'),
+                  Text(appText(context, "{0} words", [statistics.words])),
                   const SizedBox(width: 14),
-                  Text('${statistics.characters} characters'),
+                  Text(
+                    appText(context, "{0} characters", [statistics.characters]),
+                  ),
                   const SizedBox(width: 12),
                   Text(document.encoding),
                   const SizedBox(width: 12),

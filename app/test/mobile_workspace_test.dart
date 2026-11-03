@@ -35,9 +35,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byTooltip('保存'), findsOneWidget);
+    expect(find.byTooltip('Save'), findsOneWidget);
     expect(tester.takeException(), isNull);
-    await tester.tap(find.byTooltip('工作区'));
+    await tester.tap(find.byTooltip('Workspace'));
     await tester.pumpAndSettle();
     expect(find.byType(Drawer), findsOneWidget);
     expect(tester.takeException(), isNull);

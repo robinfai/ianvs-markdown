@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
+    <array><string>work.ianvs.linefold-spks</string><string>work.ianvs.linefold-spki</string></array>
 	<!-- Required by the offline native PDF backend; no Print command is exposed. -->
 	<key>com.apple.security.print</key>
 	<true/>

@@ -18,7 +18,7 @@
     <key>NSExtensionPrincipalClass</key><string>$(PRODUCT_MODULE_NAME).PreviewProvider</string>
     <key>NSExtensionAttributes</key>
     <dict>
-      <key>QLIsDataBasedPreview</key><true/>
+      <key>QLIsDataBasedPreview</key><false/>
       <key>QLSupportedContentTypes</key>
       <array><string>net.daringfireball.markdown</string></array>
     </dict>

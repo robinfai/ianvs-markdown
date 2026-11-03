@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'package:ianvs_design/ianvs_design.dart';
 
 import '../desktop_theme.dart';
@@ -18,7 +19,7 @@ class SidebarResizeHandle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Tooltip(
-    message: 'Drag to resize sidebar. Double-click to reset.',
+    message: appText(context, "Drag to resize sidebar. Double-click to reset."),
     excludeFromSemantics: true,
     child: Theme(
       data: desktopTheme(Brightness.dark),
@@ -29,7 +30,7 @@ class SidebarResizeHandle extends StatelessWidget {
         resetValue: WorkspaceLayout.defaultSidebarWidth,
         hitExtent: 8,
         lineAlignment: Alignment.centerRight,
-        semanticLabel: 'Resize sidebar',
+        semanticLabel: appText(context, "Resize sidebar"),
         semanticValueFormatter: (value) => '${value.round()} points',
         onChanged: onResize,
       ),

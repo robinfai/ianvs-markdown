@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'package:flutter/material.dart';
 import '../services/wiki_note_resolver.dart';
 import '../services/attachment_repository.dart';
@@ -94,8 +95,8 @@ class _WikiNotePickerState extends State<WikiNotePicker> {
                     key: const ValueKey('wiki-note-query'),
                     controller: _query,
                     autofocus: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Filter notes by path',
+                    decoration: InputDecoration(
+                      labelText: appText(context, "Filter notes by path"),
                     ),
                     onSubmitted: (_) {
                       if (!composing && matches.length == 1) {
@@ -106,24 +107,35 @@ class _WikiNotePickerState extends State<WikiNotePicker> {
                   const SizedBox(height: 8),
                   Text(
                     widget.notice ??
-                        'Filename-based workspace .md picker. YAML aliases resolve when following links; heading and block navigation are not available.',
+                        appText(
+                          context,
+                          "Filename-based workspace .md picker. YAML aliases resolve when following links; heading and block navigation are not available.",
+                        ),
                   ),
                   if (_normalizationIssue)
-                    const Text(
-                      'Unicode normalization is unavailable. Some matches may be missing.',
+                    Text(
+                      appText(
+                        context,
+                        "Unicode normalization is unavailable. Some matches may be missing.",
+                      ),
                     ),
                   if (matches.length > 100)
-                    const Text(
-                      'Showing the first 100 notes. Narrow the filter to see others.',
+                    Text(
+                      appText(
+                        context,
+                        "Showing the first 100 notes. Narrow the filter to see others.",
+                      ),
                     ),
                   const SizedBox(height: 8),
                 ],
               ),
             ),
             if (matches.isEmpty)
-              const SliverFillRemaining(
+              SliverFillRemaining(
                 hasScrollBody: false,
-                child: Center(child: Text('No matching notes.')),
+                child: Center(
+                  child: Text(appText(context, "No matching notes.")),
+                ),
               )
             else
               SliverList.builder(
@@ -135,10 +147,10 @@ class _WikiNotePickerState extends State<WikiNotePicker> {
                     title: Text(note.relativePath),
                     subtitle: Text(
                       note.sessionId != null
-                          ? 'Open buffer'
+                          ? appText(context, "Open buffer")
                           : note.metadata?.local == false
-                          ? 'Not locally available'
-                          : 'Workspace note',
+                          ? appText(context, "Not locally available")
+                          : appText(context, "Workspace note"),
                     ),
                     enabled: !composing,
                     onTap: () => Navigator.pop(context, note),
@@ -151,7 +163,7 @@ class _WikiNotePickerState extends State<WikiNotePicker> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(appText(context, "Cancel")),
         ),
       ],
     );

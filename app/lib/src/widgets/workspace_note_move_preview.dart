@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
@@ -164,7 +165,11 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                     context,
                     WorkspaceNoteMoveDecision(automatic: _record),
                   ),
-            child: Text(_attempted ? 'Close' : 'Cancel'),
+            child: Text(
+              _attempted
+                  ? appText(context, "Close")
+                  : appText(context, "Cancel"),
+            ),
           ),
           if (!_attempted)
             TextButton(
@@ -175,7 +180,7 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                       context,
                       const WorkspaceNoteMoveDecision(manual: true),
                     ),
-              child: const Text('Move without updating links'),
+              child: Text(appText(context, "Move without updating links")),
             ),
           if (!_attempted &&
               plan?.complete == true &&
@@ -184,7 +189,7 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
             FilledButton(
               key: const ValueKey('move-and-update-links'),
               onPressed: waiting ? null : () => _maintain(plan!),
-              child: const Text('Move and update links'),
+              child: Text(appText(context, "Move and update links")),
             ),
           if (_record != null &&
               _record!.entries.isNotEmpty &&
@@ -192,13 +197,13 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
             TextButton(
               key: const ValueKey('recover-note-move-copies'),
               onPressed: _busy ? null : _recover,
-              child: const Text('Recover originals as new copies'),
+              child: Text(appText(context, "Recover originals as new copies")),
             ),
         ];
         return AlertDialog(
           actions: scrollActions ? null : actions,
           scrollable: true,
-          title: const Text('Preview rename / move'),
+          title: Text(appText(context, "Preview rename / move")),
           content: SizedBox(
             width: 620,
             child: Column(
@@ -210,40 +215,74 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                     '${_displayPath(widget.sources[i])} → ${_displayPath(widget.destinations[i])}',
                   ),
                 if (widget.sources.length > 20)
-                  Text('… and ${widget.sources.length - 20} more items.'),
+                  Text(
+                    appText(context, "… and {0} more items.", [
+                      widget.sources.length - 20,
+                    ]),
+                  ),
                 const SizedBox(height: 16),
-                const Text(
-                  'Move without updating links only moves the selected files. Links in other notes and relative links or images inside moved notes will NOT be updated and may break.',
+                Text(
+                  appText(
+                    context,
+                    "Move without updating links only moves the selected files. Links in other notes and relative links or images inside moved notes will NOT be updated and may break.",
+                  ),
                 ),
                 const SizedBox(height: 12),
                 if (waiting) ...[
                   const LinearProgressIndicator(),
                   const SizedBox(height: 8),
-                  const Text('Preparing a read-only reference preview…'),
+                  Text(
+                    appText(
+                      context,
+                      "Preparing a read-only reference preview…",
+                    ),
+                  ),
                 ] else if (plan != null) ...[
                   if (plan.kind == WorkspaceNoteMovePlanKind.batch) ...[
-                    const Text(
-                      'Batch reference maintenance maps all selected roots simultaneously and rewrites each affected note once. Destination vacancy and all root identities are rechecked by native preflight before any user file changes. Root moves are not all-or-nothing: a failure can leave some roots at their old locations after references have changed. Review each root receipt; never repeat a partial move blindly.',
+                    Text(
+                      appText(
+                        context,
+                        "Batch reference maintenance maps all selected roots simultaneously and rewrites each affected note once. Destination vacancy and all root identities are rechecked by native preflight before any user file changes. Root moves are not all-or-nothing: a failure can leave some roots at their old locations after references have changed. Review each root receipt; never repeat a partial move blindly.",
+                      ),
                     ),
                     Text(
-                      'Selected roots: ${plan.batchRoots.length}. Shared limits: 256 members, 64 folders, 128 notes and 32 MiB recovery text.',
+                      appText(
+                        context,
+                        "Selected roots: {0}. Shared limits: 256 members, 64 folders, 128 notes and 32 MiB recovery text.",
+                        [plan.batchRoots.length],
+                      ),
                     ),
                     const SizedBox(height: 8),
                   ],
                   if (plan.kind == WorkspaceNoteMovePlanKind.directory) ...[
-                    const Text(
-                      'Directory reference maintenance moves one folder and updates affected notes. Native preflight rechecks the complete tree and destination vacancy. No merging, overwriting or automatic rollback.',
+                    Text(
+                      appText(
+                        context,
+                        "Directory reference maintenance moves one folder and updates affected notes. Native preflight rechecks the complete tree and destination vacancy. No merging, overwriting or automatic rollback.",
+                      ),
                     ),
                     if (plan.treeSnapshot case final tree?) ...[
                       Text(
-                        'Directory members observed: ${tree.members.length}${tree.complete ? '' : ' (incomplete scan)'}.',
+                        appText(
+                          context,
+                          "Directory members observed: {0}{1}.",
+                          [
+                            tree.members.length,
+                            tree.complete ? '' : ' (incomplete scan)',
+                          ],
+                        ),
                       ),
                       if (tree.members.isNotEmpty)
                         ExpansionTile(
                           key: const ValueKey('directory-move-manifest'),
-                          title: const Text('Observed directory members'),
-                          subtitle: const Text(
-                            'Metadata only. Unsupported members are included.',
+                          title: Text(
+                            appText(context, "Observed directory members"),
+                          ),
+                          subtitle: Text(
+                            appText(
+                              context,
+                              "Metadata only. Unsupported members are included.",
+                            ),
                           ),
                           children: [
                             SizedBox(
@@ -272,22 +311,44 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                     const SizedBox(height: 8),
                   ],
                   Text(
-                    'Proposed reference maintenance: ${plan.editCount} source replacement(s) across ${plan.files.length} affected note(s)${plan.kind == WorkspaceNoteMovePlanKind.singleNote ? ', including the moved note' : ', including moved notes with unchanged text'}.',
+                    appText(
+                      context,
+                      "Proposed reference maintenance: {0} source replacement(s) across {1} affected note(s){2}.",
+                      [
+                        plan.editCount,
+                        plan.files.length,
+                        plan.kind == WorkspaceNoteMovePlanKind.singleNote
+                            ? ', including the moved note'
+                            : ', including moved notes with unchanged text',
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 8),
                   if (plan.complete)
                     Text(
                       plan.executionSupported
-                          ? 'Supported-source coverage is complete. Execution rechecks local identities and exact bytes. Files change independently; a failure can leave a partial result.'
-                          : 'Supported-source impact coverage is complete for this preview. No executor is available for this proposal.',
+                          ? appText(
+                              context,
+                              "Supported-source coverage is complete. Execution rechecks local identities and exact bytes. Files change independently; a failure can leave a partial result.",
+                            )
+                          : appText(
+                              context,
+                              "Supported-source impact coverage is complete for this preview. No executor is available for this proposal.",
+                            ),
                     )
                   else
-                    const Text(
-                      'Coverage is incomplete or blocked. This is not a safe-maintenance approval.',
+                    Text(
+                      appText(
+                        context,
+                        "Coverage is incomplete or blocked. This is not a safe-maintenance approval.",
+                      ),
                     ),
                   if (!plan.executionSupported)
-                    const Text(
-                      'Destination vacancy and conflicts with all filesystem objects have not been verified. This is a hypothetical impact preview, not approval to move safely.',
+                    Text(
+                      appText(
+                        context,
+                        "Destination vacancy and conflicts with all filesystem objects have not been verified. This is a hypothetical impact preview, not approval to move safely.",
+                      ),
                     ),
                   for (final blocker in plan.blockers.take(12))
                     Text(
@@ -295,14 +356,19 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                     ),
                   if (plan.blockers.length > 12)
                     Text(
-                      '… and ${plan.blockers.length - 12} more coverage issue(s).',
+                      appText(context, "… and {0} more coverage issue(s).", [
+                        plan.blockers.length - 12,
+                      ]),
                     ),
                   const SizedBox(height: 8),
                   if (plan.complete &&
                       plan.executionSupported &&
                       widget.onMaintain != null)
-                    const Text(
-                      'Moving with updates retains original recovery copies: a private app journal and hidden recovery files beside changed notes. Hidden files use disk space and may sync with your vault. They are not automatically deleted. Review recovery before retrying a partial or unknown result.',
+                    Text(
+                      appText(
+                        context,
+                        "Moving with updates retains original recovery copies: a private app journal and hidden recovery files beside changed notes. Hidden files use disk space and may sync with your vault. They are not automatically deleted. Review recovery before retrying a partial or unknown result.",
+                      ),
                     ),
                   for (final file in plan.files)
                     ExpansionTile(
@@ -311,12 +377,17 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                         '${file.path}${file.destination == file.path ? '' : ' → ${file.destination}'}',
                       ),
                       subtitle: Text(
-                        '${file.edits.length} exact source replacement(s)',
+                        appText(context, "{0} exact source replacement(s)", [
+                          file.edits.length,
+                        ]),
                       ),
                       children: [
                         if (file.edits.isEmpty)
-                          const Text(
-                            'The note contents stay byte-for-byte unchanged.',
+                          Text(
+                            appText(
+                              context,
+                              "The note contents stay byte-for-byte unchanged.",
+                            ),
                           ),
                         if (file.edits.isNotEmpty)
                           SizedBox(
@@ -340,7 +411,11 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                                 return Padding(
                                   padding: const EdgeInsets.all(8),
                                   child: SelectableText(
-                                    'Line $line: ${edit.before} → ${edit.after}',
+                                    appText(context, "Line {0}: {1} → {2}", [
+                                      line,
+                                      edit.before,
+                                      edit.after,
+                                    ]),
                                   ),
                                 );
                               },
@@ -351,15 +426,24 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                 ] else
                   Text(
                     (state.data?.$2 == true
-                            ? 'The reference preview is unavailable. No complete maintenance plan could be verified.'
+                            ? appText(
+                                context,
+                                "The reference preview is unavailable. No complete maintenance plan could be verified.",
+                              )
                             : widget.unavailable) ??
-                        'No complete reference preview is available for this selection.',
+                        appText(
+                          context,
+                          "No complete reference preview is available for this selection.",
+                        ),
                   ),
                 if (_busy && !_confirmingRecovery) ...[
                   const SizedBox(height: 12),
                   const LinearProgressIndicator(),
-                  const Text(
-                    'Verifying and recording the operation. Do not start another move.',
+                  Text(
+                    appText(
+                      context,
+                      "Verifying and recording the operation. Do not start another move.",
+                    ),
                   ),
                 ],
                 if (_error != null) Text(_error!),
@@ -367,14 +451,26 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                   const SizedBox(height: 12),
                   Text(
                     record.completed
-                        ? 'Move and reference updates verified.'
-                        : 'Operation state: ${record.phase}. Do not assume every file changed.',
+                        ? appText(
+                            context,
+                            "Move and reference updates verified.",
+                          )
+                        : appText(
+                            context,
+                            "Operation state: {0}. Do not assume every file changed.",
+                            [record.phase],
+                          ),
                   ),
                   if (record.message != null) Text(record.message!),
                   if (record.code != null) Text(record.code!),
                   if (record.namespace case final namespace?)
                     Text(
-                      'Directory: ${namespace.sourcePath} → ${namespace.destinationPath}; ${namespace.verified ? 'verified' : 'unverified'} at ${namespace.actualPath ?? 'unknown location'}.',
+                      appText(context, "Directory: {0} → {1}; {2} at {3}.", [
+                        namespace.sourcePath,
+                        namespace.destinationPath,
+                        namespace.verified ? 'verified' : 'unverified',
+                        namespace.actualPath ?? 'unknown location',
+                      ]),
                     ),
                   for (final root in record.namespaces)
                     Text(workspaceBatchRootStatus(root)),
@@ -384,13 +480,28 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                     ),
                   for (final artifact in record.retainedArtifacts)
                     Text(
-                      'Retained artifact: ${artifact.path} (${artifact.state}${artifact.verified ? ', verified' : ', unverified'})',
+                      appText(context, "Retained artifact: {0} ({1}{2})", [
+                        artifact.path,
+                        artifact.state,
+                        artifact.verified ? ', verified' : ', unverified',
+                      ]),
                     ),
                   for (final copy in record.recoveryEntries)
-                    Text('Original copy: ${copy.path} (${copy.state})'),
+                    Text(
+                      appText(context, "Original copy: {0} ({1})", [
+                        copy.path,
+                        copy.state,
+                      ]),
+                    ),
                   for (final path in record.recoveryPaths)
-                    Text('Recovered original copy: $path'),
-                  Text('Recovery journal: ${record.transactionId}'),
+                    Text(
+                      appText(context, "Recovered original copy: {0}", [path]),
+                    ),
+                  Text(
+                    appText(context, "Recovery journal: {0}", [
+                      record.transactionId,
+                    ]),
+                  ),
                 ],
                 if (scrollActions) ...[
                   const SizedBox(height: 16),

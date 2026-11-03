@@ -22,17 +22,24 @@ for key in ('CFBundleVersion', 'CFBundleShortVersionString'):
     assert info[key] == host[key], f'Host/extension version mismatch: {key}'
 assert info['NSExtension']['NSExtensionPointIdentifier'] == 'com.apple.quicklook.preview'
 attributes = info['NSExtension']['NSExtensionAttributes']
-assert attributes['QLIsDataBasedPreview'] is True
+assert attributes['QLIsDataBasedPreview'] is False
 assert attributes['QLSupportedContentTypes'] == ['net.daringfireball.markdown']
 binary = extension / 'Contents/MacOS/LinefoldQuickLook'
 libraries = subprocess.check_output(['otool', '-L', str(binary)], text=True).splitlines()
 # Universal binaries emit one header per architecture; only indented rows are
 # load commands. Validate every architecture's dependencies.
 dependencies = [line.strip().split(' (')[0] for line in libraries if line.startswith('\t')]
-assert '@rpath/libmerman_ffi.dylib' in dependencies
+assert '@rpath/FlutterMacOS.framework/Versions/A/FlutterMacOS' in dependencies
 for dependency in dependencies:
-    assert dependency == '@rpath/libmerman_ffi.dylib' or dependency.startswith(('/System/Library/', '/usr/lib/')), dependency
-assert (extension / 'Contents/Frameworks/libmerman_ffi.dylib').is_file()
+    assert dependency.startswith(('@rpath/FlutterMacOS.framework/', '/System/Library/', '/usr/lib/')), dependency
+frameworks = extension / 'Contents/Frameworks'
+assert (frameworks / 'libmerman_ffi.dylib').is_file()
+assert (frameworks / 'App.framework/Resources/flutter_assets/NativeAssetsManifest.json').is_file()
+assert (frameworks / 'FlutterMacOS.framework/FlutterMacOS').is_file()
+assert list(frameworks.glob('*svg*.framework')), 'Missing SVG native asset'
+app_archs = set(subprocess.check_output(['lipo', '-archs', str(app / 'Contents/MacOS/Linefold')], text=True).split())
+for code in [binary, frameworks / 'App.framework/App', frameworks / 'FlutterMacOS.framework/FlutterMacOS', frameworks / 'libmerman_ffi.dylib']:
+    assert app_archs <= set(subprocess.check_output(['lipo', '-archs', str(code)], text=True).split()), code
 assert (extension / 'Contents/Resources/ThirdPartyNotices.txt').is_file()
 entitlements = plistlib.loads(subprocess.check_output([
     'codesign', '-d', '--entitlements', '-', '--xml', str(extension)], stderr=subprocess.DEVNULL))

@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -76,7 +77,13 @@ class DesktopMenuBar extends StatelessWidget {
             PlatformMenuItemGroup(
               members: [
                 PlatformMenuItem(
-                  label: 'Settings…',
+                  label: appText(context, "Check for Updates…"),
+                  onSelected: () => const MethodChannel(
+                    'work.ianvs.linefold/software_update',
+                  ).invokeMethod<void>('check'),
+                ),
+                PlatformMenuItem(
+                  label: appText(context, "Settings…"),
                   shortcut: const SingleActivator(
                     LogicalKeyboardKey.comma,
                     meta: true,
@@ -111,10 +118,10 @@ class DesktopMenuBar extends StatelessWidget {
           ],
         ),
         PlatformMenu(
-          label: 'File',
+          label: appText(context, "File"),
           menus: [
             PlatformMenuItem(
-              label: 'New Document',
+              label: appText(context, "New Document"),
               shortcut: const SingleActivator(
                 LogicalKeyboardKey.keyN,
                 meta: true,
@@ -122,16 +129,19 @@ class DesktopMenuBar extends StatelessWidget {
               onSelected: workspace.newDocument,
             ),
             PlatformMenuItem(
-              label: 'Open…',
+              label: appText(context, "Open…"),
               shortcut: const SingleActivator(
                 LogicalKeyboardKey.keyO,
                 meta: true,
               ),
               onSelected: onOpen,
             ),
-            PlatformMenuItem(label: 'Import Image…', onSelected: onImportImage),
             PlatformMenuItem(
-              label: 'Open Folder…',
+              label: appText(context, "Import Image…"),
+              onSelected: onImportImage,
+            ),
+            PlatformMenuItem(
+              label: appText(context, "Open Folder…"),
               shortcut: const SingleActivator(
                 LogicalKeyboardKey.keyO,
                 meta: true,
@@ -141,9 +151,12 @@ class DesktopMenuBar extends StatelessWidget {
             ),
             PlatformMenuItemGroup(
               members: [
-                PlatformMenuItem(label: 'Save', onSelected: onSave),
                 PlatformMenuItem(
-                  label: 'Save As…',
+                  label: appText(context, "Save"),
+                  onSelected: onSave,
+                ),
+                PlatformMenuItem(
+                  label: appText(context, "Save As…"),
                   shortcut: const SingleActivator(
                     LogicalKeyboardKey.keyS,
                     meta: true,
@@ -156,22 +169,25 @@ class DesktopMenuBar extends StatelessWidget {
             PlatformMenuItemGroup(
               members: [
                 PlatformMenuItem(
-                  label: 'Export HTML…',
+                  label: appText(context, "Export HTML…"),
                   onSelected: onExportHtml,
                 ),
                 PlatformMenuItem(
-                  label: 'Export Markdown Copy…',
+                  label: appText(context, "Export Markdown Copy…"),
                   onSelected: onExportMarkdown,
                 ),
                 PlatformMenuItem(
-                  label: 'Export Markdown + Attachments…',
+                  label: appText(context, "Export Markdown + Attachments…"),
                   onSelected: onExportBundle,
                 ),
-                PlatformMenuItem(label: 'Export PDF…', onSelected: onExportPdf),
+                PlatformMenuItem(
+                  label: appText(context, "Export PDF…"),
+                  onSelected: onExportPdf,
+                ),
               ],
             ),
             PlatformMenuItem(
-              label: 'Close Document',
+              label: appText(context, "Close Document"),
               shortcut: const SingleActivator(
                 LogicalKeyboardKey.keyW,
                 meta: true,
@@ -181,24 +197,24 @@ class DesktopMenuBar extends StatelessWidget {
           ],
         ),
         PlatformMenu(
-          label: 'Edit',
+          label: appText(context, "Edit"),
           menus: [
             PlatformMenuItem(
-              label: 'Undo',
+              label: appText(context, "Undo"),
               onSelected: () => _edit(
                 IanvsMarkdownCommand.undo,
                 const UndoTextIntent(SelectionChangedCause.keyboard),
               ),
             ),
             PlatformMenuItem(
-              label: 'Redo',
+              label: appText(context, "Redo"),
               onSelected: () => _edit(
                 IanvsMarkdownCommand.redo,
                 const RedoTextIntent(SelectionChangedCause.keyboard),
               ),
             ),
             PlatformMenuItem(
-              label: 'Cut',
+              label: appText(context, "Cut"),
               onSelected: () => _edit(
                 IanvsMarkdownCommand.cut,
                 const CopySelectionTextIntent.cut(
@@ -207,38 +223,38 @@ class DesktopMenuBar extends StatelessWidget {
               ),
             ),
             PlatformMenuItem(
-              label: 'Copy',
+              label: appText(context, "Copy"),
               onSelected: () => _edit(
                 IanvsMarkdownCommand.copy,
                 CopySelectionTextIntent.copy,
               ),
             ),
             PlatformMenuItem(
-              label: 'Paste',
+              label: appText(context, "Paste"),
               onSelected: () => _edit(
                 IanvsMarkdownCommand.paste,
                 const PasteTextIntent(SelectionChangedCause.keyboard),
               ),
             ),
             PlatformMenuItem(
-              label: 'Paste as Plain Text',
+              label: appText(context, "Paste as Plain Text"),
               onSelected: () => _edit(
                 IanvsMarkdownCommand.pastePlainText,
                 const PasteTextIntent(SelectionChangedCause.keyboard),
               ),
             ),
             PlatformMenuItem(
-              label: 'Select All',
+              label: appText(context, "Select All"),
               onSelected: () => _edit(
                 IanvsMarkdownCommand.selectAll,
                 const SelectAllTextIntent(SelectionChangedCause.keyboard),
               ),
             ),
             PlatformMenu(
-              label: 'Find',
+              label: appText(context, "Find"),
               menus: [
                 PlatformMenuItem(
-                  label: 'Find…',
+                  label: appText(context, "Find…"),
                   shortcut: const SingleActivator(
                     LogicalKeyboardKey.keyF,
                     meta: true,
@@ -246,7 +262,7 @@ class DesktopMenuBar extends StatelessWidget {
                   onSelected: onFind,
                 ),
                 PlatformMenuItem(
-                  label: 'Find Next',
+                  label: appText(context, "Find Next"),
                   shortcut: const SingleActivator(
                     LogicalKeyboardKey.keyG,
                     meta: true,
@@ -254,7 +270,7 @@ class DesktopMenuBar extends StatelessWidget {
                   onSelected: onFindNext,
                 ),
                 PlatformMenuItem(
-                  label: 'Find Previous',
+                  label: appText(context, "Find Previous"),
                   shortcut: const SingleActivator(
                     LogicalKeyboardKey.keyG,
                     meta: true,
@@ -267,10 +283,10 @@ class DesktopMenuBar extends StatelessWidget {
           ],
         ),
         PlatformMenu(
-          label: 'View',
+          label: appText(context, "View"),
           menus: [
             PlatformMenuItem(
-              label: 'Back to Previous Position',
+              label: appText(context, "Back to Previous Position"),
               shortcut: const SingleActivator(
                 LogicalKeyboardKey.bracketLeft,
                 meta: true,
@@ -278,7 +294,9 @@ class DesktopMenuBar extends StatelessWidget {
               onSelected: () => navigateBack(workspace),
             ),
             PlatformMenuItem(
-              label: workspace.sidebarVisible ? 'Hide Sidebar' : 'Show Sidebar',
+              label: workspace.sidebarVisible
+                  ? appText(context, "Hide Sidebar")
+                  : appText(context, "Show Sidebar"),
               shortcut: const SingleActivator(
                 LogicalKeyboardKey.keyS,
                 meta: true,
@@ -287,25 +305,27 @@ class DesktopMenuBar extends StatelessWidget {
               onSelected: workspace.toggleSidebar,
             ),
             PlatformMenuItem(
-              label: workspace.outlineVisible ? 'Hide Outline' : 'Show Outline',
+              label: workspace.outlineVisible
+                  ? appText(context, "Hide Outline")
+                  : appText(context, "Show Outline"),
               onSelected: workspace.toggleOutline,
             ),
             PlatformMenuItemGroup(
               members: [
                 PlatformMenuItem(
-                  label: 'Live Preview',
+                  label: appText(context, "Live Preview"),
                   onSelected: () => setEditorMode(
                     workspace,
                     IanvsMarkdownEditorMode.livePreview,
                   ),
                 ),
                 PlatformMenuItem(
-                  label: 'Source',
+                  label: appText(context, "Source"),
                   onSelected: () =>
                       setEditorMode(workspace, IanvsMarkdownEditorMode.source),
                 ),
                 PlatformMenuItem(
-                  label: 'Read',
+                  label: appText(context, "Read"),
                   onSelected: () =>
                       setEditorMode(workspace, IanvsMarkdownEditorMode.preview),
                 ),
@@ -314,7 +334,7 @@ class DesktopMenuBar extends StatelessWidget {
             PlatformMenuItemGroup(
               members: [
                 PlatformMenuItem(
-                  label: 'Larger Reading Text',
+                  label: appText(context, "Larger Reading Text"),
                   shortcut: const SingleActivator(
                     LogicalKeyboardKey.equal,
                     meta: true,
@@ -323,7 +343,7 @@ class DesktopMenuBar extends StatelessWidget {
                       changeReadingTextSize(workspace, delta: 0.5),
                 ),
                 PlatformMenuItem(
-                  label: 'Smaller Reading Text',
+                  label: appText(context, "Smaller Reading Text"),
                   shortcut: const SingleActivator(
                     LogicalKeyboardKey.minus,
                     meta: true,
@@ -332,7 +352,7 @@ class DesktopMenuBar extends StatelessWidget {
                       changeReadingTextSize(workspace, delta: -0.5),
                 ),
                 PlatformMenuItem(
-                  label: 'Actual Reading Text Size',
+                  label: appText(context, "Actual Reading Text Size"),
                   shortcut: const SingleActivator(
                     LogicalKeyboardKey.digit0,
                     meta: true,
@@ -342,12 +362,12 @@ class DesktopMenuBar extends StatelessWidget {
               ],
             ),
             PlatformMenuItem(
-              label: 'Toggle Appearance',
+              label: appText(context, "Toggle Appearance"),
               onSelected: onToggleTheme,
             ),
             if (onUseSystemTheme != null)
               PlatformMenuItem(
-                label: 'Use System Appearance',
+                label: appText(context, "Use System Appearance"),
                 onSelected: onUseSystemTheme,
               ),
             const PlatformProvidedMenuItem(
@@ -356,7 +376,7 @@ class DesktopMenuBar extends StatelessWidget {
           ],
         ),
         PlatformMenu(
-          label: 'Window',
+          label: appText(context, "Window"),
           menus: [
             PlatformProvidedMenuItem(
               type: PlatformProvidedMenuItemType.minimizeWindow,

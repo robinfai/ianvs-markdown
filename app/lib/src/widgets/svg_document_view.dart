@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:ianvs_mermaid/ianvs_mermaid.dart';
@@ -59,19 +60,25 @@ class _SvgDocumentViewState extends State<SvgDocumentView> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'This SVG cannot be displayed in the built-in preview.',
+              Text(
+                appText(
+                  context,
+                  "This SVG cannot be displayed in the built-in preview.",
+                ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'It may be invalid or use unsupported features such as HTML labels, filters, or embedded images.',
+              Text(
+                appText(
+                  context,
+                  "It may be invalid or use unsupported features such as HTML labels, filters, or embedded images.",
+                ),
                 textAlign: TextAlign.center,
               ),
               if (widget.onOpenExternal != null) ...[
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: widget.onOpenExternal,
-                  child: const Text('Open in default app'),
+                  child: Text(appText(context, "Open in default app")),
                 ),
               ],
             ],

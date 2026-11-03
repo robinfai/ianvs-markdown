@@ -1,3 +1,7 @@
+import 'app_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:ianvs_markdown/ianvs_markdown.dart';
+import 'widgets/finder_preview_settings.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -103,7 +107,11 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
     }
     if (!mounted) return;
     await _fileAssociation.initialize();
-    if (!mounted || !_fileAssociation.needsPrompt) return;
+    if (!mounted) return;
+    if (!_fileAssociation.needsPrompt) {
+      await offerFinderPreviewSetup(_navigatorKey.currentContext!);
+      return;
+    }
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted || _settingsOpen) return;
     _promptOpen = true;
@@ -118,6 +126,7 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
     final saved = await _fileAssociation.setPreference(choice ?? false);
     _promptOpen = false;
     if (mounted && !saved) await _openSettings();
+    if (mounted) await offerFinderPreviewSetup(_navigatorKey.currentContext!);
   }
 
   Future<String?> _requestMobileName(String name) async {
@@ -247,6 +256,15 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
       scaffoldMessengerKey: _messengerKey,
       debugShowCheckedModeBanner: false,
       title: 'Linefold',
+      supportedLocales: appSupportedLocales,
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      localeListResolutionCallback: resolveAppLocale,
+      builder: (context, child) => IanvsMarkdownLocalization(
+        strings: Localizations.localeOf(context).languageCode == 'zh'
+            ? const IanvsMarkdownStrings.chinese()
+            : const IanvsMarkdownStrings.english(),
+        child: child!,
+      ),
       themeMode: _themeMode,
       theme: desktopTheme(
         Brightness.light,
