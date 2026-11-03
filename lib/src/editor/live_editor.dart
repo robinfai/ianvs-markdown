@@ -4088,14 +4088,10 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         onEditImage: (imageIndex) => _editStandardImage(block, imageIndex),
         checkboxBuilder: sourceTasks.isNotEmpty
             ? (checked) {
-                final taskIndex = renderedTaskIndex;
-                final task = taskIndex < sourceTasks.length
-                    ? sourceTasks[taskIndex]
-                    : IanvsMarkdownTaskSourceMarker(
-                        marker: checked ? 'x' : ' ',
-                        offset: -1,
-                        nestLevel: 0,
-                      );
+                // The Markdown subtree can rebuild when folding changes its
+                // constraints without recreating this builder closure.
+                final taskIndex = renderedTaskIndex % sourceTasks.length;
+                final task = sourceTasks[taskIndex];
                 renderedTaskIndex += 1;
                 return IanvsMarkdownTaskCheckbox(
                   value: ianvsMarkdownTaskMarkerIsChecked(task.marker),
