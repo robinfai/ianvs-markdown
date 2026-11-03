@@ -64,6 +64,8 @@ jobs:
           flutter-version: '3.44.8'
           cache: true
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
       - name: Resolve dependencies and run app tests
         run: |
           make deps-integrations
