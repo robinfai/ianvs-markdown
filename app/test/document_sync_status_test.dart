@@ -18,7 +18,7 @@ void main() {
     ...fields,
   };
 
-  testWidgets('unsupported provider visibly remains unknown without reading', (
+  testWidgets('unsupported provider stays silent without reading', (
     tester,
   ) async {
     var reads = 0;
@@ -38,7 +38,7 @@ void main() {
         home: Scaffold(body: DocumentSyncIndicator(controller: controller)),
       ),
     );
-    expect(find.text('Cloud status unknown'), findsOneWidget);
+    expect(find.text('Cloud status unknown'), findsNothing);
     controller.scheduleRefresh();
     await controller.refresh();
     await tester.pump(const Duration(minutes: 1));

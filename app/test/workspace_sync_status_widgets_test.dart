@@ -17,7 +17,7 @@ class _Metadata implements DocumentSyncSource {
 }
 
 void main() {
-  testWidgets('desktop status details remain reachable in a short 3x window', (
+  testWidgets('routine cloud activity stays silent in a short 3x window', (
     tester,
   ) async {
     final files = MemoryMarkdownFileService()
@@ -51,24 +51,8 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Saved locally'), findsOneWidget);
-    expect(find.text('iCloud upload pending'), findsOneWidget);
-    final status = find.byTooltip('Cloud status details and retry');
-    await tester.ensureVisible(status);
-    await tester.pumpAndSettle();
-    expect(tester.takeException(), isNull);
-    expect(
-      tester.getSemantics(find.text('iCloud upload pending')).label,
-      'iCloud upload pending',
-    );
-    await tester.tap(status);
-    await tester.pumpAndSettle();
-    expect(find.text('Cloud status'), findsOneWidget);
-    expect(
-      find.text(
-        'iCloud has not reported this item uploaded. Pending does not identify a network problem.',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('iCloud upload pending'), findsNothing);
+    expect(find.byTooltip('Cloud status details and retry'), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     semantics.dispose();

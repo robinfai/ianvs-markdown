@@ -1,3 +1,5 @@
+import 'dart:io';
+import '../preview/preview_platform.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
@@ -33,7 +35,13 @@ class DocumentLinkService {
   static const _channel = MethodChannel('work.ianvs.linefold/file_access');
 
   static Future<void> openExternalUri(Uri uri) async {
-    await _channel.invokeMethod<void>('openExternal', {'url': uri.toString()});
+    if (Platform.isIOS) {
+      await PreviewPlatform().openExternal(uri);
+    } else {
+      await _channel.invokeMethod<void>('openExternal', {
+        'url': uri.toString(),
+      });
+    }
   }
 
   Future<void> open(DocumentSession origin, String? href) async {

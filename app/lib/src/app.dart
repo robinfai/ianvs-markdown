@@ -1,4 +1,9 @@
 import 'dart:async';
+import 'dart:io';
+
+import 'services/mobile_markdown_file_service.dart';
+import 'services/attachment_import_service.dart';
+import 'preview/preview_platform.dart';
 import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/material.dart';
@@ -33,17 +38,26 @@ class LinefoldApp extends StatefulWidget {
 
 class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
   late final _performanceFiles = LocalPerformanceFiles();
+  final _mobileFiles = MobileMarkdownFileService();
+  final _mobileIncoming = PreviewPlatform();
   late final WorkspaceController _workspace =
       widget.workspaceController ??
       (localPerformanceEnabled
           ? localPerformanceWorkspace(_performanceFiles)
           : WorkspaceController(
-              fileService: const DesktopMarkdownFileService(
-                workspace: AppleWorkspaceService(),
-              ),
+              fileService: Platform.isIOS
+                  ? _mobileFiles
+                  : const DesktopMarkdownFileService(
+                      workspace: AppleWorkspaceService(),
+                    ),
+              welcomeText: Platform.isIOS
+                  ? mobileWelcomeMarkdown
+                  : welcomeMarkdown,
+              indexSource: Platform.isIOS ? _mobileFiles.indexSource : null,
               sessionStore: const DesktopWorkspaceSessionStore(),
-              defaultWorkspaceDirectory:
-                  const AppleWorkspaceService().defaultDirectory,
+              defaultWorkspaceDirectory: Platform.isIOS
+                  ? _mobileFiles.defaultDirectory
+                  : const AppleWorkspaceService().defaultDirectory,
             ));
   late final FileAssociationController _fileAssociation =
       widget.fileAssociationController ??
@@ -61,6 +75,7 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _mobileFiles.requestName = _requestMobileName;
     if (widget.workspaceController == null && !localPerformanceEnabled) {
       _cloudChanges = const AppleWorkspaceService().changes.listen((_) {
         if (_workspace.initialized) {
@@ -78,7 +93,11 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
     await _workspace.initialize();
     if (!mounted || localPerformanceEnabled || !_workspace.initialized) return;
     try {
-      await _incomingFiles.start(_openIncomingFiles);
+      if (Platform.isIOS) {
+        await _mobileIncoming.start(_openIncomingFiles, _showError);
+      } else {
+        await _incomingFiles.start(_openIncomingFiles);
+      }
     } on Object catch (error) {
       _showError('Unable to receive files from Finder: $error');
     }
@@ -101,7 +120,42 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
     if (mounted && !saved) await _openSettings();
   }
 
+  Future<String?> _requestMobileName(String name) async {
+    final input = TextEditingController(text: name);
+    try {
+      return await showDialog<String>(
+        context: _navigatorKey.currentContext!,
+        builder: (context) => AlertDialog(
+          title: const Text('保存文档'),
+          content: TextField(
+            controller: input,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: '文件名'),
+            onSubmitted: (value) => Navigator.pop(context, value),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, input.text),
+              child: const Text('保存'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      // The dialog's exit animation can still reference its controller.
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      input.dispose();
+    }
+  }
+
   Future<void> _openIncomingFiles(List<String> paths) async {
+    if (Platform.isIOS && paths.isNotEmpty) {
+      await _workspace.useDefaultWorkspace();
+    }
     for (final path in paths) {
       if (!mounted) return;
       try {
@@ -152,7 +206,16 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
+      unawaited(
+        _workspace.flushSession().catchError((Object error) {
+          _showError('Unable to save recovery: $error');
+        }),
+      );
+    }
     if (state == AppLifecycleState.resumed && _fileAssociation.initialized) {
+      if (Platform.isIOS) _mobileFiles.refreshExternalChanges();
       unawaited(_fileAssociation.refresh());
       _workspace.sync.scheduleRefresh();
       if (_workspace.isCloudWorkspace) unawaited(_workspace.browser.refresh());
@@ -162,6 +225,7 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    if (Platform.isIOS) _mobileIncoming.dispose();
     _incomingFiles.dispose();
     _cloudChanges?.cancel();
     if (widget.fileAssociationController == null) _fileAssociation.dispose();
@@ -184,8 +248,14 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
       debugShowCheckedModeBanner: false,
       title: 'Linefold',
       themeMode: _themeMode,
-      theme: desktopTheme(Brightness.light),
-      darkTheme: desktopTheme(Brightness.dark),
+      theme: desktopTheme(
+        Brightness.light,
+        platform: Platform.isIOS ? TargetPlatform.iOS : TargetPlatform.macOS,
+      ),
+      darkTheme: desktopTheme(
+        Brightness.dark,
+        platform: Platform.isIOS ? TargetPlatform.iOS : TargetPlatform.macOS,
+      ),
       // Isolate editor semantics when modal routes block and reveal the document.
       home: Builder(
         builder: (context) => Semantics(
@@ -194,6 +264,9 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
           child: _withPerformance(
             EditorShell(
               workspace: _workspace,
+              attachmentImportPlatform: Platform.isIOS
+                  ? MobileAttachmentImportPlatform(_mobileFiles.library)
+                  : const AppleAttachmentImportPlatform(),
               onRetryInitialization: _initialize,
               dark: Theme.of(context).brightness == Brightness.dark,
               onToggleTheme: () => setState(

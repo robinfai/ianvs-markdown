@@ -48,6 +48,24 @@ void main() {
   });
 
   test(
+    'directory invalidated during a read retries without a visible error',
+    () async {
+      final pending = Completer<List<WorkspaceEntry>>();
+      files.blocked['/vault/docs'] = pending;
+      final load = workspace.browser.load('/vault/docs');
+      await Future<void>.delayed(Duration.zero);
+      files.files['/vault/docs'] = 'new directory revision';
+      await workspace.index.directory('', refresh: true);
+      files.blocked.remove('/vault/docs');
+      pending.complete([entry('/vault/docs/stale.md')]);
+      await load;
+      expect(workspace.browser.errors.containsKey('/vault/docs'), isFalse);
+      final snapshot = await workspace.index.directory('docs');
+      expect(snapshot.entries.map((e) => e.relativePath), ['docs/deep']);
+    },
+  );
+
+  test(
     'late reads cannot leak across workspace switches or override a newer reveal',
     () async {
       final blocked = Completer<List<WorkspaceEntry>>();

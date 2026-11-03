@@ -587,7 +587,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('iCloud upload pending'), findsOneWidget);
+    expect(find.text('iCloud upload pending'), findsNothing);
     expect(find.byType(IanvsMarkdownView), findsOneWidget);
     expect(tester.takeException(), isNull);
     library.metadata = DocumentSyncMetadata(

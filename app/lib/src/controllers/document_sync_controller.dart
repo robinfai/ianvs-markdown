@@ -17,7 +17,7 @@ class DocumentSyncController extends ChangeNotifier {
   }) : _now = now ?? DateTime.now;
 
   final Future<DocumentSyncMetadata> Function(String path) read;
-  // An unsupported provider still has a visible unknown status, without I/O.
+  // Unsupported providers remain unknown without I/O or a foreground notice.
   final bool canRead;
   final DateTime Function() _now;
   final Duration freshness;
@@ -127,16 +127,26 @@ class DocumentSyncController extends ChangeNotifier {
       _expiry?.cancel();
       // Future times are not trusted either. A wall-clock change cannot turn an
       // old sample into a permanent "uploaded" or "uploading" indicator.
-      if (observation.state != CloudSyncState.localOnly &&
+      final needsAttention =
+          metadata.state == CloudSyncState.failure ||
+          metadata.state == CloudSyncState.conflict;
+      if (needsAttention && observation.state == CloudSyncState.unknown) {
+        // A failed status read cannot prove that a known problem was resolved.
+      } else if (observation.state != CloudSyncState.localOnly &&
           (age == null || age.isNegative || age >= freshness)) {
-        metadata = DocumentSyncMetadata(
-          detail:
-              observation.detail ??
-              'No current cloud observation is available. Check again for an updated status.',
-        );
+        if (!needsAttention) {
+          metadata = DocumentSyncMetadata(
+            detail:
+                observation.detail ??
+                'No current cloud observation is available. Check again for an updated status.',
+          );
+        }
       } else {
         metadata = observation;
-        if (age != null && observation.state != CloudSyncState.localOnly) {
+        if (age != null &&
+            observation.state != CloudSyncState.localOnly &&
+            observation.state != CloudSyncState.failure &&
+            observation.state != CloudSyncState.conflict) {
           _expiry = Timer(freshness - age, () {
             if (_disposed || epoch != _epoch) return;
             metadata = const DocumentSyncMetadata(

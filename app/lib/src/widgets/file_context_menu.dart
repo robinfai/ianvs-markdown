@@ -97,7 +97,10 @@ class _FileContextMenuState extends State<FileContextMenu> {
             const PopupMenuDivider(),
           PopupMenuItem(
             value: entries[i],
-            height: 32,
+            height: switch (Theme.of(context).platform) {
+              TargetPlatform.iOS || TargetPlatform.android => 48,
+              _ => 32,
+            },
             child: Text(
               entries[i].label,
               style: entries[i].destructive
@@ -132,6 +135,7 @@ class _FileContextMenuState extends State<FileContextMenu> {
         Theme.of(context).platform == TargetPlatform.macOS && _controlPressed;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
+      onLongPressStart: (details) => _show(context, details.globalPosition),
       onSecondaryTapUp: (details) => _show(context, details.globalPosition),
       onTapUp: controlClick
           ? (details) => _show(context, details.globalPosition)

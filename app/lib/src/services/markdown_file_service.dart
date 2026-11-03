@@ -438,3 +438,13 @@ String describeFileError(Object error) {
   }
   return error.toString();
 }
+
+/// Selecting an operation destination must not replace the active workspace.
+abstract interface class WorkspaceOperationFolderPicker {
+  Future<String?> chooseOperationFolder();
+}
+
+abstract interface class WorkspaceDisplaySource {
+  String? workspaceName(String path);
+  bool isCloudPath(String path);
+}

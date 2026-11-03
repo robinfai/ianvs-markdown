@@ -46,3 +46,14 @@ linefold_timed compile xcrun swiftc \
   "$linefold_app_dir/test/native_scoped_note_save_test.swift" \
   -o "$linefold_test_dir/scoped_note_save_tests"
 linefold_timed execute "$linefold_test_dir/scoped_note_save_tests"
+
+linefold_timed compile xcrun swiftc \
+  -swift-version 5 -target "$(uname -m)-apple-macosx12.0" \
+  -module-cache-path "${LINEFOLD_SWIFT_MODULE_CACHE:-$linefold_test_dir/module-cache}" \
+  -F "$framework_dir" -framework FlutterMacOS \
+  -Xlinker -rpath -Xlinker "$framework_dir" \
+  "$linefold_app_dir/apple/CloudWorkspace.swift" \
+  "$linefold_app_dir/apple/WorkspaceNoteTransaction.swift" \
+  "$linefold_app_dir/test/native_mobile_management_test.swift" \
+  -o "$linefold_test_dir/mobile_management_tests"
+linefold_timed execute "$linefold_test_dir/mobile_management_tests"
