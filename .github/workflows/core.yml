@@ -76,7 +76,9 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libglu1-mesa
       - name: Resolve app dependencies
         id: app-dependencies
-        run: cd app && flutter pub get
+        run: |
+          (cd app && flutter pub get)
+          bash app/tool/prepare_quicklook.sh
       - name: Check app formatting with actionable diff
         run: |
           dart format app/lib app/test
