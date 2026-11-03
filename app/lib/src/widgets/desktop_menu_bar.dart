@@ -76,6 +76,12 @@ class DesktopMenuBar extends StatelessWidget {
             PlatformMenuItemGroup(
               members: [
                 PlatformMenuItem(
+                  label: 'Check for Updates…',
+                  onSelected: () => const MethodChannel(
+                    'work.ianvs.linefold/software_update',
+                  ).invokeMethod<void>('check'),
+                ),
+                PlatformMenuItem(
                   label: 'Settings…',
                   shortcut: const SingleActivator(
                     LogicalKeyboardKey.comma,

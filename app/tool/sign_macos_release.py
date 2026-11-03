@@ -60,6 +60,8 @@ def main():
     app = Path(sys.argv[1]).resolve(strict=True)
     source = Path(__file__).resolve().parents[1]
     identity = os.environ['APPLE_SIGNING_IDENTITY']
+    if not identity.startswith('Developer ID Application:'):
+        raise ValueError('Public releases require Developer ID Application signing')
     keychain = os.environ['SIGNING_KEYCHAIN']
     entitlements = cloud_entitlements(app, source)
     bundles = [p for p in app.rglob('*') if p.is_dir() and not p.is_symlink()
