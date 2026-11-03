@@ -7,4 +7,5 @@ for source in desktop_theme.dart desktop_typography.dart reading_typography.dart
   cp "$linefold_app_dir/lib/src/$source" "$linefold_app_dir/quicklook/lib/shared/$source"
 done
 cd "$linefold_app_dir/quicklook"
-"${FLUTTER_ROOT:+$FLUTTER_ROOT/bin/}flutter" pub get "$@"
+linefold_flutter="${FLUTTER:-${FLUTTER_ROOT:+$FLUTTER_ROOT/bin/}flutter}"
+"$linefold_flutter" pub get "$@"

@@ -7,7 +7,7 @@ APP_TEST_FLAGS ?=
 
 CORE_DART = lib test example/lib example/test tool/package_smoke_test.dart benchmark
 API_CHECK_DART = tool/api_check/lib tool/api_check/bin tool/api_check/test
-INTEGRATION_DART = app/lib app/test packages/ianvs_mermaid/lib packages/ianvs_mermaid/hook packages/ianvs_mermaid/test packages/ianvs_mermaid/example/lib packages/ianvs_mermaid/example/test packages/ianvs_markdown_clipboard/lib packages/ianvs_markdown_clipboard/test
+INTEGRATION_DART = app/lib app/test app/quicklook/lib/main.dart app/quicklook/test packages/ianvs_mermaid/lib packages/ianvs_mermaid/hook packages/ianvs_mermaid/test packages/ianvs_mermaid/example/lib packages/ianvs_mermaid/example/test packages/ianvs_markdown_clipboard/lib packages/ianvs_markdown_clipboard/test
 
 .DEFAULT_GOAL := help
 # Flutter resolves dependencies and writes generated files in each package.
@@ -27,6 +27,7 @@ deps-integrations: ## Install app and optional native adapter dependencies
 	cd packages/ianvs_mermaid && $(FLUTTER) pub get
 	cd packages/ianvs_markdown_clipboard && $(FLUTTER) pub get
 	cd app && $(FLUTTER) pub get
+	FLUTTER="$(FLUTTER)" bash app/tool/prepare_quicklook.sh
 
 format: ## Format Dart source and test files
 	$(FORMAT_DART) format $(CORE_DART) $(INTEGRATION_DART) $(API_CHECK_DART)
@@ -110,6 +111,7 @@ test-mermaid-example: ## Run the optional native integration example tests
 test-quicklook: deps-integrations ## Test the native macOS Quick Look renderer and file loading
 	cargo fmt --check --manifest-path app/macos/QuickLook/renderer/Cargo.toml
 	bash app/tool/test_native_quicklook.sh
+	cd app/quicklook && $(FLUTTER) test
 
 check-processing-budget: ## Check large-input preprocessing in killable processes
 	$(PYTHON) tool/check_processing_budget.py --flutter "$(FLUTTER)" --output build/processing-budget
