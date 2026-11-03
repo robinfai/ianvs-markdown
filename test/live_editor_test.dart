@@ -8445,6 +8445,39 @@ url: https://example.com/path
     },
   );
 
+  testWidgets('list fold and task checkbox have separate usable hit areas', (
+    tester,
+  ) async {
+    const source = '- [ ] Parent\n  - Child\n- Sibling';
+    final controller = IanvsMarkdownController(text: source);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+
+    final toggle = find.byKey(const ValueKey('ianvs-markdown-list-fold-0'));
+    final checkbox = find.byKey(const ValueKey('ianvs-markdown-task-checkbox'));
+    final foldRect = tester.getRect(toggle);
+    final checkboxRect = tester.getRect(checkbox);
+    expect(foldRect.size, const Size(24, 24));
+    expect(checkboxRect.left - foldRect.right, greaterThanOrEqualTo(6));
+
+    // The edge of each target must invoke only its own action.
+    await tester.tapAt(Offset(foldRect.left + 1, foldRect.center.dy));
+    await tester.pumpAndSettle();
+    expect(find.text('Child'), findsNothing);
+    expect(controller.text, source);
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    final expandedCheckboxRect = tester.getRect(checkbox);
+    await tester.tapAt(
+      Offset(expandedCheckboxRect.left + 1, expandedCheckboxRect.center.dy),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.text, '- [x] Parent\n  - Child\n- Sibling');
+    expect(find.text('Child'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('list folding keeps RTL and scaled wrapped parent rows aligned', (
     tester,
   ) async {
@@ -8474,6 +8507,10 @@ url: https://example.com/path
     await tester.pumpAndSettle();
     final toggle = find.byKey(const ValueKey('ianvs-markdown-list-fold-0'));
     final before = tester.getRect(toggle);
+    final markerRect = tester.getRect(
+      find.byKey(const ValueKey('ianvs-markdown-ordered-marker-0')).first,
+    );
+    expect(before.center.dy, closeTo(markerRect.center.dy, 0.5));
     await tester.tap(toggle);
     await tester.pumpAndSettle();
     expect(find.text('Child'), findsNothing);

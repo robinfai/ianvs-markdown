@@ -43,10 +43,11 @@ class _LiveListFoldFrameState extends State<_LiveListFoldFrame> {
       child: MouseRegion(
         onEnter: (_) => setState(() => _hovering = true),
         onExit: (_) => setState(() => _hovering = false),
-        child: Stack(
+        child: _ListFoldStack(
           children: [
             Padding(
-              padding: const EdgeInsetsDirectional.only(start: 20),
+              // Reserve space for the control and ancestor indentation guides.
+              padding: const EdgeInsetsDirectional.only(start: 32),
               child: widget.collapsed
                   ? _ListFoldEllipsis(
                       color: widget.colors.textTertiary,
@@ -62,8 +63,9 @@ class _LiveListFoldFrameState extends State<_LiveListFoldFrame> {
             ),
             if (widget.foldable)
               PositionedDirectional(
-                start: 20,
-                top: 3,
+                // Use the leading gutter, leaving the marker's hit area clear.
+                start: 0,
+                top: 0,
                 child: AnimatedOpacity(
                   opacity: visible ? 1 : 0,
                   duration: const Duration(milliseconds: 120),
@@ -86,10 +88,10 @@ class _LiveListFoldFrameState extends State<_LiveListFoldFrame> {
                         : widget.colors.textTertiary,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints.tightFor(
-                      width: 20,
-                      height: 23,
+                      width: 24,
+                      height: 24,
                     ),
-                    visualDensity: VisualDensity.compact,
+                    visualDensity: VisualDensity.standard,
                     icon: Icon(
                       widget.collapsed
                           ? (Directionality.of(context) == TextDirection.rtl
@@ -105,6 +107,56 @@ class _LiveListFoldFrameState extends State<_LiveListFoldFrame> {
         ),
       ),
     );
+  }
+}
+
+/// Aligns the control with the first text line, including its actual padding
+/// and text scaling, rather than the height of a potentially wrapped item.
+class _ListFoldStack extends Stack {
+  const _ListFoldStack({required super.children});
+
+  @override
+  RenderStack createRenderObject(BuildContext context) =>
+      _RenderListFoldStack(textDirection: Directionality.of(context));
+}
+
+class _RenderListFoldStack extends RenderStack {
+  _RenderListFoldStack({required super.textDirection});
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    if (childCount < 2) return;
+    double? lineCenter;
+    void visit(RenderObject object) {
+      if (lineCenter != null) return;
+      Rect? line;
+      if (object is RenderParagraph && object.text.toPlainText().isNotEmpty) {
+        final boxes = object.getBoxesForSelection(
+          const TextSelection(baseOffset: 0, extentOffset: 1),
+          boxHeightStyle: BoxHeightStyle.max,
+        );
+        if (boxes.isNotEmpty) line = boxes.first.toRect();
+      } else if (object is RenderEditable) {
+        final boxes = object.getBoxesForSelection(
+          const TextSelection(baseOffset: 0, extentOffset: 1),
+        );
+        line = boxes.isEmpty
+            ? Rect.fromLTWH(0, 0, 0, object.preferredLineHeight)
+            : boxes.first.toRect();
+      }
+      if (line != null && object is RenderBox) {
+        lineCenter = object.localToGlobal(line.center, ancestor: this).dy;
+        return;
+      }
+      object.visitChildren(visit);
+    }
+
+    visit(firstChild!);
+    if (lineCenter == null) return;
+    final toggle = lastChild!;
+    final data = toggle.parentData! as StackParentData;
+    data.offset = Offset(data.offset.dx, lineCenter! - toggle.size.height / 2);
   }
 }
 
