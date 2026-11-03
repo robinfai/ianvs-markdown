@@ -94,8 +94,23 @@ def sign_app(app, identity, entitlements, test=False):
     options += ['--timestamp=none'] if test else ['--timestamp']
     # Sign nested Mach-O executables and bundles inside-out, never --deep sign.
     paths = sorted(app.rglob('*'), key=lambda p: len(p.parts), reverse=True)
+    # Signing a bundle executable also signs its bundle. Defer entry points
+    # until their nested code is signed, including initially unsigned builds.
+    executables = set()
+    bundles = [app] + [p for p in paths if p.is_dir() and not p.is_symlink()
+                       and p.suffix in ('.framework', '.app', '.xpc', '.appex')]
+    for bundle in bundles:
+        for relative in ('Contents/Info.plist', 'Resources/Info.plist', 'Info.plist'):
+            info = bundle / relative
+            if info.is_file():
+                name = plistlib.loads(info.read_bytes()).get('CFBundleExecutable')
+                if name:
+                    for candidate in (bundle / 'Contents/MacOS' / name, bundle / name):
+                        if candidate.is_file():
+                            executables.add(candidate.resolve())
+                break
     for path in paths:
-        if path.is_symlink():
+        if path.is_symlink() or (path.is_file() and path.resolve() in executables):
             continue
         is_bundle = path.is_dir() and path.suffix in ('.framework', '.app', '.xpc', '.appex')
         is_macho = False
