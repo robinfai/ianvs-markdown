@@ -78,7 +78,10 @@ void main() {
             addTearDown(tester.view.reset);
             final english = List.filled(8, 'Long readable prose').join(' ');
             final chinese = List.filled(8, '中文长段落需要正常换行').join();
-            const label = 'Long link title with several words and 中文标题';
+            final label = List.filled(
+              4,
+              'Long link title with several words and 中文标题',
+            ).join(' ');
             await tester.pumpWidget(
               MaterialApp(
                 home: MediaQuery(
@@ -99,7 +102,7 @@ void main() {
             );
             await tester.pumpAndSettle();
             final table = tester.renderObject<RenderTable>(find.byType(Table));
-            expect(table.size.width, lessThan(3 * (140 * scale + 20)));
+            expect(table.size.width, lessThan(3 * (36 * 14.5 * scale + 20)));
             expect(table.size.width, greaterThan(2 * (140 * scale + 20)));
             final initialWidth = table.size.width;
             await tester.pump();
@@ -107,7 +110,7 @@ void main() {
               table.size.width,
               initialWidth,
               reason:
-                  'Embedded links must keep the fallback width after layout',
+                  'Embedded links must keep their measured width after layout',
             );
             final link = tester.renderObject<RenderBox>(find.text(label));
             final row = table.getRowBox(1);
@@ -127,7 +130,7 @@ void main() {
               );
               expect(
                 paragraph.size.width,
-                lessThanOrEqualTo(140 * scale + .01),
+                lessThanOrEqualTo(36 * 14.5 * scale + .01),
               );
               expect(paragraph.size.height, greaterThan(30 * scale));
             }

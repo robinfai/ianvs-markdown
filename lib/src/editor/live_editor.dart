@@ -40,6 +40,7 @@ import '../renderer/viewport_geometry.dart';
 import '../task_checkbox.dart';
 import '../task_syntax.dart';
 import '../theme.dart';
+import '../table_layout.dart';
 import '../wiki_embed.dart';
 import 'editor_controller.dart';
 import 'block_identity.dart';

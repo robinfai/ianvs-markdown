@@ -15,7 +15,6 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import 'blocked_image.dart';
-import 'reading_table_width.dart';
 import 'callout.dart';
 import 'code_block.dart';
 import 'code_surface.dart';
@@ -56,6 +55,7 @@ import 'inline_code.dart';
 import 'inline_link.dart';
 import 'list_guide.dart';
 import 'markdown_table_syntax.dart';
+import 'table_layout.dart';
 import 'math.dart';
 import 'markdown_document.dart';
 import 'obsidian_autolink.dart';
@@ -2740,12 +2740,7 @@ MarkdownStyleSheet ianvsMarkdownStyleSheet(
       fontSize: 14.5,
       height: 1.58,
     ),
-    // Compact plain-text columns without querying embedded controls for
-    // intrinsic sizes. Long text and links retain a bounded wrapping width.
-    tableColumnWidth: ReadingTableColumnWidth(
-      maximum: MediaQuery.textScalerOf(context).scale(140) + 20,
-      minimum: MediaQuery.textScalerOf(context).scale(32) + 20,
-    ),
+    tableColumnWidth: const AdaptiveMarkdownColumnWidth(),
     tableScrollbarThumbVisibility: true,
     tableBorder: TableBorder.all(color: colors.borderSoft),
     tableHead: TextStyle(
