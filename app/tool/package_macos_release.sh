@@ -12,6 +12,18 @@ RELEASE_REPOSITORY="$GITHUB_REPOSITORY"
 MACOS_SIGNING_IDENTITY="$APPLE_SIGNING_IDENTITY"
 notary_auth=(--apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD")
 mkdir -p "$RELEASE_OUTPUT"
+# Apple's ticket delivery endpoint can briefly drop connections after acceptance.
+# Stapling is idempotent; retry with bounded delays, then fail closed.
+staple_with_retry() {
+  local delay
+  for delay in 0 5 15 30 60; do
+    if [[ "$delay" -gt 0 ]]; then sleep "$delay"; fi
+    if xcrun stapler staple "$1"; then return 0; fi
+    echo "Stapling attempt failed; retrying ticket delivery." >&2
+  done
+  echo "Unable to staple notarization ticket after bounded retries." >&2
+  return 1
+}
 while IFS= read -r -d '' binary; do
   if file -b "$binary" | grep -q 'Mach-O'; then
     lipo "$binary" -verify_arch arm64
@@ -27,7 +39,7 @@ result = json.load(open(sys.argv[1]))
 if result.get('status') != 'Accepted':
     raise SystemExit('Apple notarization was not accepted: ' + str(result.get('status')))
 PY
-xcrun stapler staple "$app"
+staple_with_retry "$app"
 xcrun stapler validate "$app"
 spctl --assess --type execute --verbose=2 "$app"
 # Repackage after stapling, then sign the exact bytes users will download.
@@ -56,7 +68,7 @@ result = json.load(open(sys.argv[1]))
 if result.get('status') != 'Accepted':
     raise SystemExit('Apple DMG notarization was not accepted: ' + str(result.get('status')))
 PY
-xcrun stapler staple "$dmg"
+staple_with_retry "$dmg"
 xcrun stapler validate "$dmg"
 hdiutil verify "$dmg"
 spctl --assess --type open --context context:primary-signature --verbose=2 "$dmg"
