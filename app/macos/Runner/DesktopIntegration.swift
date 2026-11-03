@@ -1,4 +1,5 @@
 import Cocoa
+import ServiceManagement
 import UniformTypeIdentifiers
 
 protocol MarkdownApplicationWorkspace {
@@ -239,5 +240,59 @@ enum WorkspaceFileOperations {
       throw CocoaError(.featureUnsupported)
     }
     return nil
+  }
+}
+
+/// Launch Services discovers embedded extensions when the installed app opens.
+/// Election belongs to macOS; never invoke registration tools from the sandbox.
+final class FinderPreviewSetup {
+  private let defaults = UserDefaults.standard
+  private let key = "finderPreview.setupSeen.v1"
+
+  func state() -> [String: Any] {
+    let app = Bundle.main.bundleURL
+    let applicationFolders = FileManager.default.urls(for: .applicationDirectory, in: [.localDomainMask, .userDomainMask])
+    let installed = applicationFolders.contains { app.path.hasPrefix($0.path + "/") }
+    let extensionURL = app.appendingPathComponent("Contents/PlugIns/LinefoldQuickLook.appex")
+    let bundled = FileManager.default.fileExists(atPath: extensionURL.path)
+    return ["needsSetup": !defaults.bool(forKey: key), "installed": installed,
+            "bundled": bundled]
+  }
+
+  func dismissSetup() { defaults.set(true, forKey: key) }
+
+  func openSettings() -> Bool {
+    if #available(macOS 15, *) {
+      SMAppService.openSystemSettingsLoginItems()
+      return true
+    }
+    return NSWorkspace.shared.open(URL(string:
+      "x-apple.systempreferences:com.apple.ExtensionsPreferences?extensionPointIdentifier=com.apple.quicklook.preview")!)
+  }
+
+  func revealExample(completion: @escaping (Error?) -> Void) {
+    // A user-selected location lets Finder and the preview extension access the
+    // sample without relying on access to the host application's private container.
+    let panel = NSSavePanel()
+    panel.title = "Save Finder Preview Sample"
+    panel.nameFieldStringValue = "Linefold Preview.md"
+    panel.allowedContentTypes = [UTType(importedAs: "net.daringfireball.markdown")]
+    panel.canCreateDirectories = true
+    panel.begin { response in
+      guard response == .OK, let file = panel.url else { completion(nil); return }
+      do {
+        try """
+        # Linefold Finder Preview
+
+        This sentence contains **bold text**.
+
+        | Feature | Result |
+        | --- | --- |
+        | Markdown preview | Ready |
+        """.write(to: file, atomically: true, encoding: .utf8)
+        NSWorkspace.shared.activateFileViewerSelecting([file])
+        completion(nil)
+      } catch { completion(error) }
+    }
   }
 }

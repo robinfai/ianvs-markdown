@@ -14,6 +14,24 @@ import 'support/fakes.dart';
 
 void main() {
   void configure(WidgetTester tester) {
+    const previewChannel = MethodChannel(
+      'work.ianvs.linefold/file_association',
+    );
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      previewChannel,
+      (_) async => {
+        'needsSetup': false,
+        'installed': true,
+        'bundled': true,
+        'registered': true,
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        previewChannel,
+        null,
+      ),
+    );
     tester.view.physicalSize = const Size(840, 560);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);

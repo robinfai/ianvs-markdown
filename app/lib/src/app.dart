@@ -1,3 +1,4 @@
+import 'widgets/finder_preview_settings.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -103,7 +104,11 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
     }
     if (!mounted) return;
     await _fileAssociation.initialize();
-    if (!mounted || !_fileAssociation.needsPrompt) return;
+    if (!mounted) return;
+    if (!_fileAssociation.needsPrompt) {
+      await offerFinderPreviewSetup(_navigatorKey.currentContext!);
+      return;
+    }
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted || _settingsOpen) return;
     _promptOpen = true;
@@ -118,6 +123,7 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
     final saved = await _fileAssociation.setPreference(choice ?? false);
     _promptOpen = false;
     if (mounted && !saved) await _openSettings();
+    if (mounted) await offerFinderPreviewSetup(_navigatorKey.currentContext!);
   }
 
   Future<String?> _requestMobileName(String name) async {

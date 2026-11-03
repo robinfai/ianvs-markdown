@@ -642,3 +642,25 @@ You can cancel or export the available resources. The original document is
 never saved or rewritten by this operation. Bundle output is bounded to 32 MiB
 and 256 unique attachments, and uses the same native atomic destination and
 source-file protection as other exports.
+
+### DMG 首次安装与 Finder 预览开关
+
+将 Linefold 拖入 Applications 并从该位置首次打开。macOS 会在启动时通过 Launch Services
+发现应用及随包扩展；应用展示一次 Finder 预览引导；关闭引导后不会在每次启动重复弹出。
+这不会修改用户在系统中关闭扩展的选择，也不会改变 Markdown 的默认打开应用。
+
+`Linefold → Settings… → Finder preview` 始终提供：
+
+- 安装位置和扩展是否存在；安装成功不等同于用户已授权启用。
+- `Enable / Disable in macOS…`：打开系统扩展管理。在 macOS 15+ 的
+  General → Login Items & Extensions 中进入 Quick Look（或 By App → Linefold）
+  开启/关闭；较旧系统在 Extensions → Quick Look 中管理。
+- `Save Preview Sample…`：将示例保存到文稿或桌面，自动在 Finder 选中；按空格确认标题、粗体、表格正确排版。
+- `Check Again`：重新检查安装状态。
+
+macOS 如询问是否打开下载的应用，或允许 LinefoldQuickLook 访问旧版本的数据，
+需用户在系统对话框中确认。拒绝授权后可稍后从设置重新尝试。更改扩展开关后先关闭
+旧的快速查看窗口，再按空格打开。普通用户不需要执行 `pluginkit` 或其他注册命令。
+
+发布验收应使用带下载隔离属性的签名 DMG，在没有开发构建的账户中验证首次安装、
+开启、关闭、重新开启与首次授权拒绝后的恢复；不要用开发构建的注册状态代替验收。

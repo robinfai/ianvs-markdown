@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'finder_preview_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -188,6 +190,10 @@ class AppSettingsDialog extends StatelessWidget {
                             : 'Restore Previous Default',
                       ),
                     ),
+                  ],
+                  if (Platform.isMacOS) ...[
+                    const Divider(),
+                    const FinderPreviewSettings(),
                   ],
                 ],
               ),
