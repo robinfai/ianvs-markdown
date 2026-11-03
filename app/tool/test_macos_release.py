@@ -2,6 +2,8 @@ import base64
 import plistlib
 import tempfile
 import unittest
+from unittest.mock import patch
+from sign_macos_release import developer_id_identity
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -74,6 +76,22 @@ class MacOSReleaseTests(unittest.TestCase):
         self.plist.write_bytes(plistlib.dumps(info))
         with self.assertRaises(ValueError):
             appcast(self.app, self.archive, 'https://example.com/a.zip', self.signature, self.feed)
+
+    def test_resolves_developer_id_certificate_hash_and_name(self):
+        digest = 'AB' * 20
+        name = 'Developer ID Application: Example (TEAM)'
+        with patch('sign_macos_release.subprocess.check_output', return_value=f'1) {digest} "{name}"'):
+            self.assertEqual(developer_id_identity(digest.lower(), 'keychain'), digest)
+            self.assertEqual(developer_id_identity(name, 'keychain'), digest)
+            self.assertEqual(developer_id_identity('Developer ID Application', 'keychain'), digest)
+            with self.assertRaises(ValueError):
+                developer_id_identity('unknown', 'keychain')
+
+    def test_rejects_development_certificate_even_when_selected_by_hash(self):
+        digest = 'AB' * 20
+        with patch('sign_macos_release.subprocess.check_output', return_value=f'1) {digest} "Apple Development: Example"'):
+            with self.assertRaises(ValueError):
+                developer_id_identity(digest, 'keychain')
 
     def test_public_release_refuses_development_or_adhoc_signatures(self):
         for identity in ('-', 'Apple Development: Example'):

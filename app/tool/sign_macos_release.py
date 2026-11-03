@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import datetime
 import plistlib
+import re
 import shutil
 import subprocess
 import sys
@@ -56,13 +57,24 @@ def sign(bundle: Path, identity: str, keychain: str, entitlements: Path | None =
     subprocess.run(command + [str(bundle)], check=True)
 
 
+def developer_id_identity(identity: str, keychain: str) -> str:
+    """Resolve a certificate name or SHA-1, then validate its actual type."""
+    listing = subprocess.check_output(
+        ['security', 'find-identity', '-v', '-p', 'codesigning', keychain], text=True
+    )
+    candidates = re.findall(r'([0-9A-Fa-f]{40}) "([^"\n]+)"', listing)
+    matches = [(digest, name) for digest, name in candidates
+               if identity and (digest.lower() == identity.lower() or identity in name)]
+    if len(matches) != 1 or not matches[0][1].startswith('Developer ID Application:'):
+        raise ValueError('Signing identity must resolve to one valid Developer ID Application certificate')
+    return matches[0][0]
+
+
 def main():
     app = Path(sys.argv[1]).resolve(strict=True)
     source = Path(__file__).resolve().parents[1]
-    identity = os.environ['APPLE_SIGNING_IDENTITY']
-    if not identity.startswith('Developer ID Application:'):
-        raise ValueError('Public releases require Developer ID Application signing')
     keychain = os.environ['SIGNING_KEYCHAIN']
+    identity = developer_id_identity(os.environ['APPLE_SIGNING_IDENTITY'], keychain)
     entitlements = cloud_entitlements(app, source)
     bundles = [p for p in app.rglob('*') if p.is_dir() and not p.is_symlink()
                and p.suffix in ('.framework', '.appex', '.app', '.xpc')]
