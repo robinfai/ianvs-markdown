@@ -45,6 +45,16 @@ enum QuickLookTests {
       _ = try MarkdownPreview.source(for: directory.appendingPathComponent("missing.md"))
       preconditionFailure("Missing file must report an error")
     } catch { checks += 1 }
+    let document = directory.appendingPathComponent("document.md")
+    let image = directory.appendingPathComponent("image.png")
+    try Data([1, 2, 3]).write(to: image)
+    check(MarkdownPreview.imageData("image.png", documentURL: document) == Data([1, 2, 3]), "Relative image")
+    check(MarkdownPreview.imageData("https://example.com/image.png", documentURL: document) == nil, "No remote image")
+    check(MarkdownPreview.imageData(image.absoluteString, documentURL: document) == nil, "No absolute file URL")
+    check(MarkdownPreview.imageData("../image.png", documentURL: document) == nil, "No parent traversal")
+    let link = directory.appendingPathComponent("escape.png")
+    try FileManager.default.createSymbolicLink(at: link, withDestinationURL: URL(fileURLWithPath: "/etc/hosts"))
+    check(MarkdownPreview.imageData("escape.png", documentURL: document) == nil, "No symlink escape")
     if CommandLine.arguments.count == 3 {
       let fixture = URL(fileURLWithPath: CommandLine.arguments[1])
       let output = URL(fileURLWithPath: CommandLine.arguments[2])

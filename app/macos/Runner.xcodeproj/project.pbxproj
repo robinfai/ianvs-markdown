@@ -35,7 +35,7 @@
 		3EFE8FE877BF5727ED63B724 /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D76D2FF63BA2BFC5FE64E935 /* Pods_RunnerTests.framework */; };
 		5AB1F3CB7D9BEB23F2A115FB /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C77BC5726F1238990577757E /* Cocoa.framework */; };
 		78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */; };
-		79362785FEE637743CECD53D /* LinefoldQuickLook.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 002B081F75F73A0931080287 /* LinefoldQuickLook.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		79362785FEE637743CECD53D /* LinefoldQuickLook.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 002B081F75F73A0931080287 /* LinefoldQuickLook.appex */; };
 		7BB0743EE8EB4570159DBF31 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9DE09AFE3F237A304DABAF0D /* Pods_Runner.framework */; };
 		F103D3012026092300000001 /* DesktopIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = F103D3012026092300000002 /* DesktopIntegration.swift */; };
 		F4DE0E076CD303F56BB48760 /* PreviewProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ADE972D1CA7D8BFEA30FB76 /* PreviewProvider.swift */; };

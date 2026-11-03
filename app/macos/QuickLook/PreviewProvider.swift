@@ -22,6 +22,20 @@ enum MarkdownPreview {
     guard let text else { throw CocoaError(.fileReadInapplicableStringEncoding) }
     return text
   }
+  static func imageData(_ value: String, documentURL: URL) -> Data? {
+    guard let relative = URL(string: value), relative.scheme == nil,
+          !value.hasPrefix("/"), !value.hasPrefix("//"),
+          !relative.path.split(separator: "/").contains("..") else { return nil }
+    let directory = documentURL.deletingLastPathComponent().standardizedFileURL.resolvingSymlinksInPath()
+    guard let resolved = URL(string: value, relativeTo: directory.appendingPathComponent("", isDirectory: true)) else { return nil }
+    let target = resolved.absoluteURL.standardizedFileURL.resolvingSymlinksInPath()
+    guard target.path.hasPrefix(directory.path + "/"),
+          let handle = try? FileHandle(forReadingFrom: target) else { return nil }
+    defer { try? handle.close() }
+    guard let data = try? handle.read(upToCount: 8 * 1024 * 1024 + 1), data.count <= 8 * 1024 * 1024 else { return nil }
+    return data
+  }
+
 }
 
 #if !QUICKLOOK_READER_TEST
@@ -98,14 +112,8 @@ final class PreviewProvider: NSViewController, QLPreviewingController {
   // Never fetch network URLs or widen access beyond the document directory.
   // Finder's sandbox may deny sibling files; return a placeholder in that case.
   private func image(_ value: String?) -> FlutterStandardTypedData? {
-    guard let value, let documentURL, let relative = URL(string: value), relative.scheme == nil,
-          !value.hasPrefix("/"), !value.hasPrefix("//") else { return nil }
-    let directory = documentURL.deletingLastPathComponent().resolvingSymlinksInPath()
-    let target = URL(string: value, relativeTo: directory.appendingPathComponent("", isDirectory: true))!.absoluteURL.resolvingSymlinksInPath()
-    guard target.path.hasPrefix(directory.path + "/"),
-          let handle = try? FileHandle(forReadingFrom: target) else { return nil }
-    defer { try? handle.close() }
-    guard let data = try? handle.read(upToCount: 8 * 1024 * 1024 + 1), data.count <= 8 * 1024 * 1024 else { return nil }
+    guard let value, let documentURL,
+          let data = MarkdownPreview.imageData(value, documentURL: documentURL) else { return nil }
     return FlutterStandardTypedData(bytes: data)
   }
 
