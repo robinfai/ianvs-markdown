@@ -135,6 +135,28 @@ void main() {
     },
   );
 
+  test('reference reuse is current inside notifications, including redo', () {
+    final controller = IanvsMarkdownController(text: '[ref]: /old');
+    addTearDown(controller.dispose);
+    final observed = <String?>[];
+    controller.addListener(() {
+      final references = ianvsMarkdownControllerReferences(
+        controller,
+        controller.text,
+      );
+      expect(references, isNotNull);
+      observed.add(references!.references['ref']?.destination);
+    });
+    controller.text = '[ref]: /new';
+    expect(observed.last, '/new');
+    controller.undo();
+    expect(observed.last, '/old');
+    controller.redo();
+    expect(observed.last, '/new');
+    controller.text = 'no references';
+    expect(observed.last, isNull);
+  });
+
   test(
     'cached vector dots match original pixels with clipping, scale and custom overlap',
     () async {
@@ -200,11 +222,14 @@ void main() {
               return bytes;
             }
 
-            expect(
-              await render(true),
-              await render(false),
-              reason: '$scale / $dots / $origin',
-            );
+            final expected = await render(false);
+            for (var repeat = 0; repeat < 3; repeat++) {
+              expect(
+                await render(true),
+                expected,
+                reason: '$scale / $dots / $origin / cache reuse $repeat',
+              );
+            }
           }
         }
       }

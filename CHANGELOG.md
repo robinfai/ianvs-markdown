@@ -60,6 +60,14 @@
   budgets, storage durability and original pixels. Measurement scope is tracked
   in the [small-document report](benchmark/SMALL-DOCUMENT-LATENCY-2026-10-15.md).
 
+- Share content-aware Markdown table widths between reading and Live Preview.
+  Keep short fields compact, account for headers and inline typography, wrap
+  bounded long columns, and scroll wide tables instead of crushing columns on
+  narrow or text-scaled screens. Preserve explicit host column-width policies,
+  alignment, source text and exports. Cache measurements across viewport/focus
+  changes; keep keyboard focus and structural drag handles usable while scrolled.
+  See [table layout behavior and regression scenarios](doc/TABLE_LAYOUT.md).
+
 - Use the public TextKit 1 compatibility path for the two macOS hosts' hidden
   Flutter text-input view on macOS 27, before activation and outside composition.
   Keep full text, selection and accessibility intact. Two paired Profile runs

@@ -41,6 +41,7 @@ import '../renderer/viewport_geometry.dart';
 import '../task_checkbox.dart';
 import '../task_syntax.dart';
 import '../theme.dart';
+import '../table_layout.dart';
 import '../wiki_embed.dart';
 import 'editor_controller.dart';
 import 'block_identity.dart';
@@ -4088,14 +4089,10 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         onEditImage: (imageIndex) => _editStandardImage(block, imageIndex),
         checkboxBuilder: sourceTasks.isNotEmpty
             ? (checked) {
-                final taskIndex = renderedTaskIndex;
-                final task = taskIndex < sourceTasks.length
-                    ? sourceTasks[taskIndex]
-                    : IanvsMarkdownTaskSourceMarker(
-                        marker: checked ? 'x' : ' ',
-                        offset: -1,
-                        nestLevel: 0,
-                      );
+                // The Markdown subtree can rebuild when folding changes its
+                // constraints without recreating this builder closure.
+                final taskIndex = renderedTaskIndex % sourceTasks.length;
+                final task = sourceTasks[taskIndex];
                 renderedTaskIndex += 1;
                 return IanvsMarkdownTaskCheckbox(
                   value: ianvsMarkdownTaskMarkerIsChecked(task.marker),

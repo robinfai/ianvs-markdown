@@ -65,6 +65,10 @@ void main() {
             final header = find.byKey(
               const ValueKey('ianvs-markdown-table-0-3'),
             );
+            // Narrow / scaled tables keep readable column floors and scroll
+            // instead of compressing every field into a few characters.
+            await Scrollable.ensureVisible(tester.element(header));
+            await tester.pumpAndSettle();
             await tester.tap(header);
             await tester.pumpAndSettle();
             expect(
