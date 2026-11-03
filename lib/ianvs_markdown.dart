@@ -19,7 +19,10 @@ export 'src/code_layout.dart' show IanvsMarkdownCodeLayout;
 export 'src/blocked_image.dart';
 export 'src/callout.dart';
 export 'src/editor/editor_controller.dart'
-    hide ianvsMarkdownInlineSourceRangeAt, markdownInlineVisibleSourceRanges;
+    hide
+        ianvsMarkdownInlineSourceRangeAt,
+        markdownInlineVisibleSourceRanges,
+        ianvsMarkdownControllerReferences;
 export 'src/editor/editor_models.dart';
 export 'src/editor/editor_shortcuts.dart';
 export 'src/editor/editor_toolbar.dart';

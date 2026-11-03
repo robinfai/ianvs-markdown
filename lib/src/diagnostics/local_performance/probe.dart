@@ -14,6 +14,10 @@ import 'probe_stub.dart' if (dart.library.io) 'probe_io.dart';
 
 const localPerformanceEnabled = bool.fromEnvironment('IANVS_LOCAL_PERFORMANCE');
 const _attribution = bool.fromEnvironment('IANVS_PERF_ATTRIBUTION');
+const _attributionBytes = int.fromEnvironment(
+  'IANVS_PERF_ATTRIBUTION_BYTES',
+  defaultValue: 1048576,
+);
 
 /// Host wiring only. The existing main, editor tree and file services remain.
 class LocalPerformanceHost {
@@ -417,7 +421,7 @@ class LocalPerformanceRun {
         'monoFontFamilyFallback': theme.monoFontFamilyFallback,
       };
       for (final bytes in localCorpusSizes) {
-        if (_attribution && bytes != 1048576) continue;
+        if (_attribution && bytes != _attributionBytes) continue;
         size = bytes;
         source = localCorpus(bytes);
         filePath = await storage!.fixture(bytes, source);
@@ -440,6 +444,8 @@ class LocalPerformanceRun {
           if (_attribution &&
               !const {
                 'readToLive',
+                'sourceToRead',
+                'save',
                 'sourceType',
                 'liveType',
                 'sourcePaste',
