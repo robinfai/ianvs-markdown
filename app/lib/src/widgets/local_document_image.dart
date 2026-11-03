@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -79,8 +80,9 @@ class _LocalDocumentImageState extends State<LocalDocumentImage> {
                     image.bytes,
                     cacheWidth: 2048,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, error, stack) =>
-                        Text('Unable to decode image: $error'),
+                    errorBuilder: (_, error, stack) => Text(
+                      appText(context, "Unable to decode image: {0}", [error]),
+                    ),
                   ),
           );
         },

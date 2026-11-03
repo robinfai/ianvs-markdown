@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'package:flutter/material.dart';
 
 import '../services/note_templates.dart';
@@ -30,7 +31,11 @@ class _NoteTemplateDialogState extends State<NoteTemplateDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: Text(widget.insert ? 'Insert template' : 'New note from template'),
+    title: Text(
+      widget.insert
+          ? appText(context, "Insert template")
+          : appText(context, "New note from template"),
+    ),
     content: SizedBox(
       width: 600,
       height: 440,
@@ -55,11 +60,15 @@ class _NoteTemplateDialogState extends State<NoteTemplateDialog> {
             key: const ValueKey('template-title'),
             controller: _title,
             autofocus: true,
-            decoration: const InputDecoration(labelText: 'Note title'),
+            decoration: InputDecoration(
+              labelText: appText(context, "Note title"),
+            ),
           ),
-          const Text(
-            'Variables: {{title}}, {{title_yaml}}, {{date}}, {{time}}. '
-            'Use title_yaml for a quoted YAML title.',
+          Text(
+            appText(
+              context,
+              "Variables: {{title}}, {{title_yaml}}, {{date}}, {{time}}. Use title_yaml for a quoted YAML title.",
+            ),
           ),
           Expanded(
             child: TextField(
@@ -68,7 +77,9 @@ class _NoteTemplateDialogState extends State<NoteTemplateDialog> {
               expands: true,
               maxLines: null,
               minLines: null,
-              decoration: const InputDecoration(labelText: 'Template Markdown'),
+              decoration: InputDecoration(
+                labelText: appText(context, "Template Markdown"),
+              ),
             ),
           ),
         ],
@@ -77,7 +88,7 @@ class _NoteTemplateDialogState extends State<NoteTemplateDialog> {
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: const Text('Cancel'),
+        child: Text(appText(context, "Cancel")),
       ),
       FilledButton(
         onPressed: () {
@@ -94,7 +105,11 @@ class _NoteTemplateDialogState extends State<NoteTemplateDialog> {
             ),
           );
         },
-        child: Text(widget.insert ? 'Insert' : 'Create'),
+        child: Text(
+          widget.insert
+              ? appText(context, "Insert")
+              : appText(context, "Create"),
+        ),
       ),
     ],
   );

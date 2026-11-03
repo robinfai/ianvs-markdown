@@ -655,7 +655,6 @@ source-file protection as other exports.
 - `Enable / Disable in macOS…`：打开系统扩展管理。在 macOS 15+ 的
   General → Login Items & Extensions 中进入 Quick Look（或 By App → Linefold）
   开启/关闭；较旧系统在 Extensions → Quick Look 中管理。
-- `Save Preview Sample…`：将示例保存到文稿或桌面，自动在 Finder 选中；按空格确认标题、粗体、表格正确排版。
 - `Check Again`：重新检查安装状态。
 
 macOS 如询问是否打开下载的应用，或允许 LinefoldQuickLook 访问旧版本的数据，
@@ -664,3 +663,11 @@ macOS 如询问是否打开下载的应用，或允许 LinefoldQuickLook 访问�
 
 发布验收应使用带下载隔离属性的签名 DMG，在没有开发构建的账户中验证首次安装、
 开启、关闭、重新开启与首次授权拒绝后的恢复；不要用开发构建的注册状态代替验收。
+
+### 界面语言
+
+应用仅支持 `zh` 和 `en`，默认按系统首选语言顺序匹配，支持地区和文字变体
+（如 `zh-CN`、`zh-TW`、`zh-Hant`、`en-GB`）。没有可匹配的语言时使用英语。
+Flutter 控件、编辑器内置操作和应用菜单共用这一语言选择；不会翻译用户文档、
+文件名、路径或 YAML 属性名。界面模板集中在 `lib/src/app_localizations.dart`。
+访达预览引导只保留系统开关和状态检查，不再生成或保存示例文件。

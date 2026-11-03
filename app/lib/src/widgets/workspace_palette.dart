@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
@@ -136,7 +137,9 @@ class _WorkspacePaletteState extends State<WorkspacePalette> {
                 key: const ValueKey('workspace-palette-query'),
                 controller: _query,
                 autofocus: true,
-                decoration: const InputDecoration(labelText: 'Search'),
+                decoration: InputDecoration(
+                  labelText: appText(context, "Search"),
+                ),
                 onChanged: (_) => setState(() => _selected = 0),
                 onSubmitted: (_) {
                   if (entries.isNotEmpty) {
@@ -166,17 +169,19 @@ class _WorkspacePaletteState extends State<WorkspacePalette> {
               if (widget.allowCreate && _query.text.trim().isNotEmpty)
                 TextButton(
                   onPressed: _create,
-                  child: Text('Create “${_query.text.trim()}”'),
+                  child: Text(
+                    appText(context, "Create “{0}”", [_query.text.trim()]),
+                  ),
                 )
               else
-                const Text('No matching results'),
+                Text(appText(context, "No matching results")),
           ],
         ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(appText(context, "Cancel")),
         ),
       ],
     );

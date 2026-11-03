@@ -1,3 +1,6 @@
+import 'app_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'widgets/finder_preview_settings.dart';
 import 'dart:async';
 import 'dart:io';
@@ -253,6 +256,15 @@ class _LinefoldAppState extends State<LinefoldApp> with WidgetsBindingObserver {
       scaffoldMessengerKey: _messengerKey,
       debugShowCheckedModeBanner: false,
       title: 'Linefold',
+      supportedLocales: appSupportedLocales,
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      localeListResolutionCallback: resolveAppLocale,
+      builder: (context, child) => IanvsMarkdownLocalization(
+        strings: Localizations.localeOf(context).languageCode == 'zh'
+            ? const IanvsMarkdownStrings.chinese()
+            : const IanvsMarkdownStrings.english(),
+        child: child!,
+      ),
       themeMode: _themeMode,
       theme: desktopTheme(
         Brightness.light,

@@ -134,7 +134,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('工作区'));
+      await tester.tap(find.byTooltip('Workspace'));
       await tester.pumpAndSettle();
       final row = find.byKey(const ValueKey('workspace-file-/vault/note.md'));
       expect(tester.getSize(row).height, greaterThanOrEqualTo(42));
@@ -220,18 +220,20 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       tester
-          .widget<FilledButton>(find.widgetWithText(FilledButton, '使用所选云端版本'))
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Use selected cloud version'),
+          )
           .onPressed,
       isNull,
     );
-    await tester.tap(find.text('比较'));
+    await tester.tap(find.text('Compare'));
     await tester.pumpAndSettle();
     expect(find.text('Compare Changes'), findsOneWidget);
     Navigator.of(tester.element(find.text('Compare Changes'))).pop();
     await tester.pumpAndSettle();
     await tester.tap(find.text('Other device'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('使用所选云端版本'));
+    await tester.tap(find.text('Use selected cloud version'));
     await tester.pumpAndSettle();
     expect(choice, '0');
     expect(tester.takeException(), isNull);

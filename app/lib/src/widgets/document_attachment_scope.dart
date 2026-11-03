@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -252,7 +253,7 @@ class _DocumentAttachmentImageState extends State<DocumentAttachmentImage> {
     if (_image case final image?) {
       return Semantics(
         image: true,
-        label: widget.label ?? 'Image attachment',
+        label: widget.label ?? appText(context, "Image attachment"),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 2048, maxHeight: 2048),
           child: RawImage(image: image.image, fit: BoxFit.contain),
@@ -271,7 +272,7 @@ class _DocumentAttachmentImageState extends State<DocumentAttachmentImage> {
         spacing: 8,
         children: [
           const Icon(Icons.image_outlined, size: 20),
-          Text(_error?.message ?? 'Loading image…'),
+          Text(_error?.message ?? appText(context, "Loading image…")),
           if (_error != null &&
               !{
                 AttachmentFailureKind.needsFolder,
@@ -280,7 +281,7 @@ class _DocumentAttachmentImageState extends State<DocumentAttachmentImage> {
               }.contains(_error!.kind))
             TextButton(
               onPressed: _repository!.refresh,
-              child: const Text('Retry'),
+              child: Text(appText(context, "Retry")),
             ),
         ],
       ),

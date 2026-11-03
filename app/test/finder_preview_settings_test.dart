@@ -62,7 +62,7 @@ void main() {
   }
 
   testWidgets(
-    'management and verification use separate native actions without claiming enabled',
+    'management opens system settings without sample export or claiming enabled',
     (tester) async {
       await mount(tester);
       expect(
@@ -72,9 +72,9 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('manage-finder-preview')));
       await tester.pumpAndSettle();
       expect(calls, contains('openFinderPreviewSettings'));
-      await tester.tap(find.byKey(const ValueKey('verify-finder-preview')));
-      await tester.pumpAndSettle();
-      expect(calls, contains('revealFinderPreviewExample'));
+      expect(find.byKey(const ValueKey('verify-finder-preview')), findsNothing);
+      expect(find.text('Save Preview Sample…'), findsNothing);
+      expect(calls, isNot(contains('revealFinderPreviewExample')));
       expect(calls, isNot(contains('setPreference')));
     },
   );
@@ -85,14 +85,7 @@ void main() {
       installed = false;
       await mount(tester);
       expect(find.textContaining('Move Linefold from the DMG'), findsOneWidget);
-      expect(
-        tester
-            .widget<TextButton>(
-              find.byKey(const ValueKey('verify-finder-preview')),
-            )
-            .onPressed,
-        isNull,
-      );
+      expect(find.byKey(const ValueKey('verify-finder-preview')), findsNothing);
     },
   );
 
@@ -105,7 +98,10 @@ void main() {
       expect(find.textContaining('extension is missing'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('manage-finder-preview')));
       await tester.pumpAndSettle();
-      expect(find.text('Open System Settings manually.'), findsOneWidget);
+      expect(
+        find.textContaining('Unable to open preview settings.'),
+        findsOneWidget,
+      );
       expect(
         tester
             .widget<OutlinedButton>(

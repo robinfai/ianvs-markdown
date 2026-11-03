@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -17,7 +18,7 @@ Future<void> offerFinderPreviewSetup(BuildContext context) async {
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Preview Markdown in Finder'),
+        title: Text(appText(context, "Preview Markdown in Finder")),
         content: const SizedBox(
           width: 440,
           child: SingleChildScrollView(child: FinderPreviewSettings()),
@@ -25,7 +26,7 @@ Future<void> offerFinderPreviewSetup(BuildContext context) async {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Done / Set Up Later'),
+            child: Text(appText(context, "Done / Set Up Later")),
           ),
         ],
       ),
@@ -101,12 +102,11 @@ class _FinderPreviewSettingsState extends State<FinderPreviewSettings>
     });
     try {
       await finderPreviewChannel.invokeMethod<void>(method);
-    } on Object catch (error) {
+    } on Object {
       if (mounted) {
         setState(
-          () => _error = error is PlatformException
-              ? error.message ?? 'Unable to complete this action.'
-              : 'Unable to complete this action. Try again.',
+          () => _error =
+              'Unable to open preview settings. Open System Settings → General → Login Items & Extensions → Quick Look.',
         );
       }
     } finally {
@@ -122,35 +122,49 @@ class _FinderPreviewSettingsState extends State<FinderPreviewSettings>
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text('Finder preview', style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          appText(context, "Finder preview"),
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         const SizedBox(height: 8),
         if (_state == null && _error == null) const LinearProgressIndicator(),
         if (_state != null)
           Text(
             !installed
-                ? 'Move Linefold from the DMG to Applications, then open that copy to finish setup.'
+                ? appText(
+                    context,
+                    "Move Linefold from the DMG to Applications, then open that copy to finish setup.",
+                  )
                 : !bundled
-                ? 'The preview extension is missing. Reinstall Linefold from the official DMG.'
-                : 'Preview extension installed. Its on/off switch is managed by macOS.',
+                ? appText(
+                    context,
+                    "The preview extension is missing. Reinstall Linefold from the official DMG.",
+                  )
+                : appText(
+                    context,
+                    "Preview extension installed. Its on/off switch is managed by macOS.",
+                  ),
           ),
         const SizedBox(height: 8),
-        const Text(
-          'Enable or disable Linefold under Quick Look in System Settings. '
-          'On macOS 15 or later: General → Login Items & Extensions → Quick Look '
-          '(or By App → Linefold). On older versions, search for Extensions → Quick Look.',
+        Text(
+          appText(
+            context,
+            "Enable or disable Linefold under Quick Look in System Settings. On macOS 15 or later: General → Login Items & Extensions → Quick Look (or By App → Linefold). On older versions, search for Extensions → Quick Look.",
+          ),
         ),
         const SizedBox(height: 8),
-        const Text(
-          'If macOS asks to open Linefold or allow LinefoldQuickLook to access data '
-          'from an earlier version, approve the system dialog to continue. '
-          'If you decline, you can return here later. No Terminal commands are needed.',
+        Text(
+          appText(
+            context,
+            "If macOS asks to open Linefold or allow LinefoldQuickLook to access data from an earlier version, approve the system dialog to continue. If you decline, you can return here later. No Terminal commands are needed.",
+          ),
         ),
         const SizedBox(height: 8),
-        const Text(
-          'To verify: save the sample to Documents or Desktop, then press Space in Finder. '
-          'You should see a large heading, bold text and a table. '
-          'After changing the switch, close any existing preview and reopen it. '
-          'This does not change the default app for opening .md files.',
+        Text(
+          appText(
+            context,
+            "After changing the switch, close any existing preview and reopen it. This does not change the default app for opening .md files.",
+          ),
         ),
         Wrap(
           spacing: 8,
@@ -160,24 +174,17 @@ class _FinderPreviewSettingsState extends State<FinderPreviewSettings>
               onPressed: _busy
                   ? null
                   : () => _perform('openFinderPreviewSettings'),
-              child: const Text('Enable / Disable in macOS…'),
-            ),
-            TextButton(
-              key: const ValueKey('verify-finder-preview'),
-              onPressed: _busy || !installed || !bundled
-                  ? null
-                  : () => _perform('revealFinderPreviewExample'),
-              child: const Text('Save Preview Sample…'),
+              child: Text(appText(context, "Enable / Disable in macOS…")),
             ),
             TextButton(
               onPressed: _busy ? null : _refresh,
-              child: const Text('Check Again'),
+              child: Text(appText(context, "Check Again")),
             ),
           ],
         ),
         if (_error != null)
           Text(
-            _error!,
+            appText(context, _error!),
             style: TextStyle(color: Theme.of(context).colorScheme.error),
           ),
       ],

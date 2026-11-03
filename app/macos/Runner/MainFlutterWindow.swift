@@ -233,11 +233,6 @@ class MainFlutterWindow: NSWindow {
       case "openFinderPreviewSettings":
         if self.finderPreviewSetup.openSettings() { result(nil) }
         else { result(FlutterError(code: "settings_unavailable", message: "Open System Settings and search for Extensions, then Quick Look.", details: nil)) }
-      case "revealFinderPreviewExample":
-        self.finderPreviewSetup.revealExample { error in
-          if let error { result(FlutterError(code: "preview_example_failed", message: error.localizedDescription, details: nil)) }
-          else { result(nil) }
-        }
       case "getState":
         result(self.fileAssociation.state())
       case "setPreference":

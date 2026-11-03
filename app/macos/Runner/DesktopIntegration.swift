@@ -2,6 +2,13 @@ import Cocoa
 import ServiceManagement
 import UniformTypeIdentifiers
 
+private func desktopText(_ english: String, _ chinese: String) -> String {
+  let language = Bundle.preferredLocalizations(
+    from: ["en", "zh"], forPreferences: Locale.preferredLanguages
+  ).first ?? "en"
+  return language == "zh" ? chinese : english
+}
+
 protocol MarkdownApplicationWorkspace {
   func defaultApplication() -> URL?
   func setDefaultApplication(_ application: URL, completion: @escaping (Error?) -> Void)
@@ -30,9 +37,9 @@ final class MacOSMarkdownApplicationWorkspace: MarkdownApplicationWorkspace {
 
   func chooseApplication(completion: @escaping (URL?) -> Void) {
     let panel = NSOpenPanel()
-    panel.title = "Default Markdown Application"
-    panel.message = "Choose the application that should open .md files."
-    panel.prompt = "Choose"
+    panel.title = desktopText("Default Markdown Application", "默认 Markdown 应用")
+    panel.message = desktopText("Choose the application that should open .md files.", "选择用于打开 .md 文件的应用。")
+    panel.prompt = desktopText("Choose", "选择")
     panel.allowedContentTypes = [.applicationBundle]
     panel.directoryURL = URL(fileURLWithPath: "/Applications", isDirectory: true)
     panel.canChooseDirectories = false
@@ -270,29 +277,4 @@ final class FinderPreviewSetup {
       "x-apple.systempreferences:com.apple.ExtensionsPreferences?extensionPointIdentifier=com.apple.quicklook.preview")!)
   }
 
-  func revealExample(completion: @escaping (Error?) -> Void) {
-    // A user-selected location lets Finder and the preview extension access the
-    // sample without relying on access to the host application's private container.
-    let panel = NSSavePanel()
-    panel.title = "Save Finder Preview Sample"
-    panel.nameFieldStringValue = "Linefold Preview.md"
-    panel.allowedContentTypes = [UTType(importedAs: "net.daringfireball.markdown")]
-    panel.canCreateDirectories = true
-    panel.begin { response in
-      guard response == .OK, let file = panel.url else { completion(nil); return }
-      do {
-        try """
-        # Linefold Finder Preview
-
-        This sentence contains **bold text**.
-
-        | Feature | Result |
-        | --- | --- |
-        | Markdown preview | Ready |
-        """.write(to: file, atomically: true, encoding: .utf8)
-        NSWorkspace.shared.activateFileViewerSelecting([file])
-        completion(nil)
-      } catch { completion(error) }
-    }
-  }
 }

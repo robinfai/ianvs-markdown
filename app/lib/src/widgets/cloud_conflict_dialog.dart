@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'package:flutter/material.dart';
 import '../services/cloud_conflict_service.dart';
 import 'save_conflict_diff_dialog.dart';
@@ -20,7 +21,7 @@ class _CloudConflictDialogState extends State<CloudConflictDialog> {
   String? selected;
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: const Text('解决 iCloud 冲突'),
+    title: Text(appText(context, "解决 iCloud 冲突")),
     scrollable: true,
     content: SizedBox(
       width: 480,
@@ -28,8 +29,11 @@ class _CloudConflictDialogState extends State<CloudConflictDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '选择要作为当前文档的版本。其他不同内容会先保存为同目录下的 conflict 副本，成功后才将这些云端版本标记为已解决。',
+          Text(
+            appText(
+              context,
+              "选择要作为当前文档的版本。其他不同内容会先保存为同目录下的 conflict 副本，成功后才将这些云端版本标记为已解决。",
+            ),
           ),
           const SizedBox(height: 12),
           for (final version in widget.review.versions)
@@ -43,7 +47,7 @@ class _CloudConflictDialogState extends State<CloudConflictDialog> {
               title: Text(version.name),
               onTap: () => setState(() => selected = version.id),
               trailing: TextButton(
-                child: const Text('比较'),
+                child: Text(appText(context, "比较")),
                 onPressed: () => showDialog<void>(
                   context: context,
                   builder: (_) => SaveConflictDiffDialog(
@@ -61,7 +65,7 @@ class _CloudConflictDialogState extends State<CloudConflictDialog> {
                 local: widget.local,
               ),
             ),
-            child: const Text('比较磁盘与当前编辑'),
+            child: Text(appText(context, "比较磁盘与当前编辑")),
           ),
         ],
       ),
@@ -69,21 +73,21 @@ class _CloudConflictDialogState extends State<CloudConflictDialog> {
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: const Text('取消'),
+        child: Text(appText(context, "取消")),
       ),
       TextButton(
         onPressed: () => Navigator.pop(context, 'keepAll'),
-        child: const Text('全部保留'),
+        child: Text(appText(context, "全部保留")),
       ),
       TextButton(
         onPressed: () => Navigator.pop(context, 'local'),
-        child: const Text('使用当前编辑'),
+        child: Text(appText(context, "使用当前编辑")),
       ),
       FilledButton(
         onPressed: selected == null
             ? null
             : () => Navigator.pop(context, selected),
-        child: const Text('使用所选云端版本'),
+        child: Text(appText(context, "使用所选云端版本")),
       ),
     ],
   );

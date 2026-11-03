@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'package:flutter/material.dart';
 
 import '../controllers/document_sync_controller.dart';
@@ -25,7 +26,7 @@ class DocumentSyncIndicator extends StatelessWidget {
                 controller.metadata.state != CloudSyncState.conflict)
         ? const SizedBox.shrink()
         : Tooltip(
-            message: 'Cloud status details and retry',
+            message: appText(context, "Cloud status details and retry"),
             child: Semantics(
               liveRegion: true,
               button: true,
@@ -41,7 +42,7 @@ class DocumentSyncIndicator extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Text(
-                    controller.metadata.label,
+                    appText(context, controller.metadata.label),
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.error,
                       fontWeight: FontWeight.w600,
@@ -72,7 +73,7 @@ class _SyncDetails extends StatelessWidget {
     builder: (context, _) {
       final metadata = controller.metadata;
       return AlertDialog(
-        title: const Text('Cloud status'),
+        title: Text(appText(context, "Cloud status")),
         scrollable: true,
         content: SizedBox(
           width: 420,
@@ -81,20 +82,32 @@ class _SyncDetails extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                controller.checking ? 'Checking cloud status' : metadata.label,
+                controller.checking
+                    ? appText(context, "Checking cloud status")
+                    : appText(context, metadata.label),
               ),
               const SizedBox(height: 12),
-              Text(metadata.explanation),
+              Text(metadata.detail ?? appText(context, metadata.explanation)),
               if (metadata.observedAt case final sampled?) ...[
                 const SizedBox(height: 8),
-                Text('Observed on this device: ${sampled.toLocal()}'),
+                Text(
+                  appText(context, "Observed on this device: {0}", [
+                    sampled.toLocal(),
+                  ]),
+                ),
               ],
               if (metadata.state == CloudSyncState.conflict) ...[
                 const SizedBox(height: 12),
                 Text(
                   metadata.conflictsAvailable
-                      ? 'Conflict versions reported by the system (up to 50):'
-                      : 'Conflict version details are unavailable.',
+                      ? appText(
+                          context,
+                          "Conflict versions reported by the system (up to 50):",
+                        )
+                      : appText(
+                          context,
+                          "Conflict version details are unavailable.",
+                        ),
                 ),
                 for (final version in metadata.conflicts)
                   Padding(
@@ -114,7 +127,7 @@ class _SyncDetails extends StatelessWidget {
                 Navigator.of(context).pop();
                 onResolve!();
               },
-              child: const Text('解决冲突'),
+              child: Text(appText(context, "解决冲突")),
             ),
 
           if (onSaveCopy != null)
@@ -123,7 +136,7 @@ class _SyncDetails extends StatelessWidget {
                 Navigator.of(context).pop();
                 onSaveCopy!();
               },
-              child: const Text('Save a copy'),
+              child: Text(appText(context, "Save a copy")),
             ),
 
           TextButton(
@@ -133,11 +146,11 @@ class _SyncDetails extends StatelessWidget {
                     controller.path == null
                 ? null
                 : controller.refresh,
-            child: const Text('Check again'),
+            child: Text(appText(context, "Check again")),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
+            child: Text(appText(context, "Close")),
           ),
         ],
       );

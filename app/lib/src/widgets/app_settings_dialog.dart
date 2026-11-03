@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'dart:io';
 import 'finder_preview_settings.dart';
 import 'package:flutter/material.dart';
@@ -27,7 +28,7 @@ class AppSettingsDialog extends StatelessWidget {
         final state = controller.state;
         return AlertDialog(
           constraints: const BoxConstraints(maxWidth: 480),
-          title: const Text('Settings'),
+          title: Text(appText(context, "Settings")),
           content: SizedBox(
             width: 400,
             child: SingleChildScrollView(
@@ -36,16 +37,26 @@ class AppSettingsDialog extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (workspace case final workspace?) ...[
-                    Text('Reading', style: DesktopTypography.headline),
                     Text(
-                      'Text size: ${workspace.readingPreferences.fontSize.toStringAsFixed(1)}',
+                      appText(context, "Reading"),
+                      style: DesktopTypography.headline,
+                    ),
+                    Text(
+                      appText(context, "Text size: {0}", [
+                        workspace.readingPreferences.fontSize.toStringAsFixed(
+                          1,
+                        ),
+                      ]),
                     ),
                     Slider(
                       key: const ValueKey('reading-font-size'),
                       label:
                           '${workspace.readingPreferences.fontSize.toStringAsFixed(1)} pt',
-                      semanticFormatterCallback: (value) =>
-                          'Text size ${value.toStringAsFixed(1)} points',
+                      semanticFormatterCallback: (value) => appText(
+                        context,
+                        'Text size {0} points',
+                        [value.toStringAsFixed(1)],
+                      ),
                       min: 12,
                       max: 28,
                       divisions: 32,
@@ -55,14 +66,21 @@ class AppSettingsDialog extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'Line spacing: ${workspace.readingPreferences.lineHeight.toStringAsFixed(2)}',
+                      appText(context, "Line spacing: {0}", [
+                        workspace.readingPreferences.lineHeight.toStringAsFixed(
+                          2,
+                        ),
+                      ]),
                     ),
                     Slider(
                       key: const ValueKey('reading-line-height'),
                       label: workspace.readingPreferences.lineHeight
                           .toStringAsFixed(2),
-                      semanticFormatterCallback: (value) =>
-                          'Line spacing ${value.toStringAsFixed(2)}',
+                      semanticFormatterCallback: (value) => appText(
+                        context,
+                        'Line spacing {0}',
+                        [value.toStringAsFixed(2)],
+                      ),
                       min: 1.2,
                       max: 2.2,
                       divisions: 50,
@@ -76,18 +94,18 @@ class AppSettingsDialog extends StatelessWidget {
                     DropdownButton<ReadingWidth>(
                       key: const ValueKey('reading-width'),
                       value: workspace.readingPreferences.width,
-                      items: const [
+                      items: [
                         DropdownMenuItem(
                           value: ReadingWidth.narrow,
-                          child: Text('Narrow body'),
+                          child: Text(appText(context, "Narrow body")),
                         ),
                         DropdownMenuItem(
                           value: ReadingWidth.standard,
-                          child: Text('Standard body'),
+                          child: Text(appText(context, "Standard body")),
                         ),
                         DropdownMenuItem(
                           value: ReadingWidth.wide,
-                          child: Text('Wide body'),
+                          child: Text(appText(context, "Wide body")),
                         ),
                       ],
                       onChanged: (value) {
@@ -100,7 +118,7 @@ class AppSettingsDialog extends StatelessWidget {
                     ),
                     CheckboxListTile(
                       key: const ValueKey('reading-wrap-code'),
-                      title: const Text('Wrap code lines'),
+                      title: Text(appText(context, "Wrap code lines")),
                       contentPadding: EdgeInsets.zero,
                       value: workspace.readingPreferences.wrapCode,
                       onChanged: (value) => workspace.setReadingPreferences(
@@ -111,11 +129,14 @@ class AppSettingsDialog extends StatelessWidget {
                       onPressed: () => workspace.setReadingPreferences(
                         ReadingPreferences.defaults,
                       ),
-                      child: const Text('Reset reading settings'),
+                      child: Text(appText(context, "Reset reading settings")),
                     ),
                     const Divider(),
                   ],
-                  Text('Markdown files', style: DesktopTypography.headline),
+                  Text(
+                    appText(context, "Markdown files"),
+                    style: DesktopTypography.headline,
+                  ),
                   const SizedBox(height: 12),
                   CheckboxListTile(
                     key: const ValueKey('default-markdown-app-preference'),
@@ -126,25 +147,44 @@ class AppSettingsDialog extends StatelessWidget {
                     controlAffinity: ListTileControlAffinity.leading,
                     contentPadding: EdgeInsets.zero,
                     dense: true,
-                    title: const Text(
-                      'Use Linefold to open .md files by default',
+                    title: Text(
+                      appText(
+                        context,
+                        "Use Linefold to open .md files by default",
+                      ),
                     ),
                   ),
                   Text(
                     state.supported
-                        ? 'Current default: ${state.currentApplicationName ?? 'No application selected'}'
-                        : 'Default application settings are available on macOS.',
+                        ? appText(context, "Current default: {0}", [
+                            state.currentApplicationName ??
+                                appText(context, 'No application selected'),
+                          ])
+                        : appText(
+                            context,
+                            "Default application settings are available on macOS.",
+                          ),
                   ),
                   const SizedBox(height: 12),
                   Text(
                     state.previousApplicationName != null
-                        ? 'Turning this off restores ${state.previousApplicationName} if Linefold is still the default.'
-                        : 'If Linefold is the default, turning this off lets you choose another application.',
+                        ? appText(
+                            context,
+                            "Turning this off restores {0} if Linefold is still the default.",
+                            [state.previousApplicationName],
+                          )
+                        : appText(
+                            context,
+                            "If Linefold is the default, turning this off lets you choose another application.",
+                          ),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Your choice is remembered. Linefold will not ask again at startup or override changes made in macOS.',
+                    appText(
+                      context,
+                      "Your choice is remembered. Linefold will not ask again at startup or override changes made in macOS.",
+                    ),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   if (controller.busy) ...[
@@ -166,7 +206,7 @@ class AppSettingsDialog extends StatelessWidget {
                           : () => controller.setPreference(
                               state.preferLinefold ?? true,
                             ),
-                      child: const Text('Try Again'),
+                      child: Text(appText(context, "Try Again")),
                     ),
                   ] else if (state.preferLinefold == true &&
                       !state.isDefault) ...[
@@ -175,7 +215,7 @@ class AppSettingsDialog extends StatelessWidget {
                       onPressed: controller.busy
                           ? null
                           : () => controller.setPreference(true),
-                      child: const Text('Set Linefold as Default'),
+                      child: Text(appText(context, "Set Linefold as Default")),
                     ),
                   ] else if (state.preferLinefold == false &&
                       state.isDefault) ...[
@@ -186,8 +226,8 @@ class AppSettingsDialog extends StatelessWidget {
                           : () => controller.setPreference(false),
                       child: Text(
                         state.previousApplicationName == null
-                            ? 'Choose Another Application…'
-                            : 'Restore Previous Default',
+                            ? appText(context, "Choose Another Application…")
+                            : appText(context, "Restore Previous Default"),
                       ),
                     ),
                   ],
@@ -202,7 +242,7 @@ class AppSettingsDialog extends StatelessWidget {
           actions: [
             FilledButton(
               onPressed: controller.busy ? null : () => Navigator.pop(context),
-              child: const Text('Done'),
+              child: Text(appText(context, "Done")),
             ),
           ],
         );
@@ -230,24 +270,26 @@ class DefaultMarkdownAppPrompt extends StatelessWidget {
           canPop: !fileAssociation.busy,
           child: AlertDialog(
             constraints: const BoxConstraints(maxWidth: 440),
-            title: const Text('Open Markdown files with Linefold?'),
-            content: const Text(
-              'Use Linefold by default when you open a .md file in Finder. '
-              'You can change this later in Linefold → Settings…',
+            title: Text(appText(context, "Open Markdown files with Linefold?")),
+            content: Text(
+              appText(
+                context,
+                "Use Linefold by default when you open a .md file in Finder. You can change this later in Linefold → Settings…",
+              ),
             ),
             actions: [
               OutlinedButton(
                 onPressed: fileAssociation.busy
                     ? null
                     : () => Navigator.pop(context, false),
-                child: const Text('Keep Current App'),
+                child: Text(appText(context, "Keep Current App")),
               ),
               FilledButton(
                 autofocus: true,
                 onPressed: fileAssociation.busy
                     ? null
                     : () => Navigator.pop(context, true),
-                child: const Text('Use Linefold'),
+                child: Text(appText(context, "Use Linefold")),
               ),
             ],
           ),

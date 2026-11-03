@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -72,28 +73,41 @@ class DocumentExportFlow {
       final proceed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text('Export $label'),
+          title: Text(appText(context, "Export {0}", [label])),
           scrollable: true,
           content: Text(
-            '${action == DocumentExportAction.bundle
-                ? documentExportBundleNotice
-                : action == DocumentExportAction.markdown
-                ? documentExportMarkdownNotice
-                : documentExportFidelityNotice}\n\n'
-            '${action == DocumentExportAction.pdf ? '$documentExportPdfNotice\n\n' : ''}'
-            'This exports the complete document, including unsaved changes, '
-            'as it was when you opened this dialog. Later edits are not included.\n\n'
-            'Cancelling the Save dialog writes nothing. After Save is confirmed, '
-            '${action == DocumentExportAction.pdf ? 'PDF preparation is still cancelled if you switch documents or folders. After final approval starts the commit, the copy cannot be recalled.' : 'the copy may be committed even if you switch tabs.'}',
+            appText(
+              context,
+              "{0}\n\n{1}This exports the complete document, including unsaved changes, as it was when you opened this dialog. Later edits are not included.\n\nCancelling the Save dialog writes nothing. After Save is confirmed, {2}",
+              [
+                action == DocumentExportAction.bundle
+                    ? appText(context, documentExportBundleNotice)
+                    : action == DocumentExportAction.markdown
+                    ? appText(context, documentExportMarkdownNotice)
+                    : appText(context, documentExportFidelityNotice),
+                action == DocumentExportAction.pdf
+                    ? '${appText(context, documentExportPdfNotice)}\n\n'
+                    : '',
+                action == DocumentExportAction.pdf
+                    ? appText(
+                        context,
+                        "PDF preparation is still cancelled if you switch documents or folders. After final approval starts the commit, the copy cannot be recalled.",
+                      )
+                    : appText(
+                        context,
+                        "the copy may be committed even if you switch tabs.",
+                      ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
+              child: Text(appText(context, "Cancel")),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Continue'),
+              child: Text(appText(context, "Continue")),
             ),
           ],
         ),
@@ -117,21 +131,23 @@ class DocumentExportFlow {
           final proceed = await showDialog<bool>(
             context: context,
             builder: (context) => AlertDialog(
-              title: const Text('Some resources were not included'),
+              title: Text(appText(context, "Some resources were not included")),
               scrollable: true,
               content: Text(
-                '${bundle.notices.take(12).join('\n')}\n\n'
-                'The complete list is in manifest.json inside the ZIP. '
-                'References to missing resources remain unchanged.',
+                appText(
+                  context,
+                  "{0}\n\nThe complete list is in manifest.json inside the ZIP. References to missing resources remain unchanged.",
+                  [bundle.notices.take(12).join('\n')],
+                ),
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel'),
+                  child: Text(appText(context, "Cancel")),
                 ),
                 FilledButton(
                   onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Export available resources'),
+                  child: Text(appText(context, "Export available resources")),
                 ),
               ],
             ),
@@ -163,7 +179,11 @@ class DocumentExportFlow {
       );
       if (context.mounted && !_disposed && completed) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$label exported. Original unchanged.')),
+          SnackBar(
+            content: Text(
+              appText(context, "{0} exported. Original unchanged.", [label]),
+            ),
+          ),
         );
       }
     } on Object catch (error) {
@@ -171,12 +191,12 @@ class DocumentExportFlow {
         await showDialog<void>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Export was not completed'),
+            title: Text(appText(context, "Export was not completed")),
             content: Text('$error'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
+                child: Text(appText(context, "OK")),
               ),
             ],
           ),

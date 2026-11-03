@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -52,8 +53,10 @@ class DocumentFindBar extends StatelessWidget {
                 children: [
                   Text(
                     controller.scope == DocumentFindScope.body
-                        ? 'Find in rendered body'
-                        : 'Find in Markdown source · $modeLabel',
+                        ? appText(context, "Find in rendered body")
+                        : appText(context, "Find in Markdown source · {0}", [
+                            modeLabel,
+                          ]),
                     style: DesktopTypography.subheadline.copyWith(
                       color: colors.textSecondary,
                     ),
@@ -69,14 +72,14 @@ class DocumentFindBar extends StatelessWidget {
                         DropdownButton<DocumentFindScope>(
                           key: const ValueKey('document-find-scope'),
                           value: controller.scope,
-                          items: const [
+                          items: [
                             DropdownMenuItem(
                               value: DocumentFindScope.body,
-                              child: Text('Body'),
+                              child: Text(appText(context, "Body")),
                             ),
                             DropdownMenuItem(
                               value: DocumentFindScope.source,
-                              child: Text('Source'),
+                              child: Text(appText(context, "Source")),
                             ),
                           ],
                           onChanged: controller.isComposing
@@ -111,8 +114,8 @@ class DocumentFindBar extends StatelessWidget {
                             controller: controller.query,
                             focusNode: queryFocus,
                             autofocus: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Find',
+                            decoration: InputDecoration(
+                              labelText: appText(context, "Find"),
                               isDense: true,
                             ),
                           ),
@@ -122,20 +125,26 @@ class DocumentFindBar extends StatelessWidget {
                         liveRegion: true,
                         child: Text(
                           controller.query.text.isEmpty
-                              ? 'Enter text to find'
+                              ? appText(context, "Enter text to find")
                               : controller.isComposing
-                              ? 'Finish composing'
+                              ? appText(context, "Finish composing")
                               : controller.isSearching
-                              ? 'Searching…'
+                              ? appText(context, "Searching…")
                               : controller.bodyUnavailable
-                              ? 'Body search unavailable · use Source'
-                              : '${controller.currentIndex + 1} of ${controller.count}',
+                              ? appText(
+                                  context,
+                                  "Body search unavailable · use Source",
+                                )
+                              : appText(context, "{0} of {1}", [
+                                  controller.currentIndex + 1,
+                                  controller.count,
+                                ]),
                           key: const ValueKey('document-find-count'),
                           style: DesktopTypography.callout,
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Match case',
+                        tooltip: appText(context, "Match case"),
                         isSelected: controller.matchCase,
                         onPressed: controller.isComposing
                             ? null
@@ -145,21 +154,21 @@ class DocumentFindBar extends StatelessWidget {
                         icon: const Text('Aa'),
                       ),
                       IconButton(
-                        tooltip: 'Previous match (⇧⌘G)',
+                        tooltip: appText(context, "Previous match (⇧⌘G)"),
                         onPressed: controller.canNavigate
                             ? () => controller.next(backwards: true)
                             : null,
                         icon: const Icon(Icons.keyboard_arrow_up),
                       ),
                       IconButton(
-                        tooltip: 'Next match (⌘G)',
+                        tooltip: appText(context, "Next match (⌘G)"),
                         onPressed: controller.canNavigate
                             ? controller.next
                             : null,
                         icon: const Icon(Icons.keyboard_arrow_down),
                       ),
                       IconButton(
-                        tooltip: 'Close find (Esc)',
+                        tooltip: appText(context, "Close find (Esc)"),
                         onPressed: controller.isComposing ? null : onClose,
                         icon: const Icon(Icons.close),
                       ),
@@ -171,7 +180,7 @@ class DocumentFindBar extends StatelessWidget {
                       onPressed: controller.isComposing
                           ? null
                           : onEnableEditing,
-                      child: const Text('Edit source to replace'),
+                      child: Text(appText(context, "Edit source to replace")),
                     )
                   else
                     Wrap(
@@ -184,8 +193,8 @@ class DocumentFindBar extends StatelessWidget {
                           child: TextField(
                             key: const ValueKey('document-find-replacement'),
                             controller: controller.replacement,
-                            decoration: const InputDecoration(
-                              labelText: 'Replace with',
+                            decoration: InputDecoration(
+                              labelText: appText(context, "Replace with"),
                               isDense: true,
                             ),
                           ),
@@ -195,20 +204,20 @@ class DocumentFindBar extends StatelessWidget {
                             onPressed: controller.isComposing
                                 ? null
                                 : onEnableEditing,
-                            child: const Text('Edit to replace'),
+                            child: Text(appText(context, "Edit to replace")),
                           )
                         else ...[
                           TextButton(
                             onPressed: controller.canReplace
                                 ? controller.replaceCurrent
                                 : null,
-                            child: const Text('Replace'),
+                            child: Text(appText(context, "Replace")),
                           ),
                           TextButton(
                             onPressed: controller.canReplaceAll
                                 ? controller.replaceAll
                                 : null,
-                            child: const Text('Replace All'),
+                            child: Text(appText(context, "Replace All")),
                           ),
                         ],
                       ],

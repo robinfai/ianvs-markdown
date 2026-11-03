@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -187,9 +188,9 @@ class _ReferenceDockState extends State<ReferenceDock> {
         child: Column(
           children: [
             ListTile(
-              title: const Text('References'),
+              title: Text(appText(context, "References")),
               trailing: IconButton(
-                tooltip: 'Close references',
+                tooltip: appText(context, "Close references"),
                 onPressed: widget.onClose,
                 icon: const Icon(Icons.close),
               ),
@@ -200,16 +201,24 @@ class _ReferenceDockState extends State<ReferenceDock> {
                   onPressed: active == null
                       ? null
                       : () => _pin(active.path, active.id),
-                  child: const Text('Pin current note'),
+                  child: Text(appText(context, "Pin current note")),
                 ),
-                TextButton(onPressed: _refresh, child: const Text('Refresh')),
+                TextButton(
+                  onPressed: _refresh,
+                  child: Text(appText(context, "Refresh")),
+                ),
               ],
             ),
             if (_error != null) Text(_error!),
             if (workspace.references.stale)
-              const Text('References changed; refresh to update links.'),
+              Text(
+                appText(
+                  context,
+                  "References changed; refresh to update links.",
+                ),
+              ),
             if (snapshot != null && !snapshot.complete)
-              const Text('Some references are unavailable.'),
+              Text(appText(context, "Some references are unavailable.")),
             SizedBox(
               height: 160,
               child: ListView(
@@ -226,12 +235,14 @@ class _ReferenceDockState extends State<ReferenceDock> {
                       ),
                     ),
                   if (related.isEmpty)
-                    const ListTile(title: Text('No known links')),
+                    ListTile(title: Text(appText(context, "No known links"))),
                   for (final document in workspace.documents)
                     ListTile(
                       dense: true,
                       title: Text(document.name),
-                      subtitle: const Text('Open note — read beside editor'),
+                      subtitle: Text(
+                        appText(context, "Open note — read beside editor"),
+                      ),
                       onTap: () => _pin(document.path, document.id),
                     ),
                 ],
@@ -244,7 +255,7 @@ class _ReferenceDockState extends State<ReferenceDock> {
                   open?.name ?? p.basename(_pinnedPath ?? 'Reference'),
                 ),
                 trailing: IconButton(
-                  tooltip: 'Insert reference at cursor',
+                  tooltip: appText(context, "Insert reference at cursor"),
                   onPressed: text == null
                       ? null
                       : () => widget.onInsert(text, open?.path ?? _pinnedPath),
@@ -253,8 +264,13 @@ class _ReferenceDockState extends State<ReferenceDock> {
               ),
             Expanded(
               child: text == null
-                  ? const Center(
-                      child: Text('Pin a note to read beside your draft.'),
+                  ? Center(
+                      child: Text(
+                        appText(
+                          context,
+                          "Pin a note to read beside your draft.",
+                        ),
+                      ),
                     )
                   : SingleChildScrollView(
                       controller: _scroll,

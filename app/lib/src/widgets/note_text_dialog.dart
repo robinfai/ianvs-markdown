@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// Owns its input until the dialog route finishes its closing animation.
@@ -56,7 +57,7 @@ class _NoteTextDialogState extends State<NoteTextDialog> {
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: const Text('Cancel'),
+        child: Text(appText(context, "Cancel")),
       ),
       FilledButton(
         onPressed: () => Navigator.pop(context, _text.text),

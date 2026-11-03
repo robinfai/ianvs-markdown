@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'note_text_dialog.dart';
 import 'dart:async';
 
@@ -137,13 +138,16 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
       value = await showDialog<String>(
         context: context,
         builder: (_) => NoteTextDialog(
-          title: 'Edit $key',
+          title: appText(context, "Edit {0}", [key]),
           label: key,
-          submit: 'Save property',
+          submit: appText(context, "Save property"),
           initialValue: originalValue,
           inputKey: const ValueKey('collection-property-input'),
-          helperText:
-              'Type: ${entry?.type.name ?? 'text'}. Lists use a JSON string array.',
+          helperText: appText(
+            context,
+            "Type: {0}. Lists use a JSON string array.",
+            [entry?.type.name ?? 'text'],
+          ),
         ),
       );
     }
@@ -214,7 +218,7 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
     width: width,
     child: TextField(
       controller: controller,
-      decoration: InputDecoration(labelText: label),
+      decoration: InputDecoration(labelText: appText(context, label)),
       onChanged: (_) => setState(() {}),
     ),
   );
@@ -249,7 +253,7 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
         child: Column(
           children: [
             ListTile(
-              title: const Text('Note collections'),
+              title: Text(appText(context, "Note collections")),
               trailing: IconButton(
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.close),
@@ -275,7 +279,7 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
               children: [
                 for (final layout in ['list', 'table', 'board'])
                   ChoiceChip(
-                    label: Text(layout),
+                    label: Text(appText(context, layout)),
                     selected: _layout == layout,
                     onSelected: (_) => setState(() => _layout = layout),
                   ),
@@ -285,22 +289,25 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
                     for (final column in columns)
                       DropdownMenuItem(
                         value: column,
-                        child: Text('Sort: $column'),
+                        child: Text(appText(context, "Sort: {0}", [column])),
                       ),
                   ],
                   onChanged: (value) =>
                       setState(() => _sort = value ?? 'filename'),
                 ),
                 IconButton(
-                  tooltip: 'Reverse sort',
+                  tooltip: appText(context, "Reverse sort"),
                   onPressed: () => setState(() => _descending = !_descending),
                   icon: const Icon(Icons.swap_vert),
                 ),
                 TextButton(
                   onPressed: _saveView,
-                  child: const Text('Save view'),
+                  child: Text(appText(context, "Save view")),
                 ),
-                TextButton(onPressed: _refresh, child: const Text('Refresh')),
+                TextButton(
+                  onPressed: _refresh,
+                  child: Text(appText(context, "Refresh")),
+                ),
                 if (widget.view['name'] is String)
                   TextButton(
                     onPressed: () async {
@@ -310,18 +317,26 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
                       );
                       if (context.mounted) Navigator.pop(context);
                     },
-                    child: const Text('Delete view'),
+                    child: Text(appText(context, "Delete view")),
                   ),
               ],
             ),
             if (_notice != null) Text(_notice!),
             if (!_current)
-              const Text('Workspace changed. Close and reopen this view.'),
-            if (snapshot != null && !snapshot.complete)
-              const Text(
-                'Index incomplete: only locally available indexed notes are shown.',
+              Text(
+                appText(
+                  context,
+                  "Workspace changed. Close and reopen this view.",
+                ),
               ),
-            Text('${rows.length} notes'),
+            if (snapshot != null && !snapshot.complete)
+              Text(
+                appText(
+                  context,
+                  "Index incomplete: only locally available indexed notes are shown.",
+                ),
+              ),
+            Text(appText(context, "{0} notes", [rows.length])),
             if (_busy) const LinearProgressIndicator(),
             Expanded(
               child: _layout == 'board'
@@ -346,7 +361,7 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
           subtitle: Text('${row.relativePath} · ${row.value('status')}'),
           onTap: () => _open(row),
           trailing: IconButton(
-            tooltip: 'Edit status',
+            tooltip: appText(context, "Edit status"),
             icon: const Icon(Icons.edit_outlined),
             onPressed: () => _edit(row, 'status'),
           ),
@@ -413,7 +428,7 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
                   children: [
                     ListTile(
                       title: Text(
-                        status.isEmpty ? 'No status' : status,
+                        status.isEmpty ? appText(context, "No status") : status,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -440,7 +455,7 @@ class _NoteCollectionDialogState extends State<NoteCollectionDialog> {
                                 ),
                                 onTap: () => _open(row),
                                 trailing: IconButton(
-                                  tooltip: 'Edit status',
+                                  tooltip: appText(context, "Edit status"),
                                   icon: const Icon(Icons.edit_outlined),
                                   onPressed: () => _edit(row, 'status'),
                                 ),

@@ -1,3 +1,4 @@
+import '../app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/outline_operations.dart';
@@ -33,7 +34,7 @@ class FloatingOutline extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        'Outline',
+                        appText(context, "Outline"),
                         style: DesktopTypography.sectionLabel.copyWith(
                           color: colors.textPrimary,
                         ),
@@ -62,13 +63,16 @@ class FloatingOutline extends StatelessWidget {
                               ),
                               const SizedBox(height: 10),
                               Text(
-                                'No Headings',
+                                appText(context, "No Headings"),
                                 style: DesktopTypography.emphasizedBody
                                     .copyWith(color: colors.textSecondary),
                               ),
                               const SizedBox(height: 5),
                               Text(
-                                'Add headings to navigate your document.',
+                                appText(
+                                  context,
+                                  "Add headings to navigate your document.",
+                                ),
                                 textAlign: TextAlign.center,
                                 style: DesktopTypography.callout.copyWith(
                                   color: colors.textTertiary,
@@ -116,7 +120,7 @@ class FloatingOutline extends StatelessWidget {
                               ),
                             ),
                             PopupMenuButton<String>(
-                              tooltip: 'Chapter actions',
+                              tooltip: appText(context, "Chapter actions"),
                               iconSize: 14,
                               onSelected: (action) {
                                 if (action == 'copy') {
@@ -142,18 +146,24 @@ class FloatingOutline extends StatelessWidget {
                                   );
                                 }
                               },
-                              itemBuilder: (_) => const [
+                              itemBuilder: (_) => [
                                 PopupMenuItem(
                                   value: 'promote',
-                                  child: Text('Promote chapter'),
+                                  child: Text(
+                                    appText(context, "Promote chapter"),
+                                  ),
                                 ),
                                 PopupMenuItem(
                                   value: 'demote',
-                                  child: Text('Demote chapter'),
+                                  child: Text(
+                                    appText(context, "Demote chapter"),
+                                  ),
                                 ),
                                 PopupMenuItem(
                                   value: 'copy',
-                                  child: Text('Copy chapter link'),
+                                  child: Text(
+                                    appText(context, "Copy chapter link"),
+                                  ),
                                 ),
                               ],
                             ),
