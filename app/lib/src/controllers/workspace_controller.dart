@@ -41,6 +41,7 @@ class WorkspaceController extends ChangeNotifier {
     required this.fileService,
     required this.sessionStore,
     this.defaultWorkspaceDirectory,
+    this.welcomeText = welcomeMarkdown,
     WorkspaceIndexSource? indexSource,
     DocumentSyncSource? syncSource,
     this.noteTransactions = const AppleWorkspaceNoteTransactionStore(),
@@ -69,6 +70,7 @@ class WorkspaceController extends ChangeNotifier {
     browser = FileBrowserController(fileService, index: index)
       ..addListener(_schedulePersist);
   }
+  final String welcomeText;
   late final DocumentSyncController sync;
   final _saveFailures = <String>{};
   final _recoveryCopies = <String, (String, String)>{};
@@ -159,7 +161,17 @@ class WorkspaceController extends ChangeNotifier {
   String? _cloudRoot;
   String? workspaceNotice;
   bool get isCloudWorkspace =>
-      _workspaceRoot != null && _workspaceRoot == _cloudRoot;
+      _workspaceRoot != null &&
+      (fileService is WorkspaceDisplaySource
+          ? (fileService as WorkspaceDisplaySource).isCloudPath(_workspaceRoot!)
+          : _workspaceRoot == _cloudRoot);
+  String? get workspaceDisplayName => _workspaceRoot == null
+      ? null
+      : (fileService is WorkspaceDisplaySource
+            ? (fileService as WorkspaceDisplaySource).workspaceName(
+                _workspaceRoot!,
+              )
+            : null);
   final List<DocumentSession> _documents = <DocumentSession>[];
   final Map<String, StreamSubscription<FileSystemEvent>> _watchers =
       <String, StreamSubscription<FileSystemEvent>>{};
@@ -424,8 +436,8 @@ class WorkspaceController extends ChangeNotifier {
       _documents.add(
         _createDocument(
           name: 'Welcome.md',
-          text: welcomeMarkdown,
-          persistedText: welcomeMarkdown,
+          text: welcomeText,
+          persistedText: welcomeText,
         ),
       );
     }
@@ -974,6 +986,27 @@ class WorkspaceController extends ChangeNotifier {
     await service.writeMarkdownFileAtomic(path, contents);
   }
 
+  Future<void> acceptCloudResolution(
+    DocumentSession document, {
+    required String path,
+    required String reviewedLocal,
+    required String resolved,
+  }) async {
+    if (!_documents.contains(document) || document.path != path) return;
+    if (document.controller.text == reviewedLocal) {
+      document.replaceFromDisk(resolved, preserveHistory: true);
+    } else {
+      // Edits made while native resolution was running remain dirty against
+      // the resolved disk baseline and survive recovery persistence.
+      document.markSaved(savedText: resolved);
+    }
+    _saveFailures.remove(document.id);
+    notifyListeners();
+    await _persistNow();
+    await browser.refresh();
+    await sync.refresh();
+  }
+
   Future<void> reloadFromDisk(DocumentSession document) async {
     final path = document.path;
     if (path == null) return;
@@ -1075,7 +1108,10 @@ class WorkspaceController extends ChangeNotifier {
   }
 
   Future<String?> chooseOperationFolder() async {
-    final selected = await fileService.chooseWorkspaceFolder();
+    final selected = await (fileService is WorkspaceOperationFolderPicker
+        ? (fileService as WorkspaceOperationFolderPicker)
+              .chooseOperationFolder()
+        : fileService.chooseWorkspaceFolder());
     if (selected == null) return null;
     final path = p.normalize(p.absolute(selected));
     final token = await fileService.createPersistentAccessToken(path);
@@ -2175,7 +2211,10 @@ class WorkspaceController extends ChangeNotifier {
           .watchDirectory(directory)
           .listen(
             (event) {
-              if (!p.equals(event.path, path)) return;
+              if (!p.equals(event.path, path) &&
+                  !(event.isDirectory && p.equals(event.path, directory))) {
+                return;
+              }
               if (identical(activeDocument, document)) sync.scheduleRefresh();
               unawaited(_checkForExternalChanges(document, path));
             },
@@ -2213,8 +2252,10 @@ class WorkspaceController extends ChangeNotifier {
       if (!isWatching()) return;
       final persistedText = document.persistedText;
       var changed = true;
+      MarkdownFileData? incoming;
       try {
         final disk = await fileService.readMarkdownFile(path);
+        incoming = disk;
         changed = disk.contents != persistedText;
       } on Object catch (error) {
         // Deletion or an unreadable replacement also needs the existing banner.
@@ -2229,7 +2270,33 @@ class WorkspaceController extends ChangeNotifier {
       if (browser.isExternal(path)) {
         unawaited(browser.refreshExternalMetadata());
       }
+      if (!changed &&
+          document.hasExternalChanges &&
+          isCloudWorkspace &&
+          p.isWithin(_workspaceRoot!, path) &&
+          !document.controller.isDirty) {
+        // Cloud resolution on another device can restore our saved snapshot.
+        // Only clear the stale warning after a successful matching read.
+        document.hasExternalChanges = false;
+        notifyListeners();
+      }
       if (changed && !document.hasExternalChanges) {
+        if (incoming != null &&
+            isCloudWorkspace &&
+            p.isWithin(_workspaceRoot!, path) &&
+            !document.controller.isDirty) {
+          // A cloud delivery is not an edit conflict when this device has no
+          // unsaved changes. Recheck dirty state after I/O to protect typing
+          // that began while the read was pending.
+          document
+            ..encoding = incoming.encoding
+            ..lineEnding = incoming.lineEnding
+            ..replaceFromDisk(incoming.contents, preserveHistory: true);
+          _saveFailures.remove(document.id);
+          _schedulePersist();
+          notifyListeners();
+          return;
+        }
         document.hasExternalChanges = true;
         notifyListeners();
       }
@@ -2411,4 +2478,21 @@ tree with **Search Files**, and change appearance from the **View** menu.
 - [ ] Open a folder
 - [ ] Edit a document
 - [ ] Save with ⌘S
+''';
+
+const mobileWelcomeMarkdown = '''# 欢迎使用 Linefold
+
+在 iPhone 和 iPad 上管理、编辑和阅读你的 Markdown 文件。
+
+## 管理目录
+
+轻点左上角打开工作区，用文件夹按钮选择目录。长按文件或文件夹可以重命名、复制、移动或移到废纸篓；目录右侧的更多菜单可新建文档和文件夹。
+
+## 编辑与阅读
+
+轻点内容开始编辑，通过顶部模式切换实时预览、源码和阅读。使用保存按钮保存，或用文档列表切换已打开的文档。
+
+## 同步与冲突
+
+iCloud 在后台同步。只有需要处理的失败或冲突才会提示；你可以比较版本、选择保留的内容，或全部保留为独立副本。
 ''';

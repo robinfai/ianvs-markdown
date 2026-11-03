@@ -9,6 +9,60 @@ import 'package:linefold/src/services/markdown_file_service.dart';
 import 'support/fakes.dart';
 
 void main() {
+  testWidgets('clean cloud delivery refreshes silently; dirty edits survive', (
+    tester,
+  ) async {
+    final files = _WatchingFiles()..files['/cloud/one.md'] = 'Base';
+    final workspace = WorkspaceController(
+      fileService: files,
+      sessionStore: MemoryWorkspaceSessionStore(),
+      defaultWorkspaceDirectory: () async => '/cloud',
+    );
+    try {
+      await workspace.initialize();
+      final document = (await workspace.openPath('/cloud/one.md'))!;
+      files.writeExternally(document.path!, 'Delivered from iPhone');
+      await tester.pump();
+      expect(document.controller.text, 'Delivered from iPhone');
+      expect(document.persistedText, 'Delivered from iPhone');
+      expect(document.hasExternalChanges, isFalse);
+      expect(document.controller.isDirty, isFalse);
+
+      files.files.remove(document.path!);
+      files.notifyModified(document.path!);
+      await tester.pump();
+      expect(document.hasExternalChanges, isTrue);
+      files.writeExternally(document.path!, 'Delivered from iPhone');
+      await tester.pump();
+      expect(document.hasExternalChanges, isFalse);
+
+      final delayed = Completer<MarkdownFileData>();
+      files.nextRead = delayed;
+      files.writeExternally(document.path!, 'Another cloud revision');
+      await tester.pump();
+      document.controller.text = 'Unsaved Mac edit during read';
+      delayed.complete(
+        MarkdownFileData(
+          path: document.path!,
+          name: document.name,
+          contents: 'Another cloud revision',
+        ),
+      );
+      await tester.pump();
+      expect(document.controller.text, 'Unsaved Mac edit during read');
+      expect(document.persistedText, 'Delivered from iPhone');
+      expect(document.hasExternalChanges, isTrue);
+      files.writeExternally(document.path!, 'Delivered from iPhone');
+      await tester.pump();
+      expect(document.hasExternalChanges, isTrue);
+      expect(document.controller.text, 'Unsaved Mac edit during read');
+    } finally {
+      workspace.dispose();
+      await files.dispose();
+      await tester.pump(const Duration(milliseconds: 601));
+    }
+  });
+
   testWidgets('external write immediately after save still raises a conflict', (
     tester,
   ) async {

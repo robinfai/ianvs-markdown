@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
 
 import '../services/workspace_note_move_plan.dart';
 import '../services/workspace_note_transaction.dart';
@@ -18,6 +19,7 @@ Future<WorkspaceNoteMoveDecision> showWorkspaceNoteMovePreview({
   required List<String> destinations,
   Future<WorkspaceNoteMovePlan>? preview,
   String? unavailable,
+  String? displayRoot,
   Future<WorkspaceNoteMoveRecord> Function(WorkspaceNoteMovePlan)? onMaintain,
   Future<WorkspaceNoteMoveRecord> Function(String)? onRecoverCopies,
   VoidCallback? onCancelPreview,
@@ -33,6 +35,7 @@ Future<WorkspaceNoteMoveDecision> showWorkspaceNoteMovePreview({
     return await showDialog<WorkspaceNoteMoveDecision>(
           context: context,
           builder: (context) => _MovePreviewDialog(
+            displayRoot: displayRoot,
             sources: sources,
             destinations: destinations,
             pending: pending,
@@ -53,6 +56,7 @@ class _MovePreviewDialog extends StatefulWidget {
     required this.destinations,
     required this.pending,
     this.unavailable,
+    this.displayRoot,
     this.onMaintain,
     this.onRecoverCopies,
   });
@@ -60,6 +64,7 @@ class _MovePreviewDialog extends StatefulWidget {
   final List<String> destinations;
   final Future<(WorkspaceNoteMovePlan?, bool)>? pending;
   final String? unavailable;
+  final String? displayRoot;
   final Future<WorkspaceNoteMoveRecord> Function(WorkspaceNoteMovePlan)?
   onMaintain;
   final Future<WorkspaceNoteMoveRecord> Function(String)? onRecoverCopies;
@@ -68,6 +73,15 @@ class _MovePreviewDialog extends StatefulWidget {
 }
 
 class _MovePreviewDialogState extends State<_MovePreviewDialog> {
+  String _displayPath(String path) {
+    final root = widget.displayRoot;
+    if (root == null) return path;
+    if (p.isWithin(root, path)) return p.relative(path, from: root);
+    // External folder grants may live outside the workspace. Keep the useful
+    // folder and filename without exposing the iOS container implementation.
+    return '…/${p.basename(p.dirname(path))}/${p.basename(path)}';
+  }
+
   bool _busy = false;
   bool _confirmingRecovery = false;
   bool _attempted = false;
@@ -192,7 +206,9 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 for (var i = 0; i < widget.sources.length && i < 20; i++)
-                  Text('${widget.sources[i]} → ${widget.destinations[i]}'),
+                  Text(
+                    '${_displayPath(widget.sources[i])} → ${_displayPath(widget.destinations[i])}',
+                  ),
                 if (widget.sources.length > 20)
                   Text('… and ${widget.sources.length - 20} more items.'),
                 const SizedBox(height: 16),

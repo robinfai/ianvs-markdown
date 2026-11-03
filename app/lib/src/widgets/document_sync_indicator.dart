@@ -3,32 +3,49 @@ import 'package:flutter/material.dart';
 import '../controllers/document_sync_controller.dart';
 import '../models/document_sync_status.dart';
 
-/// A plain status label, not an unbounded spinner. Details distinguish sampled
-/// provider metadata from successful local writes and remote-device delivery.
+/// Routine cloud activity stays in the background. Only actionable provider
+/// failures and unresolved versions appear in the document UI.
 class DocumentSyncIndicator extends StatelessWidget {
-  const DocumentSyncIndicator({super.key, required this.controller});
+  const DocumentSyncIndicator({
+    super.key,
+    required this.controller,
+    this.onSaveCopy,
+    this.onResolve,
+  });
+  final VoidCallback? onResolve;
+  final VoidCallback? onSaveCopy;
   final DocumentSyncController controller;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: controller,
-    builder: (context, _) => controller.path == null
+    builder: (context, _) =>
+        controller.path == null ||
+            (controller.metadata.state != CloudSyncState.failure &&
+                controller.metadata.state != CloudSyncState.conflict)
         ? const SizedBox.shrink()
         : Tooltip(
             message: 'Cloud status details and retry',
             child: Semantics(
+              liveRegion: true,
               button: true,
               child: InkWell(
                 onTap: () => showDialog<void>(
                   context: context,
-                  builder: (_) => _SyncDetails(controller: controller),
+                  builder: (_) => _SyncDetails(
+                    controller: controller,
+                    onSaveCopy: onSaveCopy,
+                    onResolve: onResolve,
+                  ),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Text(
-                    controller.checking
-                        ? 'Checking cloud status'
-                        : controller.metadata.label,
+                    controller.metadata.label,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                      fontWeight: FontWeight.w600,
+                    ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -40,7 +57,13 @@ class DocumentSyncIndicator extends StatelessWidget {
 }
 
 class _SyncDetails extends StatelessWidget {
-  const _SyncDetails({required this.controller});
+  const _SyncDetails({
+    required this.controller,
+    this.onSaveCopy,
+    this.onResolve,
+  });
+  final VoidCallback? onResolve;
+  final VoidCallback? onSaveCopy;
   final DocumentSyncController controller;
 
   @override
@@ -85,6 +108,24 @@ class _SyncDetails extends StatelessWidget {
           ),
         ),
         actions: [
+          if (metadata.state == CloudSyncState.conflict && onResolve != null)
+            FilledButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                onResolve!();
+              },
+              child: const Text('解决冲突'),
+            ),
+
+          if (onSaveCopy != null)
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                onSaveCopy!();
+              },
+              child: const Text('Save a copy'),
+            ),
+
           TextButton(
             onPressed:
                 !controller.canRead ||

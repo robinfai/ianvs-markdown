@@ -269,10 +269,27 @@ class FileBrowserController extends ChangeNotifier {
     task = () async {
       try {
         if (refresh) index.invalidateDirectory(index.relativeDirectory(path));
-        final snapshot = await index.directory(
-          index.relativeDirectory(path),
-          refresh: refresh,
-        );
+        WorkspaceDirectorySnapshot snapshot;
+        try {
+          snapshot = await index.directory(
+            index.relativeDirectory(path),
+            refresh: refresh,
+          );
+        } on WorkspaceIndexFailure catch (error) {
+          // Our own move/rename can invalidate a read already in flight.
+          // Retry once against the current generation before showing an error.
+          if (error.issue != WorkspaceReadIssue.changed ||
+              disposed ||
+              root != currentRoot ||
+              epoch != _rootEpoch ||
+              _versions[path] != version) {
+            rethrow;
+          }
+          snapshot = await index.directory(
+            index.relativeDirectory(path),
+            refresh: true,
+          );
+        }
         final entries = snapshot.entries
             .map((e) => e.entry(currentRoot!))
             .toList();

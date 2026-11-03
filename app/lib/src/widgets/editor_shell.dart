@@ -1,3 +1,6 @@
+import '../services/cloud_conflict_service.dart';
+import '../services/mobile_markdown_file_service.dart';
+import 'cloud_conflict_dialog.dart';
 import '../reading_typography.dart';
 import 'save_conflict_diff_dialog.dart';
 import '../services/rich_paste_service.dart';
@@ -7,6 +10,7 @@ import 'dart:math' as math;
 
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:ianvs_markdown_clipboard/ianvs_markdown_clipboard.dart';
@@ -906,10 +910,30 @@ class _EditorShellState extends State<EditorShell> {
   }
 
   void _setReferencesVisible(bool value) {
+    if (value &&
+        (MediaQuery.sizeOf(context).width < 700 ||
+            defaultTargetPlatform == TargetPlatform.iOS)) {
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (sheetContext) => SafeArea(
+          child: SizedBox(
+            height: MediaQuery.sizeOf(context).height * .8,
+            child: ReferenceDock(
+              workspace: widget.workspace,
+              onClose: () => Navigator.pop(sheetContext),
+              onInsert: _insertReference,
+            ),
+          ),
+        ),
+      );
+      return;
+    }
     setState(() => _referencesVisible = value);
     widget.workspace.setReferenceView({'visible': value});
   }
 
+  final _mobileScaffold = GlobalKey<ScaffoldState>();
   bool _referencesVisible = false;
   bool _referenceRestoreDone = false;
 
@@ -1150,6 +1174,8 @@ class _EditorShellState extends State<EditorShell> {
         ),
       'Search workspace': _openWorkspaceSearch,
       'Find in document': _openFind,
+      if (widget.onOpenSettings != null) 'Settings': widget.onOpenSettings!,
+      'Toggle theme': widget.onToggleTheme,
       'Show backlinks': _openWorkspaceReferences,
       'Toggle reference pane': () => _setReferencesVisible(!_referencesVisible),
       'Toggle sidebar': workspace.toggleSidebar,
@@ -1540,6 +1566,9 @@ class _EditorShellState extends State<EditorShell> {
       builder: (context, _) {
         final workspace = widget.workspace;
         final document = workspace.activeDocument;
+        final mobile =
+            MediaQuery.sizeOf(context).width < 700 ||
+            defaultTargetPlatform == TargetPlatform.iOS;
         if (!workspace.initialized && workspace.recoveryError != null) {
           return Scaffold(
             body: Center(
@@ -1751,406 +1780,326 @@ class _EditorShellState extends State<EditorShell> {
                     workspace.selectDocument(i),
             },
             child: Scaffold(
-              body: LayoutBuilder(
-                builder: (context, constraints) {
-                  final showOutline =
-                      workspace.outlineVisible && !_referencesVisible;
-                  final referenceWidth = _referencesVisible
-                      ? math.min(360.0, constraints.maxWidth * 0.4)
-                      : 0.0;
-                  final inspectorWidth = showOutline
-                      ? DesktopMetrics.inspectorWidth
-                      : 0.0;
-                  final minContentWidth = math.max(
-                    inspectorWidth +
-                        WorkspaceLayout.minEditorWidth +
-                        referenceWidth,
-                    WorkspaceLayout.minContentWidth,
-                  );
-                  final maxSidebarWidth =
-                      (constraints.maxWidth - minContentWidth).clamp(
-                        WorkspaceLayout.minSidebarWidth,
-                        WorkspaceLayout.maxSidebarWidth,
-                      );
-                  final sidebarWidth = workspace.sidebarWidth.clamp(
-                    WorkspaceLayout.minSidebarWidth,
-                    maxSidebarWidth,
-                  );
-                  final content = Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (workspace.sidebarVisible &&
-                          (!_referencesVisible || constraints.maxWidth >= 1100))
-                        SizedBox(
-                          width: sidebarWidth,
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              WorkspaceSidebar(
-                                key: ValueKey(workspace.workspaceRoot),
-                                workspace: workspace,
-                                onSave: _saveDocument,
-                                onSearchSource: _openWorkspaceSearch,
-                                onOpenCollection: _openCollection,
-                                width: sidebarWidth,
-                                onError: _showError,
-                              ),
-                              Positioned(
-                                top: 0,
-                                bottom: 0,
-                                right: 0,
-                                width: 8,
-                                child: SidebarResizeHandle(
-                                  key: const ValueKey('sidebar-resize-handle'),
-                                  width: sidebarWidth,
-                                  maxWidth: maxSidebarWidth,
-                                  onResize: workspace.setSidebarWidth,
-                                ),
-                              ),
-                            ],
-                          ),
+              key: _mobileScaffold,
+              drawer: mobile
+                  ? Drawer(
+                      child: SafeArea(
+                        child: WorkspaceSidebar(
+                          workspace: workspace,
+                          onSave: _saveDocument,
+                          onSearchSource: _openWorkspaceSearch,
+                          onOpenCollection: _openCollection,
+                          width: 304,
+                          onDocumentOpened: () =>
+                              _mobileScaffold.currentState?.closeDrawer(),
+                          onError: _showError,
                         ),
-                      Expanded(
-                        child: Column(
-                          children: [
-                            TitleTabsBar(
-                              workspace: workspace,
-                              onSave: _saveDocument,
-                              onClose: _closeDocument,
-                              documentActions: [
-                                IconButton(
-                                  key: const ValueKey('quick-switcher-button'),
-                                  tooltip: 'Quick switcher (⌘P / Ctrl+P)',
-                                  onPressed: () => _openPalette(),
-                                  icon: const Icon(Icons.search, size: 16),
+                      ),
+                    )
+                  : null,
+              body: SafeArea(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final showOutline =
+                        !mobile &&
+                        workspace.outlineVisible &&
+                        !_referencesVisible;
+                    final referenceWidth = _referencesVisible
+                        ? math.min(360.0, constraints.maxWidth * 0.4)
+                        : 0.0;
+                    final inspectorWidth = showOutline
+                        ? DesktopMetrics.inspectorWidth
+                        : 0.0;
+                    final minContentWidth = math.max(
+                      inspectorWidth +
+                          WorkspaceLayout.minEditorWidth +
+                          referenceWidth,
+                      WorkspaceLayout.minContentWidth,
+                    );
+                    final maxSidebarWidth =
+                        (constraints.maxWidth - minContentWidth).clamp(
+                          WorkspaceLayout.minSidebarWidth,
+                          WorkspaceLayout.maxSidebarWidth,
+                        );
+                    final sidebarWidth = workspace.sidebarWidth.clamp(
+                      WorkspaceLayout.minSidebarWidth,
+                      maxSidebarWidth,
+                    );
+                    final content = Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (!mobile &&
+                            workspace.sidebarVisible &&
+                            (!_referencesVisible ||
+                                constraints.maxWidth >= 1100))
+                          SizedBox(
+                            width: sidebarWidth,
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                WorkspaceSidebar(
+                                  key: ValueKey(workspace.workspaceRoot),
+                                  workspace: workspace,
+                                  onSave: _saveDocument,
+                                  onSearchSource: _openWorkspaceSearch,
+                                  onOpenCollection: _openCollection,
+                                  width: sidebarWidth,
+                                  onError: _showError,
                                 ),
-                                IconButton(
-                                  key: const ValueKey('command-palette-button'),
-                                  tooltip:
-                                      'Command palette (⌘⇧P / Ctrl+Shift+P)',
-                                  onPressed: () => _openPalette(commands: true),
-                                  icon: const Icon(Icons.terminal, size: 16),
-                                ),
-                                IconButton(
-                                  key: const ValueKey('import-image-button'),
-                                  tooltip: _attachmentPending
-                                      ? 'Importing image…'
-                                      : 'Import image',
-                                  onPressed: _attachmentPending
-                                      ? null
-                                      : () => unawaited(_importImage()),
-                                  icon: Icon(
-                                    _attachmentPending
-                                        ? Icons.hourglass_top
-                                        : Icons.add_photo_alternate_outlined,
-                                    size: 16,
-                                    semanticLabel: _attachmentPending
-                                        ? 'Importing image'
-                                        : 'Import image',
-                                  ),
-                                  style: const ButtonStyle(
-                                    minimumSize: WidgetStatePropertyAll(
-                                      Size(32, 32),
+                                Positioned(
+                                  top: 0,
+                                  bottom: 0,
+                                  right: 0,
+                                  width: 8,
+                                  child: SidebarResizeHandle(
+                                    key: const ValueKey(
+                                      'sidebar-resize-handle',
                                     ),
-                                    padding: WidgetStatePropertyAll(
-                                      EdgeInsets.all(6),
-                                    ),
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                  ),
-                                ),
-                                IconButton(
-                                  key: const ValueKey(
-                                    'workspace-backlinks-button',
-                                  ),
-                                  tooltip: 'Backlinks',
-                                  onPressed: () => _openWorkspaceReferences(),
-                                  icon: const Icon(
-                                    Icons.link,
-                                    size: 16,
-                                    semanticLabel: 'Backlinks',
-                                  ),
-                                  style: const ButtonStyle(
-                                    minimumSize: WidgetStatePropertyAll(
-                                      Size(32, 32),
-                                    ),
-                                    padding: WidgetStatePropertyAll(
-                                      EdgeInsets.all(6),
-                                    ),
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                  ),
-                                ),
-                                IconButton(
-                                  key: const ValueKey(
-                                    'insert-wiki-link-button',
-                                  ),
-                                  tooltip:
-                                      'Insert note link (⌘⇧K / Ctrl+Shift+K)',
-                                  onPressed: _insertWikiLink,
-                                  icon: const Icon(
-                                    Icons.add_link,
-                                    size: 16,
-                                    semanticLabel: 'Insert note link',
-                                  ),
-                                  style: const ButtonStyle(
-                                    minimumSize: WidgetStatePropertyAll(
-                                      Size(32, 32),
-                                    ),
-                                    padding: WidgetStatePropertyAll(
-                                      EdgeInsets.all(6),
-                                    ),
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
+                                    width: sidebarWidth,
+                                    maxWidth: maxSidebarWidth,
+                                    onResize: workspace.setSidebarWidth,
                                   ),
                                 ),
                               ],
                             ),
-                            if (_retainedImports.firstOrNull
-                                case final retained?)
-                              MaterialBanner(
-                                content: Text(
-                                  'Image saved to ${retained.$1}/${retained.$3.relativePath}, but the note or selection changed. The file was kept; no link was inserted.',
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => _showImportedLink(
-                                      retained.$1,
-                                      retained.$2,
-                                      retained.$3,
+                          ),
+                        Expanded(
+                          child: Column(
+                            children: [
+                              TitleTabsBar(
+                                mobile: mobile,
+                                onOpenNavigation: () =>
+                                    _mobileScaffold.currentState?.openDrawer(),
+                                onOpenOutline: () => showModalBottomSheet<void>(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  builder: (_) => SafeArea(
+                                    child: SizedBox(
+                                      height:
+                                          MediaQuery.sizeOf(context).height *
+                                          .7,
+                                      child: FloatingOutline(
+                                        document: document,
+                                      ),
                                     ),
-                                    child: const Text('Show link'),
                                   ),
-                                  TextButton(
-                                    onPressed: () => setState(
-                                      () => _retainedImports.removeAt(0),
+                                ),
+                                workspace: workspace,
+                                onSave: _saveDocument,
+                                onClose: _closeDocument,
+                                documentActions: [
+                                  IconButton(
+                                    key: const ValueKey(
+                                      'quick-switcher-button',
                                     ),
-                                    child: const Text('Dismiss'),
+                                    tooltip: 'Quick switcher (⌘P / Ctrl+P)',
+                                    onPressed: () => _openPalette(),
+                                    icon: const Icon(Icons.search, size: 16),
+                                  ),
+                                  IconButton(
+                                    key: const ValueKey(
+                                      'command-palette-button',
+                                    ),
+                                    tooltip:
+                                        'Command palette (⌘⇧P / Ctrl+Shift+P)',
+                                    onPressed: () =>
+                                        _openPalette(commands: true),
+                                    icon: const Icon(Icons.terminal, size: 16),
+                                  ),
+                                  IconButton(
+                                    key: const ValueKey('import-image-button'),
+                                    tooltip: _attachmentPending
+                                        ? 'Importing image…'
+                                        : 'Import image',
+                                    onPressed: _attachmentPending
+                                        ? null
+                                        : () => unawaited(_importImage()),
+                                    icon: Icon(
+                                      _attachmentPending
+                                          ? Icons.hourglass_top
+                                          : Icons.add_photo_alternate_outlined,
+                                      size: 16,
+                                      semanticLabel: _attachmentPending
+                                          ? 'Importing image'
+                                          : 'Import image',
+                                    ),
+                                    style: const ButtonStyle(
+                                      minimumSize: WidgetStatePropertyAll(
+                                        Size(32, 32),
+                                      ),
+                                      padding: WidgetStatePropertyAll(
+                                        EdgeInsets.all(6),
+                                      ),
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    key: const ValueKey(
+                                      'workspace-backlinks-button',
+                                    ),
+                                    tooltip: 'Backlinks',
+                                    onPressed: () => _openWorkspaceReferences(),
+                                    icon: const Icon(
+                                      Icons.link,
+                                      size: 16,
+                                      semanticLabel: 'Backlinks',
+                                    ),
+                                    style: const ButtonStyle(
+                                      minimumSize: WidgetStatePropertyAll(
+                                        Size(32, 32),
+                                      ),
+                                      padding: WidgetStatePropertyAll(
+                                        EdgeInsets.all(6),
+                                      ),
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    key: const ValueKey(
+                                      'insert-wiki-link-button',
+                                    ),
+                                    tooltip:
+                                        'Insert note link (⌘⇧K / Ctrl+Shift+K)',
+                                    onPressed: _insertWikiLink,
+                                    icon: const Icon(
+                                      Icons.add_link,
+                                      size: 16,
+                                      semanticLabel: 'Insert note link',
+                                    ),
+                                    style: const ButtonStyle(
+                                      minimumSize: WidgetStatePropertyAll(
+                                        Size(32, 32),
+                                      ),
+                                      padding: WidgetStatePropertyAll(
+                                        EdgeInsets.all(6),
+                                      ),
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                    ),
                                   ),
                                 ],
                               ),
-                            if (_find case final find?)
-                              DocumentFindBar(
-                                controller: find,
-                                queryFocus: _findFocus,
-                                onClose: _closeFind,
-                                onEnableEditing: _enableFindEditing,
-                                onScopeChanged: _changeFindScope,
-                              ),
-                            if (workspace.recoveryError != null ||
-                                workspace.recoveryNotice != null)
-                              MaterialBanner(
-                                content: Text(
-                                  workspace.recoveryError ??
-                                      workspace.recoveryNotice!,
-                                ),
-                                actions: [
-                                  if (workspace.recoveryError != null)
+                              if (_retainedImports.firstOrNull
+                                  case final retained?)
+                                MaterialBanner(
+                                  content: Text(
+                                    'Image saved to ${retained.$1}/${retained.$3.relativePath}, but the note or selection changed. The file was kept; no link was inserted.',
+                                  ),
+                                  actions: [
                                     TextButton(
-                                      onPressed: () =>
-                                          _guard(workspace.retryRecovery),
-                                      child: const Text('Retry recovery'),
-                                    )
-                                  else
+                                      onPressed: () => _showImportedLink(
+                                        retained.$1,
+                                        retained.$2,
+                                        retained.$3,
+                                      ),
+                                      child: const Text('Show link'),
+                                    ),
                                     TextButton(
-                                      onPressed:
-                                          workspace.dismissRecoveryNotice,
+                                      onPressed: () => setState(
+                                        () => _retainedImports.removeAt(0),
+                                      ),
                                       child: const Text('Dismiss'),
                                     ),
-                                ],
-                              ),
-                            if (document.hasExternalChanges)
-                              _ExternalChangeBanner(
-                                document: document,
-                                onReload: () => _guard(
-                                  () => workspace.reloadFromDisk(document),
+                                  ],
                                 ),
-                                onResolve: () =>
-                                    _guard(() => _saveDocument(document)),
-                              ),
-                            Expanded(
-                              child: DropTarget(
-                                enable: widget.enableFileDrop,
-                                onDragEntered: (_) =>
-                                    setState(() => _draggingFiles = true),
-                                onDragExited: (_) =>
-                                    setState(() => _draggingFiles = false),
-                                onDragDone: (details) {
-                                  setState(() => _draggingFiles = false);
-                                  _guard(() => _handleFileDrop(details.files));
-                                },
-                                child: Stack(
-                                  fit: StackFit.expand,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: LayoutBuilder(
-                                            builder: (context, constraints) {
-                                              // Center the same document column
-                                              // in Live, Source and Read, using
-                                              // the space between both panels.
-                                              final inset = math.max(
-                                                constraints.maxWidth < 500
-                                                    ? 24.0
-                                                    : 48.0,
-                                                (constraints.maxWidth -
-                                                        workspace
-                                                            .readingPreferences
-                                                            .width
-                                                            .pixels) /
-                                                    2,
-                                              );
-                                              if (_find case final find?
-                                                  when find.scope ==
-                                                      DocumentFindScope
-                                                          .source) {
-                                                return IanvsMarkdownEditor(
-                                                  key: ValueKey(
-                                                    'find-source-${document.id}',
-                                                  ),
-                                                  controller:
-                                                      document.controller,
-                                                  focusNode: _editorFocus,
-                                                  scrollController:
-                                                      document.scrollController,
-                                                  readOnly: find.readOnly,
-                                                  onPaste: _pasteFromClipboard,
-                                                  highlightedRange:
-                                                      find.highlight,
-                                                  showToolbar: false,
-                                                  enableModeShortcuts: false,
-                                                  placeholder:
-                                                      'Start writing Markdown…',
-                                                  padding: EdgeInsets.fromLTRB(
-                                                    inset,
-                                                    32,
-                                                    inset,
-                                                    56,
-                                                  ),
-                                                  onSaveRequested: (_) =>
-                                                      _saveFromEditor(document),
+                              if (_find case final find?)
+                                DocumentFindBar(
+                                  controller: find,
+                                  queryFocus: _findFocus,
+                                  onClose: _closeFind,
+                                  onEnableEditing: _enableFindEditing,
+                                  onScopeChanged: _changeFindScope,
+                                ),
+                              if (workspace.recoveryError != null ||
+                                  workspace.recoveryNotice != null)
+                                MaterialBanner(
+                                  content: Text(
+                                    workspace.recoveryError ??
+                                        workspace.recoveryNotice!,
+                                  ),
+                                  actions: [
+                                    if (workspace.recoveryError != null)
+                                      TextButton(
+                                        onPressed: () =>
+                                            _guard(workspace.retryRecovery),
+                                        child: const Text('Retry recovery'),
+                                      )
+                                    else
+                                      TextButton(
+                                        onPressed:
+                                            workspace.dismissRecoveryNotice,
+                                        child: const Text('Dismiss'),
+                                      ),
+                                  ],
+                                ),
+                              if (document.hasExternalChanges)
+                                _ExternalChangeBanner(
+                                  document: document,
+                                  onReload: () => _guard(
+                                    () => workspace.reloadFromDisk(document),
+                                  ),
+                                  onResolve: () =>
+                                      _guard(() => _saveDocument(document)),
+                                ),
+                              Expanded(
+                                child: DropTarget(
+                                  enable: widget.enableFileDrop && !mobile,
+                                  onDragEntered: (_) =>
+                                      setState(() => _draggingFiles = true),
+                                  onDragExited: (_) =>
+                                      setState(() => _draggingFiles = false),
+                                  onDragDone: (details) {
+                                    setState(() => _draggingFiles = false);
+                                    _guard(
+                                      () => _handleFileDrop(details.files),
+                                    );
+                                  },
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: LayoutBuilder(
+                                              builder: (context, constraints) {
+                                                // Center the same document column
+                                                // in Live, Source and Read, using
+                                                // the space between both panels.
+                                                final inset = math.max(
+                                                  constraints.maxWidth < 500
+                                                      ? 24.0
+                                                      : 48.0,
+                                                  (constraints.maxWidth -
+                                                          workspace
+                                                              .readingPreferences
+                                                              .width
+                                                              .pixels) /
+                                                      2,
                                                 );
-                                              }
-                                              return DocumentAttachmentScope(
-                                                root: workspace.workspaceRoot,
-                                                documentPath: document.path,
-                                                revision:
-                                                    workspace
-                                                        .workspaceFilesRevision +
-                                                    _attachmentRevision,
-                                                source: widget.attachmentSource,
-                                                builder: (context, images) => IanvsMarkdownCodeLayout(
-                                                  softWrap: workspace
-                                                      .readingPreferences
-                                                      .wrapCode,
-                                                  child: IanvsMarkdownLiveEditor(
-                                                    preserveViewport: true,
-                                                    styleSheet: readingStyleSheet(
-                                                      context,
-                                                      workspace
-                                                          .readingPreferences,
+                                                if (_find case final find?
+                                                    when find.scope ==
+                                                        DocumentFindScope
+                                                            .source) {
+                                                  return IanvsMarkdownEditor(
+                                                    key: ValueKey(
+                                                      'find-source-${document.id}',
                                                     ),
-                                                    readingHighlights:
-                                                        _find?.scope ==
-                                                            DocumentFindScope
-                                                                .body
-                                                        ? IanvsMarkdownReadingHighlights(
-                                                            source: document
-                                                                .controller
-                                                                .text,
-                                                            matches: _find!
-                                                                .bodyMatches,
-                                                            activeIndex: _find!
-                                                                .currentIndex,
-                                                          )
-                                                        : null,
-                                                    builders: {
-                                                      'a': NoteLinkPreviewBuilder(
-                                                        workspace: workspace,
-                                                        document: document,
-                                                        onTap: (link) => _guard(
-                                                          () =>
-                                                              _openDocumentLink(
-                                                                document,
-                                                                link,
-                                                              ),
-                                                        ),
-                                                      ),
-                                                    },
-                                                    imageBuilder: images.image,
-                                                    onPaste:
-                                                        _pasteFromClipboard,
-                                                    wikiEmbedBuilder:
-                                                        images.wiki,
-                                                    key: ValueKey(document.id),
                                                     controller:
                                                         document.controller,
                                                     focusNode: _editorFocus,
-                                                    autofocus: identical(
-                                                      _resumeLiveController,
-                                                      document.controller,
-                                                    ),
-                                                    clipboardWriter: (data) =>
-                                                        writeIanvsMarkdownRichClipboard(
-                                                          markdown:
-                                                              data.markdown,
-                                                          html: data.html,
-                                                        ),
-                                                    onTapLinkTarget: (link) => _guard(
-                                                      () =>
-                                                          link.kind ==
-                                                              IanvsMarkdownLinkKind
-                                                                  .wiki
-                                                          ? _openWikiLink(
-                                                              document,
-                                                              link.href ?? '',
-                                                            )
-                                                          : link.kind ==
-                                                                IanvsMarkdownLinkKind
-                                                                    .tag
-                                                          ? _openWorkspaceReferences(
-                                                              tag: (link.href ?? '')
-                                                                  .replaceFirst(
-                                                                    RegExp(
-                                                                      r'^tag:#?',
-                                                                    ),
-                                                                    '',
-                                                                  ),
-                                                            )
-                                                          : DocumentLinkService(
-                                                              workspace:
-                                                                  workspace,
-                                                              openImage:
-                                                                  _openImage,
-                                                            ).open(
-                                                              document,
-                                                              link.href,
-                                                            ),
-                                                    ),
-                                                    diagramBuilder:
-                                                        (
-                                                          context,
-                                                          source,
-                                                        ) => DocumentDiagram(
-                                                          source: source,
-                                                          renderer:
-                                                              _mermaidRenderer,
-                                                        ),
                                                     scrollController: document
                                                         .scrollController,
+                                                    readOnly: find.readOnly,
+                                                    onPaste:
+                                                        _pasteFromClipboard,
+                                                    highlightedRange:
+                                                        find.highlight,
                                                     showToolbar: false,
+                                                    enableModeShortcuts: false,
                                                     placeholder:
                                                         'Start writing Markdown…',
-                                                    enableModeShortcuts: false,
-                                                    enableHeadingFolding: true,
-                                                    showNavigationPane: false,
-                                                    showOutlineInPreview: false,
-                                                    showFrontMatter: false,
-                                                    contentMaxWidth: workspace
-                                                        .readingPreferences
-                                                        .width
-                                                        .pixels,
                                                     padding:
                                                         EdgeInsets.fromLTRB(
                                                           inset,
@@ -2162,52 +2111,272 @@ class _EditorShellState extends State<EditorShell> {
                                                         _saveFromEditor(
                                                           document,
                                                         ),
+                                                  );
+                                                }
+                                                return DocumentAttachmentScope(
+                                                  root: workspace.workspaceRoot,
+                                                  documentPath: document.path,
+                                                  revision:
+                                                      workspace
+                                                          .workspaceFilesRevision +
+                                                      _attachmentRevision,
+                                                  source:
+                                                      widget.attachmentSource,
+                                                  builder: (context, images) => IanvsMarkdownCodeLayout(
+                                                    softWrap: workspace
+                                                        .readingPreferences
+                                                        .wrapCode,
+                                                    child: IanvsMarkdownLiveEditor(
+                                                      preserveViewport: true,
+                                                      styleSheet: readingStyleSheet(
+                                                        context,
+                                                        workspace
+                                                            .readingPreferences,
+                                                      ),
+                                                      readingHighlights:
+                                                          _find?.scope ==
+                                                              DocumentFindScope
+                                                                  .body
+                                                          ? IanvsMarkdownReadingHighlights(
+                                                              source: document
+                                                                  .controller
+                                                                  .text,
+                                                              matches: _find!
+                                                                  .bodyMatches,
+                                                              activeIndex: _find!
+                                                                  .currentIndex,
+                                                            )
+                                                          : null,
+                                                      builders: {
+                                                        'a': NoteLinkPreviewBuilder(
+                                                          workspace: workspace,
+                                                          document: document,
+                                                          onTap: (link) => _guard(
+                                                            () =>
+                                                                _openDocumentLink(
+                                                                  document,
+                                                                  link,
+                                                                ),
+                                                          ),
+                                                        ),
+                                                      },
+                                                      imageBuilder:
+                                                          images.image,
+                                                      onPaste:
+                                                          _pasteFromClipboard,
+                                                      wikiEmbedBuilder:
+                                                          images.wiki,
+                                                      key: ValueKey(
+                                                        document.id,
+                                                      ),
+                                                      controller:
+                                                          document.controller,
+                                                      focusNode: _editorFocus,
+                                                      autofocus: identical(
+                                                        _resumeLiveController,
+                                                        document.controller,
+                                                      ),
+                                                      clipboardWriter: (data) =>
+                                                          writeIanvsMarkdownRichClipboard(
+                                                            markdown:
+                                                                data.markdown,
+                                                            html: data.html,
+                                                          ),
+                                                      onTapLinkTarget: (link) => _guard(
+                                                        () =>
+                                                            link.kind ==
+                                                                IanvsMarkdownLinkKind
+                                                                    .wiki
+                                                            ? _openWikiLink(
+                                                                document,
+                                                                link.href ?? '',
+                                                              )
+                                                            : link.kind ==
+                                                                  IanvsMarkdownLinkKind
+                                                                      .tag
+                                                            ? _openWorkspaceReferences(
+                                                                tag: (link.href ?? '')
+                                                                    .replaceFirst(
+                                                                      RegExp(
+                                                                        r'^tag:#?',
+                                                                      ),
+                                                                      '',
+                                                                    ),
+                                                              )
+                                                            : DocumentLinkService(
+                                                                workspace:
+                                                                    workspace,
+                                                                openImage:
+                                                                    _openImage,
+                                                              ).open(
+                                                                document,
+                                                                link.href,
+                                                              ),
+                                                      ),
+                                                      diagramBuilder:
+                                                          (
+                                                            context,
+                                                            source,
+                                                          ) => DocumentDiagram(
+                                                            source: source,
+                                                            renderer:
+                                                                _mermaidRenderer,
+                                                          ),
+                                                      scrollController: document
+                                                          .scrollController,
+                                                      showToolbar: false,
+                                                      placeholder:
+                                                          'Start writing Markdown…',
+                                                      enableModeShortcuts:
+                                                          false,
+                                                      enableHeadingFolding:
+                                                          true,
+                                                      showNavigationPane: false,
+                                                      showOutlineInPreview:
+                                                          false,
+                                                      showFrontMatter: false,
+                                                      contentMaxWidth: workspace
+                                                          .readingPreferences
+                                                          .width
+                                                          .pixels,
+                                                      padding:
+                                                          EdgeInsets.fromLTRB(
+                                                            inset,
+                                                            32,
+                                                            inset,
+                                                            56,
+                                                          ),
+                                                      onSaveRequested: (_) =>
+                                                          _saveFromEditor(
+                                                            document,
+                                                          ),
+                                                    ),
                                                   ),
-                                                ),
-                                              );
-                                            },
+                                                );
+                                              },
+                                            ),
                                           ),
-                                        ),
-                                        if (showOutline)
-                                          FloatingOutline(document: document),
-                                      ],
-                                    ),
-                                    if (_draggingFiles) const _DropOverlay(),
-                                  ],
+                                          if (showOutline)
+                                            FloatingOutline(document: document),
+                                        ],
+                                      ),
+                                      if (_draggingFiles) const _DropOverlay(),
+                                    ],
+                                  ),
                                 ),
                               ),
-                            ),
-                            _DocumentStatusBar(
-                              document: document,
-                              workspace: workspace,
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (_referencesVisible)
-                        SizedBox(
-                          width: referenceWidth,
-                          child: ReferenceDock(
-                            key: ValueKey(workspace.workspaceRoot),
-                            workspace: workspace,
-                            onClose: () => _setReferencesVisible(false),
-                            onInsert: _insertReference,
+                              _DocumentStatusBar(
+                                onSaveCopy: () => _saveCommand(saveAs: true),
+                                onResolve: () =>
+                                    unawaited(_resolveCloudConflict()),
+                                document: document,
+                                workspace: workspace,
+                              ),
+                            ],
                           ),
                         ),
-                    ],
-                  );
-                  return Focus(
-                    focusNode: _shellFocus,
-                    autofocus: true,
-                    child: content,
-                  );
-                },
+                        if (!mobile && _referencesVisible)
+                          SizedBox(
+                            width: referenceWidth,
+                            child: ReferenceDock(
+                              key: ValueKey(workspace.workspaceRoot),
+                              workspace: workspace,
+                              onClose: () => _setReferencesVisible(false),
+                              onInsert: _insertReference,
+                            ),
+                          ),
+                      ],
+                    );
+                    return Focus(
+                      focusNode: _shellFocus,
+                      autofocus: true,
+                      child: content,
+                    );
+                  },
+                ),
               ),
             ),
           ),
         );
       },
     );
+  }
+
+  bool _resolvingCloud = false;
+  Future<void> _resolveCloudConflict() async {
+    if (_resolvingCloud) return;
+    final workspace = widget.workspace;
+    final document = workspace.activeDocument;
+    final workspaceRoot = workspace.workspaceRoot;
+    final path = document?.path;
+    if (document == null || path == null) return;
+    _resolvingCloud = true;
+    try {
+      final files = workspace.fileService;
+      final mobile = files is MobileMarkdownFileService ? files.library : null;
+      final granted = files is MobileMarkdownFileService
+          ? files.scopeForDocument(path)
+          : null;
+      final root = granted?.root ?? workspaceRoot;
+      if (root == null || !p.isWithin(root, path)) {
+        throw StateError('请先打开文档所在的工作区。');
+      }
+      final generation = mobile?.workspaceGeneration;
+      final local = document.controller.text;
+      bool current() =>
+          mounted &&
+          workspace.activeDocument == document &&
+          document.path == path &&
+          workspace.workspaceRoot == workspaceRoot &&
+          document.controller.text == local &&
+          mobile?.workspaceGeneration == generation;
+      final service = CloudConflictService(
+        root: root,
+        relativePath: p.relative(path, from: root),
+        workspaceToken: granted?.token,
+      );
+      final review = await service.inspect();
+      if (!mounted || !current()) return;
+      if (review.versions.isEmpty) {
+        await workspace.sync.refresh();
+        return;
+      }
+      final choice = await showDialog<String>(
+        context: context,
+        builder: (_) => CloudConflictDialog(review: review, local: local),
+      );
+      if (choice == null) return;
+      if (!current()) throw StateError('文档或工作区已改变，请重新查看冲突。');
+      final result = await service.resolve(review, choice, local);
+      await workspace.acceptCloudResolution(
+        document,
+        path: path,
+        reviewedLocal: local,
+        resolved: result.contents,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              result.resolutionPending
+                  ? '所选内容和 ${result.copies.length} 份副本已保存；等待 iCloud 确认，无需重复操作。'
+                  : '冲突已处理；保留了 ${result.copies.length} 份不同内容的副本。',
+            ),
+          ),
+        );
+      }
+    } catch (error) {
+      final changed =
+          error is PlatformException && error.code == 'cloud_conflict_changed';
+      _showError(
+        changed
+            ? '审阅后文档或云端版本已变化，未覆盖新内容。请重新打开冲突提示，比较最新版本后重试。'
+            : '冲突处理未完成。当前编辑和已保存副本会保留，请重新打开冲突提示后重试。',
+      );
+      workspace.sync.scheduleRefresh();
+    } finally {
+      _resolvingCloud = false;
+    }
   }
 
   void _saveCommand({bool saveAs = false}) {
@@ -2450,7 +2619,14 @@ class _DropOverlay extends StatelessWidget {
 }
 
 class _DocumentStatusBar extends StatelessWidget {
-  const _DocumentStatusBar({required this.document, required this.workspace});
+  const _DocumentStatusBar({
+    required this.document,
+    required this.workspace,
+    required this.onSaveCopy,
+    required this.onResolve,
+  });
+  final VoidCallback onSaveCopy;
+  final VoidCallback onResolve;
   final DocumentSession document;
   final WorkspaceController workspace;
 
@@ -2481,7 +2657,11 @@ class _DocumentStatusBar extends StatelessWidget {
                 children: [
                   Text(workspace.persistenceStatus(document).label),
                   const SizedBox(width: 12),
-                  DocumentSyncIndicator(controller: workspace.sync),
+                  DocumentSyncIndicator(
+                    controller: workspace.sync,
+                    onSaveCopy: onSaveCopy,
+                    onResolve: onResolve,
+                  ),
                   const SizedBox(width: 16),
                   Text('${statistics.words} words'),
                   const SizedBox(width: 14),

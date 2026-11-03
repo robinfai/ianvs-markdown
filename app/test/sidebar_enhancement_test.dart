@@ -59,6 +59,7 @@ void main() {
   Future<void> pump(WidgetTester tester, {double width = 248}) async {
     await tester.pumpWidget(
       MaterialApp(
+        theme: ThemeData(platform: TargetPlatform.macOS),
         home: Scaffold(
           body: Align(
             alignment: Alignment.topLeft,

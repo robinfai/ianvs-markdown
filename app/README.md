@@ -1,8 +1,41 @@
 # Linefold
 
-`app/` includes the macOS editor and an iOS reader with explicit Source quick editing. The normal
-`lib/main.dart` entry point selects the iOS reader on iPhone/iPad and keeps the
-existing desktop shell on macOS.
+`app/` uses the same workspace and Live / Source / Read editor on macOS and iOS.
+On iOS, navigation uses a drawer and a compact toolbar with access to the command
+palette, search, open documents and outline. Native iOS saves retain workspace
+capability checks and guarded conflict detection. Normal iCloud activity is silent;
+only reported failures and conflicts expose status details and a retry action.
+
+## iOS file management and conflicts
+
+Long-press a file or folder to create notes/folders, rename, duplicate, move or
+move to Trash. Moves keep open-document identities in sync. Choosing another
+operation folder grants access without replacing the active workspace; moved
+notes remain editable during the session. On iOS, Trash moves items into unique
+subfolders of the current workspace’s visible `最近删除` folder. Expand that folder
+and use **Move to…** to restore an item; no automatic cleanup or permanent deletion
+is performed. This avoids relying on provider-specific system trash discovery.
+Existing names are never overwritten by file operations.
+
+An iCloud conflict exposes **解决冲突**. Review differences, keep the current edit,
+choose a cloud version, or keep all versions. Native resolution checks the exact
+reviewed disk contents and unresolved version set again. Different disk, draft
+and cloud contents are written as exclusive `conflict` siblings and verified
+before the reviewed system versions are marked resolved. A changed review or
+failed write leaves versions unresolved and asks for a fresh review. Edits made
+while resolution runs remain dirty and recoverable. No system versions are
+removed. Confirmed failures/conflicts stay visible until a successful observation
+clears them; normal transfer activity remains silent.
+
+`test/mobile_management_test.dart` covers touch actions, picker grants, conflict
+review and concurrent edits. `tool/test_native_guarded_save.sh` also runs the
+synthetic native directory/conflict suite. Real cross-device iCloud delivery and
+provider-specific file access require device testing; synthetic version fixtures
+do not establish real iCloud delivery. For the repeatable local simulator audit,
+build Debug with `--dart-define=LINEFOLD_SIMULATOR_QA=true`. This creates explicitly
+labelled local samples and injects synthetic cloud versions; the production
+conflict review, scoped writes and preservation paths remain real. The native
+fixture is excluded from Release and physical-device builds.
 
 ## Local iteration
 
@@ -46,8 +79,7 @@ Results show up to 500 snippets while counting continues. Use **Refresh metadata
 after provider changes; providers are not guaranteed to update live. Very large
 or slow directory listings can also be incomplete and are explicitly labelled.
 
-The iOS reader shares the safe native source contract but does not yet expose the
-workspace search interface.
+The iOS workspace exposes the same search interface through the command palette.
 
 ## Mermaid in offline export
 

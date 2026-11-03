@@ -31,6 +31,7 @@ final class CloudWorkspace {
   private var observers: [NSObjectProtocol] = []
   private var monitoredRoot: URL?
   let previewWriteAuthority = WorkspaceWriteAuthority()
+  let operationWriteGrants = WorkspaceOperationGrants()
 
   func defaultDirectory() throws -> URL {
     if Bundle.main.object(forInfoDictionaryKey: "LinefoldCloudEnabled") as? String == "NO" {
@@ -127,7 +128,7 @@ final class CloudWorkspace {
         return
       }
       #endif
-      guard ["defaultDirectory", "listDirectory", "readDocument", "readDocumentBytes", "writeDocument", "writeDocumentGuarded",
+      guard ["manageWorkspaceEntry", "inspectCloudConflict", "resolveCloudConflict", "defaultDirectory", "listDirectory", "readDocument", "readDocumentBytes", "writeDocument", "writeDocumentGuarded",
              "listAttachments", "readAttachmentBytes", "listBundleAssets", "readBundleAssetBytes", "readAttachmentImportSettings", "normalizeAttachmentPaths", "createWorkspaceAttachment",
              "listWorkspaceDirectory", "readWorkspaceTextBytes", "createWorkspaceNote", "writeWorkspaceNoteGuarded", "resolveWorkspacePath", "readDocumentSyncMetadata"].contains(method) else {
         result(FlutterMethodNotImplemented)
@@ -136,16 +137,26 @@ final class CloudWorkspace {
       // iOS edits must carry the current native-selected root capability. Do not
       // let a previously retained picker grant authorize an absolute-path write.
       var writeLease: WorkspaceWriteLease?
+      var destinationLease: WorkspaceWriteLease?
       #if os(iOS)
-      if ["writeDocument", "writeDocumentGuarded", "createWorkspaceAttachment"].contains(method) {
+      if ["writeDocument", "writeDocumentGuarded"].contains(method) {
         result(FlutterError(code: "workspace_unavailable", message: WorkspaceError.invalidPath.localizedDescription, details: nil))
         return
       }
-      if method == "createWorkspaceNote" || method == "writeWorkspaceNoteGuarded" {
+      if method == "createWorkspaceNote" || method == "writeWorkspaceNoteGuarded" || method == "createWorkspaceAttachment" || method == "manageWorkspaceEntry" || method == "inspectCloudConflict" || method == "resolveCloudConflict" {
         do {
           guard let root = arguments["path"] as? String,
                 let token = arguments["workspaceToken"] as? String else { throw WorkspaceError.invalidPath }
-          writeLease = try self.previewWriteAuthority.admit(path: root, token: token)
+          if method == "manageWorkspaceEntry" {
+            writeLease = try self.admitFileOperation(path: root, token: token)
+            if arguments["destinationRoot"] != nil {
+              guard let destination = arguments["destinationRoot"] as? String,
+                    let destinationToken = arguments["destinationToken"] as? String else { throw WorkspaceError.invalidPath }
+              destinationLease = try self.admitFileOperation(path: destination, token: destinationToken)
+            }
+          } else {
+            writeLease = try self.admitFileOperation(path: root, token: token)
+          }
         } catch {
           result(FlutterError(code: "workspace_unavailable", message: error.localizedDescription, details: nil))
           return
@@ -197,12 +208,13 @@ final class CloudWorkspace {
       }
       let isSearch = method == "listWorkspaceDirectory" || method == "readWorkspaceTextBytes" || method == "createWorkspaceNote" || method == "writeWorkspaceNoteGuarded" || method == "resolveWorkspacePath"
       let isAttachment = method == "listBundleAssets" || method == "readBundleAssetBytes" || method == "listAttachments" || method == "readAttachmentBytes" || method == "readAttachmentImportSettings" || method == "createWorkspaceAttachment"
-      let workQueue = (method == "createWorkspaceNote" || method == "writeWorkspaceNoteGuarded") ? self.noteWriteQueue : (isSearch ? self.searchQueue : (isAttachment ? self.attachmentQueue : self.queue))
+      let workQueue = (["createWorkspaceNote", "writeWorkspaceNoteGuarded", "manageWorkspaceEntry", "inspectCloudConflict", "resolveCloudConflict"].contains(method)) ? self.noteWriteQueue : (isSearch ? self.searchQueue : (isAttachment ? self.attachmentQueue : self.queue))
       let admittedWrite = writeLease
+      let admittedDestination = destinationLease
       workQueue.async {
         // A Dart timeout does not cancel native IO. Keep the lease until this
         // operation really settles, and reject root changes for its lifetime.
-        defer { admittedWrite?.finish() }
+        defer { admittedWrite?.finish(); admittedDestination?.finish() }
         do {
           try admittedWrite?.validate()
           let value: Any
@@ -222,6 +234,13 @@ final class CloudWorkspace {
             }
             let url = URL(fileURLWithPath: path)
             switch method {
+            case "manageWorkspaceEntry":
+              try Self.manageWorkspaceEntry(url, arguments: arguments, validateAuthority: { try admittedWrite?.validate(); try admittedDestination?.validate() })
+              value = true
+            case "inspectCloudConflict":
+              value = try CloudConflictSessions.shared.inspect(url, arguments: arguments, validateAuthority: { try admittedWrite?.validate() })
+            case "resolveCloudConflict":
+              value = try CloudConflictSessions.shared.resolve(url, arguments: arguments, validateAuthority: { try admittedWrite?.validate() })
             case "resolveWorkspacePath":
               guard let relativePath = arguments["relativePath"] as? String else { throw AttachmentError.invalid }
               value = try Self.resolveWorkspacePath(url, relativePath: relativePath)
@@ -279,6 +298,11 @@ final class CloudWorkspace {
           }
           admittedWrite?.finish()
           DispatchQueue.main.async { result(value) }
+        } catch is CloudConflictReviewChanged {
+          admittedWrite?.finish()
+          DispatchQueue.main.async {
+            result(FlutterError(code: "cloud_conflict_changed", message: "The document or cloud versions changed after review. Review the latest versions before resolving.", details: nil))
+          }
         } catch let error as AttachmentImportWriteFailure {
           admittedWrite?.finish()
           DispatchQueue.main.async {
@@ -338,6 +362,9 @@ final class CloudWorkspace {
   /// nonlocal versions, or establish a new container/security scope here.
   /// isUploaded describes an OS observation, not completion of our local write.
   static func readSyncMetadata(_ source: URL) throws -> [String: Any] {
+    #if DEBUG && targetEnvironment(simulator)
+    if let fixture = SimulatorAuditFixture.metadata(source) { return fixture }
+    #endif
     guard source.isFileURL, !source.path.contains("\0"),
           extensions.contains(source.pathExtension.lowercased()) else {
       throw WorkspaceError.invalidPath
@@ -2992,3 +3019,311 @@ struct WorkspaceSyncObservation {
     return result
   }
 }
+
+/// Explicit user-requested file operations. The selected root capability is
+/// held for the entire coordinated operation; destination names never replace.
+extension CloudWorkspace {
+  static func manageWorkspaceEntry(_ root: URL, arguments: [String: Any], validateAuthority: (() throws -> Void)? = nil, trash: ((URL) throws -> Void)? = nil) throws {
+    guard let operation = arguments["operation"] as? String,
+          ["createDirectory", "move", "copy", "trash"].contains(operation),
+          let relative = arguments["relativePath"] as? String else { throw WorkspaceError.invalidPath }
+    let scope = try WorkspaceFileScope(root)
+    let destinationScope = try (arguments["destinationRoot"] as? String).map { try WorkspaceFileScope(URL(fileURLWithPath: $0)) } ?? scope
+    func checked(_ relative: String, vacant: Bool = false, in selectedScope: WorkspaceFileScope? = nil) throws -> URL {
+      let selected = selectedScope ?? scope
+      let parts = try WorkspaceFileScope.relativeComponents(relative)
+      guard !parts.contains(where: { $0.hasPrefix(".") }) else { throw WorkspaceError.invalidPath }
+      let parent = try selected.parentDescriptor(parts)
+      defer { close(parent) }
+      try selected.verifyRootLocation()
+      // Verify that the pinned parent still occupies the requested location.
+      var actual = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+      guard fcntl(parent, F_GETPATH, &actual) == 0,
+            String(cString: actual) == selected.rootURL.appendingPathComponent(relative).deletingLastPathComponent().path else { throw AttachmentError.unavailable }
+      if vacant { try selected.requireVacantName(parent: parent, name: parts.last!) }
+      else {
+        var attributes = stat()
+        guard fstatat(parent, parts.last!, &attributes, AT_SYMLINK_NOFOLLOW) == 0 else { throw AttachmentError.posix() }
+        guard [mode_t(S_IFDIR), mode_t(S_IFREG)].contains(attributes.st_mode & mode_t(S_IFMT)) else { throw WorkspaceError.invalidPath }
+      }
+      return selected.rootURL.appendingPathComponent(relative)
+    }
+    var coordinationError: NSError?
+    var outcome: Result<Void, Error> = .failure(WorkspaceError.unavailable)
+    let perform: (URL, URL) -> Void = { coordinated, coordinatedDestination in
+      outcome = Result {
+        try validateAuthority?()
+        guard try WorkspaceFileScope(coordinated).rootURL.path == scope.rootURL.path, try WorkspaceFileScope(coordinatedDestination).rootURL.path == destinationScope.rootURL.path else { throw WorkspaceError.invalidPath }
+        let source = try checked(relative, vacant: operation == "createDirectory")
+        switch operation {
+        case "createDirectory":
+          let parts = try WorkspaceFileScope.relativeComponents(relative)
+          let parent = try scope.parentDescriptor(parts)
+          defer { close(parent) }
+          guard mkdirat(parent, parts.last!, 0o700) == 0 else { throw AttachmentError.posix() }
+        case "move", "copy":
+          guard let destination = arguments["destination"] as? String,
+                (destinationScope.rootURL.path != scope.rootURL.path || (destination != relative && !destination.hasPrefix(relative + "/"))) else { throw WorkspaceError.invalidPath }
+          let output = try checked(destination, vacant: true, in: destinationScope)
+          guard output.path != source.path, !output.path.hasPrefix(source.path + "/") else { throw WorkspaceError.invalidPath }
+          if operation == "move" {
+            let sourceParts = try WorkspaceFileScope.relativeComponents(relative)
+            let destinationParts = try WorkspaceFileScope.relativeComponents(destination)
+            let sourceParent = try scope.parentDescriptor(sourceParts)
+            defer { close(sourceParent) }
+            let destinationParent = try destinationScope.parentDescriptor(destinationParts)
+            defer { close(destinationParent) }
+            if renameatx_np(sourceParent, sourceParts.last!, destinationParent, destinationParts.last!, UInt32(RENAME_EXCL)) != 0 {
+              guard errno == EXDEV else { throw AttachmentError.posix() }
+              // Foundation handles an explicit cross-volume move and does not replace.
+              try FileManager.default.moveItem(at: source, to: output)
+            }
+          } else {
+            // FileManager copies symlinks as links, not their targets. Reject
+            // them anyway so copied trees cannot introduce scope escapes.
+            let keys: [URLResourceKey] = [.isSymbolicLinkKey]
+            if let entries = FileManager.default.enumerator(at: source, includingPropertiesForKeys: keys) {
+              var count = 0
+              for case let entry as URL in entries {
+                count += 1
+                guard count <= 20000, try entry.resourceValues(forKeys: Set(keys)).isSymbolicLink != true else { throw AttachmentError.invalid }
+              }
+            }
+            try validateAuthority?()
+            _ = try checked(relative)
+            _ = try checked(destination, vacant: true, in: destinationScope)
+            try FileManager.default.copyItem(at: source, to: output)
+          }
+        default:
+          var trashed: NSURL?
+          // iOS 11+: the system's Recently Deleted location preserves recovery.
+          if let trash { try trash(source) }
+          else { try FileManager.default.trashItem(at: source, resultingItemURL: &trashed) }
+        }
+        try scope.verifyRootLocation()
+        try destinationScope.verifyRootLocation()
+        try validateAuthority?()
+      }
+    }
+    let coordinator = NSFileCoordinator()
+    if scope.rootURL.path == destinationScope.rootURL.path {
+      coordinator.coordinate(writingItemAt: scope.rootURL, options: .forMerging, error: &coordinationError) { perform($0, $0) }
+    } else {
+      coordinator.coordinate(writingItemAt: scope.rootURL, options: .forMerging, writingItemAt: destinationScope.rootURL, options: .forMerging, error: &coordinationError, byAccessor: perform)
+    }
+    if let coordinationError { throw coordinationError }
+    try outcome.get()
+  }
+}
+
+struct CloudConflictReviewChanged: Error {}
+
+struct CloudConflictVersionRecord {
+  let id: AnyHashable
+  let name: String
+  let modified: Date?
+  let read: () throws -> Data
+  let resolve: () -> Void
+}
+
+/// Review sessions bind the exact disk bytes and set of unresolved versions.
+/// Every losing version is saved before any system version is marked resolved.
+final class CloudConflictSessions {
+  static let shared = CloudConflictSessions()
+  private struct Snapshot {
+    let root: String
+    let path: String
+    let authority: String?
+    let current: Data
+    let versions: [(CloudConflictVersionRecord, Data)]
+    let created: Date
+  }
+  private var sessions: [String: Snapshot] = [:]
+  let versions: (URL) throws -> [CloudConflictVersionRecord]
+  init(versions: @escaping (URL) throws -> [CloudConflictVersionRecord] = CloudConflictSessions.systemVersions) {
+    self.versions = versions
+  }
+  static func systemVersions(_ url: URL) throws -> [CloudConflictVersionRecord] {
+    #if DEBUG && targetEnvironment(simulator)
+    if let fixture = SimulatorAuditFixture.versions(url) { return fixture }
+    #endif
+    return try (NSFileVersion.unresolvedConflictVersionsOfItem(at: url) ?? []).map { version in
+      guard let id = version.persistentIdentifier as? AnyHashable else { throw WorkspaceError.unavailable }
+      return CloudConflictVersionRecord(id: id, name: version.localizedName ?? "Cloud version", modified: version.modificationDate,
+        read: { Data(try CloudWorkspace.read(version.url, maximumBytes: WorkspaceTextScope.maximumTextBytes).utf8) },
+        resolve: { version.isResolved = true })
+    }
+  }
+  private func coordinated<T>(_ root: URL, path: String, _ body: (WorkspaceNoteWriteScope, Int32, URL) throws -> T) throws -> T {
+    let scope = try WorkspaceNoteWriteScope(root)
+    let parts = try WorkspaceTextScope.textComponents(path, directory: false)
+    let parent = try scope.parentDescriptor(parts)
+    defer { close(parent) }
+    let target = scope.rootURL.appendingPathComponent(path)
+    var error: NSError?
+    var outcome: Result<T, Error> = .failure(WorkspaceError.unavailable)
+    NSFileCoordinator().coordinate(writingItemAt: target.deletingLastPathComponent(), options: .forMerging, error: &error) { observed in
+      outcome = Result {
+        guard try WorkspaceFileScope(observed).rootURL.path == target.deletingLastPathComponent().path else { throw WorkspaceError.invalidPath }
+        try scope.verifyCoordinatedURL(target, relativePath: path, parentDescriptor: parent)
+        return try body(scope, parent, target)
+      }
+    }
+    if let error { throw error }
+    return try outcome.get()
+  }
+  func inspect(_ root: URL, arguments: [String: Any], validateAuthority: (() throws -> Void)? = nil) throws -> [String: Any] {
+    guard let path = arguments["relativePath"] as? String else { throw WorkspaceError.invalidPath }
+    return try coordinated(root, path: path) { scope, _, target in
+      try validateAuthority?()
+      let current = try scope.readLocalBytes(components: WorkspaceTextScope.textComponents(path, directory: false), maximumBytes: WorkspaceTextScope.maximumTextBytes, verifyRevision: true).bytes
+      guard String(data: current, encoding: .utf8) != nil else { throw WorkspaceError.invalidText }
+      let records = try versions(target)
+      guard records.count <= 50 else { throw WorkspaceError.tooLarge }
+      var total = current.count
+      let captured = try records.map { record -> (CloudConflictVersionRecord, Data) in
+        let bytes = try record.read()
+        total += bytes.count
+        guard bytes.count <= WorkspaceTextScope.maximumTextBytes, total <= 20 * 1024 * 1024,
+              String(data: bytes, encoding: .utf8) != nil else { throw WorkspaceError.tooLarge }
+        return (record, bytes)
+      }
+      sessions = sessions.filter { Date().timeIntervalSince($0.value.created) < 600 }
+      if sessions.count >= 8, let oldest = sessions.min(by: { $0.value.created < $1.value.created }) { sessions.removeValue(forKey: oldest.key) }
+      let token = UUID().uuidString
+      sessions[token] = Snapshot(root: scope.rootURL.path, path: path, authority: arguments["workspaceToken"] as? String, current: current, versions: captured, created: Date())
+      return ["session": token, "current": FlutterStandardTypedData(bytes: current), "versions": captured.enumerated().map { index, item in
+        ["id": String(index), "name": item.0.name, "contents": FlutterStandardTypedData(bytes: item.1), "modified": item.0.modified.map { $0.timeIntervalSince1970 * 1000 } as Any? ?? NSNull()] as [String: Any]
+      }]
+    }
+  }
+  func resolve(_ root: URL, arguments: [String: Any], validateAuthority: (() throws -> Void)? = nil) throws -> [String: Any] {
+    guard let token = arguments["session"] as? String, let snapshot = sessions[token],
+          let path = arguments["relativePath"] as? String, path == snapshot.path,
+          arguments["workspaceToken"] as? String == snapshot.authority,
+          Date().timeIntervalSince(snapshot.created) < 600,
+          let choice = arguments["choice"] as? String,
+          let local = arguments["localContents"] as? FlutterStandardTypedData,
+          local.data.count <= WorkspaceTextScope.maximumTextBytes,
+          let localText = String(data: local.data, encoding: .utf8) else { throw WorkspaceError.invalidPath }
+    return try coordinated(root, path: path) { scope, parent, target in
+      try validateAuthority?()
+      guard scope.rootURL.path == snapshot.root else { throw WorkspaceError.invalidPath }
+      func checkVersions() throws -> [CloudConflictVersionRecord] {
+        let current = try versions(target)
+        guard Set(current.map(\.id)) == Set(snapshot.versions.map { $0.0.id }) else { throw CloudConflictReviewChanged() }
+        for item in current {
+          guard let captured = snapshot.versions.first(where: { $0.0.id == item.id }), try item.read() == captured.1 else { throw CloudConflictReviewChanged() }
+        }
+        return current
+      }
+      _ = try checkVersions()
+      let current = try scope.readLocalBytes(components: WorkspaceTextScope.textComponents(path, directory: false), maximumBytes: WorkspaceTextScope.maximumTextBytes, verifyRevision: true).bytes
+      guard current == snapshot.current else { throw CloudConflictReviewChanged() }
+      let selected: Data
+      if choice == "local" || choice == "keepAll" { selected = local.data }
+      else if let index = Int(choice), snapshot.versions.indices.contains(index) { selected = snapshot.versions[index].1 }
+      else { throw WorkspaceError.invalidPath }
+      // Preserve all reviewed bytes, including unsaved edits if a cloud version
+      // wins. Unique, exclusively-created siblings make interrupted retries safe.
+      var copies: [String] = []
+      var preserved: [(String, Data)] = []
+      var saved: Set<Data> = [selected]
+      for bytes in [snapshot.current, local.data] + snapshot.versions.map({ $0.1 }) where !saved.contains(bytes) {
+        let name = (target.deletingPathExtension().lastPathComponent.prefix(40)) + " conflict " + UUID().uuidString + ".md"
+        let directory = (path as NSString).deletingLastPathComponent
+        let relative = directory.isEmpty ? name : directory + "/" + name
+        try scope.writeNote(relativePath: relative, contents: String(data: bytes, encoding: .utf8)!, expectedContents: nil, coordinatedParent: parent, validateAuthority: validateAuthority)
+        copies.append(relative)
+        preserved.append((relative, bytes))
+        saved.insert(bytes)
+      }
+      _ = try checkVersions()
+      try scope.writeNote(relativePath: path, contents: String(data: selected, encoding: .utf8) ?? localText,
+                         expectedContents: String(data: snapshot.current, encoding: .utf8), coordinatedParent: parent, validateAuthority: validateAuthority)
+      let remaining = try checkVersions()
+      let installed = try scope.readLocalBytes(components: WorkspaceTextScope.textComponents(path, directory: false), maximumBytes: WorkspaceTextScope.maximumTextBytes, verifyRevision: true).bytes
+      guard installed == selected else { throw AttachmentError.unavailable }
+      try validateAuthority?()
+      for (relative, bytes) in preserved {
+        let verified = try scope.readLocalBytes(components: WorkspaceTextScope.textComponents(relative, directory: false), maximumBytes: WorkspaceTextScope.maximumTextBytes, verifyRevision: true).bytes
+        guard verified == bytes else { throw AttachmentError.unavailable }
+      }
+      for version in remaining { version.resolve() }
+      // iCloud's version enumeration can lag the isResolved setters. The
+      // document and every losing version have already been verified above;
+      // do not report a failed write or invite a duplicate resolution here.
+      // Keep the normal metadata observation responsible for confirmation.
+      let resolutionPending = (try? versions(target).contains(where: { version in remaining.contains(where: { $0.id == version.id }) })) ?? true
+      sessions.removeValue(forKey: token)
+      return ["contents": FlutterStandardTypedData(bytes: selected), "copies": copies, "resolutionPending": resolutionPending]
+    }
+  }
+}
+
+
+final class WorkspaceOperationGrants {
+  private let lock = NSLock()
+  private var authorities: [String: WorkspaceWriteAuthority] = [:]
+  func activate(_ root: URL) throws -> [String: String] {
+    let authority = WorkspaceWriteAuthority()
+    let selection = try authority.activate(root)
+    lock.lock()
+    defer { lock.unlock() }
+    authorities[selection["workspaceToken"]!] = authority
+    return selection
+  }
+  func admit(path: String, token: String) throws -> WorkspaceWriteLease {
+    lock.lock()
+    let authority = authorities[token]
+    lock.unlock()
+    guard let authority else { throw WorkspaceError.invalidPath }
+    return try authority.admit(path: path, token: token)
+  }
+}
+
+extension CloudWorkspace {
+  func admitFileOperation(path: String, token: String) throws -> WorkspaceWriteLease {
+    do { return try previewWriteAuthority.admit(path: path, token: token) }
+    catch { return try operationWriteGrants.admit(path: path, token: token) }
+  }
+}
+
+
+#if DEBUG && targetEnvironment(simulator)
+/// Opt-in simulator-only fixture. No Apple account or real cloud version is
+/// touched. The UI, scoped writes, conflict review and resolution stay real.
+enum SimulatorAuditFixture {
+  private static let lock = NSLock()
+  private static var rootPath: String?
+  private static let names = ["Cloud-Choice.md", "Local-Choice.md", "Keep-All.md", "Stale-Review.md"]
+  static func prepare(_ documents: URL) throws -> [String: Any] {
+    let root = documents.appendingPathComponent("Simulator QA", isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    for name in names {
+      let url = root.appendingPathComponent(name)
+      if !FileManager.default.fileExists(atPath: url.path) {
+        try Data("# Simulator conflict fixture\n\nLocal disk version for \(name).\nThis is synthetic local data, not iCloud.\n".utf8).write(to: url, options: .withoutOverwriting)
+      }
+    }
+    let selection = try CloudWorkspace.shared.previewWriteAuthority.activate(root)
+    lock.lock(); rootPath = selection["path"]; lock.unlock()
+    return ["path": selection["path"]!, "workspaceToken": selection["workspaceToken"]!, "isCloud": false, "name": "模拟器 QA · 本机"]
+  }
+  static func versions(_ url: URL) -> [CloudConflictVersionRecord]? {
+    lock.lock(); let root = rootPath; lock.unlock()
+    guard let root, url.deletingLastPathComponent().path == root, names.contains(url.lastPathComponent) else { return nil }
+    let key = "linefold.simulator.audit.resolved." + url.lastPathComponent
+    if UserDefaults.standard.bool(forKey: key) { return [] }
+    return [CloudConflictVersionRecord(id: url.lastPathComponent, name: "模拟器本地版本 B（非真实 iCloud）", modified: Date(),
+      read: { Data("# Simulator conflict fixture\n\nRemote fixture version for \(url.lastPathComponent).\nThis is synthetic local data, not iCloud.\n".utf8) },
+      resolve: { UserDefaults.standard.set(true, forKey: key) })]
+  }
+  static func metadata(_ url: URL) -> [String: Any]? {
+    guard let versions = versions(url) else { return nil }
+    return ["observedAt": Date().timeIntervalSince1970 * 1000, "isUbiquitous": true,
+      "isUploaded": versions.isEmpty, "hasUnresolvedConflicts": !versions.isEmpty,
+      "conflictsAvailable": true, "conflicts": versions.map { ["name": $0.name] }]
+  }
+}
+#endif
