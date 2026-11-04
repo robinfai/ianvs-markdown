@@ -540,3 +540,7 @@ LF、CRLF、CR 均保留源码偏移。完整标签优先于 `-N` 后缀解释�
 桌面 Workspace 的跨文档历史仅记录显式 Markdown/Wiki 链接，不记录普通标签选择；
 返回优先处理到达目标之后的文内跳转，再切回已打开的来源会话并恢复选区和锚点。
 关闭会话会移除相关跨文档条目，返回不自动重开文件、不触发磁盘写入。
+
+## Optional bounded Markdown viewport
+
+`IanvsMarkdown(scrollable: true, scrollPadding: ...)` owns a bounded vertical viewport. Do not nest it in another vertical scroll view. Parsing keeps the complete document, while block layout and painting are lazy. The default `scrollable: false` preserves the existing body layout; `scrollPadding` defaults to `EdgeInsets.zero`. Nested Markdown bodies retain non-scrolling behavior. Whole-document Select All/Copy includes offscreen source.
