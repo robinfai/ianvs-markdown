@@ -98,6 +98,8 @@ class IanvsMarkdown extends StatelessWidget {
   const IanvsMarkdown({
     super.key,
     required this.data,
+    this.scrollable = false,
+    this.scrollPadding = EdgeInsets.zero,
     this.selectable = true,
     this.focusNode,
     this.autofocus = false,
@@ -141,6 +143,12 @@ class IanvsMarkdown extends StatelessWidget {
   }) : assert(listNestingOffset >= 0);
 
   final String data;
+
+  /// Own a bounded viewport using lazy block layout and per-block repaint
+  /// boundaries, as in the Live editor. Do not put this inside another scroll.
+  /// Parsing retains the complete document (references and footnotes included).
+  final bool scrollable;
+  final EdgeInsetsGeometry scrollPadding;
   final bool selectable;
 
   /// Optional host-owned focus for document selection. Not used by per-block
@@ -283,7 +291,7 @@ class IanvsMarkdown extends StatelessWidget {
       );
       final customFallback = fallbackBuilder?.call(context, decision);
       if (customFallback != null) return customFallback;
-      return Column(
+      final fallback = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           MarkdownBudgetNotice(
@@ -311,6 +319,9 @@ class IanvsMarkdown extends StatelessWidget {
           ),
         ],
       );
+      return scrollable
+          ? SingleChildScrollView(padding: scrollPadding, child: fallback)
+          : fallback;
     }
 
     final baseStyleSheet =
@@ -625,6 +636,8 @@ class IanvsMarkdown extends StatelessWidget {
     var taskIndex = 0;
     Set<String>? imageReferenceLabels;
     final body = ScopedMarkdownBody(
+      scrollable: scrollable,
+      scrollPadding: scrollPadding,
       key: ValueKey<bool>(softLineBreak),
       // flutter_markdown_plus only reparses when data or styles change, so
       // changing this option must remount its state to rebuild line spans.
@@ -861,6 +874,8 @@ class IanvsMarkdown extends StatelessWidget {
     required bool blockSelectable,
   }) {
     return ScopedMarkdownBody(
+      scrollable: scrollable,
+      scrollPadding: scrollPadding,
       key: ValueKey((syntaxPreset, softLineBreak)),
       data: source,
       selectable: blockSelectable,

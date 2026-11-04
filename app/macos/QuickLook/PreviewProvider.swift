@@ -44,6 +44,15 @@ import QuickLookUI
 import FlutterMacOS
 import os
 
+// Terminate native edit-action forwarding at the Flutter boundary. Quick Look
+// otherwise forwards copy: back to its first responder and can recurse until
+// stack overflow when the embedded Flutter responder has no native copy:.
+private final class PreviewFlutterController: FlutterViewController {
+  var onCommand: ((String) -> Void)?
+  @objc func copy(_ sender: Any?) { onCommand?("copy") }
+  override func selectAll(_ sender: Any?) { onCommand?("selectAll") }
+}
+
 final class PreviewProvider: NSViewController, QLPreviewingController {
   private let logger = Logger(subsystem: "work.ianvs.linefold.QuickLook", category: "preview")
   private var engine: FlutterEngine?
@@ -86,7 +95,10 @@ final class PreviewProvider: NSViewController, QLPreviewingController {
         default: result(FlutterMethodNotImplemented)
         }
       }
-      let controller = FlutterViewController(engine: engine, nibName: nil, bundle: nil)
+      let controller = PreviewFlutterController(engine: engine, nibName: nil, bundle: nil)
+      controller.onCommand = { [weak channel] command in
+        channel?.invokeMethod(command, arguments: nil)
+      }
       flutter = controller
       addChild(controller)
       controller.view.frame = view.bounds

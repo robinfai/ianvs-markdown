@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:ianvs_markdown/ianvs_markdown_diagnostics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -15,7 +16,14 @@ void main(List<String> arguments) {
   final input =
       jsonDecode(utf8.decode(base64Decode(arguments.single)))
           as Map<String, dynamic>;
-  runApp(Preview(input: input));
+  runApp(
+    scrollFrameProbeEnabled
+        ? ScrollFrameProbe(
+            host: 'finder',
+            child: Preview(input: input),
+          )
+        : Preview(input: input),
+  );
   WidgetsBinding.instance.addPostFrameCallback(
     (_) => bridge.invokeMethod<void>('firstFrame'),
   );
@@ -36,12 +44,22 @@ class _PreviewState extends State<Preview> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    bridge.setMethodCallHandler((call) async {
+      if (call.method == 'copy') {
+        return IanvsMarkdownShortcuts.invoke(IanvsMarkdownCommand.copy);
+      }
+      if (call.method == 'selectAll') {
+        return IanvsMarkdownShortcuts.invoke(IanvsMarkdownCommand.selectAll);
+      }
+      return null;
+    });
   }
 
   @override
   void didChangePlatformBrightness() => setState(() {});
   @override
   void dispose() {
+    bridge.setMethodCallHandler(null);
     WidgetsBinding.instance.removeObserver(this);
     renderer.dispose();
     super.dispose();
@@ -80,29 +98,43 @@ class _PreviewState extends State<Preview> with WidgetsBindingObserver {
                                     2)
                                 .clamp(24.0, double.infinity);
                         final source = widget.input['source'] as String;
-                        return SingleChildScrollView(
-                          padding: EdgeInsets.fromLTRB(inset, 32, inset, 48),
-                          child: source.isEmpty
-                              ? Text(zh ? '文档为空' : 'This document is empty.')
-                              : IanvsMarkdown(
-                                  data: source,
-                                  styleSheet: readingStyleSheet(
-                                    context,
-                                    ReadingPreferences.defaults,
-                                  ),
-                                  diagramBuilder: (context, source) =>
-                                      MermaidView(
-                                        source: source,
-                                        renderer: renderer,
-                                      ),
-                                  imageBuilder: (uri, title, alt) =>
-                                      PreviewImage(
-                                        uri: uri,
-                                        label: alt ?? title ?? '',
-                                        zh: zh,
-                                      ),
+                        return source.isEmpty
+                            ? Padding(
+                                padding: EdgeInsets.fromLTRB(
+                                  inset,
+                                  32,
+                                  inset,
+                                  48,
                                 ),
-                        );
+                                child: Text(
+                                  zh ? '文档为空' : 'This document is empty.',
+                                ),
+                              )
+                            : IanvsMarkdown(
+                                data: source,
+                                autofocus: true,
+                                scrollable: true,
+                                scrollPadding: EdgeInsets.fromLTRB(
+                                  inset,
+                                  32,
+                                  inset,
+                                  48,
+                                ),
+                                styleSheet: readingStyleSheet(
+                                  context,
+                                  ReadingPreferences.defaults,
+                                ),
+                                diagramBuilder: (context, source) =>
+                                    MermaidView(
+                                      source: source,
+                                      renderer: renderer,
+                                    ),
+                                imageBuilder: (uri, title, alt) => PreviewImage(
+                                  uri: uri,
+                                  label: alt ?? title ?? '',
+                                  zh: zh,
+                                ),
+                              );
                       },
                     ),
                   ),

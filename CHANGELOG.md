@@ -1,5 +1,8 @@
 ## Unreleased
 
+- Add optional `IanvsMarkdown.scrollable` and `scrollPadding` for bounded, lazy
+  block viewports. Existing body layout remains the default.
+
 - Add hover-triggered nested list folding in Live Preview with independent fold
   state, collapsed markers and ellipses, and aligned indentation guides. Add
   `expandList` / `collapseList` interface messages. Expand table cell focus hit

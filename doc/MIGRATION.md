@@ -302,3 +302,7 @@ Read 将脚注定义 ID 定位到文末渲染内容，找不到该 ID 时仍回�
 新增只读 `navigationHistoryToken`，供宿主组合文内与跨文档历史；现有 API 无需修改。
 标识不是条目数量，在达到历史上限以及源码重定位后仍可用作当前位置边界。
 桌面菜单、窗口快捷键和返回按钮现调用 Workspace 返回流程，局部 IME 保护保持。
+
+## 可选的独立滚动 Markdown 正文
+
+现有调用无需迁移，`scrollable` 默认 `false`。Finder 等有明确高度约束的只读宿主可使用 `IanvsMarkdown(scrollable: true, scrollPadding: ...)`，同时移除外层纵向 `SingleChildScrollView`。新模式保留全文引用解析，仅按视口布局与绘制各块；全选复制包含屏幕外原文。

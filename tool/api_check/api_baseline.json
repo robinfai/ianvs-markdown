@@ -230,6 +230,20 @@
           "required": true
         },
         {
+          "name": "scrollable",
+          "type": "bool",
+          "kind": "named",
+          "required": false,
+          "default": "false"
+        },
+        {
+          "name": "scrollPadding",
+          "type": "EdgeInsetsGeometry",
+          "kind": "named",
+          "required": false,
+          "default": "EdgeInsets.zero"
+        },
+        {
           "name": "selectable",
           "type": "bool",
           "kind": "named",
@@ -729,6 +743,22 @@
     "IanvsMarkdown/field:renderBudget": {
       "kind": "field",
       "type": "IanvsMarkdownRenderBudget?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdown/field:scrollPadding": {
+      "kind": "field",
+      "type": "EdgeInsetsGeometry",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdown/field:scrollable": {
+      "kind": "field",
+      "type": "bool",
       "const": false,
       "final": true,
       "static": false,

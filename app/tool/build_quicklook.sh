@@ -11,7 +11,7 @@ bash "$linefold_macos_dir/../tool/prepare_quicklook.sh" --offline
   cd "$linefold_client"
   "$FLUTTER_ROOT/bin/flutter" assemble --output=build/native \
     -dTargetPlatform=darwin -dBuildMode=release -dTargetFile=lib/main.dart \
-    "-dDarwinArchs=${ARCHS:?}" -dTreeShakeIcons=true release_macos_bundle_flutter_assets
+    "-dDarwinArchs=${ARCHS:?}" "--DartDefines=${DART_DEFINES:-}" -dTreeShakeIcons=true release_macos_bundle_flutter_assets
 )
 for framework in FlutterMacOS App; do
   rm -rf "$linefold_native_dir/$framework.framework" "$linefold_frameworks/$framework.framework"
