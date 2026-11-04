@@ -2,7 +2,7 @@ import Foundation
 
 // Shared by the extension and the native boundary tests.
 enum MarkdownPreview {
-  static let maximumBytes = 2 * 1024 * 1024
+  static let maximumBytes = 32 * 1024 * 1024
   static func source(for url: URL) throws -> String {
     let scoped = url.startAccessingSecurityScopedResource()
     defer { if scoped { url.stopAccessingSecurityScopedResource() } }

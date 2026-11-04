@@ -1,3 +1,4 @@
+import '../document_render_policy.dart';
 import '../app_localizations.dart';
 import '../services/cloud_conflict_service.dart';
 import '../services/mobile_markdown_file_service.dart';
@@ -2173,6 +2174,10 @@ class _EditorShellState extends State<EditorShell> {
                                                         .readingPreferences
                                                         .wrapCode,
                                                     child: IanvsMarkdownLiveEditor(
+                                                      renderBudget:
+                                                          linefoldDocumentRenderBudget,
+                                                      clipboardBudget:
+                                                          linefoldDocumentRenderBudget,
                                                       preserveViewport: true,
                                                       styleSheet: readingStyleSheet(
                                                         context,

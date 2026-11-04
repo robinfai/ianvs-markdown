@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:ianvs_mermaid/ianvs_mermaid.dart';
 import 'shared/desktop_theme.dart';
+import 'shared/document_render_policy.dart';
 import 'shared/models/reading_preferences.dart';
 import 'shared/reading_typography.dart';
 
@@ -112,6 +113,8 @@ class _PreviewState extends State<Preview> with WidgetsBindingObserver {
                               )
                             : IanvsMarkdown(
                                 data: source,
+                                renderBudget: linefoldDocumentRenderBudget,
+                                clipboardBudget: linefoldDocumentRenderBudget,
                                 autofocus: true,
                                 scrollable: true,
                                 scrollPadding: EdgeInsets.fromLTRB(

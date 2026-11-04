@@ -3,6 +3,69 @@ import 'package:ianvs_markdown/ianvs_markdown.dart';
 
 void main() {
   group('scanMarkdownForRendering', () {
+    test(
+      'blank-line budgets retain document capacity and bound dense runs',
+      () {
+        const budget = IanvsMarkdownRenderBudget(
+          maxSyntaxTokens: 100,
+          maxSyntaxTokensBetweenBlankLines: 4,
+          maxCodeUnitsBetweenBlankLines: 40,
+        );
+        expect(
+          scanMarkdownForRendering(
+            '**a**\n \t\r\n**b**',
+            budget: budget,
+          ).useMarkdown,
+          isTrue,
+        );
+        expect(
+          scanMarkdownForRendering(
+            '**a**\n**b**',
+            budget: budget,
+          ).budgetExceeded,
+          IanvsMarkdownBudgetExceeded.syntaxTokens,
+        );
+        expect(
+          scanMarkdownForRendering('a' * 40, budget: budget).useMarkdown,
+          isTrue,
+        );
+        expect(
+          scanMarkdownForRendering('a' * 41, budget: budget).budgetExceeded,
+          IanvsMarkdownBudgetExceeded.sourceLength,
+        );
+        expect(
+          scanMarkdownForRendering(
+            '${'a' * 39}\n\n${'b' * 40}',
+            budget: budget,
+          ).useMarkdown,
+          isTrue,
+        );
+      },
+    );
+
+    test('dense-run guard distinguishes emphasis from long link text', () {
+      const budget = IanvsMarkdownRenderBudget(
+        maxSyntaxTokens: 100,
+        maxSyntaxTokensBetweenBlankLines: 100,
+        maxDenseSyntaxTokensBetweenBlankLines: 4,
+      );
+      expect(
+        scanMarkdownForRendering('**a**\n**b**', budget: budget).useMarkdown,
+        isFalse,
+      );
+      expect(
+        scanMarkdownForRendering(
+          '[a long descriptive link](url)\n[another long description](url)',
+          budget: budget,
+        ).useMarkdown,
+        isTrue,
+      );
+      expect(
+        scanMarkdownForRendering('**a**\n\n**b**', budget: budget).useMarkdown,
+        isTrue,
+      );
+    });
+
     test('charges math delimiters only for the Obsidian preset', () {
       const budget = IanvsMarkdownRenderBudget(maxSyntaxTokens: 0);
       final standard = scanMarkdownForRendering(

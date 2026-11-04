@@ -13,7 +13,7 @@ import '../models/document_sync_status.dart';
 import 'preview_platform.dart';
 
 const previewExtensions = {'.md', '.markdown', '.mdown', '.mkd', '.txt'};
-const previewMaximumBytes = 5 * 1024 * 1024;
+const previewMaximumBytes = 32 * 1024 * 1024;
 
 class PreviewDocument {
   const PreviewDocument({

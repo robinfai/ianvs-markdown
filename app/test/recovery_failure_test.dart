@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:linefold/src/controllers/workspace_controller.dart';
 import 'package:linefold/src/services/workspace_session_store.dart';
 import 'package:linefold/src/widgets/editor_shell.dart';
@@ -39,6 +40,33 @@ void main() {
   tearDown(() async {
     workspace.dispose();
     await files.dispose();
+  });
+
+  testWidgets('viewport-only recovery does not rebuild unchanged documents', (
+    tester,
+  ) async {
+    await workspace.initialize();
+    final draft = workspace.newDocument();
+    draft.controller.text = '# Saved draft\n\nBody';
+    await workspace.flushSession();
+    var notifications = 0;
+    workspace.addListener(() => notifications++);
+    draft.controller.rememberViewport(
+      IanvsMarkdownViewportAnchor(
+        source: draft.controller.text,
+        sourceOffset: 2,
+        viewportOffset: 10,
+      ),
+    );
+    await workspace.flushSession();
+    expect(notifications, 0);
+    expect(store.snapshot!.documents.last['viewport'], isNotNull);
+    draft.controller.text += ' changed';
+    notifications = 0;
+    await workspace.flushSession();
+    expect(notifications, greaterThan(0));
+    expect(store.snapshot!.documents.last['text'], draft.controller.text);
+    await tester.pump(const Duration(milliseconds: 600));
   });
 
   testWidgets('load failure cannot persist Welcome over the failed session', (

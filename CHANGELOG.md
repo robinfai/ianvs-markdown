@@ -1,5 +1,10 @@
 ## Unreleased
 
+- Improve large-document read/Finder viewports, avoid redundant fallback and
+  reference parsing work, and index protected highlight ranges. Add optional
+  nonblank-run budget bounds so hosts can increase document capacity without
+  allowing pathological single paragraphs to monopolize parsing/layout.
+
 - Add optional `IanvsMarkdown.scrollable` and `scrollPadding` for bounded, lazy
   block viewports. Existing body layout remains the default.
 

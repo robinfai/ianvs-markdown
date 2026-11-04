@@ -544,3 +544,23 @@ LF、CRLF、CR 均保留源码偏移。完整标签优先于 `-N` 后缀解释�
 ## Optional bounded Markdown viewport
 
 `IanvsMarkdown(scrollable: true, scrollPadding: ...)` owns a bounded vertical viewport. Do not nest it in another vertical scroll view. Parsing keeps the complete document, while block layout and painting are lazy. The default `scrollable: false` preserves the existing body layout; `scrollPadding` defaults to `EdgeInsets.zero`. Nested Markdown bodies retain non-scrolling behavior. Whole-document Select All/Copy includes offscreen source.
+
+### Large-document host policy
+
+`IanvsMarkdownRenderBudget` additionally accepts nullable
+`maxSyntaxTokensBetweenBlankLines`, `maxDenseSyntaxTokensBetweenBlankLines` and
+`maxCodeUnitsBetweenBlankLines`. All three
+are disabled by default for existing integrations. They bound runs of nonblank
+LF-delimited lines, not parsed Markdown blocks. Spaces, tabs and CR alone count
+as a blank line. Density rejection reports `syntaxTokens`; run-length rejection
+reports `sourceLength`. Exact source remains available for editing and copying;
+rendering still uses the bounded plain-text fallback on rejection.
+
+The Linefold hosts share an 8 Mi UTF-16 document, 16 Ki UTF-16 physical-line,
+256 Ki syntax-unit policy, with 8 Ki syntax units / 256 Ki UTF-16 units per
+nonblank run. Runs denser than one syntax unit per four UTF-16 units additionally
+use a 4 Ki syntax-unit bound. File ingress is bounded separately at 32 MiB. Core defaults remain
+unchanged. Large `IanvsMarkdownView` bodies (over 64 Ki UTF-16 units) lay out only
+viewport blocks and materialize offscreen source/heading targets before reveal.
+The standalone scrollable renderer also defers widget construction when no
+custom builder/source-region traversal contract requires document-order visits.

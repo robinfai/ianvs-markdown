@@ -9812,6 +9812,24 @@
           "default": "4096"
         },
         {
+          "name": "maxSyntaxTokensBetweenBlankLines",
+          "type": "int?",
+          "kind": "named",
+          "required": false
+        },
+        {
+          "name": "maxDenseSyntaxTokensBetweenBlankLines",
+          "type": "int?",
+          "kind": "named",
+          "required": false
+        },
+        {
+          "name": "maxCodeUnitsBetweenBlankLines",
+          "type": "int?",
+          "kind": "named",
+          "required": false
+        },
+        {
           "name": "maxFallbackBytes",
           "type": "int",
           "kind": "named",
@@ -9837,6 +9855,22 @@
       "abstract": false,
       "const": true,
       "factory": false
+    },
+    "IanvsMarkdownRenderBudget/field:maxCodeUnitsBetweenBlankLines": {
+      "kind": "field",
+      "type": "int?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownRenderBudget/field:maxDenseSyntaxTokensBetweenBlankLines": {
+      "kind": "field",
+      "type": "int?",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
     },
     "IanvsMarkdownRenderBudget/field:maxFallbackBytes": {
       "kind": "field",
@@ -9865,6 +9899,14 @@
     "IanvsMarkdownRenderBudget/field:maxSyntaxTokens": {
       "kind": "field",
       "type": "int",
+      "const": false,
+      "final": true,
+      "static": false,
+      "late": false
+    },
+    "IanvsMarkdownRenderBudget/field:maxSyntaxTokensBetweenBlankLines": {
+      "kind": "field",
+      "type": "int?",
       "const": false,
       "final": true,
       "static": false,

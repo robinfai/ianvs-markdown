@@ -748,7 +748,11 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     IanvsMarkdownEditorDiagnostics.recordDocumentParse();
     final decision = IanvsMarkdownEditorDiagnostics.measure(
       'live.preflight',
-      () => scanMarkdownForRendering(source, budget: widget.renderBudget),
+      () =>
+          identical(widget.renderBudget, widget.controller.parseBudget) &&
+              source == widget.controller.text
+          ? widget.controller.parseDecision
+          : scanMarkdownForRendering(source, budget: widget.renderBudget),
     );
     _renderDecision = decision;
     if (widget.onRenderDecision != null) {
