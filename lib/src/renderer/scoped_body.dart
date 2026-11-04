@@ -22,6 +22,8 @@ import 'source_regions.dart';
 class ScopedMarkdownBody extends MarkdownBody {
   const ScopedMarkdownBody({
     super.key,
+    this.scrollable = false,
+    this.scrollPadding = EdgeInsets.zero,
     required super.data,
     required MarkdownImageBuilder imageBuilder,
     super.selectable,
@@ -47,13 +49,21 @@ class ScopedMarkdownBody extends MarkdownBody {
     super.softLineBreak,
   }) : super(imageBuilder: imageBuilder);
 
+  final bool scrollable;
+  final EdgeInsetsGeometry scrollPadding;
+
   final IanvsMarkdownTapLinkTargetCallback? onTapLinkTarget;
 
   @override
   State<ScopedMarkdownBody> createState() => _ScopedMarkdownBodyState();
 
-  Widget _buildBody(BuildContext context, List<Widget>? children) =>
-      super.build(context, children);
+  Widget _buildBody(BuildContext context, List<Widget>? children) => scrollable
+      ? ListView.builder(
+          padding: scrollPadding,
+          itemCount: children!.length,
+          itemBuilder: (context, index) => children[index],
+        )
+      : super.build(context, children);
 }
 
 class _ScopedMarkdownBodyState extends State<ScopedMarkdownBody>

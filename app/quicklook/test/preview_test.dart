@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linefold_quicklook/main.dart';
 
@@ -24,6 +26,49 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('文档为空'), findsOneWidget);
   });
+  testWidgets(
+    'native copy with no selection is safe; select all copies offscreen source',
+    (tester) async {
+      final source = List.generate(200, (i) => 'Paragraph $i').join('\n\n');
+      String? copied;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            copied = (call.arguments as Map)['text'] as String;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      await tester.pumpWidget(
+        Preview(input: {'source': source, 'merman': '/unused'}),
+      );
+      await tester.pumpAndSettle();
+      Future<void> command(String name) async {
+        final done = Completer<void>();
+        tester.binding.channelBuffers.push(
+          bridge.name,
+          const StandardMethodCodec().encodeMethodCall(MethodCall(name)),
+          (_) => done.complete(),
+        );
+        await tester.pumpAndSettle();
+        await done.future;
+      }
+
+      await command('copy');
+      expect(copied, isNull);
+      await command('selectAll');
+      await command('copy');
+      expect(copied, source);
+      expect(tester.takeException(), isNull);
+    },
+  );
   testWidgets('renders Markdown and follows system appearance', (tester) async {
     tester.binding.platformDispatcher.platformBrightnessTestValue =
         Brightness.dark;

@@ -1,0 +1,78 @@
+{
+  "fixtureBytes": 69857,
+  "fixtureSHA256": "0604367da6755f9e522cef6686e5d34b663859140e26465ea8f9cc806dc44d3f",
+  "macOS": "27.0.1 (26A434)",
+  "hardware": "Mac16,7",
+  "flutter": "3.44.8",
+  "buildMode": "release",
+  "scroll": "0 \u2192 2400 \u2192 0 logical pixels, 6 seconds per leg, linear",
+  "measurement": "Flutter FrameTiming; not end-to-end WindowServer presentation latency",
+  "cases": {
+    "finderBefore": {
+      "frames": 1446,
+      "viewportHeight": 900.0,
+      "refreshHz": 120.0,
+      "buildMs": {
+        "p50": 1.858,
+        "p95": 3.874,
+        "max": 5.596
+      },
+      "rasterMs": {
+        "p50": 0.436,
+        "p95": 0.716,
+        "max": 72.25
+      },
+      "totalSpanMs": {
+        "p50": 2.509,
+        "p95": 4.545,
+        "max": 74.487
+      },
+      "framesTotalAbove16_67ms": 2,
+      "framesTotalAbove8_33ms": 5
+    },
+    "finderAfter": {
+      "frames": 1470,
+      "viewportHeight": 900.0,
+      "refreshHz": 120.0,
+      "buildMs": {
+        "p50": 0.388,
+        "p95": 0.708,
+        "max": 3.16
+      },
+      "rasterMs": {
+        "p50": 0.899,
+        "p95": 1.2,
+        "max": 7.778
+      },
+      "totalSpanMs": {
+        "p50": 1.5,
+        "p95": 2.001,
+        "max": 8.371
+      },
+      "framesTotalAbove16_67ms": 0,
+      "framesTotalAbove8_33ms": 1
+    },
+    "appLive": {
+      "frames": 1440,
+      "viewportHeight": 671.0,
+      "refreshHz": 120.0,
+      "buildMs": {
+        "p50": 0.626,
+        "p95": 1.353,
+        "max": 10.218
+      },
+      "rasterMs": {
+        "p50": 1.243,
+        "p95": 1.705,
+        "max": 7.134
+      },
+      "totalSpanMs": {
+        "p50": 2.037,
+        "p95": 4.672,
+        "max": 17.78
+      },
+      "framesTotalAbove16_67ms": 1,
+      "framesTotalAbove8_33ms": 4
+    }
+  }
+}
