@@ -7,6 +7,7 @@ import 'package:ianvs_markdown_clipboard/ianvs_markdown_clipboard.dart';
 import 'package:ianvs_mermaid/ianvs_mermaid.dart';
 import 'package:path/path.dart' as p;
 
+import '../document_render_policy.dart';
 import '../widgets/document_diagram.dart';
 import '../controllers/document_find_controller.dart';
 import '../widgets/document_sync_indicator.dart';
@@ -1052,6 +1053,7 @@ class _PreviewLibraryViewState extends State<_PreviewLibraryView> {
 class _PreviewReadingSession {
   _PreviewReadingSession(String text)
     : controller = IanvsMarkdownController(
+        parseBudget: linefoldDocumentRenderBudget,
         text: text,
         mode: IanvsMarkdownEditorMode.preview,
       );
@@ -1376,6 +1378,8 @@ class _PreviewReaderState extends State<_PreviewReader> {
                 documentPath: widget.documentPath,
                 source: widget.attachmentSource,
                 builder: (context, images) => IanvsMarkdownView(
+                  renderBudget: linefoldDocumentRenderBudget,
+                  clipboardBudget: linefoldDocumentRenderBudget,
                   imageBuilder: images.image,
                   wikiEmbedBuilder: images.wiki,
                   data: widget.contents,

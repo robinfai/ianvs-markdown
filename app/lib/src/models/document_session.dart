@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
 
+import '../document_render_policy.dart';
 import 'document_analysis.dart';
 
 class DocumentSession {
@@ -16,6 +17,7 @@ class DocumentSession {
     this.lineEnding = 'LF',
   }) : persistedText = persistedText ?? text,
        controller = IanvsMarkdownController(
+         parseBudget: linefoldDocumentRenderBudget,
          text: persistedText ?? text,
          mode: mode,
        ) {

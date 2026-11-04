@@ -1153,7 +1153,7 @@ final class IanvsMarkdownLivePreviewFootnoteReference {
 /// range is projected in the document body.
 List<IanvsMarkdownLivePreviewFootnoteReference>
 ianvsMarkdownLivePreviewFootnoteReferences(String source) {
-  if (!source.contains('^')) {
+  if (!source.contains('[^') && !source.contains('^[')) {
     return const <IanvsMarkdownLivePreviewFootnoteReference>[];
   }
   final content = _maskObsidianComments(source);
@@ -1232,6 +1232,7 @@ String _applyObsidianFootnoteDefinitionPrecedence(String source) {
 List<_ObsidianStandardFootnoteDefinition> _standardFootnoteDefinitions(
   String source,
 ) {
+  if (!source.contains('[^')) return const [];
   final definitions = <_ObsidianStandardFootnoteDefinition>[];
   final blockCodeRanges = ianvsMarkdownBlockCodeRanges(source);
   final definitionPattern = RegExp(

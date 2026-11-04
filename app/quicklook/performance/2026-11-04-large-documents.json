@@ -1,0 +1,336 @@
+{
+  "baseCommit": "893a14dc9f05f6eb6ad79e13ab52ec89aad96f74",
+  "baseline": "same base renderer with increased host limits only, before algorithm changes",
+  "buildMode": "release",
+  "flutter": "3.44.8",
+  "macOS": "27.0.1 (26A434)",
+  "hardware": "Mac16,7",
+  "scroll": "0 -> 2400 -> 0 logical pixels, 6s per leg, 3s idle between; 120 Hz",
+  "measurement": "Flutter FrameTiming, not input-to-WindowServer latency; RSS is full host process, not Dart heap",
+  "fixtures": [
+    {
+      "name": "angular",
+      "bytes": 1072599,
+      "utf16CodeUnits": 1072557,
+      "sha256": "d54c9a2e5d47935e16eac93288b074552a16dc51912557823f87f9207a7f8321",
+      "kind": "public release history"
+    },
+    {
+      "name": "angular-archive",
+      "bytes": 1104183,
+      "utf16CodeUnits": 1103986,
+      "sha256": "c074a3afc908c62b02715fb0e002a7ce8ac363dcd51294772bf663225ef346ac",
+      "kind": "public release history"
+    },
+    {
+      "name": "deno",
+      "bytes": 669209,
+      "utf16CodeUnits": 669181,
+      "sha256": "8e9cb0615edcaa71ab185611da69408963fe4fd79f40651df94722d656b074c9",
+      "kind": "public release history"
+    },
+    {
+      "name": "release-histories",
+      "bytes": 2845995,
+      "utf16CodeUnits": 2845728,
+      "sha256": "d4be3fdce9bef53f70179a573c38cfec3c63e682ac70044fd29231928e5acf6d",
+      "kind": "concatenated distinct public release histories"
+    },
+    {
+      "name": "plain-8m",
+      "bytes": 8329288,
+      "utf16CodeUnits": 8329288,
+      "sha256": "59c7b4e767993233e752cd486841e58ffef765d381e31c71b3af0a82df43919d",
+      "kind": "synthetic plain-paragraph stress"
+    }
+  ],
+  "cases": {
+    "baseline-finder": {
+      "frames": 1456,
+      "viewportHeight": 900.0,
+      "refreshHz": 120.0,
+      "buildMs": {
+        "p50": 0.225,
+        "p95": 0.359,
+        "p99": 0.479,
+        "max": 5.763
+      },
+      "rasterMs": {
+        "p50": 0.583,
+        "p95": 0.821,
+        "p99": 1.786,
+        "max": 9.267
+      },
+      "totalSpanMs": {
+        "p50": 0.983,
+        "p95": 1.355,
+        "p99": 2.343,
+        "max": 9.491
+      },
+      "framesOver8_33ms": 2,
+      "framesOver16_67ms": 0,
+      "peakRssBytes": 196640768,
+      "lastRssBytes": 166182912,
+      "rawSHA256": "fb2c187e3387cf8319c3426c94bf43387dc397f7a5fd0632f6736713fa122b37"
+    },
+    "baseline-app": {
+      "frames": 1407,
+      "viewportHeight": 671.0,
+      "refreshHz": 120.0,
+      "buildMs": {
+        "p50": 2.643,
+        "p95": 4.75,
+        "p99": 5.705,
+        "max": 143.066
+      },
+      "rasterMs": {
+        "p50": 0.759,
+        "p95": 2.124,
+        "p99": 2.366,
+        "max": 41.339
+      },
+      "totalSpanMs": {
+        "p50": 3.526,
+        "p95": 6.885,
+        "p99": 8.606,
+        "max": 216.185
+      },
+      "framesOver8_33ms": 17,
+      "framesOver16_67ms": 5,
+      "peakRssBytes": 364560384,
+      "lastRssBytes": 265158656,
+      "rawSHA256": "57ae1032028995d02eecd5b36f73dcf54723a818def0b7ac8cf570e3ddf67153"
+    },
+    "candidate-angular-finder": {
+      "frames": 1441,
+      "viewportHeight": 900.0,
+      "refreshHz": 120.0,
+      "buildMs": {
+        "p50": 0.222,
+        "p95": 0.35,
+        "p99": 0.475,
+        "max": 4.036
+      },
+      "rasterMs": {
+        "p50": 0.543,
+        "p95": 0.828,
+        "p99": 1.256,
+        "max": 18.897
+      },
+      "totalSpanMs": {
+        "p50": 0.893,
+        "p95": 1.314,
+        "p99": 2.272,
+        "max": 28.827
+      },
+      "framesOver8_33ms": 3,
+      "framesOver16_67ms": 2,
+      "peakRssBytes": 182059008,
+      "lastRssBytes": 149651456,
+      "rawSHA256": "280979f4cbacb9e9c4e0bf71a9d24cff48519b9fae8f243b5577e4cc1bc0b9ea"
+    },
+    "candidate-angular-read": {
+      "frames": 1425,
+      "viewportHeight": 671.0,
+      "refreshHz": 120.0,
+      "buildMs": {
+        "p50": 0.303,
+        "p95": 0.435,
+        "p99": 0.552,
+        "max": 5.534
+      },
+      "rasterMs": {
+        "p50": 1.112,
+        "p95": 1.682,
+        "p99": 1.834,
+        "max": 49.767
+      },
+      "totalSpanMs": {
+        "p50": 1.573,
+        "p95": 2.244,
+        "p99": 4.435,
+        "max": 72.039
+      },
+      "framesOver8_33ms": 11,
+      "framesOver16_67ms": 10,
+      "peakRssBytes": 388251648,
+      "lastRssBytes": 357171200,
+      "rawSHA256": "1f5cb4b1145d2d80aef0afe74964bb9b91a38c228d3e016c6a9c1c1c30b9e6b2"
+    },
+    "final-histories-finder": {
+      "frames": 1443,
+      "viewportHeight": 900.0,
+      "refreshHz": 120.0,
+      "buildMs": {
+        "p50": 0.227,
+        "p95": 0.343,
+        "p99": 0.495,
+        "max": 4.072
+      },
+      "rasterMs": {
+        "p50": 0.556,
+        "p95": 0.808,
+        "p99": 1.004,
+        "max": 13.968
+      },
+      "totalSpanMs": {
+        "p50": 0.886,
+        "p95": 1.257,
+        "p99": 1.685,
+        "max": 17.132
+      },
+      "framesOver8_33ms": 2,
+      "framesOver16_67ms": 1,
+      "peakRssBytes": 200605696,
+      "lastRssBytes": 170508288,
+      "rawSHA256": "da0e2c14702acd15d538ed0844bcaa84291cee0fb1cb674baafd6e7565c1a282"
+    },
+    "final-histories-live": {
+      "frames": 1411,
+      "viewportHeight": 671.0,
+      "refreshHz": 120.0,
+      "buildMs": {
+        "p50": 2.347,
+        "p95": 4.195,
+        "p99": 5.422,
+        "max": 145.98
+      },
+      "rasterMs": {
+        "p50": 0.733,
+        "p95": 2.025,
+        "p99": 2.467,
+        "max": 10.27
+      },
+      "totalSpanMs": {
+        "p50": 3.201,
+        "p95": 6.24,
+        "p99": 8.001,
+        "max": 220.099
+      },
+      "framesOver8_33ms": 12,
+      "framesOver16_67ms": 4,
+      "peakRssBytes": 440729600,
+      "lastRssBytes": 288931840,
+      "rawSHA256": "f5b796e2cb9d35cf930c0de7437b7911375201c208affc3d1948566d1cc61f3d"
+    },
+    "final-histories-read": {
+      "frames": 945,
+      "viewportHeight": 671.0,
+      "refreshHz": 120.0,
+      "buildMs": {
+        "p50": 0.291,
+        "p95": 0.422,
+        "p99": 0.555,
+        "max": 2.433
+      },
+      "rasterMs": {
+        "p50": 1.12,
+        "p95": 1.709,
+        "p99": 1.977,
+        "max": 81.739
+      },
+      "totalSpanMs": {
+        "p50": 1.58,
+        "p95": 2.301,
+        "p99": 3.806,
+        "max": 4055.59
+      },
+      "framesOver8_33ms": 6,
+      "framesOver16_67ms": 4,
+      "peakRssBytes": 613941248,
+      "lastRssBytes": 580681728,
+      "rawSHA256": "713e06d568031b82a9ae975da0215a924ae8394df807b3317995ccef9b1be66c"
+    },
+    "fixed-histories-read": {
+      "frames": 1428,
+      "viewportHeight": 671.0,
+      "refreshHz": 120.0,
+      "buildMs": {
+        "p50": 0.289,
+        "p95": 0.442,
+        "p99": 0.619,
+        "max": 6.718
+      },
+      "rasterMs": {
+        "p50": 1.056,
+        "p95": 1.588,
+        "p99": 1.882,
+        "max": 94.309
+      },
+      "totalSpanMs": {
+        "p50": 1.501,
+        "p95": 2.176,
+        "p99": 3.632,
+        "max": 96.206
+      },
+      "framesOver8_33ms": 10,
+      "framesOver16_67ms": 4,
+      "peakRssBytes": 491782144,
+      "lastRssBytes": 441647104,
+      "rawSHA256": "35901127e56813bec8532c629531eef5bbca0cbb6598b9d39acac4f451531100"
+    },
+    "final-8m-finder": {
+      "frames": 1448,
+      "viewportHeight": 900.0,
+      "refreshHz": 120.0,
+      "buildMs": {
+        "p50": 0.21,
+        "p95": 0.341,
+        "p99": 1.093,
+        "max": 1.714
+      },
+      "rasterMs": {
+        "p50": 0.631,
+        "p95": 0.914,
+        "p99": 1.562,
+        "max": 6.864
+      },
+      "totalSpanMs": {
+        "p50": 1.001,
+        "p95": 1.384,
+        "p99": 2.164,
+        "max": 7.136
+      },
+      "framesOver8_33ms": 0,
+      "framesOver16_67ms": 0,
+      "peakRssBytes": 200605696,
+      "lastRssBytes": 154550272,
+      "rawSHA256": "37318f2c7e6e4d7d7539065c10bc9357ec7b2acac9004ab6d9e532c994f2525a"
+    },
+    "final-8m-live": {
+      "frames": 1413,
+      "viewportHeight": 671.0,
+      "refreshHz": 120.0,
+      "buildMs": {
+        "p50": 0.316,
+        "p95": 0.44,
+        "p99": 0.929,
+        "max": 34.956
+      },
+      "rasterMs": {
+        "p50": 0.896,
+        "p95": 1.151,
+        "p99": 1.684,
+        "max": 10.628
+      },
+      "totalSpanMs": {
+        "p50": 1.364,
+        "p95": 1.826,
+        "p99": 28.4,
+        "max": 35.483
+      },
+      "framesOver8_33ms": 29,
+      "framesOver16_67ms": 28,
+      "peakRssBytes": 686473216,
+      "lastRssBytes": 482869248,
+      "rawSHA256": "cc2cf198736ea53a4a9febc20c88ead19338738f9815a6e1cd6743be0ddf2018"
+    }
+  },
+  "readBaselineFailure": {
+    "document": "angular",
+    "observedRssKiB": 2988784,
+    "samplePhysicalFootprint": "2.5G",
+    "samplePeakPhysicalFootprint": "3.0G",
+    "observation": "Read mode remained busy at ~100% CPU; terminated isolated test process after sampling. No completed baseline scroll result."
+  }
+}

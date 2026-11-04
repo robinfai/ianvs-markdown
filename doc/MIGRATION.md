@@ -306,3 +306,14 @@ Read 将脚注定义 ID 定位到文末渲染内容，找不到该 ID 时仍回�
 ## 可选的独立滚动 Markdown 正文
 
 现有调用无需迁移，`scrollable` 默认 `false`。Finder 等有明确高度约束的只读宿主可使用 `IanvsMarkdown(scrollable: true, scrollPadding: ...)`，同时移除外层纵向 `SingleChildScrollView`。新模式保留全文引用解析，仅按视口布局与绘制各块；全选复制包含屏幕外原文。
+
+### Large-document budgets and read layout
+
+The optional `IanvsMarkdownRenderBudget` nonblank-run bounds default to null;
+existing callers need no change. Hosts increasing total source/syntax budgets
+should set these too (including the stricter dense-run syntax bound), rather than allowing one huge soft-wrapped paragraph to
+consume the full document budget. Blank lines are a conservative input boundary,
+not a replacement Markdown parser. `IanvsMarkdownView` now virtualizes layout
+above 64 Ki UTF-16 units; offscreen elements no longer all have mounted contexts.
+Use its heading/source navigation interfaces instead of looking up offscreen
+render objects directly. Select All/Copy still preserves the complete source.

@@ -9,15 +9,47 @@ import 'syntax_preset.dart';
 final class IanvsMarkdownRenderBudget {
   const IanvsMarkdownRenderBudget({
     this.maxSyntaxTokens = 4096,
+    this.maxSyntaxTokensBetweenBlankLines,
+    this.maxDenseSyntaxTokensBetweenBlankLines,
+    this.maxCodeUnitsBetweenBlankLines,
     this.maxFallbackBytes = 64 * 1024,
     this.maxSourceCodeUnits = 1024 * 1024,
     this.maxLineCodeUnits = 4 * 1024,
   }) : assert(maxSyntaxTokens >= 0),
+       assert(
+         maxSyntaxTokensBetweenBlankLines == null ||
+             maxSyntaxTokensBetweenBlankLines >= 0,
+       ),
+       assert(
+         maxCodeUnitsBetweenBlankLines == null ||
+             maxCodeUnitsBetweenBlankLines >= 0,
+       ),
+       assert(
+         maxDenseSyntaxTokensBetweenBlankLines == null ||
+             maxDenseSyntaxTokensBetweenBlankLines >= 0,
+       ),
        assert(maxFallbackBytes >= 0),
        assert(maxSourceCodeUnits >= 0),
        assert(maxLineCodeUnits >= 0);
 
   final int maxSyntaxTokens;
+
+  /// Optional density bound for a run of nonblank LF-delimited lines.
+  /// This is a conservative input guard, not Markdown block parsing. Blank
+  /// lines containing only spaces, tabs or CR reset the counter. Hosts can
+  /// raise the document-wide budget without accepting a single enormous
+  /// paragraph of links/emphasis. Null preserves the document-only policy.
+  final int? maxSyntaxTokensBetweenBlankLines;
+
+  /// Additional syntax bound when a nonblank run contains more than one
+  /// charged syntax unit per four UTF-16 units. This catches densely styled
+  /// soft-wrapped paragraphs while allowing large tables with long cell text.
+  final int? maxDenseSyntaxTokensBetweenBlankLines;
+
+  /// Optional UTF-16 bound for the same nonblank line run. Prevents a single
+  /// very long soft-wrapped paragraph from bypassing the physical line bound.
+  /// Rejection reports [IanvsMarkdownBudgetExceeded.sourceLength].
+  final int? maxCodeUnitsBetweenBlankLines;
   final int maxFallbackBytes;
   final int maxSourceCodeUnits;
 
@@ -62,24 +94,14 @@ IanvsMarkdownRenderDecision scanMarkdownForRendering(
       ? IanvsMarkdownBudgetExceeded.sourceLength
       : null;
   var lineCodeUnits = 0;
+  var groupTokens = 0;
+  var groupCodeUnits = 0;
+  var lineHasContent = false;
   final lineScanner = _MarkdownLineScanner();
-  final fallback = StringBuffer();
-  var fallbackBytes = 0;
-  var fallbackNextIndex = 0;
-  var fallbackFull = false;
-
-  for (var index = 0; index < source.length; index += 1) {
+  // Accepted documents need no fallback allocation. Stop scanning as soon as
+  // a bound fails; construct the bounded UTF-8 prefix only on that path.
+  for (var index = 0; index < source.length && exceeded == null; index += 1) {
     final codeUnit = source.codeUnitAt(index);
-    if (!fallbackFull && index == fallbackNextIndex) {
-      final scalar = _plainFallbackScalar(source, index);
-      if (scalar.bytes > budget.maxFallbackBytes - fallbackBytes) {
-        fallbackFull = true;
-      } else {
-        fallback.write(scalar.text);
-        fallbackBytes += scalar.bytes;
-        fallbackNextIndex += scalar.codeUnits;
-      }
-    }
     if (exceeded == null) {
       if (codeUnit == 0x0a) {
         lineCodeUnits = 0;
@@ -91,17 +113,55 @@ IanvsMarkdownRenderDecision scanMarkdownForRendering(
       if (lineCodeUnits > budget.maxLineCodeUnits) {
         exceeded = IanvsMarkdownBudgetExceeded.lineLength;
       }
-      tokens += lineScanner.consume(codeUnit);
-      if (_isMarkdownSyntaxCodeUnit(codeUnit, syntaxPreset)) tokens += 1;
+      final added =
+          lineScanner.consume(codeUnit) +
+          (_isMarkdownSyntaxCodeUnit(codeUnit, syntaxPreset) ? 1 : 0);
+      tokens += added;
+      if (budget.maxSyntaxTokensBetweenBlankLines != null ||
+          budget.maxDenseSyntaxTokensBetweenBlankLines != null ||
+          budget.maxCodeUnitsBetweenBlankLines != null) {
+        groupTokens += added;
+        groupCodeUnits++;
+        if (codeUnit == 0x0a) {
+          if (!lineHasContent) {
+            groupTokens = 0;
+            groupCodeUnits = 0;
+          }
+          lineHasContent = false;
+        } else if (codeUnit != 0x20 && codeUnit != 0x09 && codeUnit != 0x0d) {
+          lineHasContent = true;
+        }
+        if (budget.maxSyntaxTokensBetweenBlankLines case final limit?
+            when groupTokens > limit) {
+          exceeded ??= IanvsMarkdownBudgetExceeded.syntaxTokens;
+        }
+        if (budget.maxDenseSyntaxTokensBetweenBlankLines case final limit?
+            when groupTokens > limit && groupTokens * 4 > groupCodeUnits) {
+          exceeded ??= IanvsMarkdownBudgetExceeded.syntaxTokens;
+        }
+        if (budget.maxCodeUnitsBetweenBlankLines case final limit?
+            when groupCodeUnits > limit) {
+          exceeded ??= IanvsMarkdownBudgetExceeded.sourceLength;
+        }
+      }
       if (tokens > budget.maxSyntaxTokens) {
         exceeded ??= IanvsMarkdownBudgetExceeded.syntaxTokens;
       }
     }
-    if (exceeded != null && fallbackFull) break;
   }
 
   if (exceeded == null) {
-    tokens += lineScanner.finish();
+    final finalTokens = lineScanner.finish();
+    tokens += finalTokens;
+    if (budget.maxSyntaxTokensBetweenBlankLines case final limit?
+        when groupTokens + finalTokens > limit) {
+      exceeded = IanvsMarkdownBudgetExceeded.syntaxTokens;
+    }
+    if (budget.maxDenseSyntaxTokensBetweenBlankLines case final limit?
+        when groupTokens + finalTokens > limit &&
+            (groupTokens + finalTokens) * 4 > groupCodeUnits) {
+      exceeded = IanvsMarkdownBudgetExceeded.syntaxTokens;
+    }
     if (tokens > budget.maxSyntaxTokens) {
       exceeded = IanvsMarkdownBudgetExceeded.syntaxTokens;
     }
@@ -114,6 +174,17 @@ IanvsMarkdownRenderDecision scanMarkdownForRendering(
       syntaxTokens: tokens,
       truncated: false,
     );
+  }
+
+  final fallback = StringBuffer();
+  var fallbackBytes = 0;
+  var fallbackNextIndex = 0;
+  while (fallbackNextIndex < source.length) {
+    final scalar = _plainFallbackScalar(source, fallbackNextIndex);
+    if (scalar.bytes > budget.maxFallbackBytes - fallbackBytes) break;
+    fallback.write(scalar.text);
+    fallbackBytes += scalar.bytes;
+    fallbackNextIndex += scalar.codeUnits;
   }
 
   return IanvsMarkdownRenderDecision(

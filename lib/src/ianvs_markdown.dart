@@ -319,9 +319,27 @@ class IanvsMarkdown extends StatelessWidget {
           ),
         ],
       );
-      return scrollable
-          ? SingleChildScrollView(padding: scrollPadding, child: fallback)
-          : fallback;
+      if (!scrollable) return fallback;
+      final viewport = MarkdownViewportLayout.maybeOf(context);
+      return SingleChildScrollView(
+        controller: viewport?.controller,
+        padding: viewport?.padding ?? scrollPadding,
+        child: viewport == null
+            ? fallback
+            : Align(
+                alignment: viewport.alignment,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: viewport.maxWidth),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (viewport.header != null) viewport.header!,
+                      fallback,
+                    ],
+                  ),
+                ),
+              ),
+      );
     }
 
     final baseStyleSheet =
@@ -637,6 +655,14 @@ class IanvsMarkdown extends StatelessWidget {
     Set<String>? imageReferenceLabels;
     final body = ScopedMarkdownBody(
       scrollable: scrollable,
+      // Custom element builders may rely on document-order visitation.
+      onBuildBlock:
+          builders.isEmpty && checkboxBuilder == null && bulletBuilder == null
+          ? (images, tasks) {
+              imageIndex = images;
+              taskIndex = tasks;
+            }
+          : null,
       scrollPadding: scrollPadding,
       key: ValueKey<bool>(softLineBreak),
       // flutter_markdown_plus only reparses when data or styles change, so
@@ -1613,6 +1639,67 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
     unawaited(_revealSource(request, epoch));
   }
 
+  // Small documents retain fully mounted anchors. Large documents use the
+  // same viewport-only layout strategy as Live and Finder.
+  bool get _useLazyReadingViewport => _document.body.length > 64 * 1024;
+
+  Future<void> _materializeReadingTarget(
+    int sourceOffset,
+    BuildContext? Function() target,
+    bool Function() current,
+  ) async {
+    if (!_useLazyReadingViewport ||
+        target() != null ||
+        !_scrollController.hasClients) {
+      return;
+    }
+    final scroll = _scrollController;
+    var lower = 0.0;
+    double? upper;
+    scroll.jumpTo(
+      scroll.position.maxScrollExtent *
+          (sourceOffset / widget.data.length).clamp(0.0, 1.0),
+    );
+    await WidgetsBinding.instance.endOfFrame;
+    for (var attempt = 0; attempt < 32; attempt++) {
+      if (!mounted || !current() || !scroll.hasClients || target() != null) {
+        return;
+      }
+      final viewport = context.findRenderObject();
+      if (viewport is! RenderBox || !viewport.hasSize) return;
+      final top = viewport.localToGlobal(Offset.zero).dy;
+      final bottom = top + viewport.size.height;
+      final visible = <int>[];
+      for (final entry
+          in _sourceRegions?.regions.entries ??
+              const <MapEntry<TextRange, GlobalKey>>[]) {
+        final render = entry.value.currentContext?.findRenderObject();
+        if (render is! RenderBox || !render.hasSize || render.size.isEmpty) {
+          continue;
+        }
+        final y = render.localToGlobal(Offset.zero).dy;
+        if (y <= bottom && y + render.size.height >= top) {
+          visible.add(entry.key.start);
+        }
+      }
+      if (visible.isEmpty) return;
+      visible.sort();
+      final position = scroll.position;
+      if (sourceOffset < visible.first) {
+        upper = position.pixels;
+      } else {
+        lower = position.pixels;
+      }
+      final next =
+          (upper == null ? position.maxScrollExtent : (lower + upper) / 2)
+              .clamp(position.minScrollExtent, position.maxScrollExtent)
+              .toDouble();
+      if ((next - position.pixels).abs() < .5) return;
+      scroll.jumpTo(next);
+      await WidgetsBinding.instance.endOfFrame;
+    }
+  }
+
   Future<void> _revealSource(
     IanvsMarkdownSourceNavigation request,
     int epoch, {
@@ -1640,6 +1727,14 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
     }
     await WidgetsBinding.instance.endOfFrame;
     if (!current() || !scroll.hasClients) return;
+    await _materializeReadingTarget(
+      request.range.start,
+      () =>
+          _sourceRegions?.contextForTarget(request.targetId) ??
+          _sourceRegions?.contextAt(request.range.start),
+      current,
+    );
+    if (!current()) return;
     final target =
         _sourceRegions?.contextForTarget(request.targetId) ??
         _sourceRegions?.contextAt(request.range.start);
@@ -1847,7 +1942,8 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
         widget.sourceNavigation == null &&
             widget.onViewportChanged == null &&
             widget.initialViewportAnchor == null &&
-            widget.readingHighlights == null
+            widget.readingHighlights == null &&
+            !_useLazyReadingViewport
         ? null
         : MarkdownSourceRegions(
             plainKey: _plainFallbackKey,
@@ -1892,6 +1988,30 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
         'h6': headingBuilder,
       },
     };
+    final readingBody = MarkdownSourceRegionScope(
+      regions: sourceRegions,
+      child: IanvsMarkdown(
+        data: foldProjection.source,
+        scrollable: _useLazyReadingViewport,
+        syntaxPreset: widget.syntaxPreset,
+        selectable: false,
+        softLineBreak: widget.softLineBreak,
+        styleSheet: widget.styleSheet,
+        onTapLink: widget.onTapLink,
+        onTapLinkTarget: widget.onTapLinkTarget,
+        imageBuilder: widget.imageBuilder,
+        builders: headingBuilders,
+        renderBudget: widget.renderBudget,
+        fallbackBuilder: widget.fallbackBuilder,
+        diagramBuilder: widget.diagramBuilder,
+        mathBuilder: widget.mathBuilder,
+        onCopyCode: widget.onCopyCode,
+        wikiEmbedBuilder: widget.wikiEmbedBuilder,
+        wikiLinkExists: widget.wikiLinkExists,
+        enableFileLinkChips: widget.enableFileLinkChips,
+        theme: colors,
+      ),
+    );
     return NotificationListener<UserScrollNotification>(
       onNotification: _handleUserReadingScroll,
       child: LayoutBuilder(
@@ -1931,70 +2051,79 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
                   clipboardWriter: widget.clipboardWriter,
                   clipboardBudget: widget.clipboardBudget,
                   onSelectionChanged: widget.onSelectionChanged,
-                  child: SingleChildScrollView(
-                    key: const ValueKey('ianvs-markdown-scroll-view'),
-                    controller: _scrollController,
-                    padding: widget.padding,
-                    child: Align(
-                      alignment: widget.contentAlignment,
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
+                  child: _useLazyReadingViewport
+                      ? MarkdownViewportLayout(
+                          controller: _scrollController,
+                          padding: widget.padding,
                           maxWidth: widget.contentMaxWidth,
-                        ),
-                        child:
-                            NotificationListener<SizeChangedLayoutNotification>(
-                              onNotification: _handleReadingLayout,
-                              child: SizeChangedLayoutNotifier(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    if (widget.showFrontMatter &&
-                                        _document.metadata.isNotEmpty) ...[
-                                      IanvsMarkdownFrontMatterCard(
-                                        entries: _document.metadata,
-                                        theme: colors,
-                                        compact: widget.compactFrontMatter,
-                                        initiallyExpanded: true,
-                                        showDocumentTitle:
-                                            widget.showDocumentTitle,
-                                        onTapLink: widget.onTapLink,
-                                        onTapLinkTarget: widget.onTapLinkTarget,
-                                      ),
-                                      const SizedBox(height: 18),
-                                    ],
-                                    MarkdownSourceRegionScope(
-                                      regions: sourceRegions,
-                                      child: IanvsMarkdown(
-                                        data: foldProjection.source,
-                                        syntaxPreset: widget.syntaxPreset,
-                                        selectable: false,
-                                        softLineBreak: widget.softLineBreak,
-                                        styleSheet: widget.styleSheet,
-                                        onTapLink: widget.onTapLink,
-                                        onTapLinkTarget: widget.onTapLinkTarget,
-                                        imageBuilder: widget.imageBuilder,
-                                        builders: headingBuilders,
-                                        renderBudget: widget.renderBudget,
-                                        fallbackBuilder: widget.fallbackBuilder,
-                                        diagramBuilder: widget.diagramBuilder,
-                                        mathBuilder: widget.mathBuilder,
-                                        onCopyCode: widget.onCopyCode,
-                                        wikiEmbedBuilder:
-                                            widget.wikiEmbedBuilder,
-                                        wikiLinkExists: widget.wikiLinkExists,
-                                        enableFileLinkChips:
-                                            widget.enableFileLinkChips,
-                                        theme: colors,
+                          alignment: widget.contentAlignment,
+                          header:
+                              widget.showFrontMatter &&
+                                  _document.metadata.isNotEmpty
+                              ? Padding(
+                                  padding: const EdgeInsets.only(bottom: 18),
+                                  child: IanvsMarkdownFrontMatterCard(
+                                    entries: _document.metadata,
+                                    theme: colors,
+                                    compact: widget.compactFrontMatter,
+                                    initiallyExpanded: true,
+                                    showDocumentTitle: widget.showDocumentTitle,
+                                    onTapLink: widget.onTapLink,
+                                    onTapLinkTarget: widget.onTapLinkTarget,
+                                  ),
+                                )
+                              : null,
+                          child: PrimaryScrollController(
+                            controller: _scrollController,
+                            child: readingBody,
+                          ),
+                        )
+                      : SingleChildScrollView(
+                          key: const ValueKey('ianvs-markdown-scroll-view'),
+                          controller: _scrollController,
+                          padding: widget.padding,
+                          child: Align(
+                            alignment: widget.contentAlignment,
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth: widget.contentMaxWidth,
+                              ),
+                              child:
+                                  NotificationListener<
+                                    SizeChangedLayoutNotification
+                                  >(
+                                    onNotification: _handleReadingLayout,
+                                    child: SizeChangedLayoutNotifier(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          if (widget.showFrontMatter &&
+                                              _document
+                                                  .metadata
+                                                  .isNotEmpty) ...[
+                                            IanvsMarkdownFrontMatterCard(
+                                              entries: _document.metadata,
+                                              theme: colors,
+                                              compact:
+                                                  widget.compactFrontMatter,
+                                              initiallyExpanded: true,
+                                              showDocumentTitle:
+                                                  widget.showDocumentTitle,
+                                              onTapLink: widget.onTapLink,
+                                              onTapLinkTarget:
+                                                  widget.onTapLinkTarget,
+                                            ),
+                                            const SizedBox(height: 18),
+                                          ],
+                                          readingBody,
+                                        ],
                                       ),
                                     ),
-                                  ],
-                                ),
-                              ),
+                                  ),
                             ),
-                      ),
-                    ),
-                  ),
+                          ),
+                        ),
                 ),
               ),
             ],
@@ -2031,6 +2160,22 @@ class _IanvsMarkdownViewState extends State<IanvsMarkdownView> {
             !identical(widget.headingNavigation?.value, request))) {
       return;
     }
+    if (index < _headingFoldModel.sections.length) {
+      final section = _headingFoldModel.sections[index];
+      final offset =
+          _headingFoldModel.blocks[section.headingBlockIndex].start +
+          widget.data.length -
+          _document.body.length;
+      await _materializeReadingTarget(
+        offset,
+        () => heading.anchorKey.currentContext,
+        () =>
+            mounted &&
+            (request == null ||
+                identical(widget.headingNavigation?.value, request)),
+      );
+    }
+    if (!mounted) return;
     final headingContext = heading.anchorKey.currentContext;
     if (headingContext == null || !headingContext.mounted) return;
     await Scrollable.ensureVisible(

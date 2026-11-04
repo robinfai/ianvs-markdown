@@ -22,7 +22,7 @@ List<MarkdownLinkReferenceDefinition> parseMarkdownLinkReferenceDefinitions(
   String source, {
   IanvsMarkdownRenderBudget? budget = const IanvsMarkdownRenderBudget(),
 }) {
-  if (!source.contains('[') ||
+  if (!source.contains(']:') ||
       !scanMarkdownForRendering(source, budget: budget).useMarkdown) {
     return const <MarkdownLinkReferenceDefinition>[];
   }
@@ -82,9 +82,10 @@ final class MarkdownLinkReferenceContext {
     String source, {
     IanvsMarkdownRenderBudget? budget = const IanvsMarkdownRenderBudget(),
   }) {
-    // Every Markdown reference definition requires a literal opening bracket.
-    // Avoid a full GFM parse for ordinary prose, including very long lines.
-    if (!source.contains('[') ||
+    // Every reference definition requires an adjacent closing bracket and colon.
+    // Inline links alone do not justify parsing all blocks on every edit.
+    // Keep the actual parser for candidates, including nested/multiline labels.
+    if (!source.contains(']:') ||
         !scanMarkdownForRendering(source, budget: budget).useMarkdown) {
       return MarkdownLinkReferenceContext.empty();
     }

@@ -84,6 +84,8 @@ class _ScrollFrameProbeState extends State<ScrollFrameProbe> {
   Future<void> flush() async {
     if (!mounted || frames.isEmpty) return;
     final record = {
+      'rssBytes': ProcessInfo.currentRss,
+      'peakRssBytes': ProcessInfo.maxRss,
       'host': widget.host,
       'run': run++,
       'controlled': running,

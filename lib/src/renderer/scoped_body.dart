@@ -23,6 +23,7 @@ class ScopedMarkdownBody extends MarkdownBody {
   const ScopedMarkdownBody({
     super.key,
     this.scrollable = false,
+    this.onBuildBlock,
     this.scrollPadding = EdgeInsets.zero,
     required super.data,
     required MarkdownImageBuilder imageBuilder,
@@ -50,6 +51,9 @@ class ScopedMarkdownBody extends MarkdownBody {
   }) : super(imageBuilder: imageBuilder);
 
   final bool scrollable;
+
+  // Restores source ordinals when viewport blocks build out of order.
+  final void Function(int images, int tasks)? onBuildBlock;
   final EdgeInsetsGeometry scrollPadding;
 
   final IanvsMarkdownTapLinkTargetCallback? onTapLinkTarget;
@@ -57,13 +61,30 @@ class ScopedMarkdownBody extends MarkdownBody {
   @override
   State<ScopedMarkdownBody> createState() => _ScopedMarkdownBodyState();
 
-  Widget _buildBody(BuildContext context, List<Widget>? children) => scrollable
-      ? ListView.builder(
-          padding: scrollPadding,
-          itemCount: children!.length,
-          itemBuilder: (context, index) => children[index],
-        )
-      : super.build(context, children);
+  Widget _buildBody(BuildContext context, List<Widget>? children) {
+    final viewport = MarkdownViewportLayout.maybeOf(context);
+    if (!scrollable) return super.build(context, children);
+    final header = viewport?.header;
+    return ListView.builder(
+      controller: viewport?.controller,
+      padding: viewport?.padding ?? scrollPadding,
+      itemCount: children!.length + (header == null ? 0 : 1),
+      itemBuilder: (context, index) {
+        final child = header != null && index == 0
+            ? header
+            : children[index - (header == null ? 0 : 1)];
+        return viewport == null
+            ? child
+            : Align(
+                alignment: viewport.alignment,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: viewport.maxWidth),
+                  child: SizedBox(width: double.infinity, child: child),
+                ),
+              );
+      },
+    );
+  }
 }
 
 class _ScopedMarkdownBodyState extends State<ScopedMarkdownBody>
@@ -117,38 +138,79 @@ class _ScopedMarkdownBodyState extends State<ScopedMarkdownBody>
       'body.parse',
       () => document.parseLines(const LineSplitter().convert(widget.data)),
     );
-    final builder = ScopedMarkdownBuilder(
-      delegate: this,
-      selectable: widget.selectable,
-      styleSheet: styleSheet,
-      imageDirectory: widget.imageDirectory,
-      imageBuilder: widget.imageBuilder!,
-      checkboxBuilder: widget.checkboxBuilder,
-      bulletBuilder: widget.bulletBuilder,
-      builders: widget.builders,
-      paddingBuilders: widget.paddingBuilders,
-      fitContent: widget.fitContent,
-      listItemCrossAxisAlignment: widget.listItemCrossAxisAlignment,
-      onSelectionChanged: widget.onSelectionChanged,
-      onTapText: widget.onTapText,
-      contextMenuBuilder: widget.contextMenuBuilder,
-      softLineBreak: widget.softLineBreak,
-      wrapSourceNode: document is SourceMappedMarkdownDocument
-          ? (node, child) {
-              if (node is md.Element && node.tag == 'li') {
-                final id = node.attributes['id'];
-                if (id != null && id.startsWith('fn-')) {
-                  child = _sourceRegions!.wrapTarget(
-                    Uri.decodeComponent(id),
-                    child,
-                  );
+    ScopedMarkdownBuilder makeBuilder(ScopedMarkdownBuilderDelegate delegate) =>
+        ScopedMarkdownBuilder(
+          delegate: delegate,
+          selectable: widget.selectable,
+          styleSheet: styleSheet,
+          imageDirectory: widget.imageDirectory,
+          imageBuilder: widget.imageBuilder!,
+          checkboxBuilder: widget.checkboxBuilder,
+          bulletBuilder: widget.bulletBuilder,
+          builders: widget.builders,
+          paddingBuilders: widget.paddingBuilders,
+          fitContent: widget.fitContent,
+          listItemCrossAxisAlignment: widget.listItemCrossAxisAlignment,
+          onSelectionChanged: widget.onSelectionChanged,
+          onTapText: widget.onTapText,
+          contextMenuBuilder: widget.contextMenuBuilder,
+          softLineBreak: widget.softLineBreak,
+          wrapSourceNode: document is SourceMappedMarkdownDocument
+              ? (node, child) {
+                  if (node is md.Element && node.tag == 'li') {
+                    final id = node.attributes['id'];
+                    if (id != null && id.startsWith('fn-')) {
+                      child = _sourceRegions!.wrapTarget(
+                        Uri.decodeComponent(id),
+                        child,
+                      );
+                    }
+                  }
+                  final range = document.ranges[node];
+                  return range == null
+                      ? child
+                      : _sourceRegions!.wrap(range, child);
                 }
-              }
-              final range = document.ranges[node];
-              return range == null ? child : _sourceRegions!.wrap(range, child);
-            }
-          : null,
-    );
+              : null,
+        );
+    if (widget.scrollable &&
+        widget.onBuildBlock != null &&
+        _sourceRegions == null) {
+      var images = 0;
+      var tasks = 0;
+      void count(md.Node node) {
+        if (node is! md.Element) return;
+        if (node.tag == 'img') images++;
+        if (node.attributes['type'] == 'checkbox') tasks++;
+        for (final child in node.children ?? const <md.Node>[]) {
+          count(child);
+        }
+      }
+
+      _children = <Widget>[];
+      for (final node in nodes) {
+        final imageStart = images;
+        final taskStart = tasks;
+        count(node);
+        if (_children!.isNotEmpty) {
+          _children!.add(SizedBox(height: styleSheet.blockSpacing));
+        }
+        _children!.add(
+          _DeferredMarkdownBlock(
+            key: ObjectKey(node),
+            buildBlock: (delegate) {
+              widget.onBuildBlock!(imageStart, taskStart);
+              return makeBuilder(delegate).build([node]);
+            },
+            onTapLink: widget.onTapLink,
+            onTapLinkTarget: widget.onTapLinkTarget,
+            syntaxHighlighter: widget.syntaxHighlighter,
+          ),
+        );
+      }
+      return;
+    }
+    final builder = makeBuilder(this);
     _children = IanvsMarkdownEditorDiagnostics.measure(
       'body.buildWidgets',
       () => builder.build(nodes),
@@ -187,4 +249,107 @@ class _ScopedMarkdownBodyState extends State<ScopedMarkdownBody>
     regions: null, // Nested callout/HTML renderers own a different source.
     child: widget._buildBody(context, _children),
   );
+}
+
+// Offscreen blocks release their Widget/InlineSpan trees and recognizers. The
+// document AST stays shared so cross-block link definitions remain intact.
+class _DeferredMarkdownBlock extends StatefulWidget {
+  const _DeferredMarkdownBlock({
+    super.key,
+    required this.buildBlock,
+    required this.onTapLink,
+    required this.onTapLinkTarget,
+    required this.syntaxHighlighter,
+  });
+  final List<Widget> Function(ScopedMarkdownBuilderDelegate) buildBlock;
+  final MarkdownTapLinkCallback? onTapLink;
+  final IanvsMarkdownTapLinkTargetCallback? onTapLinkTarget;
+  final SyntaxHighlighter? syntaxHighlighter;
+  @override
+  State<_DeferredMarkdownBlock> createState() => _DeferredMarkdownBlockState();
+}
+
+class _DeferredMarkdownBlockState extends State<_DeferredMarkdownBlock>
+    implements ScopedMarkdownBuilderDelegate {
+  final _recognizers = <GestureRecognizer>[];
+  late List<Widget> _children;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _clear();
+    _children = widget.buildBlock(this);
+  }
+
+  @override
+  void didUpdateWidget(_DeferredMarkdownBlock oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _clear();
+    _children = widget.buildBlock(this);
+  }
+
+  void _clear() {
+    for (final recognizer in _recognizers) {
+      recognizer.dispose();
+    }
+    _recognizers.clear();
+  }
+
+  @override
+  void dispose() {
+    _clear();
+    super.dispose();
+  }
+
+  @override
+  GestureRecognizer createLink(IanvsMarkdownLinkTarget target) {
+    final recognizer = TapGestureRecognizer()
+      ..onTap = () => dispatchIanvsMarkdownLinkTap(
+        target,
+        onTapLinkTarget: widget.onTapLinkTarget,
+        onTapLink: widget.onTapLink,
+      );
+    _recognizers.add(recognizer);
+    return recognizer;
+  }
+
+  @override
+  TextSpan formatText(MarkdownStyleSheet styleSheet, String code) =>
+      widget.syntaxHighlighter?.format(code.replaceAll(RegExp(r'\n$'), '')) ??
+      TextSpan(
+        style: styleSheet.code,
+        text: code.replaceAll(RegExp(r'\n$'), ''),
+      );
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: _children,
+  );
+}
+
+/// Internal host layout for the read view's viewport. Keeps the public renderer
+/// API unchanged and preserves one vertical scroll position for header + body.
+class MarkdownViewportLayout extends InheritedWidget {
+  const MarkdownViewportLayout({
+    super.key,
+    required super.child,
+    required this.controller,
+    required this.padding,
+    required this.maxWidth,
+    required this.alignment,
+    this.header,
+  });
+  final ScrollController controller;
+  final EdgeInsetsGeometry padding;
+  final double maxWidth;
+  final AlignmentGeometry alignment;
+  final Widget? header;
+  static MarkdownViewportLayout? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<MarkdownViewportLayout>();
+  @override
+  bool updateShouldNotify(MarkdownViewportLayout oldWidget) =>
+      controller != oldWidget.controller ||
+      padding != oldWidget.padding ||
+      maxWidth != oldWidget.maxWidth ||
+      alignment != oldWidget.alignment ||
+      header != oldWidget.header;
 }

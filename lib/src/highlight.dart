@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
@@ -205,7 +207,7 @@ List<TextRange> _ianvsMarkdownHighlightHigherPriorityRanges(
   List<TextRange> baseRanges,
 ) {
   final ranges = <TextRange>[];
-  final protected = <TextRange>[...baseRanges];
+  final protected = _HighlightRangeIndex(baseRanges);
   void protect(TextRange range) {
     if (!range.isValid || range.isCollapsed) return;
     ranges.add(range);
@@ -219,8 +221,7 @@ List<TextRange> _ianvsMarkdownHighlightHigherPriorityRanges(
   for (var index = 0; index < lines.length; index += 1) {
     final line = lines[index];
     final lineEnd = offset + line.length;
-    if (displayFence.hasMatch(line) &&
-        !_overlapsHighlightRange(offset, lineEnd, protected)) {
+    if (displayFence.hasMatch(line) && !protected.overlaps(offset, lineEnd)) {
       if (displayStart == null) {
         displayStart = offset;
       } else {
@@ -238,7 +239,7 @@ List<TextRange> _ianvsMarkdownHighlightHigherPriorityRanges(
   for (final pattern in mathPatterns) {
     for (final match in pattern.allMatches(source)) {
       if (_highlightDollarOpeningIsEscapedOrContinued(source, match.start) ||
-          _overlapsHighlightRange(match.start, match.end, protected)) {
+          protected.overlaps(match.start, match.end)) {
         continue;
       }
       protect(TextRange(start: match.start, end: match.end));
@@ -246,7 +247,7 @@ List<TextRange> _ianvsMarkdownHighlightHigherPriorityRanges(
   }
 
   for (final match in RegExp(r'<[^>\n]+>').allMatches(source)) {
-    if (!_overlapsHighlightRange(match.start, match.end, protected)) {
+    if (!protected.overlaps(match.start, match.end)) {
       protect(TextRange(start: match.start, end: match.end));
     }
   }
@@ -256,7 +257,7 @@ List<TextRange> _ianvsMarkdownHighlightHigherPriorityRanges(
     multiLine: true,
   );
   for (final match in definitionPattern.allMatches(source)) {
-    if (!_overlapsHighlightRange(match.start, match.end, protected)) {
+    if (!protected.overlaps(match.start, match.end)) {
       protect(TextRange(start: match.start, end: match.end));
     }
   }
@@ -264,7 +265,7 @@ List<TextRange> _ianvsMarkdownHighlightHigherPriorityRanges(
   var bracket = source.indexOf('[');
   while (bracket >= 0) {
     if (_highlightOffsetIsEscaped(source, bracket) ||
-        _overlapsHighlightRange(bracket, bracket + 1, protected)) {
+        protected.overlaps(bracket, bracket + 1)) {
       bracket = source.indexOf('[', bracket + 1);
       continue;
     }
@@ -297,6 +298,39 @@ List<TextRange> _ianvsMarkdownHighlightHigherPriorityRanges(
   }
 
   return ranges;
+}
+
+// Disjoint interval union: testing every link against every previously seen
+// link made highlight preprocessing quadratic on real release histories.
+final class _HighlightRangeIndex {
+  _HighlightRangeIndex(Iterable<TextRange> ranges) {
+    for (final range in ranges) {
+      add(range);
+    }
+  }
+  final _ends = SplayTreeMap<int, int>();
+  bool overlaps(int start, int end) {
+    final key = _ends.lastKeyBefore(end);
+    return key != null && _ends[key]! > start;
+  }
+
+  void add(TextRange range) {
+    var start = range.start;
+    var end = range.end;
+    final previous = _ends.lastKeyBefore(start + 1);
+    if (previous != null && _ends[previous]! >= start) {
+      start = previous;
+      if (_ends[previous]! > end) end = _ends[previous]!;
+      _ends.remove(previous);
+    }
+    var next = _ends.firstKeyAfter(start - 1);
+    while (next != null && next <= end) {
+      if (_ends[next]! > end) end = _ends[next]!;
+      _ends.remove(next);
+      next = _ends.firstKeyAfter(start - 1);
+    }
+    _ends[start] = end;
+  }
 }
 
 bool _highlightDollarOpeningIsEscapedOrContinued(String source, int offset) {

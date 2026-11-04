@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:ianvs_markdown/ianvs_markdown.dart';
@@ -2386,20 +2387,23 @@ class WorkspaceController extends ChangeNotifier {
     return writing.then<void>(
       (_) {
         if (!_disposed) {
+          final copies = <String, (String, String)>{
+            for (final entry in snapshot.documents)
+              entry['id'] as String: (
+                entry['text'] as String,
+                entry['persistedText'] as String,
+              ),
+          };
+          final statusChanged =
+              recoveryError != null || !mapEquals(_recoveryCopies, copies);
           recoveryError = null;
           _recoveryCopies
             ..clear()
-            ..addEntries(
-              snapshot.documents.map(
-                (entry) => MapEntry(entry['id'] as String, (
-                  entry['text'] as String,
-                  entry['persistedText'] as String,
-                )),
-              ),
-            );
-          // Recovery status changed, not the workspace/catalog. Avoid triggering
-          // an unrelated index reconfiguration or a second folder scan.
-          super.notifyListeners();
+            ..addAll(copies);
+          // Scroll-anchor-only saves do not change visible recovery status.
+          // Rebuilding the workspace here reparsed a large Read document in
+          // the middle of the next scroll animation.
+          if (statusChanged) super.notifyListeners();
         }
       },
       onError: (Object error, StackTrace stackTrace) {

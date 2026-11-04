@@ -4,13 +4,21 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:linefold/src/app.dart';
 import 'package:linefold/src/controllers/workspace_controller.dart';
 
-import '../../test/fixtures/large_documents.dart';
+import 'package:linefold/src/document_render_policy.dart';
 import 'support/fakes.dart';
 
 void main() {
+  final budget = linefoldDocumentRenderBudget;
+  final largeDocuments = <String, String>{
+    'lineLength': '${'a' * (budget.maxLineCodeUnits + 1)}\nEnd 中文😀',
+    'syntaxTokens':
+        '${'**x**\n' * (budget.maxDenseSyntaxTokensBetweenBlankLines! ~/ 4 + 1)}End 中文😀',
+    'sourceLength':
+        '${'ordinary text\n' * (budget.maxCodeUnitsBetweenBlankLines! ~/ 14 + 1)}End 中文😀',
+  };
   for (final entry in largeDocuments.entries) {
     testWidgets(
-      'app preserves default-budget ${entry.key} through edit, Read and reopen',
+      'app preserves host-budget ${entry.key} through edit, Read and reopen',
       (tester) async {
         tester.view.physicalSize = const Size(1200, 900);
         tester.view.devicePixelRatio = 1;
