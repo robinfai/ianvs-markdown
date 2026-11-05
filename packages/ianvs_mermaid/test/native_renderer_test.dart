@@ -1,26 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:ffi';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_mermaid/ianvs_mermaid.dart';
 import 'package:ianvs_mermaid/src/native_svg_bridge.dart';
 
-Future<String> nativeMermanPath() async {
-  final config = File('.dart_tool/package_config.json');
-  final packages =
-      (jsonDecode(await config.readAsString()) as Map)['packages'] as List;
-  final merman = packages.cast<Map>().singleWhere((p) => p['name'] == 'merman');
-  final root = config.uri.resolve(merman['rootUri'] as String).toFilePath();
-  if (Platform.isMacOS) {
-    final arch = Abi.current() == Abi.macosArm64 ? 'arm64' : 'x86_64';
-    return '$root/native/macos/$arch/libmerman_ffi.dylib';
-  }
-  throw UnsupportedError('Native integration fixtures currently run on macOS');
-}
-
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   test(
     'standalone SVG preview expands text and markers off the UI isolate',
     () async {
@@ -45,9 +32,7 @@ void main() {
   test(
     'production FFI expands all seven demo sources and caches results',
     () async {
-      final renderer = NativeMermanRenderer(
-        libraryPath: await nativeMermanPath(),
-      );
+      final renderer = NativePeleRenderer();
       addTearDown(renderer.dispose);
       final cases =
           jsonDecode(
@@ -79,9 +64,7 @@ void main() {
   );
 
   test('native rendering leaves the caller event loop responsive', () async {
-    final renderer = NativeMermanRenderer(
-      libraryPath: await nativeMermanPath(),
-    );
+    final renderer = NativePeleRenderer();
     addTearDown(renderer.dispose);
     var ticks = 0;
     final timer = Timer.periodic(
@@ -104,14 +87,11 @@ void main() {
     expect(themed.fromCache, isFalse);
     final validation = await renderer.validate('flowchart LR\nA-->B');
     expect(validation.valid, isTrue);
-    expect(validation.raw, isNotNull);
     expect(await renderer.layoutJson('flowchart LR\nA-->B'), contains('{'));
   });
 
   test('dispose settles pending work and rejects subsequent renders', () async {
-    final renderer = NativeMermanRenderer(
-      libraryPath: await nativeMermanPath(),
-    );
+    final renderer = NativePeleRenderer();
     final pending = renderer.render('flowchart LR\nA-->B');
     final assertion = expectLater(
       pending,
@@ -125,6 +105,32 @@ void main() {
       throwsA(isA<MermaidRendererDisposedException>()),
     );
   });
+
+  test(
+    'source and SVG budgets reject work without poisoning the worker',
+    () async {
+      final renderer = NativePeleRenderer();
+      addTearDown(renderer.dispose);
+      const source = 'flowchart LR\n中文节点-->结束';
+      await expectLater(
+        renderer.render(
+          source,
+          options: const MermaidRenderOptions(maxSourceBytes: 8),
+        ),
+        throwsA(isA<MermaidRenderFailure>()),
+      );
+      await expectLater(
+        renderer.render(
+          source,
+          options: const MermaidRenderOptions(maxSvgBytes: 32),
+        ),
+        throwsA(isA<MermaidRenderFailure>()),
+      );
+      final result = await renderer.render(source);
+      expect(result.width, greaterThan(0));
+      expect(result.svg, contains('<path'));
+    },
+  );
 
   test('FFI exposes unsupported features instead of silently dropping them', () {
     final bridge = NativeSvgBridge();

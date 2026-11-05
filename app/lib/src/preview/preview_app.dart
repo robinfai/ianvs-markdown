@@ -57,7 +57,7 @@ class _LinefoldPreviewAppState extends State<LinefoldPreviewApp>
   );
   late final _positions = widget.readingPositions ?? PreviewReadingPositions();
   late final _platform = widget.platform ?? PreviewPlatform();
-  late final _renderer = NativeMermanRenderer();
+  late final _renderer = NativePeleRenderer();
   final _navigator = GlobalKey<NavigatorState>();
   StreamSubscription<void>? _cloudChanges;
   bool _prompting = false;

@@ -1,0 +1,1 @@
+{"private":true,"type":"module","scripts":{"build":"node build.mjs"},"dependencies":{"pele":"1.13.0","esbuild":"0.25.12","@babel/core":"7.28.5"}}

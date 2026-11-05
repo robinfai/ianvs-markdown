@@ -1,7 +1,3 @@
-import 'dart:convert';
-import 'dart:ffi';
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -31,10 +27,7 @@ void main() {
   });
 
   test('renders a flowchart with the packaged native engine', () async {
-    final libraryPath = await _nativeLibraryPath();
-    expect(libraryPath, isNotNull);
-
-    final renderer = NativeMermanRenderer(libraryPath: libraryPath!);
+    final renderer = NativePeleRenderer();
     addTearDown(renderer.dispose);
 
     final result = await renderer.render(
@@ -83,39 +76,4 @@ class _FakeRenderer implements MermaidRenderer {
   }) async {
     return const MermaidValidationResult(valid: true);
   }
-}
-
-Future<String?> _nativeLibraryPath() async {
-  final packageDir = await _packageRoot('merman');
-  if (packageDir == null) return null;
-  final path = switch (Abi.current()) {
-    Abi.macosArm64 => '$packageDir/native/macos/arm64/libmerman_ffi.dylib',
-    Abi.macosX64 => '$packageDir/native/macos/x86_64/libmerman_ffi.dylib',
-    Abi.linuxX64 => '$packageDir/native/linux/x86_64/libmerman_ffi.so',
-    Abi.linuxArm64 => '$packageDir/native/linux/aarch64/libmerman_ffi.so',
-    Abi.windowsX64 => '$packageDir/native/windows/x86_64/merman_ffi.dll',
-    _ => null,
-  };
-  if (path == null || !File(path).existsSync()) return null;
-  return path;
-}
-
-Future<String?> _packageRoot(String packageName) async {
-  final configFile = File('.dart_tool/package_config.json');
-  if (!configFile.existsSync()) return null;
-
-  final decoded =
-      jsonDecode(await configFile.readAsString()) as Map<String, Object?>;
-  final packages = decoded['packages'];
-  if (packages is! List<Object?>) return null;
-
-  for (final package in packages) {
-    if (package is! Map<String, Object?> || package['name'] != packageName) {
-      continue;
-    }
-    final rootUri = package['rootUri'];
-    if (rootUri is! String) return null;
-    return configFile.uri.resolve(rootUri).toFilePath();
-  }
-  return null;
 }

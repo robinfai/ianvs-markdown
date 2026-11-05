@@ -45,6 +45,77 @@ void main(List<String> args) async {
         '${config.targetOS}/${config.targetArchitecture}',
       ),
     };
+    if (config.targetOS == OS.macOS || config.targetOS == OS.iOS) {
+      final sdkName = config.targetOS == OS.macOS
+          ? 'macosx'
+          : config.iOS.targetSdk.type;
+      final sdkResult = await Process.run('/usr/bin/xcrun', [
+        '--sdk',
+        sdkName,
+        '--show-sdk-path',
+      ]);
+      if (sdkResult.exitCode != 0) throw StateError('${sdkResult.stderr}');
+      final arch = config.targetArchitecture == Architecture.arm64
+          ? 'arm64'
+          : 'x86_64';
+      final platform = config.targetOS == OS.macOS
+          ? 'macos12.0'
+          : 'ios${config.iOS.targetVersion}.0${config.iOS.targetSdk == IOSSdk.iPhoneSimulator ? '-simulator' : ''}';
+      final native = input.packageRoot.resolve('native/pele_jsc.c');
+      final library = input.outputDirectory.resolve('libianvs_pele.dylib');
+      // Keep the object file until Flutter creates the framework dSYM. Linking
+      // a C source directly leaves a deleted temporary object in the debug map.
+      final object = input.outputDirectory.resolve('pele_jsc.o');
+      final compilerArguments = [
+        '--sdk',
+        sdkName,
+        'clang',
+        '-target',
+        '$arch-apple-$platform',
+        '-isysroot',
+        (sdkResult.stdout as String).trim(),
+      ];
+      final compiled = await Process.run('/usr/bin/xcrun', [
+        ...compilerArguments,
+        '-std=c11',
+        '-O2',
+        '-g',
+        '-Wall',
+        '-Wextra',
+        '-Werror',
+        '-c',
+        native.toFilePath(),
+        '-o',
+        object.toFilePath(),
+      ]);
+      if (compiled.exitCode != 0) {
+        throw StateError('System JSC bridge compile: ${compiled.stderr}');
+      }
+      final linked = await Process.run('/usr/bin/xcrun', [
+        ...compilerArguments,
+        '-dynamiclib',
+        '-Wl,-headerpad_max_install_names',
+        '-framework',
+        'JavaScriptCore',
+        object.toFilePath(),
+        '-o',
+        library.toFilePath(),
+        '-install_name',
+        '@rpath/libianvs_pele.dylib',
+      ]);
+      if (linked.exitCode != 0) {
+        throw StateError('System JSC bridge link: ${linked.stderr}');
+      }
+      output.assets.code.add(
+        CodeAsset(
+          package: input.packageName,
+          name: 'src/native_pele_bridge.dart',
+          linkMode: DynamicLoadingBundled(),
+          file: library,
+        ),
+      );
+      output.dependencies.add(native);
+    }
     final root = input.packageRoot.resolve('rust/');
     final target = input.outputDirectoryShared.resolve('cargo/');
     final cargoHome =

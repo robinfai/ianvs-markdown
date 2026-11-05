@@ -52,7 +52,7 @@ void main() {
           codec.dispose();
         }
         if (Platform.isMacOS) {
-          final renderer = NativeMermanRenderer();
+          final renderer = NativePeleRenderer();
           try {
             final dimensions = <Map<String, int>>[];
             final output =

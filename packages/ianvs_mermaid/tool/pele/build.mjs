@@ -1,0 +1,15 @@
+import {build} from 'esbuild';
+import {instrument} from './instrument.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+const here=path.dirname(fileURLToPath(import.meta.url));
+const out=path.resolve(here,'../../vendor/pele');
+const bundle=await build({stdin:{contents:"export {render,parse} from 'pele';",resolveDir:here,sourcefile:'entry.js'},bundle:true,write:false,format:'iife',globalName:'Pele',platform:'neutral',target:'es2020'});
+const {code,checkpoints}=instrument(bundle.outputFiles[0].text);
+const final=await build({stdin:{contents:code,sourcefile:'instrumented.js'},write:false,minify:true,platform:'neutral',target:'es2020',legalComments:'eof'});
+fs.mkdirSync(out,{recursive:true});
+fs.writeFileSync(path.join(out,'pele-runtime.js'),final.outputFiles[0].text);
+fs.copyFileSync(path.join(here,'node_modules/pele/LICENSE'),path.join(out,'LICENSE'));
+fs.writeFileSync(path.join(out,'provenance.json'),JSON.stringify({version:'1.13.0',entrypoints:['render','parse'],checkpoints,guardInterval:128,build:'npm ci && npm run build',measurement:'Pele built-in metrics; no DOM or Canvas',interruptBoundary:'JS functions and loops; native builtins are not preemptible'},null,2)+'\n');
+console.log({checkpoints,bytes:final.outputFiles[0].contents.length});

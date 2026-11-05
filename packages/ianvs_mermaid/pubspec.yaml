@@ -12,7 +12,6 @@ dependencies:
     sdk: flutter
   crypto: ^3.0.7
   flutter_svg: ^2.3.0
-  merman: 0.9.3
   xml: ^7.0.1
 
 dev_dependencies:
@@ -23,3 +22,8 @@ dev_dependencies:
 # Native Assets hooks 2.2 require newer annotations than Flutter 3.44 pins.
 dependency_overrides:
   meta: 1.19.0
+
+flutter:
+  assets:
+    - vendor/pele/pele-runtime.js
+    - vendor/pele/LICENSE

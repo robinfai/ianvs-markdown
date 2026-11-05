@@ -7,16 +7,12 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_mermaid/ianvs_mermaid.dart';
 
-import 'native_renderer_test.dart' show nativeMermanPath;
-
 void main() {
   testWidgets(
     'live production FFI matches the seven vector reference pictures',
     (tester) async {
       await tester.runAsync(() async {
-        final renderer = NativeMermanRenderer(
-          libraryPath: await nativeMermanPath(),
-        );
+        final renderer = NativePeleRenderer();
         final root = Directory('../../demos/mermaid_rendering_comparison');
         final cases =
             (jsonDecode(
@@ -24,7 +20,7 @@ void main() {
                     )
                     as List)
                 .cast<Map>();
-        final references = Directory('test/fixtures/merman-0.9.3')
+        final references = Directory('test/fixtures/pele-1.13.0')
           ..createSync(recursive: true);
         final output = Directory('build/visual-regression')
           ..createSync(recursive: true);
@@ -38,7 +34,7 @@ void main() {
                 fontFamily: 'Hiragino Sans GB',
               ),
             );
-            if (const bool.fromEnvironment('UPDATE_MERMAN_REFERENCES')) {
+            if (const bool.fromEnvironment('UPDATE_PELE_REFERENCES')) {
               final info = await vg.loadPicture(
                 SvgStringLoader(result.svg),
                 null,

@@ -2,110 +2,63 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
 
-import 'package:merman/merman.dart' as merman;
+import 'package:flutter/services.dart';
+import 'dart:io';
+import 'native_pele_bridge.dart';
+import 'pele_svg_normalizer.dart';
 
 import 'mermaid_cache.dart';
 import 'mermaid_exception.dart';
 import 'mermaid_render_options.dart';
 import 'mermaid_render_result.dart';
 import 'mermaid_renderer.dart';
-import 'mermaid_svg_normalizer.dart';
 import 'native_svg_bridge.dart';
-
-abstract interface class MermanEngine {
-  String get packageVersion;
-
-  String renderSvg(String source, {String? optionsJson});
-
-  String layoutJsonRaw(String source, {String? optionsJson});
-
-  merman.MermanValidationResult validate(String source, {String? optionsJson});
-}
-
-class BundledMermanEngine implements MermanEngine {
-  BundledMermanEngine(this._engine);
-
-  factory BundledMermanEngine.open() {
-    return BundledMermanEngine(merman.Merman.open());
-  }
-
-  factory BundledMermanEngine.openPath(String path) {
-    return BundledMermanEngine(merman.Merman.openPath(path));
-  }
-
-  final merman.Merman _engine;
-
-  @override
-  String get packageVersion => _engine.packageVersion;
-
-  @override
-  String renderSvg(String source, {String? optionsJson}) {
-    return _engine.renderSvg(source, optionsJson: optionsJson);
-  }
-
-  @override
-  String layoutJsonRaw(String source, {String? optionsJson}) {
-    return jsonEncode(
-      _engine.layoutJson(source, optionsJson: _nonSvgOptions(optionsJson)),
-    );
-  }
-
-  @override
-  merman.MermanValidationResult validate(String source, {String? optionsJson}) {
-    return _engine.validate(source, optionsJson: optionsJson);
-  }
-}
-
-// Schema 2 rejects output-specific limits on validation/layout operations.
-String? _nonSvgOptions(String? source) {
-  if (source == null) return null;
-  final options = jsonDecode(source) as Map<String, dynamic>;
-  final resources = options['resources'] as Map<String, dynamic>?;
-  (resources?['limits'] as Map<String, dynamic>?)?.remove('max_svg_bytes');
-  return jsonEncode(options);
-}
-
-typedef MermanEngineOpener = MermanEngine Function();
 
 /// Owns one background isolate. Native rendering, font discovery, SVG expansion
 /// and the bounded LRU all live there; no native calls run on the UI isolate.
-class NativeMermanRenderer implements MermaidRenderer {
-  NativeMermanRenderer({
-    MermaidSvgCache? cache,
-    MermanEngineOpener? openEngine,
-    String? libraryPath,
-    this.maxPendingRequests = 32,
-  }) : assert(maxPendingRequests > 0),
-       _config = _WorkerConfig(
-         openEngine,
-         libraryPath,
-         cache?.maxEntries ?? 64,
-         cache?.maxBytes ?? 16 * 1024 * 1024,
-       );
+class NativePeleRenderer implements MermaidRenderer {
+  NativePeleRenderer({MermaidSvgCache? cache, this.maxPendingRequests = 32})
+    : assert(maxPendingRequests > 0),
+      _config = _WorkerConfig(
+        cache?.maxEntries ?? 64,
+        cache?.maxBytes ?? 16 * 1024 * 1024,
+      );
 
   final int maxPendingRequests;
   final _WorkerConfig _config;
   final _pending = <int, Completer<Object>>{};
   final _inFlight = <String, Future<MermaidRenderResult>>{};
   Future<SendPort>? _starting;
-  ReceivePort? _responses;
   SendPort? _commands;
   var _nextId = 0;
   var _disposed = false;
+  NativePeleBridge? _control;
+  static const engineVersion = 'pele/1.13.0;checkpoints/1';
 
   Future<SendPort> _start() => _starting ??= _spawn();
 
   Future<SendPort> _spawn() async {
+    if (!Platform.isMacOS && !Platform.isIOS) {
+      throw UnsupportedError(
+        'Pele requires system JavaScriptCore on macOS/iOS',
+      );
+    }
+    final runtime = await rootBundle.loadString(
+      'packages/ianvs_mermaid/vendor/pele/pele-runtime.js',
+    );
+    if (_disposed) throw const MermaidRendererDisposedException();
+    final control = NativePeleBridge.allocate();
+    _control = control;
+    control
+        .retain(); // worker ownership, released after it destroys its context
     final ready = Completer<SendPort>();
     final responses = ReceivePort();
-    _responses = responses;
     responses.listen((message) {
       if (message is SendPort) {
         _commands = message;
         ready.complete(message);
         if (_disposed) {
           message.send(null);
-          responses.close();
         }
       } else if (message is _WorkerReply) {
         final request = _pending.remove(message.id);
@@ -127,17 +80,22 @@ class NativeMermanRenderer implements MermaidRenderer {
         responses.close();
         _starting = null;
         _commands = null;
+        _control?.release();
+        _control = null;
       }
     });
     try {
       await Isolate.spawn(
         _runMermaidWorker,
-        (_config, responses.sendPort),
+        (_config, responses.sendPort, runtime, control.address),
         onError: responses.sendPort,
         onExit: responses.sendPort,
         debugName: 'Mermaid vector rendering',
       );
     } catch (error, stack) {
+      control.release();
+      control.release();
+      _control = null;
       responses.close();
       _starting = null;
       if (!ready.isCompleted) ready.completeError(error, stack);
@@ -152,7 +110,6 @@ class NativeMermanRenderer implements MermaidRenderer {
     bool includeLayout = false,
   }) async {
     if (_disposed) throw const MermaidRendererDisposedException();
-    if (method != 'render') optionsJson = _nonSvgOptions(optionsJson)!;
     final commands = await _start();
     if (_disposed) throw const MermaidRendererDisposedException();
     if (_pending.length >= maxPendingRequests) {
@@ -236,22 +193,15 @@ class NativeMermanRenderer implements MermaidRenderer {
     _disposed = true;
     _failPending(const MermaidRendererDisposedException());
     _inFlight.clear();
-    // Let an in-progress FFI call return and release its buffers before exit.
-    // If startup is pending, the ready handler sends this shutdown instead.
+    // Polling checkpoints stop active JS execution; the worker then destroys
+    // its context and releases its reference. Never free a running JSC context.
+    _control?.cancelThrough(_nextId);
     _commands?.send(null);
-    if (_commands != null) _responses?.close();
   }
 }
 
 class _WorkerConfig {
-  const _WorkerConfig(
-    this.openEngine,
-    this.libraryPath,
-    this.cacheEntries,
-    this.cacheBytes,
-  );
-  final MermanEngineOpener? openEngine;
-  final String? libraryPath;
+  const _WorkerConfig(this.cacheEntries, this.cacheBytes);
   final int cacheEntries;
   final int cacheBytes;
 }
@@ -279,48 +229,107 @@ class _WorkerReply {
   final String? stack;
 }
 
-void _runMermaidWorker((_WorkerConfig, SendPort) args) {
-  final (config, responses) = args;
+void _runMermaidWorker((_WorkerConfig, SendPort, String, int) args) {
+  final (config, responses, runtime, address) = args;
   final commands = ReceivePort();
   final cache = MermaidSvgCache.memory(
     maxEntries: config.cacheEntries,
     maxBytes: config.cacheBytes,
   );
-  MermanEngine? engine;
+  final engine = NativePeleBridge.at(address);
   final svgBridge = NativeSvgBridge();
   responses.send(commands.sendPort);
   commands.listen((message) {
     if (message == null) {
       cache.clear();
+      engine.close();
+      engine.release();
       commands.close();
       Isolate.exit();
     }
     final request = message as _WorkerRequest;
     try {
-      final current = engine ??=
-          config.openEngine?.call() ??
-          (config.libraryPath == null
-              ? BundledMermanEngine.open()
-              : BundledMermanEngine.openPath(config.libraryPath!));
+      final config = jsonDecode(request.options) as Map<String, dynamic>;
+      final limits = config['resources']['limits'] as Map<String, dynamic>;
+      if (utf8.encode(request.source).length >
+          (limits['max_source_bytes'] as int)) {
+        throw const MermaidRenderFailure(
+          message: 'Diagram source exceeds the byte limit',
+        );
+      }
+      final site = config['site_config'] as Map<String, dynamic>;
+      final layout = config['layout'] as Map<String, dynamic>;
+      final variables = Map<String, String>.from(site['themeVariables'] as Map);
+      final identity = svgBridge.cacheIdentity;
+      final key = MermaidSvgCache.keyFor(
+        source: request.source,
+        optionsJson: request.options,
+        engineVersion: NativePeleRenderer.engineVersion,
+        preprocessingIdentity: identity,
+      );
+      final options = <String, Object?>{
+        'responsive': false,
+        'limit': limits['max_source_bytes'],
+        'outputLimit': limits['max_svg_bytes'],
+        if (limits['max_model_items'] != null)
+          'maxEdges': limits['max_model_items'],
+        'idPrefix': 'linefold-${key.substring(0, 20)}',
+        'fontFamily':
+            variables['fontFamily'] ?? svgBridge.environment['fontFamily'],
+        'fontFamilyMono':
+            variables['fontFamily'] ?? svgBridge.environment['fontFamily'],
+        if (layout['container_width'] != null)
+          'maxWidth': layout['container_width'],
+        'now': config['fixed_today'] == null
+            ? 0
+            : DateTime.parse(
+                config['fixed_today'] as String,
+              ).millisecondsSinceEpoch,
+      };
       Object result;
-      switch (request.method) {
-        case 'render':
-          final identity = svgBridge.cacheIdentity;
-          final key = MermaidSvgCache.keyFor(
-            source: request.source,
-            optionsJson: request.options,
-            engineVersion: current.packageVersion,
-            preprocessingIdentity: identity,
+      if (request.method == 'validate') {
+        try {
+          engine.run(
+            runtime,
+            request.source,
+            options,
+            request.id,
+            parseOnly: true,
           );
-          final cached = cache.get(key);
-          // Cache the expanded SVG with its dimensions as one bounded payload.
+          result = const MermaidValidationResult(valid: true);
+        } catch (e) {
+          result = MermaidValidationResult(
+            valid: false,
+            errorMessage: e.toString(),
+          );
+        }
+      } else {
+        final cached = cache.get(key);
+        Map<String, dynamic>? rendered;
+        Map<String, dynamic> render() => rendered ??= engine.run(
+          runtime,
+          request.source,
+          options,
+          request.id,
+        );
+        if (request.method == 'layout') {
+          final r = render();
+          result = jsonEncode({
+            'width': r['width'],
+            'height': r['height'],
+            'type': r['type'],
+            'links': r['links'],
+          });
+        } else {
           final expanded = cached == null
               ? svgBridge.preprocess(
-                  normalizeMermaidSvgForFlutter(
-                    current.renderSvg(
-                      request.source,
-                      optionsJson: request.options,
-                    ),
+                  normalizePeleSvg(
+                    render()['svg'] as String,
+                    dark: (site['theme'] as String).contains('dark'),
+                    overrides: {
+                      for (final e in variables.entries)
+                        if (e.key.startsWith('--pele-')) e.key: e.value,
+                    },
                   ),
                 )
               : jsonDecode(cached) as Map<String, dynamic>;
@@ -329,56 +338,26 @@ void _runMermaidWorker((_WorkerConfig, SendPort) args) {
             source: request.source,
             svg: expanded['svg'] as String,
             optionsJson: request.options,
-            engineVersion: current.packageVersion,
+            engineVersion: NativePeleRenderer.engineVersion,
             preprocessingIdentity: identity,
             width: (expanded['width'] as num).toDouble(),
             height: (expanded['height'] as num).toDouble(),
             fromCache: cached != null,
             layoutJson: request.includeLayout
-                ? current.layoutJsonRaw(
-                    request.source,
-                    optionsJson: request.options,
-                  )
+                ? jsonEncode({
+                    'width': expanded['width'],
+                    'height': expanded['height'],
+                  })
                 : null,
           );
-        case 'validate':
-          try {
-            final validation = current.validate(
-              request.source,
-              optionsJson: request.options,
-            );
-            result = MermaidValidationResult(
-              valid: validation.valid,
-              raw: validation,
-              errorMessage: validation.json['error'] as String?,
-              code: validation.json['code'] as int?,
-              codeName: validation.codeName,
-            );
-          } on merman.MermanException catch (error) {
-            result = MermaidValidationResult(
-              valid: false,
-              raw: error,
-              errorMessage: error.message,
-              code: error.code,
-              codeName: error.codeName,
-            );
-          }
-        case 'layout':
-          result = current.layoutJsonRaw(
-            request.source,
-            optionsJson: request.options,
-          );
-        default:
-          throw StateError('Unknown Mermaid worker request: ${request.method}');
+        }
       }
       responses.send(_WorkerReply(request.id, value: result));
     } catch (error, stack) {
       responses.send(
         _WorkerReply(
           request.id,
-          error: error is MermaidRenderFailure
-              ? error.message
-              : error.toString(),
+          error: error.toString(),
           stack: stack.toString(),
         ),
       );

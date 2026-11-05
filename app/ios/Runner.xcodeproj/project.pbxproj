@@ -217,7 +217,6 @@
 				9705A1C41CF9048500538489 /* Embed Frameworks */,
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
 				22AF948355B7D7C2A8FCC8CE /* [CP] Embed Pods Frameworks */,
-				C10D00000000000000000070 /* Embed Merman source symbols */,
 			);
 			buildRules = (
 			);
@@ -290,19 +289,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		C10D00000000000000000070 /* Embed Merman source symbols */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = ();
-			inputPaths = ();
-			name = "Embed Merman source symbols";
-			outputPaths = ();
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/bash;
-			shellScript = "bash \"$SRCROOT/../tool/embed_merman_ios_symbols.sh\"";
-			showEnvVarsInLog = 0;
-		};
+
 
 		22AF948355B7D7C2A8FCC8CE /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;

@@ -38,7 +38,7 @@ class Preview extends StatefulWidget {
 }
 
 class _PreviewState extends State<Preview> with WidgetsBindingObserver {
-  late final renderer = NativeMermanRenderer();
+  late final renderer = NativePeleRenderer();
   @override
   void initState() {
     super.initState();

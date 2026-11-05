@@ -18,8 +18,10 @@ for framework in FlutterMacOS App; do
   ditto "$linefold_client/build/native/$framework.framework" "$linefold_native_dir/$framework.framework"
   ditto "$linefold_native_dir/$framework.framework" "$linefold_frameworks/$framework.framework"
 done
-# Remove the obsolete CocoaPods library from incremental extension builds.
+# Remove obsolete Merman libraries from incremental extension builds. Copying
+# current Native Assets does not delete frameworks removed by a dependency change.
 rm -f "$linefold_frameworks/libmerman_ffi.dylib"
+rm -rf "$linefold_frameworks/merman_ffi.framework"
 # Flutter's native-asset frameworks must be adjacent to App.framework.
 if [[ -d "$linefold_client/build/native/native_assets" ]]; then
   for asset in "$linefold_client/build/native/native_assets/"*.framework; do
