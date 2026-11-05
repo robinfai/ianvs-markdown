@@ -45,13 +45,24 @@ class BundledMermanEngine implements MermanEngine {
 
   @override
   String layoutJsonRaw(String source, {String? optionsJson}) {
-    return _engine.layoutJsonRaw(source, optionsJson: optionsJson);
+    return jsonEncode(
+      _engine.layoutJson(source, optionsJson: _nonSvgOptions(optionsJson)),
+    );
   }
 
   @override
   merman.MermanValidationResult validate(String source, {String? optionsJson}) {
     return _engine.validate(source, optionsJson: optionsJson);
   }
+}
+
+// Schema 2 rejects output-specific limits on validation/layout operations.
+String? _nonSvgOptions(String? source) {
+  if (source == null) return null;
+  final options = jsonDecode(source) as Map<String, dynamic>;
+  final resources = options['resources'] as Map<String, dynamic>?;
+  (resources?['limits'] as Map<String, dynamic>?)?.remove('max_svg_bytes');
+  return jsonEncode(options);
 }
 
 typedef MermanEngineOpener = MermanEngine Function();
@@ -141,6 +152,7 @@ class NativeMermanRenderer implements MermaidRenderer {
     bool includeLayout = false,
   }) async {
     if (_disposed) throw const MermaidRendererDisposedException();
+    if (method != 'render') optionsJson = _nonSvgOptions(optionsJson)!;
     final commands = await _start();
     if (_disposed) throw const MermaidRendererDisposedException();
     if (_pending.length >= maxPendingRequests) {
@@ -338,8 +350,8 @@ void _runMermaidWorker((_WorkerConfig, SendPort) args) {
             result = MermaidValidationResult(
               valid: validation.valid,
               raw: validation,
-              errorMessage: validation.error,
-              code: validation.code,
+              errorMessage: validation.json['error'] as String?,
+              code: validation.json['code'] as int?,
               codeName: validation.codeName,
             );
           } on merman.MermanException catch (error) {

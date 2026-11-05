@@ -18,17 +18,14 @@ for framework in FlutterMacOS App; do
   ditto "$linefold_client/build/native/$framework.framework" "$linefold_native_dir/$framework.framework"
   ditto "$linefold_native_dir/$framework.framework" "$linefold_frameworks/$framework.framework"
 done
+# Remove the obsolete CocoaPods library from incremental extension builds.
+rm -f "$linefold_frameworks/libmerman_ffi.dylib"
 # Flutter's native-asset frameworks must be adjacent to App.framework.
 if [[ -d "$linefold_client/build/native/native_assets" ]]; then
   for asset in "$linefold_client/build/native/native_assets/"*.framework; do
     ditto "$asset" "$linefold_frameworks/$(basename "$asset")"
   done
 fi
-linefold_merman="$linefold_macos_dir/Flutter/ephemeral/.symlinks/plugins/merman/macos/Libraries/libmerman_ffi.dylib"
-linefold_arch_flags=()
-for arch in $ARCHS; do linefold_arch_flags+=(-extract "$arch"); done
-lipo "$linefold_merman" "${linefold_arch_flags[@]}" -output "$linefold_frameworks/libmerman_ffi.dylib"
-install_name_tool -id '@rpath/libmerman_ffi.dylib' "$linefold_frameworks/libmerman_ffi.dylib"
 mkdir -p "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH:?}"
 ditto "$linefold_macos_dir/QuickLook/ThirdPartyNotices.txt" "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ThirdPartyNotices.txt"
 if [[ "${CODE_SIGNING_ALLOWED:-YES}" != NO ]]; then

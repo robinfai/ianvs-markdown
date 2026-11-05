@@ -156,7 +156,7 @@ THE SOFTWARE.
 
 
 
-merman 0.7.0
+merman 0.9.3
 ============
 This package is dual-licensed under either of:
 

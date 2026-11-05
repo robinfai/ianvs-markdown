@@ -18,3 +18,7 @@ dev_dependencies:
     sdk: flutter
 flutter:
   uses-material-design: true
+
+# Native Assets hooks 2.2 require newer annotations than Flutter 3.44 pins.
+dependency_overrides:
+  meta: 1.19.0

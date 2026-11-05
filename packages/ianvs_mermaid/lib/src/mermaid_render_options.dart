@@ -41,14 +41,12 @@ class MermaidRenderOptions {
     this.rootBackgroundColor = 'transparent',
     this.viewportWidth,
     this.viewportHeight,
-    this.deterministicTextMetrics = false,
     this.fixedToday,
     this.fixedLocalOffsetMinutes,
     this.resourceProfile = 'interactive',
     this.maxSourceBytes = 524288,
     this.maxSvgBytes = 8 * 1024 * 1024,
-    this.maxFlowchartNodes,
-    this.maxFlowchartEdges,
+    this.maxModelItems,
   });
 
   final String? diagramId;
@@ -59,14 +57,12 @@ class MermaidRenderOptions {
   final String rootBackgroundColor;
   final double? viewportWidth;
   final double? viewportHeight;
-  final bool deterministicTextMetrics;
   final String? fixedToday;
   final int? fixedLocalOffsetMinutes;
   final String resourceProfile;
   final int maxSourceBytes;
   final int maxSvgBytes;
-  final int? maxFlowchartNodes;
-  final int? maxFlowchartEdges;
+  final int? maxModelItems;
 
   Map<String, Object?> toJson() {
     final mergedThemeVariables = <String, Object?>{
@@ -74,28 +70,29 @@ class MermaidRenderOptions {
       if (fontFamily != null) 'fontFamily': fontFamily,
     };
     return <String, Object?>{
-      'version': 1,
+      'version': 2,
       if (fixedToday != null) 'fixed_today': fixedToday,
       if (fixedLocalOffsetMinutes != null)
         'fixed_local_offset_minutes': fixedLocalOffsetMinutes,
       'site_config': <String, Object?>{
         'theme': theme,
+        'look': 'classic',
+        'layout': 'dagre',
         if (mergedThemeVariables.isNotEmpty)
           'themeVariables': mergedThemeVariables,
       },
       'layout': <String, Object?>{
-        if (viewportWidth != null) 'viewport_width': viewportWidth,
-        if (viewportHeight != null) 'viewport_height': viewportHeight,
-        'text_measurer': deterministicTextMetrics
-            ? 'deterministic'
-            : 'vendored',
+        if (viewportWidth != null) 'container_width': viewportWidth,
+        if (viewportHeight != null) 'container_height': viewportHeight,
       },
+      'environment': <String, Object?>{'text_measurement': 'deterministic'},
       'resources': <String, Object?>{
         'profile': resourceProfile,
-        'max_source_bytes': maxSourceBytes,
-        'max_svg_bytes': maxSvgBytes,
-        if (maxFlowchartNodes != null) 'max_flowchart_nodes': maxFlowchartNodes,
-        if (maxFlowchartEdges != null) 'max_flowchart_edges': maxFlowchartEdges,
+        'limits': <String, Object?>{
+          'max_source_bytes': maxSourceBytes,
+          'max_svg_bytes': maxSvgBytes,
+          if (maxModelItems != null) 'max_model_items': maxModelItems,
+        },
       },
       'svg': <String, Object?>{
         if (diagramId != null) 'diagram_id': diagramId,
