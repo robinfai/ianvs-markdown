@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ffi';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ianvs_mermaid/ianvs_mermaid.dart';
@@ -12,7 +13,10 @@ Future<String> nativeMermanPath() async {
       (jsonDecode(await config.readAsString()) as Map)['packages'] as List;
   final merman = packages.cast<Map>().singleWhere((p) => p['name'] == 'merman');
   final root = config.uri.resolve(merman['rootUri'] as String).toFilePath();
-  if (Platform.isMacOS) return '$root/macos/Libraries/libmerman_ffi.dylib';
+  if (Platform.isMacOS) {
+    final arch = Abi.current() == Abi.macosArm64 ? 'arm64' : 'x86_64';
+    return '$root/native/macos/$arch/libmerman_ffi.dylib';
+  }
   throw UnsupportedError('Native integration fixtures currently run on macOS');
 }
 

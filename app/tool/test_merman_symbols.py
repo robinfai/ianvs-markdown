@@ -15,7 +15,7 @@ class SymbolsTest(unittest.TestCase):
             source = root / "abi.c"
 
             def build(name, value, debug):
-                source.write_text(f"int merman_abi_version(void) {{ return {value}; }}\n")
+                source.write_text(f"int merman_get_native_api(void) {{ return {value}; }}\n")
                 binary = root / f"{name}.dylib"
                 dsym = root / f"{name}.dSYM"
                 obj = root / f"{name}.o"

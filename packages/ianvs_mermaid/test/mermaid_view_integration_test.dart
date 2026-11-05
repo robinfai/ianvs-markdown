@@ -89,11 +89,11 @@ Future<String?> _nativeLibraryPath() async {
   final packageDir = await _packageRoot('merman');
   if (packageDir == null) return null;
   final path = switch (Abi.current()) {
-    Abi.macosArm64 ||
-    Abi.macosX64 => '$packageDir/macos/Libraries/libmerman_ffi.dylib',
-    Abi.linuxX64 => '$packageDir/linux/lib/x86_64/libmerman_ffi.so',
-    Abi.linuxArm64 => '$packageDir/linux/lib/aarch64/libmerman_ffi.so',
-    Abi.windowsX64 => '$packageDir/windows/merman_ffi.dll',
+    Abi.macosArm64 => '$packageDir/native/macos/arm64/libmerman_ffi.dylib',
+    Abi.macosX64 => '$packageDir/native/macos/x86_64/libmerman_ffi.dylib',
+    Abi.linuxX64 => '$packageDir/native/linux/x86_64/libmerman_ffi.so',
+    Abi.linuxArm64 => '$packageDir/native/linux/aarch64/libmerman_ffi.so',
+    Abi.windowsX64 => '$packageDir/native/windows/x86_64/merman_ffi.dll',
     _ => null,
   };
   if (path == null || !File(path).existsSync()) return null;

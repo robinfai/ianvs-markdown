@@ -43,6 +43,28 @@ String normalizeMermaidSvgForFlutter(String svg) {
 
   try {
     final document = XmlDocument.parse(svg);
+    // Merman 0.9 uses nested SVG viewports for generated HTML-label fallbacks.
+    // Its deterministic widths can be smaller than our actual outlined fonts.
+    // Only relax those generated label viewports; preserve user SVG clipping.
+    for (final group in document.findAllElements('g')) {
+      if (!(group.getAttribute('id') ?? '').startsWith(
+        'merman-foreignobject-label-',
+      )) {
+        continue;
+      }
+      for (final label in group.childElements.where(
+        (e) => e.name.local == 'svg',
+      )) {
+        label.setAttribute('overflow', 'visible');
+        label.setAttribute(
+          'style',
+          (label.getAttribute('style') ?? '').replaceAll(
+            'overflow:hidden',
+            'overflow:visible',
+          ),
+        );
+      }
+    }
     final styles = document.findAllElements('style').toList();
     if (styles.isEmpty) return svg;
 

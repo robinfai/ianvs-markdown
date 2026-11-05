@@ -33,12 +33,14 @@ assert '@rpath/FlutterMacOS.framework/Versions/A/FlutterMacOS' in dependencies
 for dependency in dependencies:
     assert dependency.startswith(('@rpath/FlutterMacOS.framework/', '/System/Library/', '/usr/lib/')), dependency
 frameworks = extension / 'Contents/Frameworks'
-assert (frameworks / 'libmerman_ffi.dylib').is_file()
+merman_frameworks = list(frameworks.glob('*merman*.framework'))
+assert len(merman_frameworks) == 1, 'Missing or duplicate Merman native asset'
+merman_binary = merman_frameworks[0] / merman_frameworks[0].stem
 assert (frameworks / 'App.framework/Resources/flutter_assets/NativeAssetsManifest.json').is_file()
 assert (frameworks / 'FlutterMacOS.framework/FlutterMacOS').is_file()
 assert list(frameworks.glob('*svg*.framework')), 'Missing SVG native asset'
 app_archs = set(subprocess.check_output(['lipo', '-archs', str(app / 'Contents/MacOS/Linefold')], text=True).split())
-for code in [binary, frameworks / 'App.framework/App', frameworks / 'FlutterMacOS.framework/FlutterMacOS', frameworks / 'libmerman_ffi.dylib']:
+for code in [binary, frameworks / 'App.framework/App', frameworks / 'FlutterMacOS.framework/FlutterMacOS', merman_binary]:
     assert app_archs <= set(subprocess.check_output(['lipo', '-archs', str(code)], text=True).split()), code
 assert (extension / 'Contents/Resources/ThirdPartyNotices.txt').is_file()
 entitlements = plistlib.loads(subprocess.check_output([

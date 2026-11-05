@@ -38,9 +38,7 @@ class Preview extends StatefulWidget {
 }
 
 class _PreviewState extends State<Preview> with WidgetsBindingObserver {
-  late final renderer = NativeMermanRenderer(
-    libraryPath: widget.input['merman'] as String,
-  );
+  late final renderer = NativeMermanRenderer();
   @override
   void initState() {
     super.initState();

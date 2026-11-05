@@ -24,6 +24,8 @@ void main() {
                     )
                     as List)
                 .cast<Map>();
+        final references = Directory('test/fixtures/merman-0.9.3')
+          ..createSync(recursive: true);
         final output = Directory('build/visual-regression')
           ..createSync(recursive: true);
         final metrics = <Map<String, Object>>[];
@@ -36,8 +38,34 @@ void main() {
                 fontFamily: 'Hiragino Sans GB',
               ),
             );
+            if (const bool.fromEnvironment('UPDATE_MERMAN_REFERENCES')) {
+              final info = await vg.loadPicture(
+                SvgStringLoader(result.svg),
+                null,
+              );
+              final recorder = ui.PictureRecorder();
+              final canvas = Canvas(recorder)
+                ..drawColor(Colors.white, BlendMode.src);
+              const width = 1280;
+              final height = (width * info.size.height / info.size.width)
+                  .ceil();
+              canvas.scale(width / info.size.width);
+              canvas.drawPicture(info.picture);
+              final picture = recorder.endRecording();
+              final image = await picture.toImage(width, height);
+              final png = await image.toByteData(
+                format: ui.ImageByteFormat.png,
+              );
+              File(
+                '${references.path}/$id.png',
+              ).writeAsBytesSync(png!.buffer.asUint8List());
+              image.dispose();
+              picture.dispose();
+              info.picture.dispose();
+              continue;
+            }
             final codec = await ui.instantiateImageCodec(
-              File('${root.path}/results/$id-vector-2x.png').readAsBytesSync(),
+              File('${references.path}/$id.png').readAsBytesSync(),
             );
             final reference = (await codec.getNextFrame()).image;
             final info = await vg.loadPicture(

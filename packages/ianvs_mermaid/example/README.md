@@ -17,9 +17,9 @@ flutter test
 flutter run -d macos
 ```
 
-The macOS host requires macOS 12 or later. Its Xcode build phases normalize the
-packaged merman library using `../../tool/normalize_macos.sh`. It does not open
-or save user files; the save callback only marks the document clean.
+The macOS host requires macOS 12 or later. Flutter Native Assets bundles and
+signs the Merman library; no CocoaPods library normalization is needed. It does
+not open or save user files; the save callback only marks the document clean.
 
 Native view and FFI coverage moved from the core example into
 [`../test/mermaid_view_integration_test.dart`](../test/mermaid_view_integration_test.dart).

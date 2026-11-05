@@ -16,7 +16,7 @@ def verify(binary: Path, dsym: Path) -> None:
     expected = uuids(binary)
     if not expected or expected != uuids(dsym):
         raise ValueError("MermanFFI binary and dSYM UUID/architectures do not match")
-    debug = dwarf("--name=merman_abi_version", str(dsym))
+    debug = dwarf("--name=merman_get_native_api", str(dsym))
     if "DW_TAG_subprogram" not in debug or "DW_AT_decl_line" not in debug:
         raise ValueError("MermanFFI dSYM has no source-level information for its ABI entry point")
     print(f"MermanFFI source symbols verified: {sorted(expected)}")

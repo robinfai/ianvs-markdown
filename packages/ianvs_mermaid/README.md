@@ -12,9 +12,9 @@ keeps its `Mermaid diagram` semantics label (customizable by the caller).
 
 Install Rust/Cargo and the Rust target for the build architecture. The Dart
 `hook/build.dart` compiles the locked Rust crate and declares a bundled code asset.
-Flutter handles copying and signing it. The existing macOS merman library
-normalization remains in `tool/normalize_macos.sh`; merman is still the diagram
-engine. End users do not need Cargo or separately installed fonts on iOS.
+Flutter handles copying and signing both it and the pinned Merman 0.9.3 Native
+Assets library. The old CocoaPods install-name build phases are removed.
+The application, Finder client and test host all use the same ABI 3 package. End users do not need Cargo or separately installed fonts on iOS.
 
 After adding this build hook to an existing checkout, run `flutter clean` and
 `flutter pub get` once in `app/` and `packages/ianvs_mermaid/example/` to discard old native-asset
@@ -65,7 +65,8 @@ rather than capturing a pre-opened FFI engine.
 
 ## Verified scope
 
-Seven live FFI examples match the demo's Flutter vector reference images:
+Seven live FFI examples match the reviewed Merman 0.9.3 references in
+`test/fixtures/merman-0.9.3/` (the demo retains its historical 0.7.0 images):
 Chinese flowchart and line breaks, sequence/dashes/activation bars, class hollow
 arrowheads and diamonds, state transitions, 64 nodes, and two real article
 diagrams. Actual Flutter output is exported to `build/visual-regression/`.
@@ -87,3 +88,38 @@ preprocesses all 25 Mermaid sources through the same native pipeline.
 
 The [optional adapter example](example/) demonstrates `diagramBuilder`
 integration. The repository's root `example/` is independent of this backend.
+
+
+## Merman 0.9.3 migration
+
+The official stable release fixes unquoted ER entity names and Unicode flowchart
+node IDs; no parser fork is needed. Regression tests exercise both through
+Native Assets, layout, SVG preprocessing and Flutter picture loading. Options
+use schema 2, operation-specific resource limits and deterministic measurement.
+Classic/Dagre is selected explicitly to retain a vector-compatible layout without
+active ELK shadow filters. Only generated HTML-label fallback viewports allow
+font overflow, avoiding clipped glyphs when outlined fonts exceed estimated widths.
+
+The unpublished Flutter hosts override `meta` to 1.19.0 because upstream hooks
+2.2 require it while Flutter 3.44 pins 1.18.0. This is an explicit, tested SDK
+compatibility override; remove it once the supported Flutter SDK pin catches up.
+iOS archive symbol preparation now builds the matching 0.9.3 official feature
+recipe and verifies the ABI 3 entry point and UUID against its dSYM.
+
+For a private document, keep it outside the repository and run:
+
+```sh
+flutter test test/mermaid_compatibility_test.dart \
+  --dart-define=MERMAN_DOCUMENT=/absolute/path/document.md
+```
+
+The supplied AIGW document is 25,416 bytes with 17 Mermaid fences. On 0.9.3 its
+original ER block works; other malformed blocks still fail. A local copy with
+statement newlines restored, mixed-quoted subgraph labels quoted as a whole, and
+Go `interface{}` represented as `any` passes all 17 through the production chain.
+ER entity names remain unquoted and the Chinese node ID remains unchanged.
+Neither the original document nor private diagram bodies are committed here.
+The ER and Chinese-node diagrams were also inspected in the macOS application
+and Finder Quick Look using isolated test hosts. macOS Release bundle validation,
+iOS simulator compilation, and an unsigned iOS archive were checked; this does
+not substitute for a signed device or TestFlight acceptance run.

@@ -79,7 +79,7 @@ final class PreviewProvider: NSViewController, QLPreviewingController {
         throw CocoaError(.fileNoSuchFile)
       }
       let payload = try JSONSerialization.data(withJSONObject: [
-        "source": source, "merman": frameworks.appendingPathComponent("libmerman_ffi.dylib").path
+        "source": source
       ])
       let project = FlutterDartProject(precompiledDartBundle: dartBundle)
       project.dartEntrypointArguments = [payload.base64EncodedString()]
