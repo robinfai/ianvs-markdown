@@ -52,19 +52,7 @@ void main() {
           codec.dispose();
         }
         if (Platform.isMacOS) {
-          final config = File('.dart_tool/package_config.json');
-          final packages =
-              (jsonDecode(await config.readAsString()) as Map)['packages']
-                  as List;
-          final merman = packages.cast<Map>().singleWhere(
-            (p) => p['name'] == 'merman',
-          );
-          final root = config.uri
-              .resolve(merman['rootUri'] as String)
-              .toFilePath();
-          final renderer = NativeMermanRenderer(
-            libraryPath: '$root/macos/Libraries/libmerman_ffi.dylib',
-          );
+          final renderer = NativeMermanRenderer();
           try {
             final dimensions = <Map<String, int>>[];
             final output =

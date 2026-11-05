@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -34,18 +33,7 @@ void main() {
   final rendered = <String, MermaidRenderResult>{};
   late NativeMermanRenderer renderer;
   setUpAll(() async {
-    final config = File('.dart_tool/package_config.json');
-    final packages =
-        (jsonDecode(config.readAsStringSync()) as Map)['packages'] as List;
-    final package = packages.cast<Map>().singleWhere(
-      (p) => p['name'] == 'merman',
-    );
-    final packageRoot = config.uri
-        .resolve(package['rootUri'] as String)
-        .toFilePath();
-    renderer = NativeMermanRenderer(
-      libraryPath: '$packageRoot/macos/Libraries/libmerman_ffi.dylib',
-    );
+    renderer = NativeMermanRenderer();
     for (final file in diagrams) {
       final source = file.readAsStringSync().trim();
       final result = await renderer.render(source);
