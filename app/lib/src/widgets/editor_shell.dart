@@ -94,7 +94,7 @@ class EditorShell extends StatefulWidget {
 class _EditorShellState extends State<EditorShell> {
   var _draggingFiles = false;
   final _documentExport = DocumentExportFlow();
-  final _mermaidRenderer = NativeMermanRenderer();
+  final _mermaidRenderer = NativePeleRenderer();
   final _editorFocus = FocusNode();
   final _findFocus = FocusNode();
   final _shellFocus = FocusNode();

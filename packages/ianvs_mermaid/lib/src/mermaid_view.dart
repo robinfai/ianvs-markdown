@@ -4,7 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'mermaid_render_options.dart';
 import 'mermaid_render_result.dart';
 import 'mermaid_renderer.dart';
-import 'native_merman_renderer.dart';
+import 'native_pele_renderer.dart';
 
 class MermaidView extends StatefulWidget {
   const MermaidView({
@@ -76,7 +76,7 @@ class _MermaidViewState extends State<MermaidView> {
   }
 
   void _configureRenderer() {
-    _renderer = widget.renderer ?? NativeMermanRenderer();
+    _renderer = widget.renderer ?? NativePeleRenderer();
     _ownsRenderer = widget.renderer == null;
   }
 

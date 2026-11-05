@@ -33,14 +33,18 @@ assert '@rpath/FlutterMacOS.framework/Versions/A/FlutterMacOS' in dependencies
 for dependency in dependencies:
     assert dependency.startswith(('@rpath/FlutterMacOS.framework/', '/System/Library/', '/usr/lib/')), dependency
 frameworks = extension / 'Contents/Frameworks'
-merman_frameworks = list(frameworks.glob('*merman*.framework'))
-assert len(merman_frameworks) == 1, 'Missing or duplicate Merman native asset'
-merman_binary = merman_frameworks[0] / merman_frameworks[0].stem
+assert not list(app.rglob('*merman*.framework')), 'Obsolete Merman native asset remains in bundle'
+pele_frameworks = list(frameworks.glob('*pele*.framework'))
+assert len(pele_frameworks) == 1, 'Missing or duplicate Pele native asset'
+pele_binary = pele_frameworks[0] / pele_frameworks[0].stem
+assert '/System/Library/Frameworks/JavaScriptCore.framework/' in subprocess.check_output(
+    ['otool', '-L', str(pele_binary)], text=True), 'Pele must use system JavaScriptCore'
+assert (frameworks / 'App.framework/Resources/flutter_assets/packages/ianvs_mermaid/vendor/pele/pele-runtime.js').is_file()
 assert (frameworks / 'App.framework/Resources/flutter_assets/NativeAssetsManifest.json').is_file()
 assert (frameworks / 'FlutterMacOS.framework/FlutterMacOS').is_file()
 assert list(frameworks.glob('*svg*.framework')), 'Missing SVG native asset'
 app_archs = set(subprocess.check_output(['lipo', '-archs', str(app / 'Contents/MacOS/Linefold')], text=True).split())
-for code in [binary, frameworks / 'App.framework/App', frameworks / 'FlutterMacOS.framework/FlutterMacOS', merman_binary]:
+for code in [binary, frameworks / 'App.framework/App', frameworks / 'FlutterMacOS.framework/FlutterMacOS', pele_binary]:
     assert app_archs <= set(subprocess.check_output(['lipo', '-archs', str(code)], text=True).split()), code
 assert (extension / 'Contents/Resources/ThirdPartyNotices.txt').is_file()
 entitlements = plistlib.loads(subprocess.check_output([

@@ -31,9 +31,9 @@ void main() {
       .toList();
   final svgs = <String, String>{};
   final rendered = <String, MermaidRenderResult>{};
-  late NativeMermanRenderer renderer;
+  late NativePeleRenderer renderer;
   setUpAll(() async {
-    renderer = NativeMermanRenderer();
+    renderer = NativePeleRenderer();
     for (final file in diagrams) {
       final source = file.readAsStringSync().trim();
       final result = await renderer.render(source);

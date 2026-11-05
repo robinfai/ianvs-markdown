@@ -5,5 +5,5 @@ export 'src/mermaid_render_result.dart';
 export 'src/mermaid_renderer.dart';
 export 'src/mermaid_svg_normalizer.dart';
 export 'src/mermaid_view.dart';
-export 'src/native_merman_renderer.dart';
+export 'src/native_pele_renderer.dart';
 export 'src/svg_renderer.dart';
