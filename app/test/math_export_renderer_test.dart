@@ -81,6 +81,8 @@ void main() {
                         r'$$\frac{x^2+1}{\sqrt{y}}$$'
                         '\n\nFORMULA_DISPLAY\n\n'
                         '```mermaid\nflowchart LR\nA[Export] --> B[Complete]\n'
+                        'style A fill:#eef3fa,stroke:#7894b0\n'
+                        'style B fill:#eef3fa,stroke:#7894b0\n'
                         '```\n\nDIAGRAM_END',
                   ),
                   isCurrent: () => true,

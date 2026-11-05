@@ -458,9 +458,10 @@ private enum RenderedGraphicsEvidence {
       for y in stride(from: 0, to: bitmap.pixelsHigh, by: 3) {
         for x in stride(from: 0, to: bitmap.pixelsWide, by: 3) {
           guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { continue }
-          // Production renderer's blue-gray fill/stroke is the only non-gray
+          // The fixture's explicit blue-gray fill/stroke is the only non-gray
           // content in this fixture. White paper and formula/text ink cannot
-          // satisfy these tests, unlike a count of all dark pixels.
+          // satisfy these tests, unlike a count of all dark pixels. Explicit
+          // colors keep this gate independent of the renderer's default theme.
           if color.blueComponent - color.redComponent > 0.008 &&
              color.greenComponent - color.redComponent > 0.003 {
             if color.redComponent > 0.9 { diagramFill += 1 }
