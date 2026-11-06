@@ -53,7 +53,8 @@ extension _LiveEditorSourceProjection on _IanvsMarkdownLiveEditorState {
     if (root == null || !root.attached) return null;
     final editables = <RenderEditable>[];
     void collect(RenderObject child) {
-      if (child is RenderEditable && child.readOnly) {
+      if (child is RenderEditable &&
+          (child.readOnly || _usesRenderedSelection)) {
         editables.add(child);
         return;
       }
@@ -95,7 +96,9 @@ extension _LiveEditorSourceProjection on _IanvsMarkdownLiveEditorState {
     if (block.type == IanvsMarkdownBlockType.indentedCode) {
       return _indentedCodeDocumentOffsetAtRenderedPoint(block, globalPosition);
     }
-    if (block.type == IanvsMarkdownBlockType.blockquote ||
+    if (_documentDragActive ||
+        _usesRenderedSelection ||
+        block.type == IanvsMarkdownBlockType.blockquote ||
         block.type == IanvsMarkdownBlockType.heading) {
       return _markdownProjectionDocumentOffsetAtRenderedPoint(
         block,
@@ -109,7 +112,8 @@ extension _LiveEditorSourceProjection on _IanvsMarkdownLiveEditorState {
     if (root == null || !root.attached) return null;
     final editables = <RenderEditable>[];
     void collect(RenderObject child) {
-      if (child is RenderEditable && child.readOnly) {
+      if (child is RenderEditable &&
+          (child.readOnly || _usesRenderedSelection)) {
         editables.add(child);
         return;
       }
@@ -152,7 +156,8 @@ extension _LiveEditorSourceProjection on _IanvsMarkdownLiveEditorState {
     if (root == null || !root.attached) return null;
     final editables = <RenderEditable>[];
     void collect(RenderObject child) {
-      if (child is RenderEditable && child.readOnly) {
+      if (child is RenderEditable &&
+          (child.readOnly || _usesRenderedSelection)) {
         editables.add(child);
         return;
       }
@@ -184,7 +189,8 @@ extension _LiveEditorSourceProjection on _IanvsMarkdownLiveEditorState {
     if (root == null || !root.attached) return null;
     final editables = <RenderEditable>[];
     void collect(RenderObject child) {
-      if (child is RenderEditable && child.readOnly) {
+      if (child is RenderEditable &&
+          (child.readOnly || _usesRenderedSelection)) {
         editables.add(child);
         return;
       }
