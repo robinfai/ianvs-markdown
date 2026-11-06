@@ -56,6 +56,7 @@ part 'live_editor/navigation.dart';
 part 'live_editor/source_projection.dart';
 part 'live_editor/table.dart';
 part 'live_editor/list.dart';
+part 'live_editor/selection.dart';
 
 /// Obsidian-style Markdown editor with live, source, and reading modes.
 ///
@@ -262,10 +263,13 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   Offset? _documentDragProjectedExtentPoint;
   int? _documentDragProjectedExtent;
   var _documentDragActive = false;
+  var _renderedDragSelection = false;
   var _documentDragEnding = false;
   var _documentDragUpdateScheduled = false;
   var _documentDragExpansionAttempts = 0;
   var _documentDragEpoch = 0;
+  var _pointerInteractionEpoch = 0;
+  var _suppressRenderedTap = false;
   _FoldedSelectionBridge? _foldedSelectionBridge;
 
   bool get _ownsFocusNode => widget.focusNode == null;
@@ -1710,6 +1714,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     bool requestFocus = true,
   }) {
     if (_redirectHiddenFrontMatter(block, requestFocus: requestFocus)) return;
+    _renderedDragSelection = false;
     _foldedSelectionBridge = null;
     _blockController.revealLeadingMarker = false;
     _activeGapLine = false;
@@ -1966,6 +1971,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     bool requestFocus = true,
   }) {
     if (_redirectHiddenFrontMatter(block, requestFocus: requestFocus)) return;
+    _renderedDragSelection = false;
     _foldedSelectionBridge = null;
     _projectedRenderedTapBlockStart = null;
     _projectedRenderedTapLocalOffset = null;
@@ -2030,7 +2036,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         !_pointerHitsEditableText(event)) {
       return;
     }
+    _suppressRenderedTap = false;
     _resetDocumentDragSelection();
+    if (widget.controller.selection.isCollapsed) _renderedDragSelection = false;
     _documentDragPointer = event.pointer;
     _documentDragOrigin = event.position;
     _documentDragLatest = event.position;
@@ -2061,6 +2069,12 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       final origin = _documentDragOrigin;
       if (origin == null || (event.position - origin).distance < 4) return;
       _documentDragActive = true;
+      // Our text drag starts before Flutter's tap-slop threshold. A short
+      // selection may still produce a child onTap on release; it must not
+      // activate an editing block after the selection has been committed.
+      _suppressRenderedTap = true;
+      _pointerInteractionEpoch++;
+      _pendingRenderedTapGlobal = null;
       _beginDocumentDragSelection();
       return;
     }
@@ -2090,8 +2104,12 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       _resetDocumentDragSelection();
       return;
     }
-    final activeOffset = _documentOffsetAtActivePoint(origin);
+    final activeOffset = _usesRenderedSelection
+        ? null
+        : _documentOffsetAtActivePoint(origin);
     if (activeOffset != null) {
+      _renderedDragSelection = true;
+      setState(() {});
       _documentDragAnchor = activeOffset;
       _scheduleDocumentDragUpdate();
       return;
@@ -2111,8 +2129,12 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         ? _projectedDocumentOffsetAtRenderedPoint(block, latest)
         : null;
     final epoch = _documentDragEpoch;
-    _activateBlock(block, documentOffset: renderedOffset ?? block.end);
     if (renderedOffset != null) {
+      _renderedDragSelection = true;
+      _activateSelectionSurface(
+        TextSelection.collapsed(offset: renderedOffset),
+        (first: block, start: block.start, end: block.end),
+      );
       _documentDragAnchor = renderedOffset;
       _documentDragProjectedExtentPoint = renderedExtent == null
           ? null
@@ -2121,6 +2143,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       _scheduleDocumentDragUpdate();
       return;
     }
+    _activateBlock(block, documentOffset: block.end);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || epoch != _documentDragEpoch || !_documentDragActive) {
         return;
@@ -2164,7 +2187,12 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     _documentDragProjectedExtentPoint = null;
     _documentDragProjectedExtent = null;
 
-    final exactExtent = _documentOffsetAtActivePoint(latest);
+    final renderedTarget = _renderedBlockAtGlobalPoint(latest);
+    final exactExtent = _usesRenderedSelection
+        ? (renderedTarget == null
+              ? null
+              : _projectedDocumentOffsetAtRenderedPoint(renderedTarget, latest))
+        : _documentOffsetAtActivePoint(latest);
     if (exactExtent != null) {
       _documentDragExpansionAttempts = 0;
       _applyDocumentDragSelection(anchor, exactExtent);
@@ -2174,13 +2202,18 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
 
     final target =
         _renderedBlockAtGlobalPoint(latest) ?? _nearestRenderedBlock(latest);
-    final extent = target == null
-        ? latest.dy < (_documentDragOrigin?.dy ?? latest.dy)
-              ? 0
-              : widget.controller.text.length
-        : target.end <= anchor
-        ? target.start
-        : target.end;
+    final projectedTarget = target == null
+        ? null
+        : _projectedDocumentOffsetAtRenderedPoint(target, latest);
+    final extent =
+        projectedTarget ??
+        (target == null
+            ? latest.dy < (_documentDragOrigin?.dy ?? latest.dy)
+                  ? 0
+                  : widget.controller.text.length
+            : target.end <= anchor
+            ? target.start
+            : target.end);
     final previousStart = _editingStart;
     final previousEnd = _editingEnd;
     _applyDocumentDragSelection(anchor, extent);
@@ -2229,6 +2262,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   }
 
   void _recordPointerDown(PointerDownEvent event) {
+    _suppressRenderedTap = false;
+    _pointerInteractionEpoch++;
     final previousTime = _lastPointerDownTimeStamp;
     final previousPosition = _lastPointerDownGlobal;
     final elapsed = previousTime == null
@@ -2250,6 +2285,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   }
 
   void _activateRenderedBlock(IanvsMarkdownBlock block, {int tapCount = 1}) {
+    if (_suppressRenderedTap) return;
     final pendingGlobal = _pendingRenderedTapGlobal;
     _pendingRenderedTapGlobal = null;
     final renderObject = _renderedBlockTapKeys[block.start]?.currentContext
@@ -2309,8 +2345,14 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     Offset globalPosition,
     _RenderedTapSelection selectionKind,
   ) {
+    final interactionEpoch = _pointerInteractionEpoch;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _activeBlockStart != block.start) return;
+      if (!mounted ||
+          _activeBlockStart != block.start ||
+          interactionEpoch != _pointerInteractionEpoch ||
+          _suppressRenderedTap) {
+        return;
+      }
       final editable = _activeRenderEditable();
       if (editable == null) return;
       final localSelection = _selectionAtEditablePoint(
@@ -2363,8 +2405,14 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
     final tapCount = _pointerTapCount;
     if (tapCount < 2) return;
     final globalPosition = event.position;
+    final interactionEpoch = _pointerInteractionEpoch;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || tapCount != _pointerTapCount) return;
+      if (!mounted ||
+          tapCount != _pointerTapCount ||
+          interactionEpoch != _pointerInteractionEpoch ||
+          _suppressRenderedTap) {
+        return;
+      }
       final editable = _activeRenderEditable();
       if (editable == null) return;
       final projectedOffset =
@@ -3058,12 +3106,12 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       widget.readingHighlights,
       widget.controller.text,
       block.start,
-      _activeBlockStart == block.start
+      _activeBlockStart == block.start && !_usesRenderedSelection
           ? math.max(block.end, _editingEnd)
           : block.end,
     );
     if (flows.isEmpty) return child;
-    final active = _activeBlockStart == block.start;
+    final active = _activeBlockStart == block.start && !_usesRenderedSelection;
     final sourceText = active ? _blockController.text : null;
     return MarkdownReadingHighlightOverlay(
       flows: flows,
@@ -3115,7 +3163,8 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
         (styleSheet.listIndent ?? 24) +
         (styleSheet.listBulletPadding?.horizontal ?? 4);
     final listNestingLevels = _listLevels;
-    return Listener(
+    final preserveSelection = _usesRenderedSelection;
+    final document = Listener(
       key: const ValueKey('ianvs-markdown-document-drag-selection'),
       behavior: HitTestBehavior.translucent,
       onPointerDown: _handleDocumentDragPointerDown,
@@ -3159,7 +3208,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
                       block.start != _activeBlockStart &&
                       block.start > _editingStart &&
                       block.start < _editingEnd;
-                  if (coveredByActiveSelection) {
+                  if (coveredByActiveSelection && !preserveSelection) {
                     return KeyedSubtree(
                       key: _blockKeys[block.start],
                       child: const SizedBox.shrink(),
@@ -3179,48 +3228,56 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
                     key: _blockKeys[block.start],
                     block: block,
                     child: _trackLiveLayout(
-                      _highlightLiveBlock(
+                      _paintRenderedSelection(
                         block,
-                        Align(
-                          alignment: Alignment.topLeft,
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: widget.contentMaxWidth,
-                            ),
-                            child: Padding(
-                              padding: EdgeInsetsDirectional.only(
-                                start: listNestingLevel * listIndentStep,
+                        _highlightLiveBlock(
+                          block,
+                          Align(
+                            alignment: Alignment.topLeft,
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth: widget.contentMaxWidth,
                               ),
-                              child: Column(
-                                key: ValueKey(block.type),
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  _listFoldFrame(
-                                    index,
-                                    colors,
-                                    _activeBlockStart == block.start &&
-                                            !activeGapLine
-                                        ? _buildActiveBlock(
-                                            block,
-                                            colors,
-                                            listNestingLevel: listNestingLevel,
-                                            headingSection: headingSection,
-                                          )
-                                        : _buildRenderedBlock(
-                                            block,
-                                            colors,
-                                            listNestingLevel: listNestingLevel,
-                                            headingSection: headingSection,
-                                          ),
-                                  ),
-                                  if (activeGapLine)
-                                    _buildActiveGapLine(colors)
-                                  else if (_activeBlockStart == block.start &&
-                                      _editingEnd > block.end)
-                                    const SizedBox.shrink()
-                                  else
-                                    _buildBlockGap(block, gapLines: gapLines),
-                                ],
+                              child: Padding(
+                                padding: EdgeInsetsDirectional.only(
+                                  start: listNestingLevel * listIndentStep,
+                                ),
+                                child: Column(
+                                  key: ValueKey(block.type),
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    _listFoldFrame(
+                                      index,
+                                      colors,
+                                      _activeBlockStart == block.start &&
+                                              !activeGapLine &&
+                                              !preserveSelection
+                                          ? _buildActiveBlock(
+                                              block,
+                                              colors,
+                                              listNestingLevel:
+                                                  listNestingLevel,
+                                              headingSection: headingSection,
+                                            )
+                                          : _buildRenderedBlock(
+                                              block,
+                                              colors,
+                                              listNestingLevel:
+                                                  listNestingLevel,
+                                              headingSection: headingSection,
+                                            ),
+                                    ),
+                                    if (activeGapLine)
+                                      _buildActiveGapLine(colors)
+                                    else if (!preserveSelection &&
+                                        _activeBlockStart == block.start &&
+                                        _editingEnd > block.end)
+                                      const SizedBox.shrink()
+                                    else
+                                      _buildBlockGap(block, gapLines: gapLines),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -3234,6 +3291,23 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
           ),
         ],
       ),
+    );
+    return Stack(
+      children: [
+        document,
+        if (preserveSelection)
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            height: 0,
+            child: ClipRect(
+              child: IgnorePointer(
+                child: ExcludeSemantics(child: _buildSelectionInput(colors)),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -3978,6 +4052,7 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   }) {
     if (block.type == IanvsMarkdownBlockType.table) {
       return Padding(
+        key: _renderedBlockTapKeys.putIfAbsent(block.start, GlobalKey.new),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
         child: _EditableMarkdownTable(
           block: block,
