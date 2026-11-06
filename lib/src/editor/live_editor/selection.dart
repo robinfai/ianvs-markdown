@@ -54,14 +54,16 @@ extension _LiveRenderedSelection on _IanvsMarkdownLiveEditorState {
   }
 
   Widget _paintRenderedSelection(IanvsMarkdownBlock block, Widget child) {
-    if (!_usesRenderedSelection) return child;
     final selection = widget.controller.selection;
     final start = (selection.start - block.start).clamp(0, block.source.length);
     final end = (selection.end - block.start).clamp(0, block.source.length);
-    if (start >= end) return child;
+    // Keep this wrapper mounted while selection changes. Reparenting keyed
+    // table fields during sliver layout can detach their selection overlays.
     return _RenderedSelectionSurface(
       source: block.source,
-      range: TextRange(start: start, end: end),
+      range: _usesRenderedSelection
+          ? TextRange(start: start, end: end)
+          : TextRange.empty,
       color:
           DefaultSelectionStyle.of(context).selectionColor ??
           Theme.of(context).colorScheme.primary.withValues(alpha: .3),
@@ -105,55 +107,82 @@ class _RenderSelectionSurface extends RenderProxyBox {
   @override
   void paint(PaintingContext context, Offset offset) {
     super.paint(context, offset);
+    if (!range.isValid || range.isCollapsed) return;
     var cursor = 0;
+    void paintFragment(RenderBox object, String text, int textOffset) {
+      // Advance monotonically through repeated fragments, retaining Markdown
+      // delimiters only in the source model. Selection never changes layout.
+      var from = -1, to = -1;
+      var position = cursor;
+      for (var i = 0; i < text.length; i++) {
+        final next = source.indexOf(text[i], position);
+        if (next < 0) break;
+        if (next >= range.start && next < range.end) {
+          if (from < 0) from = i;
+          to = i + 1;
+        }
+        position = next + 1;
+      }
+      cursor = position;
+      if (from >= 0) {
+        final selection = TextSelection(
+          baseOffset: textOffset + from,
+          extentOffset: textOffset + to,
+        );
+        final boxes = switch (object) {
+          RenderEditable e => e.getBoxesForSelection(selection),
+          RenderParagraph p => p.getBoxesForSelection(selection),
+          _ => const <TextBox>[],
+        };
+        for (final box in boxes) {
+          var rect = MatrixUtils.transformRect(
+            object.getTransformTo(this),
+            box.toRect(),
+          );
+          RenderObject current = object;
+          while (current != this && current.parent != null) {
+            final parent = current.parent!;
+            final clip = parent.describeApproximatePaintClip(current);
+            if (clip != null) {
+              rect = rect.intersect(
+                MatrixUtils.transformRect(parent.getTransformTo(this), clip),
+              );
+            }
+            current = parent;
+          }
+          context.canvas.drawRect(rect.shift(offset), Paint()..color = color);
+        }
+      }
+    }
+
     void visit(RenderObject object) {
       final String? text = switch (object) {
         RenderEditable e => e.text?.toPlainText(includeSemanticsLabels: false),
         RenderParagraph p => p.text.toPlainText(includeSemanticsLabels: false),
         _ => null,
       };
-      if (text != null &&
-          text.isNotEmpty &&
-          object is RenderBox &&
-          object.hasSize) {
-        // Advance monotonically through repeated fragments, retaining Markdown
-        // delimiters only in the source model. Selection never changes layout.
-        var from = -1, to = -1;
-        var position = cursor;
-        for (var i = 0; i < text.length; i++) {
-          final next = source.indexOf(text[i], position);
-          if (next < 0) break;
-          if (next >= range.start && next < range.end) {
-            if (from < 0) from = i;
-            to = i + 1;
-          }
-          position = next + 1;
+      if (text != null && object is RenderBox && object.hasSize) {
+        final children = <RenderObject>[];
+        // Walk the inline child list directly: visitChildren on RenderEditable
+        // also includes its foreground/background painters.
+        RenderBox? inlineChild = switch (object) {
+          RenderEditable e => e.firstChild,
+          RenderParagraph p => p.firstChild,
+          _ => null,
+        };
+        while (inlineChild != null) {
+          children.add(inlineChild);
+          inlineChild = (inlineChild.parentData! as TextParentData).nextSibling;
         }
-        cursor = position;
-        if (from >= 0) {
-          final selection = TextSelection(baseOffset: from, extentOffset: to);
-          final boxes = switch (object) {
-            RenderEditable e => e.getBoxesForSelection(selection),
-            RenderParagraph p => p.getBoxesForSelection(selection),
-            _ => const <TextBox>[],
-          };
-          for (final box in boxes) {
-            var rect = MatrixUtils.transformRect(
-              object.getTransformTo(this),
-              box.toRect(),
-            );
-            RenderObject current = object;
-            while (current != this && current.parent != null) {
-              final parent = current.parent!;
-              final clip = parent.describeApproximatePaintClip(current);
-              if (clip != null) {
-                rect = rect.intersect(
-                  MatrixUtils.transformRect(parent.getTransformTo(this), clip),
-                );
-              }
-              current = parent;
-            }
-            context.canvas.drawRect(rect.shift(offset), Paint()..color = color);
+        var textOffset = 0;
+        var childIndex = 0;
+        // A WidgetSpan occupies one layout character, but its visible child
+        // text must consume source characters before the next parent fragment.
+        for (final fragment in text.split('\uFFFC')) {
+          paintFragment(object, fragment, textOffset);
+          textOffset += fragment.length + 1;
+          if (textOffset <= text.length && childIndex < children.length) {
+            visit(children[childIndex++]);
           }
         }
         return;
