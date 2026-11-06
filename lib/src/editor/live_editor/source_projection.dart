@@ -88,6 +88,9 @@ extension _LiveEditorSourceProjection on _IanvsMarkdownLiveEditorState {
     IanvsMarkdownBlock block,
     Offset globalPosition,
   ) {
+    if (block.type == IanvsMarkdownBlockType.table) {
+      return _tableDocumentOffsetAtRenderedPoint(block, globalPosition);
+    }
     final literalOffset = _literalProjectionDocumentOffsetAtRenderedPoint(
       block,
       globalPosition,
@@ -178,6 +181,53 @@ extension _LiveEditorSourceProjection on _IanvsMarkdownLiveEditorState {
       return block.start + visibleOffset;
     }
     return null;
+  }
+
+  int? _tableDocumentOffsetAtRenderedPoint(
+    IanvsMarkdownBlock block,
+    Offset globalPosition,
+  ) {
+    final root = _renderedBlockTapKeys[block.start]?.currentContext;
+    if (root == null) return null;
+    final cells = {
+      for (final row in _parseEditableTable(block).rows)
+        for (final cell in row)
+          ValueKey('ianvs-markdown-table-${cell.key}'): cell,
+    };
+    int? result;
+    void visit(Element element) {
+      final cell = cells[element.widget.key];
+      if (cell != null && element.widget is TextField) {
+        final box = element.findRenderObject();
+        if (box is! RenderBox ||
+            !box.attached ||
+            !box.hasSize ||
+            !(Offset.zero & box.size).contains(
+              box.globalToLocal(globalPosition),
+            )) {
+          return;
+        }
+        void findEditable(RenderObject object) {
+          if (object is RenderEditable) {
+            result =
+                cell.start +
+                object
+                    .getPositionForPoint(globalPosition)
+                    .offset
+                    .clamp(0, cell.end - cell.start);
+            return;
+          }
+          object.visitChildren(findEditable);
+        }
+
+        findEditable(box);
+        return;
+      }
+      element.visitChildElements(visit);
+    }
+
+    root.visitChildElements(visit);
+    return result;
   }
 
   int? _markdownProjectionDocumentOffsetAtRenderedPoint(
