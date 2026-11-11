@@ -48,7 +48,21 @@ extension _LiveRenderedSelection on _IanvsMarkdownLiveEditorState {
         autocorrect: false,
         enableSuggestions: false,
         inputFormatters: [_editingFormatter],
-        decoration: const InputDecoration.collapsed(hintText: ''),
+        // This TextField keeps its state when moved back into visible prose.
+        // Inheriting the host's focusedBorder here leaves an outline animation
+        // running on that prose after a focus/selection-surface transition.
+        decoration: const InputDecoration(
+          filled: false,
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          disabledBorder: InputBorder.none,
+          errorBorder: InputBorder.none,
+          focusedErrorBorder: InputBorder.none,
+          isCollapsed: true,
+          visualDensity: VisualDensity.standard,
+          contentPadding: EdgeInsets.zero,
+        ),
       ),
     );
   }
