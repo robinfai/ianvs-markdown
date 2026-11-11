@@ -5,6 +5,94 @@ import 'package:ianvs_markdown/ianvs_markdown.dart';
 import 'package:ianvs_markdown/src/editor/block_identity.dart';
 
 void main() {
+  for (final restoreFocusBeforeTap in [false, true]) {
+    testWidgets(
+      'focus transitions never animate a themed border onto live prose, restoreFocus=$restoreFocusBeforeTap',
+      (tester) async {
+        const blue = Color(0xff0055ff);
+        const source =
+            'Opening paragraph\n\nSecond paragraph\n\nClosing paragraph';
+        final controller = IanvsMarkdownController(text: source);
+        final editorFocus = FocusNode();
+        final outsideFocus = FocusNode();
+        addTearDown(controller.dispose);
+        addTearDown(editorFocus.dispose);
+        addTearDown(outsideFocus.dispose);
+        controller.selection = TextSelection(
+          baseOffset: 2,
+          extentOffset: source.indexOf('Closing') + 3,
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData(
+              inputDecorationTheme: const InputDecorationThemeData(
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: blue),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: blue, width: 2),
+                ),
+              ),
+            ),
+            home: Scaffold(
+              body: Column(
+                children: [
+                  TextField(focusNode: outsideFocus),
+                  Expanded(
+                    child: IanvsMarkdownLiveEditor(
+                      controller: controller,
+                      focusNode: editorFocus,
+                      autofocus: true,
+                      showToolbar: false,
+                      showNavigationPane: false,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        outsideFocus.requestFocus();
+        await tester.pumpAndSettle();
+        if (restoreFocusBeforeTap) {
+          editorFocus.requestFocus();
+          await tester.pumpAndSettle();
+        }
+        await tester.tap(find.text('Second paragraph'));
+        for (var frame = 0; frame < 15; frame++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          final paints = find.descendant(
+            of: find.byKey(const ValueKey('ianvs-markdown-active-block')),
+            matching: find.byType(CustomPaint),
+          );
+          var borderPainters = 0;
+          for (final element in paints.evaluate()) {
+            final widget = element.widget as CustomPaint;
+            final painter = widget.foregroundPainter;
+            if (painter?.runtimeType.toString() != '_InputBorderPainter') {
+              continue;
+            }
+            borderPainters++;
+            final canvas = TestRecordingCanvas();
+            painter!.paint(canvas, tester.getSize(find.byWidget(widget)));
+            final borders = canvas.invocations.where(
+              (call) => call.invocation.memberName == #drawRRect,
+            );
+            expect(
+              borders,
+              isEmpty,
+              reason: 'frame $frame: prose must never paint an input border',
+            );
+          }
+          expect(borderPainters, greaterThan(0));
+        }
+        expect(controller.text, source);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets(
     'short drags never flash an editing rail and subsequent taps still edit',
     (tester) async {
