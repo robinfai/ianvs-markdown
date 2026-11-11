@@ -61,6 +61,7 @@ extension _LiveRenderedSelection on _IanvsMarkdownLiveEditorState {
     // table fields during sliver layout can detach their selection overlays.
     return _RenderedSelectionSurface(
       source: block.source,
+      linkReferenceLabels: _linkReferences.labels,
       range: _usesRenderedSelection
           ? TextRange(start: start, end: end)
           : TextRange.empty,
@@ -76,15 +77,17 @@ class _RenderedSelectionSurface extends SingleChildRenderObjectWidget {
   const _RenderedSelectionSurface({
     required this.source,
     required this.range,
+    required this.linkReferenceLabels,
     required this.color,
     required super.child,
   });
   final String source;
+  final Set<String> linkReferenceLabels;
   final TextRange range;
   final Color color;
   @override
   _RenderSelectionSurface createRenderObject(BuildContext context) =>
-      _RenderSelectionSurface(source, range, color);
+      _RenderSelectionSurface(source, range, color, linkReferenceLabels);
   @override
   void updateRenderObject(
     BuildContext context,
@@ -92,6 +95,7 @@ class _RenderedSelectionSurface extends SingleChildRenderObjectWidget {
   ) {
     object
       ..source = source
+      ..linkReferenceLabels = linkReferenceLabels
       ..range = range
       ..color = color
       ..markNeedsPaint();
@@ -99,8 +103,17 @@ class _RenderedSelectionSurface extends SingleChildRenderObjectWidget {
 }
 
 class _RenderSelectionSurface extends RenderProxyBox {
-  _RenderSelectionSurface(this.source, this.range, this.color);
+  _RenderSelectionSurface(
+    this.source,
+    this.range,
+    this.color,
+    this.linkReferenceLabels,
+  );
   String source;
+  Set<String> linkReferenceLabels;
+  String? _mappedSource;
+  Set<String>? _mappedLabels;
+  _RenderedSourceMapping? _mapping;
   TextRange range;
   Color color;
 
@@ -108,22 +121,25 @@ class _RenderSelectionSurface extends RenderProxyBox {
   void paint(PaintingContext context, Offset offset) {
     super.paint(context, offset);
     if (!range.isValid || range.isCollapsed) return;
-    var cursor = 0;
+    if (_mappedSource != source ||
+        !setEquals(_mappedLabels, linkReferenceLabels)) {
+      _mapping = _RenderedSourceMapping(
+        source,
+        linkReferenceLabels: linkReferenceLabels,
+      );
+      _mappedSource = source;
+      _mappedLabels = Set.of(linkReferenceLabels);
+    }
+    final mapping = _mapping!..reset();
     void paintFragment(RenderBox object, String text, int textOffset) {
-      // Advance monotonically through repeated fragments, retaining Markdown
-      // delimiters only in the source model. Selection never changes layout.
+      final offsets = mapping.consume(text);
       var from = -1, to = -1;
-      var position = cursor;
-      for (var i = 0; i < text.length; i++) {
-        final next = source.indexOf(text[i], position);
-        if (next < 0) break;
-        if (next >= range.start && next < range.end) {
+      for (var i = 0; i < offsets.length; i++) {
+        if (offsets[i] >= range.start && offsets[i] < range.end) {
           if (from < 0) from = i;
           to = i + 1;
         }
-        position = next + 1;
       }
-      cursor = position;
       if (from >= 0) {
         final selection = TextSelection(
           baseOffset: textOffset + from,
@@ -155,41 +171,108 @@ class _RenderSelectionSurface extends RenderProxyBox {
       }
     }
 
-    void visit(RenderObject object) {
-      final String? text = switch (object) {
-        RenderEditable e => e.text?.toPlainText(includeSemanticsLabels: false),
-        RenderParagraph p => p.text.toPlainText(includeSemanticsLabels: false),
-        _ => null,
-      };
-      if (text != null && object is RenderBox && object.hasSize) {
-        final children = <RenderObject>[];
-        // Walk the inline child list directly: visitChildren on RenderEditable
-        // also includes its foreground/background painters.
-        RenderBox? inlineChild = switch (object) {
-          RenderEditable e => e.firstChild,
-          RenderParagraph p => p.firstChild,
-          _ => null,
-        };
-        while (inlineChild != null) {
-          children.add(inlineChild);
-          inlineChild = (inlineChild.parentData! as TextParentData).nextSibling;
-        }
-        var textOffset = 0;
-        var childIndex = 0;
-        // A WidgetSpan occupies one layout character, but its visible child
-        // text must consume source characters before the next parent fragment.
-        for (final fragment in text.split('\uFFFC')) {
-          paintFragment(object, fragment, textOffset);
-          textOffset += fragment.length + 1;
-          if (textOffset <= text.length && childIndex < children.length) {
-            visit(children[childIndex++]);
-          }
-        }
-        return;
+    if (child != null) {
+      for (final fragment in _renderedTextFragments(child!)) {
+        paintFragment(fragment.object, fragment.text, fragment.offset);
       }
-      object.visitChildren(visit);
     }
+  }
+}
 
-    if (child != null) visit(child!);
+// Visit WidgetSpan children in text order. Parent text contains only a single
+// placeholder for these children, including links with their own text layout.
+Iterable<_RenderedTextFragment> _renderedTextFragments(
+  RenderObject object,
+) sync* {
+  final String? text = switch (object) {
+    RenderEditable e => e.text?.toPlainText(includeSemanticsLabels: false),
+    RenderParagraph p => p.text.toPlainText(includeSemanticsLabels: false),
+    _ => null,
+  };
+  if (text != null && object is RenderBox && object.hasSize) {
+    RenderBox? inlineChild = switch (object) {
+      RenderEditable e => e.firstChild,
+      RenderParagraph p => p.firstChild,
+      _ => null,
+    };
+    var offset = 0;
+    for (final fragment in text.split('\uFFFC')) {
+      if (fragment.isNotEmpty) {
+        yield _RenderedTextFragment(object, fragment, offset);
+      }
+      offset += fragment.length + 1;
+      if (offset <= text.length && inlineChild != null) {
+        yield* _renderedTextFragments(inlineChild);
+        inlineChild = (inlineChild.parentData! as TextParentData).nextSibling;
+      }
+    }
+    return;
+  }
+  final children = <RenderObject>[];
+  object.visitChildren(children.add);
+  for (final child in children) {
+    yield* _renderedTextFragments(child);
+  }
+}
+
+class _RenderedTextFragment {
+  const _RenderedTextFragment(this.object, this.text, this.offset);
+  final RenderBox object;
+  final String text;
+  final int offset;
+
+  List<TextBox> get boxes {
+    final selection = TextSelection(
+      baseOffset: offset,
+      extentOffset: offset + text.length,
+    );
+    return switch (object) {
+      RenderEditable e => e.getBoxesForSelection(selection),
+      RenderParagraph p => p.getBoxesForSelection(selection),
+      _ => const [],
+    };
+  }
+
+  int positionAt(Offset point) => switch (object) {
+    RenderEditable e => e.getPositionForPoint(point).offset,
+    RenderParagraph p => p.getPositionForOffset(p.globalToLocal(point)).offset,
+    _ => offset,
+  };
+}
+
+// Use the same recognized visible source ranges as the source editor. Hidden
+// destinations, titles and formatting markers must never consume visible text.
+class _RenderedSourceMapping {
+  _RenderedSourceMapping(String source, {Set<String>? linkReferenceLabels}) {
+    final visible = StringBuffer();
+    for (final range in markdownInlineVisibleSourceRanges(
+      source,
+      linkReferenceLabels: linkReferenceLabels,
+    )) {
+      visible.write(range.textInside(source));
+      for (var i = range.start; i < range.end; i++) {
+        _offsets.add(i);
+      }
+    }
+    _visible = visible.toString();
+  }
+
+  late final String _visible;
+  final _offsets = <int>[];
+  var _cursor = 0;
+
+  void reset() => _cursor = 0;
+
+  List<int> consume(String text) {
+    final result = <int>[];
+    var position = _cursor;
+    for (var i = 0; i < text.length; i++) {
+      final next = _visible.indexOf(text[i], position);
+      if (next < 0) return const [];
+      result.add(_offsets[next]);
+      position = next + 1;
+    }
+    _cursor = position;
+    return result;
   }
 }

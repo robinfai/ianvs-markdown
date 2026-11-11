@@ -99,16 +99,17 @@ extension _LiveEditorSourceProjection on _IanvsMarkdownLiveEditorState {
     if (block.type == IanvsMarkdownBlockType.indentedCode) {
       return _indentedCodeDocumentOffsetAtRenderedPoint(block, globalPosition);
     }
-    if (_documentDragActive ||
-        _usesRenderedSelection ||
-        block.type == IanvsMarkdownBlockType.blockquote ||
-        block.type == IanvsMarkdownBlockType.heading) {
+    final definition = _livePreviewFootnoteDefinition(block.source);
+    if (definition == null &&
+        (_documentDragActive ||
+            _usesRenderedSelection ||
+            block.type == IanvsMarkdownBlockType.blockquote ||
+            block.type == IanvsMarkdownBlockType.heading)) {
       return _markdownProjectionDocumentOffsetAtRenderedPoint(
         block,
         globalPosition,
       );
     }
-    final definition = _livePreviewFootnoteDefinition(block.source);
     if (definition == null) return null;
     final root = _renderedBlockTapKeys[block.start]?.currentContext
         ?.findRenderObject();
@@ -237,52 +238,38 @@ extension _LiveEditorSourceProjection on _IanvsMarkdownLiveEditorState {
     final root = _renderedBlockTapKeys[block.start]?.currentContext
         ?.findRenderObject();
     if (root == null || !root.attached) return null;
-    final editables = <RenderEditable>[];
-    void collect(RenderObject child) {
-      if (child is RenderEditable &&
-          (child.readOnly || _usesRenderedSelection)) {
-        editables.add(child);
-        return;
-      }
-      child.visitChildren(collect);
-    }
-
-    root.visitChildren(collect);
-    var sourceSearchStart = 0;
-    for (final editable in editables) {
-      if (!editable.attached || !editable.hasSize) continue;
-      final visibleText = editable.text?.toPlainText() ?? '';
-      if (visibleText.isEmpty) continue;
-      final visibleSourceStart = _markdownSourceOffsetForRenderedOffset(
-        block.source,
-        visibleText,
-        0,
-        sourceSearchStart: sourceSearchStart,
-      );
-      if (visibleSourceStart == null) continue;
-      final visibleSourceEnd = _markdownSourceOffsetForRenderedOffset(
-        block.source,
-        visibleText,
-        visibleText.length,
-        sourceSearchStart: visibleSourceStart,
-      );
-      final local = editable.globalToLocal(globalPosition);
-      if (local.dy >= -1 && local.dy <= editable.size.height + 1) {
-        final visibleOffset = editable
-            .getPositionForPoint(globalPosition)
-            .offset
-            .clamp(0, visibleText.length);
-        final sourceOffset = _markdownSourceOffsetForRenderedOffset(
-          block.source,
-          visibleText,
-          visibleOffset,
-          sourceSearchStart: visibleSourceStart,
+    final mapping = _RenderedSourceMapping(
+      block.source,
+      linkReferenceLabels: _linkReferences.labels,
+    );
+    int? result;
+    var nearestDistance = double.infinity;
+    for (final fragment in _renderedTextFragments(root)) {
+      final offsets = mapping.consume(fragment.text);
+      if (offsets.isEmpty) continue;
+      final local = fragment.object.globalToLocal(globalPosition);
+      for (final box in fragment.boxes) {
+        final rect = box.toRect();
+        final dx = math.max(
+          rect.left - local.dx,
+          math.max(0.0, local.dx - rect.right),
         );
-        if (sourceOffset != null) return block.start + sourceOffset;
+        final dy = math.max(
+          rect.top - local.dy,
+          math.max(0.0, local.dy - rect.bottom),
+        );
+        if (dy > 1) continue;
+        final distance = dx * dx + dy * dy;
+        if (distance >= nearestDistance) continue;
+        nearestDistance = distance;
+        final position = (fragment.positionAt(globalPosition) - fragment.offset)
+            .clamp(0, offsets.length);
+        result =
+            block.start +
+            (position == offsets.length ? offsets.last + 1 : offsets[position]);
       }
-      if (visibleSourceEnd != null) sourceSearchStart = visibleSourceEnd;
     }
-    return null;
+    return result;
   }
 
   IanvsMarkdownBlock? _renderedBlockAtGlobalPoint(Offset globalPosition) {
@@ -971,28 +958,6 @@ int? _markdownSourceOffsetForVisibleOffset(
 ) {
   final safeOffset = visibleOffset.clamp(0, visible.length);
   var sourceOffset = 0;
-  for (var index = 0; index < safeOffset; index += 1) {
-    final next = source.indexOf(visible[index], sourceOffset);
-    if (next < 0) return null;
-    sourceOffset = next + 1;
-  }
-  return sourceOffset;
-}
-
-int? _markdownSourceOffsetForRenderedOffset(
-  String source,
-  String visible,
-  int visibleOffset, {
-  required int sourceSearchStart,
-}) {
-  if (visible.isEmpty) return sourceSearchStart.clamp(0, source.length);
-  final safeOffset = visibleOffset.clamp(0, visible.length);
-  var sourceOffset = source.indexOf(
-    visible[0],
-    sourceSearchStart.clamp(0, source.length),
-  );
-  if (sourceOffset < 0) return null;
-  if (safeOffset == 0) return sourceOffset;
   for (var index = 0; index < safeOffset; index += 1) {
     final next = source.indexOf(visible[index], sourceOffset);
     if (next < 0) return null;

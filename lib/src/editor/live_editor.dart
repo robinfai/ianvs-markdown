@@ -2167,6 +2167,9 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
       _documentDragUpdateScheduled = false;
       _resolveDocumentDragSelection();
     });
+    // Pointer moves need not dirty a widget (especially after focus moves to
+    // the hidden input). A post-frame callback alone never requests a frame.
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   void _resolveDocumentDragSelection() {
@@ -2228,13 +2231,21 @@ class _IanvsMarkdownLiveEditorState extends State<IanvsMarkdownLiveEditor> {
   }
 
   void _applyDocumentDragSelection(int anchor, int extent) {
-    if (anchor == extent) return;
     final selection = TextSelection(
       baseOffset: anchor,
       extentOffset: extent,
       isDirectional: true,
     );
-    final surface = _selectionSurfaceFor(selection);
+    final anchorBlock = markdownBlockAtOffset(_blocks, anchor);
+    final surface =
+        _selectionSurfaceFor(selection) ??
+        (selection.isCollapsed && anchorBlock != null
+            ? (
+                first: anchorBlock,
+                start: anchorBlock.start,
+                end: anchorBlock.end,
+              )
+            : null);
     if (surface == null) return;
     final current = widget.controller.selection;
     if (current.baseOffset == selection.baseOffset &&
