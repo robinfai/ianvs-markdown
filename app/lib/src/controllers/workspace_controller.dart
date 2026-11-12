@@ -1468,7 +1468,8 @@ class WorkspaceController extends ChangeNotifier {
     }
   }
 
-  /// Called only after the user approves this exact, displayed proposal.
+  /// Called for a submitted fully checked rename, or an explicitly reviewed
+  /// risk/move proposal. Native preflight still verifies the exact plan.
   /// No automatic fallback to the unmaintained file operation is permitted.
   Future<WorkspaceNoteMoveRecord> executeNoteMove(
     WorkspaceNoteMovePlan plan,

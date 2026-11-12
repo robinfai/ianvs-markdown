@@ -63,7 +63,7 @@ class WorkspaceNoteMoveBlocker {
 
 /// A read-only proposal, not a transaction and not authority to write.
 /// Even a complete proposal requires fresh native identity/CAS preflight and
-/// explicit user approval of this exact proposal before a future executor runs.
+/// authorization from a submitted rename or an explicit risk/move review.
 class WorkspaceNoteMovePlan {
   WorkspaceNoteMovePlan({
     this.kind = WorkspaceNoteMovePlanKind.singleNote,
@@ -116,6 +116,11 @@ class WorkspaceNoteMovePlan {
       executionSupported &&
       (warnings.isEmpty ||
           kind == WorkspaceNoteMovePlanKind.directory && isRename);
+  bool get canRenameWithoutConfirmation =>
+      kind != WorkspaceNoteMovePlanKind.batch &&
+      isRename &&
+      complete &&
+      canExecute;
   bool get isRename =>
       p.posix.dirname(sourcePath) == p.posix.dirname(destinationPath);
 

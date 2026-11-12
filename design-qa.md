@@ -105,3 +105,22 @@ The implementation uses existing compact native typography and button styling ra
 No actionable P0/P1/P2 issue remains in the reviewed rename-dialog scope. Minor P3 follow-up: native system font appearance can differ slightly from the deterministic test fonts.
 
 final result: passed
+
+---
+
+# Rename confirmation refinement — 2026-11-12
+
+The user's follow-up replaces routine preview confirmation with a decision only when a rename carries uncertainty. Source: `/var/folders/k2/8qbf3nrs7t1749d198rw0df40000gn/T/codex-clipboard-ca40e3db-d3fe-4ce8-9b2a-0d5e9c7018e9.png` and the approved follow-up rules. This is a deliberate simplification of the earlier mock, not a pixel reproduction of the large screenshot.
+
+- A submitted same-parent rename with complete coverage executes through the existing native preflight, including zero-edit and confirmed-link-update cases. The sidebar reports the result and offers optional receipt details.
+- Incomplete coverage shows a short warning with Back / Rename anyway. Zero replacement counts, relocated-but-unchanged notes, directory manifests and technical coverage counts are absent from this prompt; diagnostics remain collapsed.
+- Known blockers explain the issue without offering automatic or raw rename bypass. Returning preserves the original path and any unsaved contents.
+- Moves and batch operations retain their explicit review. Execution failures remain single shot, with receipts/recovery available and no fallback rename.
+
+Final Flutter harness captures (1000 × 900 pixels, DPR 1): `app/build/workflow-ui/rename-risk-partial-zh.png`, `rename-risk-blocked-zh.png`, `rename-risk-partial-dark-zh.png`. The light and dark partial-risk captures were opened together and checked at full resolution. Text, icon contrast, compact layout, collapsed details and button labels are legible and unclipped. No density normalization or claim of native installed-app capture is made.
+
+Verification: 170 related widget, sidebar, planner and execution tests passed; static analysis reports no issues; `git diff --check` passed. Added coverage for automatic zero-edit and inbound-link renames, explicit partial-risk choice, known blockers, cancelled/stale intent, mismatched destinations, execution failure, on-demand completed receipts and retained cross-parent confirmation. The sidebar progress indicator hides while a decision dialog is current, so it does not animate indefinitely behind the prompt.
+
+No actionable P0/P1/P2 issue remains in this refinement's reviewed scope.
+
+final result: passed
