@@ -157,6 +157,10 @@
     "ianvsMarkdownInlineMathSources": "package:ianvs_markdown/src/editor/editor_controller.dart",
     "ianvsMarkdownLivePreviewFootnoteReferences": "package:ianvs_markdown/src/obsidian_metadata.dart",
     "ianvsMarkdownSelectionClipboardData": "package:ianvs_markdown/src/rich_clipboard.dart",
+    "ianvsMarkdownSemanticBudget": "package:ianvs_markdown/src/note_semantics.dart",
+    "ianvsMarkdownSemanticLineLimit": "package:ianvs_markdown/src/note_semantics.dart",
+    "ianvsMarkdownSemanticOccurrenceLimit": "package:ianvs_markdown/src/note_semantics.dart",
+    "ianvsMarkdownSemanticSourceLimit": "package:ianvs_markdown/src/note_semantics.dart",
     "ianvsMarkdownStrikethroughScan": "package:ianvs_markdown/src/strikethrough.dart",
     "ianvsMarkdownStyleSheet": "package:ianvs_markdown/src/ianvs_markdown.dart",
     "ianvsMarkdownSyntaxTheme": "package:ianvs_markdown/src/editor/source_editor.dart",
@@ -16309,6 +16313,42 @@
       ],
       "static": true,
       "abstract": false
+    },
+    "ianvsMarkdownSemanticBudget": {
+      "kind": "top level variable",
+      "type": "IanvsMarkdownRenderBudget",
+      "const": true,
+      "final": false,
+      "static": true,
+      "late": false,
+      "initializer": "IanvsMarkdownRenderBudget(maxSourceCodeUnits: ianvsMarkdownSemanticSourceLimit, maxLineCodeUnits: ianvsMarkdownSemanticLineLimit, maxSyntaxTokens: 256 * 1024)"
+    },
+    "ianvsMarkdownSemanticLineLimit": {
+      "kind": "top level variable",
+      "type": "int",
+      "const": true,
+      "final": false,
+      "static": true,
+      "late": false,
+      "initializer": "1024 * 1024"
+    },
+    "ianvsMarkdownSemanticOccurrenceLimit": {
+      "kind": "top level variable",
+      "type": "int",
+      "const": true,
+      "final": false,
+      "static": true,
+      "late": false,
+      "initializer": "64 * 1024"
+    },
+    "ianvsMarkdownSemanticSourceLimit": {
+      "kind": "top level variable",
+      "type": "int",
+      "const": true,
+      "final": false,
+      "static": true,
+      "late": false,
+      "initializer": "8 * 1024 * 1024"
     },
     "ianvsMarkdownStrikethroughScan": {
       "kind": "function",

@@ -1,5 +1,10 @@
 ## Unreleased
 
+- Give source-preserving note semantics independent limits of 8 Mi UTF-16
+  source units, 1 Mi line units, 262,144 syntax tokens and 65,536 occurrences.
+  Export shared semantic budget constants for host rewrite verification, and
+  advance long ASCII words without repeated failed matching.
+
 - Improve large-document read/Finder viewports, avoid redundant fallback and
   reference parsing work, and index protected highlight ranges. Add optional
   nonblank-run budget bounds so hosts can increase document capacity without
