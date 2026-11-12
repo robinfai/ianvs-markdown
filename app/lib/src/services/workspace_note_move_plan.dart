@@ -55,10 +55,18 @@ class WorkspaceNoteMoveFile {
 }
 
 class WorkspaceNoteMoveBlocker {
-  const WorkspaceNoteMoveBlocker(this.code, this.message, {this.path});
+  const WorkspaceNoteMoveBlocker(
+    this.code,
+    this.message, {
+    this.path,
+    this.target,
+    this.line,
+  });
   final String code;
   final String message;
   final String? path;
+  final String? target;
+  final int? line;
 }
 
 /// A read-only proposal, not a transaction and not authority to write.

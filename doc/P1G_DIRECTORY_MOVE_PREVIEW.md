@@ -162,3 +162,32 @@ Compact enlarged-text UI tests use real taps and require explicit execution appr
 Existing v1 and mobile scope tests remain regression gates. Batch reference maintenance and recovery garbage collection remain unfinished.
 Native execution claims require actual macOS CI; these source contracts do not
 substitute for that acceptance.
+
+
+## Same-parent rename refinements (0.1.17)
+
+Submitting a fully checked same-parent rename authorizes its execution without a
+second preview confirmation. Incomplete coverage requires an explicit risk
+choice; moves and batches retain their existing complete-coverage checks.
+
+Standard Markdown references from an external, unchanged origin may be omitted
+from diagnostics only when their normalized filesystem path is outside both the
+old and new directory namespaces. Wiki/alias references, images, unverified
+normalization and references into either namespace do not receive this exemption.
+Unresolved references retain target and source-line diagnostics.
+
+Existing parser/reparse budgets remain bounded. For a same-parent rename, an
+input-budget-only failure can retain the exact original note and become a
+coverage warning. A proposed edit exceeding reparse bounds is discarded for that
+whole note; external skipped notes are not written, and moved notes remain in the
+native manifest unchanged. The plan is incomplete and requires explicit user
+acceptance. Structural failures, local availability, dirty sources, ambiguous
+rewrites, transaction budgets and native identity/byte/target checks still block.
+
+V2 directory notes with identical expected/replacement bytes are not staged or
+replaced. Their reads therefore admit existing metadata without stripping or
+rewriting it: the directory rename carries the original inode, xattrs, ACLs and
+flags. Exact bytes, identity, revision (including ctime), owner, permissions and
+local availability remain checked. Modified notes and private artifacts retain
+the strict supported-metadata policy. A prepare rejection with no user-file
+manifest is reported as blocked before changes, rather than partial completion.

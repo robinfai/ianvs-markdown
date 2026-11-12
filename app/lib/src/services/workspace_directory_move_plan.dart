@@ -400,6 +400,51 @@ Future<WorkspaceNoteMovePlan> _buildDirectoryMovePlan(
     return false;
   }
 
+  bool bodyBudgetOnly(WorkspaceSemanticNote note) =>
+      note.semantics.issues.isNotEmpty &&
+      note.semantics.issues.every((issue) => issue.code == 'bodyBudget');
+
+  Future<bool> unchangedOpaqueReference(
+    String origin,
+    WorkspaceSemanticNote note,
+    IanvsMarkdownSourceReference ref,
+  ) async {
+    if (!partialRename ||
+        transform.moves(origin) ||
+        _wiki(ref) ||
+        imageReference(note, ref) ||
+        ref.target.isEmpty ||
+        ref.target.startsWith('//') ||
+        RegExp(r'^[A-Za-z][A-Za-z0-9+.-]*:').hasMatch(ref.target)) {
+      return false;
+    }
+    final absolute = p.posix.normalize(
+      p.posix.isAbsolute(ref.target)
+          ? ref.target
+          : p.posix.join(root, p.posix.dirname(origin), ref.target),
+    );
+    if (!p.posix.isWithin(root, absolute)) return false;
+    final path = p.posix.relative(absolute, from: root);
+    if (!safeWorkspaceRelativePath(path)) return false;
+    try {
+      charge(3);
+      final normalized = await checked(
+        () => references.resolver.comparisonKeys([
+          path,
+          sourcePath,
+          destinationPath,
+        ]),
+      );
+      // Standard Markdown paths do not use Wiki aliases. An external origin
+      // and a target outside BOTH namespaces retain exactly the same spelling
+      // and resolution context, even for unsupported extensions/directories.
+      return !WorkspaceMoveNamespace.contains(normalized[1], normalized[0]) &&
+          !WorkspaceMoveNamespace.contains(normalized[2], normalized[0]);
+    } on Object {
+      return false; // Unverifiable normalization never proves irrelevance.
+    }
+  }
+
   // The note-only graph can call a renderer-valid rooted image "unknown".
   // Discharge only that exact typed occurrence with the image resolver below;
   // source/parser/budget/alias failures and non-image unknowns remain blockers.
@@ -420,14 +465,43 @@ Future<WorkspaceNoteMovePlan> _buildDirectoryMovePlan(
         issue.value.every(
           (message) => message == 'A reference target could not be resolved.',
         );
-    if (!imageOnly) {
+    var irrelevantOnly = false;
+    if (note != null &&
+        origins.containsKey(note) &&
+        note.semantics.complete &&
+        unknown.isNotEmpty &&
+        issue.value.every(
+          (message) => message == 'A reference target could not be resolved.',
+        )) {
+      irrelevantOnly = true;
+      for (final edge in unknown) {
+        if (!await unchangedOpaqueReference(
+          origins[note] ?? '',
+          note,
+          edge.reference,
+        )) {
+          irrelevantOnly = false;
+          break;
+        }
+      }
+    }
+    if (!imageOnly && !irrelevantOnly) {
       final issuePath = issue.key.startsWith('aliases:')
           ? issue.key.substring('aliases:'.length)
           : p.posix.isWithin(root, issue.key)
           ? p.posix.relative(issue.key, from: root)
           : null;
-      if (partialRename && issuePath != null && !transform.moves(issuePath)) {
-        warn('coverage', issue.value.join('; '), issuePath);
+      if (partialRename &&
+          issuePath != null &&
+          (!transform.moves(issuePath) ||
+              note != null && bodyBudgetOnly(note))) {
+        warn(
+          note != null && bodyBudgetOnly(note) ? 'scanBudget' : 'coverage',
+          note != null && bodyBudgetOnly(note)
+              ? 'Link scanning reached its input limit. This note will be preserved unchanged; some links may be omitted.'
+              : issue.value.join('; '),
+          issuePath,
+        );
       } else {
         block('coverage', issue.value.join('; '), issue.key);
       }
@@ -881,6 +955,7 @@ Future<WorkspaceNoteMovePlan> _buildDirectoryMovePlan(
       final changes = <(int, int), WorkspaceReferenceEdit>{};
       final targets = <IanvsMarkdownSourceReference, String>{};
       final expected = <IanvsMarkdownSourceReference, _DirectoryResolution>{};
+      final preserveUnparsed = partialRename && bodyBudgetOnly(note);
       if (!note.semantics.complete &&
           partialRename &&
           !transform.moves(origin)) {
@@ -889,7 +964,7 @@ Future<WorkspaceNoteMovePlan> _buildDirectoryMovePlan(
         final knownInbound = (edgesByNote[note] ?? []).any(
           (edge) => edge.candidatePaths.any(transform.moves),
         );
-        if (knownInbound) {
+        if (knownInbound && !preserveUnparsed) {
           block(
             'coverage',
             'A known inbound note could not be fully parsed.',
@@ -905,7 +980,7 @@ Future<WorkspaceNoteMovePlan> _buildDirectoryMovePlan(
         continue;
       }
       final unresolved = <WorkspaceNoteMoveBlocker>[];
-      if (!note.semantics.complete) {
+      if (!note.semantics.complete && !preserveUnparsed) {
         block(
           'coverage',
           'The note contains unsupported or unknown source syntax.',
@@ -926,11 +1001,19 @@ Future<WorkspaceNoteMovePlan> _buildDirectoryMovePlan(
         );
         if (before.status == WorkspaceReferenceStatus.unknown ||
             before.status == WorkspaceReferenceStatus.ambiguous) {
+          if (await unchangedOpaqueReference(origin, note, ref)) continue;
+          final line =
+              '\n'
+                  .allMatches(note.source.text.substring(0, ref.range.start))
+                  .length +
+              1;
           unresolved.add(
             WorkspaceNoteMoveBlocker(
               'unresolved',
-              'An unknown or ambiguous reference prevents complete directory maintenance.',
+              'Link target "${ref.target}" at line $line could not be uniquely resolved; its update cannot be verified.',
               path: origin,
+              target: ref.target,
+              line: line,
             ),
           );
           continue;
@@ -1095,11 +1178,26 @@ Future<WorkspaceNoteMovePlan> _buildDirectoryMovePlan(
         yield note.source.text.substring(offset);
       }
 
-      void reparseComplexity(String limit) => block(
-        'reparseComplexity',
-        'A changed note exceeds the conservative directory-preview $limit limit.',
-        origin,
-      );
+      void reparseComplexity(String limit) {
+        if (partialRename) {
+          warn(
+            'scanBudget',
+            'Link verification reached its $limit limit. This note will be preserved unchanged; its links may need manual repair.',
+            origin,
+          );
+          edits.clear();
+          changes.clear();
+          targets.clear();
+          expected.clear();
+        } else {
+          block(
+            'reparseComplexity',
+            'A changed note exceeds the conservative directory-preview $limit limit.',
+            origin,
+          );
+        }
+      }
+
       if (edits.isNotEmpty) {
         final projectedLength =
             note.source.text.length +
@@ -1117,7 +1215,8 @@ Future<WorkspaceNoteMovePlan> _buildDirectoryMovePlan(
                   reparseTextLimit(projectedLength, projectedPieces());
         if (limit != null) {
           reparseComplexity(limit);
-          return finish();
+          if (!partialRename) return finish();
+          if (!transform.moves(origin)) continue;
         }
       }
       var contents = note.source.text;
@@ -1176,10 +1275,15 @@ Future<WorkspaceNoteMovePlan> _buildDirectoryMovePlan(
         }
       }
       for (final issue in unresolved) {
-        if (partialRename && !transform.moves(origin) && edits.isEmpty) {
-          warn(issue.code, issue.message, origin);
-        } else {
-          block(issue.code, issue.message, origin);
+        final issues =
+            partialRename && !transform.moves(origin) && edits.isEmpty
+            ? warnings
+            : blockers;
+        if (!issues.any(
+          (existing) =>
+              existing.code == issue.code && existing.path == issue.path,
+        )) {
+          issues.add(issue);
         }
       }
       if (!transform.moves(origin) && edits.isEmpty) continue;

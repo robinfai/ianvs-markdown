@@ -502,11 +502,13 @@ void main() {
     'rename can omit unresolved external notes but never rewrite a note with unresolved dependencies',
     () async {
       source.note('a/One.md', '# One');
-      source.note('Outside.md', '[opaque](secret.pdf)');
+      source.note('one/Dup.md', '# one');
+      source.note('two/Dup.md', '# two');
+      source.note('Outside.md', '[[Dup]]');
       var result = await plan(to: 'renamed');
       expect(result.canExecute, isTrue, reason: codes(result).toString());
       expect(result.warnings, isNotEmpty);
-      source.note('Outside.md', '[one](a/One.md) [opaque](secret.pdf)');
+      source.note('Outside.md', '[one](a/One.md) [[Dup]]');
       index.updateBuffer(
         sessionId: 'outside',
         path: '/vault/Outside.md',
@@ -516,6 +518,111 @@ void main() {
       result = await plan(to: 'renamed');
       expect(result.canExecute, isFalse);
       expect(codes(result), contains('unresolved'));
+    },
+  );
+
+  test(
+    'unrelated README directory and opaque file links do not interrupt rename',
+    () async {
+      source.note('a/One.md', '# One');
+      source.note(
+        'betterleaks-intro/README.md',
+        '[deep](deep/) [pdf](../assets/spec.pdf)',
+      );
+      source.note(
+        'betterleaks-intro/deep/README.md',
+        '[parent](../) [source](example.txt)',
+      );
+      final result = await plan(to: 'renamed');
+      complete(result);
+      expect(result.canRenameWithoutConfirmation, isTrue);
+      expect(result.warnings, isEmpty);
+      expect(result.files.map((f) => f.path), ['a/One.md']);
+      expect(codes(await plan(to: 'dest/a')), contains('unresolved'));
+    },
+  );
+
+  test(
+    'opaque targets under either namespace and case aliases remain disclosed',
+    () async {
+      source.note('a/One.md', '# One');
+      source.note(
+        'Outside.md',
+        '[old](A/unknown.pdf) [new](renamed/unknown.pdf)',
+      );
+      final result = await plan(to: 'renamed');
+      expect(result.canExecute, isTrue, reason: codes(result).toString());
+      expect(result.canRenameWithoutConfirmation, isFalse);
+      expect(result.warnings.any((w) => w.code == 'unresolved'), isTrue);
+      expect(
+        result.warnings.where((w) => w.code == 'unresolved').first.message,
+        contains('A/unknown.pdf'),
+      );
+      expect(
+        result.warnings.where((w) => w.code == 'unresolved').first.message,
+        contains('line 1'),
+      );
+    },
+  );
+
+  test(
+    'a long moved line is preserved exactly while known inbound links update',
+    () async {
+      final contents = '${'x' * 9000} [self](One.md)';
+      source.note('a/One.md', contents);
+      source.note('Incoming.md', '[one](a/One.md)');
+      final result = await plan(to: 'renamed');
+      expect(result.canExecute, isTrue, reason: codes(result).toString());
+      expect(result.complete, isFalse);
+      expect(
+        result.warnings.any(
+          (w) => w.code == 'scanBudget' && w.path == 'a/One.md',
+        ),
+        isTrue,
+      );
+      final moved = result.files.firstWhere((f) => f.path == 'a/One.md');
+      expect(moved.contents, contents);
+      expect(moved.edits, isEmpty);
+      expect(
+        result.files.firstWhere((f) => f.path == 'Incoming.md').contents,
+        '[one](renamed/One.md)',
+      );
+      expect((await plan(to: 'dest/a')).canExecute, isFalse);
+    },
+  );
+
+  test(
+    'same-parent rename preserves a note when changed-text verification exceeds line limits',
+    () async {
+      final contents = '[self](/vault/a/One.md) ${'x' * 2000}';
+      source.note('a/One.md', contents);
+      source.note('Incoming.md', '[one](a/One.md)');
+      final result = await plan(to: 'renamed');
+      expect(result.canExecute, isTrue, reason: codes(result).toString());
+      final moved = result.files.firstWhere((f) => f.path == 'a/One.md');
+      expect(moved.contents, contents);
+      expect(moved.edits, isEmpty);
+      expect(result.editCount, 1);
+      expect(result.warnings.any((w) => w.code == 'scanBudget'), isTrue);
+    },
+  );
+
+  test(
+    'a long inbound note that cannot be reverified is not partially rewritten',
+    () async {
+      source.note('a/One.md', '# One');
+      final contents = '[one](a/One.md) ${'x' * 2000}';
+      source.note('Incoming.md', contents);
+      final result = await plan(to: 'renamed');
+      expect(result.canExecute, isTrue, reason: codes(result).toString());
+      expect(result.files.map((f) => f.path), ['a/One.md']);
+      expect(source.files['Incoming.md'], contents);
+      expect(
+        result.warnings.any(
+          (w) => w.code == 'scanBudget' && w.path == 'Incoming.md',
+        ),
+        isTrue,
+      );
     },
   );
 

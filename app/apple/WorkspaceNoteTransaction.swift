@@ -618,7 +618,8 @@ final class WorkspaceNoteTransaction {
     } else if errno != ENOENT { throw Failure(failureCode) }
   }
 
-  private func read(_ scope: WorkspaceTextScope, path: String, artifact: Bool = false) throws -> Snapshot {
+  private func read(_ scope: WorkspaceTextScope, path: String, artifact: Bool = false,
+                    preservingInode: Bool = false) throws -> Snapshot {
     let parts = try (artifact ? artifactComponents(path) : components(path))
     let parent = try scope.parentDescriptor(parts); defer { close(parent) }
     var attributes = stat()
@@ -628,9 +629,18 @@ final class WorkspaceNoteTransaction {
     let descriptor = openat(parent, parts.last!, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
     guard descriptor >= 0 else { throw Failure("file_unavailable") }
     defer { close(descriptor) }
-    try requirePlainMetadata(descriptor)
+    // An unchanged v2 directory member is never replaced or chmod'ed. A
+    // namespace rename preserves its existing inode, ACLs, flags and xattrs,
+    // including provider/quarantine metadata. Changed text and all artifacts
+    // still use the strict metadata-preservation path.
+    if preservingInode {
+      guard attributes.st_uid == getuid(),
+            attributes.st_mode & mode_t(S_ISUID | S_ISGID | S_ISVTX) == 0 else {
+        throw Failure("unsupported_metadata")
+      }
+    } else { try requirePlainMetadata(descriptor) }
     let dataProtection = try protectionClass(descriptor)
-    let sourceProvenance = try readProvenance(descriptor)
+    let sourceProvenance = preservingInode ? nil : try readProvenance(descriptor)
     var inspected = stat()
     guard fstat(descriptor, &inspected) == 0,
           WorkspaceFileScope.revision(inspected) == WorkspaceFileScope.revision(attributes) else { throw Failure("file_conflict") }
@@ -2024,7 +2034,8 @@ final class WorkspaceNoteTransaction {
       // The future parent is the same pinned directory object, not a path that
       // must already exist. It is re-opened at its new address after the rename.
       parents[to] = parent
-      let snapshot = try read(scope, path: path)
+      let snapshot = try read(scope, path: path,
+                              preservingInode: movedNotes.contains(path) && original.data == replacement.data)
       guard snapshot.revision == revision, snapshot.bytes == original.data,
             actualCatalog.contains(where: { $0.path == path && !$0.isDirectory && $0.revision == revision }) else {
         throw Failure("file_conflict")
@@ -2107,7 +2118,8 @@ final class WorkspaceNoteTransaction {
         let parent = try Parent(scope: scope, components: components(path))
         guard parent.identity == entry.parentIdentity else { throw Failure("parent_changed") }
         if let session { _ = try verifyParent(session, path: path) }
-        let snapshot = try read(scope, path: path)
+        let snapshot = try read(scope, path: path,
+                                preservingInode: entry.path != entry.destinationPath && entry.original == entry.replacement)
         let revision = entry.writeRevision ?? entry.expectedRevision
         guard snapshot.revision == revision, snapshot.identity == Self.identity(revision),
               snapshot.bytes == (entry.writeRevision == nil ? entry.original : entry.replacement),
