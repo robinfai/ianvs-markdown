@@ -22,6 +22,18 @@ Future<WorkspaceNoteMovePlan> _buildDirectoryMovePlan(
   final index = references.index;
   final root = index.root;
   final blockers = <WorkspaceNoteMoveBlocker>[];
+  final warnings = <WorkspaceNoteMoveBlocker>[];
+  // Only a single same-parent directory rename permits explicitly disclosed
+  // incomplete external coverage. Moves and batches retain full coverage.
+  final partialRename =
+      batchRoots == null &&
+      p.posix.dirname(sourcePath) == p.posix.dirname(destinationPath);
+  void warn(String code, String message, [String? path]) {
+    if (!warnings.any((w) => w.code == code && w.path == path)) {
+      warnings.add(WorkspaceNoteMoveBlocker(code, message, path: path));
+    }
+  }
+
   final files = <WorkspaceNoteMoveFile>[];
   final assets = <String, AttachmentMetadata>{};
   WorkspaceMoveNamespace? namespace;
@@ -88,6 +100,7 @@ Future<WorkspaceNoteMovePlan> _buildDirectoryMovePlan(
       destinationPath: destinationPath,
       files: files,
       blockers: blockers,
+      warnings: warnings,
       attachmentRequirements: assets.values.toList(),
     );
   }
@@ -407,11 +420,31 @@ Future<WorkspaceNoteMovePlan> _buildDirectoryMovePlan(
         issue.value.every(
           (message) => message == 'A reference target could not be resolved.',
         );
-    if (!imageOnly) block('coverage', issue.value.join('; '), issue.key);
+    if (!imageOnly) {
+      final issuePath = issue.key.startsWith('aliases:')
+          ? issue.key.substring('aliases:'.length)
+          : p.posix.isWithin(root, issue.key)
+          ? p.posix.relative(issue.key, from: root)
+          : null;
+      if (partialRename && issuePath != null && !transform.moves(issuePath)) {
+        warn('coverage', issue.value.join('; '), issuePath);
+      } else {
+        block('coverage', issue.value.join('; '), issue.key);
+      }
+    }
+  }
+  if (partialRename &&
+      (!snapshot.aliases.complete ||
+          snapshot.knownDocuments != snapshot.notes.length)) {
+    warn(
+      'incomplete',
+      'Some external notes or aliases could not be inspected. Links may be omitted.',
+    );
   }
   if (!snapshot.catalog.complete ||
-      !snapshot.aliases.complete ||
-      snapshot.knownDocuments != snapshot.notes.length) {
+      !partialRename &&
+          (!snapshot.aliases.complete ||
+              snapshot.knownDocuments != snapshot.notes.length)) {
     block(
       'incomplete',
       'Complete note, directory and alias coverage is required.',
@@ -848,6 +881,30 @@ Future<WorkspaceNoteMovePlan> _buildDirectoryMovePlan(
       final changes = <(int, int), WorkspaceReferenceEdit>{};
       final targets = <IanvsMarkdownSourceReference, String>{};
       final expected = <IanvsMarkdownSourceReference, _DirectoryResolution>{};
+      if (!note.semantics.complete &&
+          partialRename &&
+          !transform.moves(origin)) {
+        // A known inbound dependency must not be silently skipped. Otherwise
+        // disclose the uninspected source without editing its parsed subset.
+        final knownInbound = (edgesByNote[note] ?? []).any(
+          (edge) => edge.candidatePaths.any(transform.moves),
+        );
+        if (knownInbound) {
+          block(
+            'coverage',
+            'A known inbound note could not be fully parsed.',
+            origin,
+          );
+        } else {
+          warn(
+            'coverage',
+            'This note could not be fully parsed; its links are omitted.',
+            origin,
+          );
+        }
+        continue;
+      }
+      final unresolved = <WorkspaceNoteMoveBlocker>[];
       if (!note.semantics.complete) {
         block(
           'coverage',
@@ -869,10 +926,12 @@ Future<WorkspaceNoteMovePlan> _buildDirectoryMovePlan(
         );
         if (before.status == WorkspaceReferenceStatus.unknown ||
             before.status == WorkspaceReferenceStatus.ambiguous) {
-          block(
-            'unresolved',
-            'An unknown or ambiguous reference prevents complete directory maintenance.',
-            origin,
+          unresolved.add(
+            WorkspaceNoteMoveBlocker(
+              'unresolved',
+              'An unknown or ambiguous reference prevents complete directory maintenance.',
+              path: origin,
+            ),
           );
           continue;
         }
@@ -1114,6 +1173,13 @@ Future<WorkspaceNoteMovePlan> _buildDirectoryMovePlan(
             'A rewritten or unchanged occurrence changed target identity.',
             origin,
           );
+        }
+      }
+      for (final issue in unresolved) {
+        if (partialRename && !transform.moves(origin) && edits.isEmpty) {
+          warn(issue.code, issue.message, origin);
+        } else {
+          block(issue.code, issue.message, origin);
         }
       }
       if (!transform.moves(origin) && edits.isEmpty) continue;

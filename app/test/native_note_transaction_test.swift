@@ -238,6 +238,7 @@ struct NativeNoteTransactionAcceptance {
     try run("storageInventoryCountsAndBounds", storageInventoryCountsAndBounds)
     try run("storageInventoryScopeAndArtifacts", storageInventoryScopeAndArtifacts)
     try run("storageInventoryRaces", storageInventoryRaces)
+    try run("directoryRenameExternalOffline", directoryRenameExternalOffline)
     try run("directorySuccessAndRestart", directorySuccessAndRestart)
     try run("directoryEmptyAndImageOnly", directoryEmptyAndImageOnly)
     try run("directoryPreflight", directoryPreflight)
@@ -1522,6 +1523,67 @@ struct NativeNoteTransactionAcceptance {
     return ["path": f.root.path, "transactionId": UUID().uuidString, "sourcePath": source,
             "destinationPath": destination, "files": files, "tree": tree,
             "catalog": try f.catalogRows(), "assets": [["path": "assets/image.png", "revision": try f.revision("assets/image.png")]]]
+  }
+
+  private static func directoryRenameExternalOffline() throws {
+    func request(_ f: Fixture) throws -> [String: Any] {
+      var value = try directoryRequest(f, destination: "Renamed")
+      value["files"] = [
+        ["path": f.source, "destinationPath": "Renamed/Old.md", "expectedRevision": try f.revision(f.source),
+         "expectedBytes": FlutterStandardTypedData(bytes: f.originalSource),
+         "replacementBytes": FlutterStandardTypedData(bytes: f.originalSource)],
+        ["path": f.incoming, "destinationPath": f.incoming, "expectedRevision": try f.revision(f.incoming),
+         "expectedBytes": FlutterStandardTypedData(bytes: f.originalIncoming),
+         "replacementBytes": FlutterStandardTypedData(bytes: Data(String(decoding: f.originalIncoming, as: UTF8.self)
+           .replacingOccurrences(of: "notes/Old.md", with: "Renamed/Old.md").utf8))],
+      ]
+      return value
+    }
+    do {
+      let f = try Fixture()
+      try f.write("other/.Offline.md.icloud", Data("provider placeholder".utf8))
+      let before = try f.attributes("other/.Offline.md.icloud")
+      let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let plan = try request(f)
+      let prepared = try f.invoke(executor, "prepareWorkspaceDirectoryMove", plan)
+      try require(prepared["phase"] as? String == "prepared", "External placeholder must not block rename: \(prepared)")
+      let result = try f.invoke(executor, "executeWorkspaceNoteMove", f.command(plan, token: prepared["token"]))
+      try require(result["phase"] as? String == "completed", "Partial coverage rename should execute: \(result)")
+      try require(try f.bytes("Renamed/Old.md") == f.originalSource, "Internal links remain unchanged on same-parent rename")
+      let after = try f.attributes("other/.Offline.md.icloud")
+      try require(WorkspaceFileScope.revision(before) == WorkspaceFileScope.revision(after), "External placeholder must not be changed or hydrated")
+      let restarted = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let receipt = try f.invoke(restarted, "reconcileWorkspaceNoteMove", f.command(plan))
+      try require(receipt["phase"] as? String == "completed", "Restart must retain offline-aware read-set verification: \(receipt)")
+    }
+    do {
+      let f = try Fixture()
+      try f.write("other/.Offline.md.icloud", Data())
+      let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let plan = try request(f)
+      let prepared = try f.invoke(executor, "prepareWorkspaceDirectoryMove", plan)
+      try require(prepared["phase"] as? String == "prepared", "Rename should prepare before external change")
+      try f.write("other/.Offline.md.icloud", Data("changed".utf8))
+      let result = try f.invoke(executor, "executeWorkspaceNoteMove", f.command(plan, token: prepared["token"]))
+      try require(result["phase"] as? String != "completed", "External placeholders remain in the checked metadata read set")
+      try f.expectOriginals()
+    }
+    do {
+      let f = try Fixture()
+      try f.write("other/.Offline.md.icloud", Data())
+      let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let result = try f.invoke(executor, "prepareWorkspaceDirectoryMove", directoryRequest(f))
+      try require(result["phase"] as? String == "blocked", "Cross-parent move retains full local coverage requirements")
+      try f.expectOriginals()
+    }
+    do {
+      let f = try Fixture()
+      try f.write("notes/.Offline.md.icloud", Data())
+      let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let result = try f.invoke(executor, "prepareWorkspaceDirectoryMove", request(f))
+      try require(result["phase"] as? String == "blocked", "Offline source member must still block rename")
+      try f.expectOriginals()
+    }
   }
 
   private static func directorySuccessAndRestart() throws {

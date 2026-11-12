@@ -76,10 +76,12 @@ class WorkspaceNoteMovePlan {
     required this.destinationPath,
     required List<WorkspaceNoteMoveFile> files,
     required List<WorkspaceNoteMoveBlocker> blockers,
+    List<WorkspaceNoteMoveBlocker> warnings = const [],
     required List<AttachmentMetadata> attachmentRequirements,
   }) : batchRoots = List.unmodifiable(batchRoots),
        files = List.unmodifiable(files),
        blockers = List.unmodifiable(blockers),
+       warnings = List.unmodifiable(warnings),
        attachmentRequirements = List.unmodifiable(attachmentRequirements);
   final WorkspaceNoteMovePlanKind kind;
   final WorkspaceMoveTreeSnapshot? treeSnapshot;
@@ -90,11 +92,11 @@ class WorkspaceNoteMovePlan {
   bool get executionSupported =>
       kind == WorkspaceNoteMovePlanKind.singleNote ||
       (kind == WorkspaceNoteMovePlanKind.directory &&
-          complete &&
+          blockers.isEmpty &&
           treeSnapshot?.complete == true &&
           namespace != null) ||
       (kind == WorkspaceNoteMovePlanKind.batch &&
-          complete &&
+          blockers.isEmpty &&
           namespace is WorkspaceBatchMoveNamespace &&
           batchRoots.length >= 2 &&
           batchRoots.length <= 8 &&
@@ -106,10 +108,21 @@ class WorkspaceNoteMovePlan {
   final List<WorkspaceNoteMoveFile> files;
   final List<WorkspaceNoteMoveBlocker> blockers;
 
+  /// Uninspected external sources may contain links omitted from a rename.
+  /// They never authorize writes to those sources or weaken native preflight.
+  final List<WorkspaceNoteMoveBlocker> warnings;
+  bool get canExecute =>
+      blockers.isEmpty &&
+      executionSupported &&
+      (warnings.isEmpty ||
+          kind == WorkspaceNoteMovePlanKind.directory && isRename);
+  bool get isRename =>
+      p.posix.dirname(sourcePath) == p.posix.dirname(destinationPath);
+
   /// Metadata-only evidence. The future native preflight must verify these
   /// exact paths/revisions are regular, local files without downloading them.
   final List<AttachmentMetadata> attachmentRequirements;
-  bool get complete => blockers.isEmpty;
+  bool get complete => blockers.isEmpty && warnings.isEmpty;
   int get editCount => files.fold(0, (sum, file) => sum + file.edits.length);
 
   bool isCurrent(WorkspaceIndex index) =>

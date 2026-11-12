@@ -968,7 +968,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(transactions.operations, isEmpty);
       expect(
-        find.textContaining('retains original recovery copies'),
+        find.textContaining('Original recovery copies are retained'),
         findsOneWidget,
       );
       await tester.tap(find.text('Cancel'));

@@ -289,6 +289,29 @@ void main() {
   );
 
   test(
+    'partial rename executes verified edits without reading external offline notes',
+    () async {
+      source.note('Elsewhere/Offline.md', '[A](../Old/A.md)');
+      source.offline.add('Elsewhere/Offline.md');
+      final plan = await preview();
+      expect(plan.complete, isFalse);
+      expect(
+        plan.canExecute,
+        isTrue,
+        reason: plan.blockers.map((b) => b.message).join('; '),
+      );
+      expect(plan.files.any((f) => f.path == 'Elsewhere/Offline.md'), isFalse);
+      final record = await workspace.executeNoteMove(plan);
+      expect(record.completed, isTrue);
+      expect(source.files['Incoming.md'], '[A](New/A.md)');
+      expect(source.files['Elsewhere/Offline.md'], '[A](../Old/A.md)');
+      expect(source.files['New/A.md'], '# A');
+      expect(transactions.executions, 1);
+      expect(images.reads, 0);
+    },
+  );
+
+  test(
     'batch preview is global and read-only until explicit execution',
     () async {
       source.folders.add('dest');
@@ -368,13 +391,13 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.textContaining('Root moves are not all-or-nothing'),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.byKey(const ValueKey('move-and-update-links')),
         findsOneWidget,
       );
-      expect(find.textContaining('Destination vacancy'), findsOneWidget);
+      expect(find.textContaining('Destination vacancy'), findsNothing);
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       expect(transactions.executions, 0);
@@ -891,10 +914,17 @@ void main() {
     await tester.pumpAndSettle();
     final manifest = find.byKey(const ValueKey('directory-move-manifest'));
     await tester.ensureVisible(manifest);
-    await tester.tap(find.text('Observed directory members'));
+    await tester.tap(find.text('Directory contents'));
     await tester.pumpAndSettle();
     expect(find.text('Old/Guide.pdf · unsupported · local'), findsOneWidget);
-    expect(find.byKey(const ValueKey('move-and-update-links')), findsNothing);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const ValueKey('move-and-update-links')),
+          )
+          .onPressed,
+      isNull,
+    );
     await tester.ensureVisible(find.text('Cancel'));
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
@@ -946,7 +976,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(
           find.textContaining('Directory reference maintenance moves'),
-          findsOneWidget,
+          findsNothing,
         );
         expect(
           find.byKey(const ValueKey('move-and-update-links')),

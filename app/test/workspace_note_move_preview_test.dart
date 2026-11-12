@@ -31,7 +31,7 @@ void main() {
       );
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('will NOT be updated'), findsOneWidget);
+      expect(find.textContaining('may break existing links'), findsOneWidget);
       expect(
         find.textContaining(
           'No complete reference preview is available for this selection',
@@ -78,7 +78,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       expect(
         tester
-            .widget<TextButton>(
+            .widget<OutlinedButton>(
               find.byKey(const ValueKey('move-without-updating-links')),
             )
             .onPressed,
@@ -120,7 +120,7 @@ void main() {
         find.textContaining('No complete maintenance plan could be verified'),
         findsOneWidget,
       );
-      expect(find.textContaining('will NOT be updated'), findsOneWidget);
+      expect(find.textContaining('may break existing links'), findsOneWidget);
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       expect(result?.cancelled, isTrue);
@@ -179,6 +179,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(calls, 0);
       expect(find.textContaining('may sync with your vault'), findsOneWidget);
+      expect(find.textContaining('Line 1:'), findsNothing);
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('move-link-details')),
+      );
+      await tester.tap(find.byKey(const ValueKey('move-link-details')));
+      await tester.pumpAndSettle();
       await tester.ensureVisible(
         find.byKey(const ValueKey('note-move-diff-Origin.md')),
       );

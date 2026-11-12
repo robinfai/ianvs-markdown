@@ -319,7 +319,7 @@ final class WorkspaceNoteTransaction {
 
   /// Metadata-only complete catalog. Per-directory budgets and a whole-walk
   /// deadline are independent of the transaction byte limit. No body is fetched.
-  private func catalog(_ scope: WorkspaceTextScope) throws -> [Metadata] {
+  private func catalog(_ scope: WorkspaceTextScope, allowOfflineFiles: Bool = false) throws -> [Metadata] {
     let end = DispatchTime.now().uptimeNanoseconds + 10_000_000_000
     var pending = [""]; var rows: [Metadata] = []
     while let path = pending.popLast() {
@@ -333,7 +333,8 @@ final class WorkspaceNoteTransaction {
               let relative = entry["relativePath"] as? String,
               let revision = entry["revision"] as? String,
               let directory = entry["isDirectory"] as? Bool,
-              let local = entry["local"] as? Bool, local else { throw Failure("catalog_unavailable") }
+              let local = entry["local"] as? Bool,
+              local || (allowOfflineFiles && !directory) else { throw Failure("catalog_unavailable") }
         rows.append(Metadata(path: relative, revision: revision, isDirectory: directory, local: local))
         if directory { pending.append(relative) }
       }
@@ -341,7 +342,7 @@ final class WorkspaceNoteTransaction {
     try scope.verifyRootLocation()
     return rows
   }
-  private func metadata(_ raw: Any?, assets: Bool = false) throws -> [Metadata] {
+  private func metadata(_ raw: Any?, assets: Bool = false, allowOfflineFiles: Bool = false) throws -> [Metadata] {
     guard let values = raw as? [[String: Any]], values.count <= Self.maximumCatalogEntries else { throw Failure("invalid_catalog") }
     var seen = Set<String>()
     return try values.map { row in
@@ -349,7 +350,8 @@ final class WorkspaceNoteTransaction {
             !revision.isEmpty, revision.utf8.count <= 200, seen.insert(path).inserted else { throw Failure("invalid_catalog") }
       let directory = assets ? false : row["isDirectory"] as? Bool
       let local = assets ? true : row["local"] as? Bool
-      guard let isDirectory = directory, let isLocal = local, isLocal else { throw Failure("catalog_unavailable") }
+      guard let isDirectory = directory, let isLocal = local,
+            isLocal || (allowOfflineFiles && !isDirectory) else { throw Failure("catalog_unavailable") }
       let parts = try WorkspaceFileScope.relativeComponents(path)
       guard !parts.contains(where: { $0.hasPrefix(".") }) else { throw Failure("invalid_catalog") }
       return Metadata(path: path, revision: revision, isDirectory: isDirectory, local: isLocal)
@@ -358,7 +360,13 @@ final class WorkspaceNoteTransaction {
   /// Reconstructible metadata-only read-set fingerprint. No unrelated rows are
   /// persisted. Non-note files are included so image dependencies can also be
   /// verified after restart without retaining their paths in the journal.
-  private func dependencyDigest(_ scope: WorkspaceTextScope, excluding: Set<String>, directoryRecord: Record? = nil) throws -> String {
+  private func isDirectoryRename(_ record: Record) -> Bool {
+    record.version == 2 && (record.sourcePath as NSString).deletingLastPathComponent ==
+      (record.destinationPath as NSString).deletingLastPathComponent
+  }
+
+  private func dependencyDigest(_ scope: WorkspaceTextScope, excluding: Set<String>, directoryRecord: Record? = nil,
+                                allowOfflineFiles: Bool = false) throws -> String {
     guard !forceDependencyTimeout else { throw Failure("dependency_timeout") }
     let deadline = DispatchTime.now().uptimeNanoseconds + 10_000_000_000
     var pending: [[String]] = [[]]
@@ -388,14 +396,19 @@ final class WorkspaceNoteTransaction {
           pointer.withMemoryRebound(to: CChar.self, capacity: capacity) { String(validatingUTF8: $0) }
         }
         guard let name else { throw Failure("dependency_unavailable") }
+        let placeholder = name.hasPrefix(".") && name.hasSuffix(".icloud") &&
+          !String(name.dropFirst().dropLast(7)).isEmpty &&
+          !String(name.dropFirst().dropLast(7)).hasPrefix(".")
         if name.hasPrefix(".") {
-          if name.hasSuffix(".icloud") {
-            let logical = String(name.dropFirst().dropLast(7))
-            if !logical.isEmpty && !logical.hasPrefix(".") {
+          if placeholder {
+            // A disclosed partial rename does not read or hydrate external
+            // placeholders. Fingerprint their physical metadata instead of
+            // omitting them: eviction, hydration or replacement invalidates
+            // the read set, including after a restart.
+            guard allowOfflineFiles || directoryRecord.map(isDirectoryRename) == true else {
               throw Failure("catalog_unavailable")
             }
-          }
-          continue
+          } else { continue }
         }
         count += 1
         guard count <= Self.maximumCatalogEntries else { throw Failure("dependency_limit") }
@@ -414,7 +427,7 @@ final class WorkspaceNoteTransaction {
         } else { logicalPath = path }
         if excluding.contains(logicalPath) { continue }
         let revision = kind == mode_t(S_IFDIR) ? Self.identity(value) : WorkspaceFileScope.revision(value)
-        let local = value.st_flags & UInt32(SF_DATALESS) == 0
+        let local = !placeholder && value.st_flags & UInt32(SF_DATALESS) == 0
         lines.append(Data("\(logicalPath.utf8.count):\(logicalPath)|\(kind)|\(revision)|\(local)\n".utf8))
       }
       var after = stat()
@@ -430,7 +443,8 @@ final class WorkspaceNoteTransaction {
     return hasher.finalize().map { String(format: "%02x", $0) }.joined()
   }
 
-  private func digest(_ rows: [Metadata], excluding: Set<String>, assets: [Metadata], scope: WorkspaceTextScope) throws -> String {
+  private func digest(_ rows: [Metadata], excluding: Set<String>, assets: [Metadata], scope: WorkspaceTextScope,
+                      allowOfflineFiles: Bool = false) throws -> String {
     for asset in assets {
       let parts = try WorkspaceFileScope.relativeComponents(asset.path)
       let parent = try scope.parentDescriptor(parts); defer { close(parent) }
@@ -439,7 +453,7 @@ final class WorkspaceNoteTransaction {
             value.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG), value.st_flags & UInt32(SF_DATALESS) == 0,
             WorkspaceFileScope.revision(value) == asset.revision else { throw Failure("asset_changed") }
     }
-    return try dependencyDigest(scope, excluding: excluding)
+    return try dependencyDigest(scope, excluding: excluding, allowOfflineFiles: allowOfflineFiles)
   }
 
   private func matchesMetadata(_ snapshot: Snapshot?, entry: Entry) -> Bool {
@@ -1974,8 +1988,9 @@ final class WorkspaceNoteTransaction {
           }),
           let sourceMember = actualMembers.first(where: { $0.path == source }),
           tree["sourceIdentity"] as? String == sourceMember.identity else { throw Failure("directory_tree_changed") }
-    let expectedCatalog = try metadata(arguments["catalog"])
-    let actualCatalog = try catalog(scope)
+    let rename = (source as NSString).deletingLastPathComponent == (destination as NSString).deletingLastPathComponent
+    let expectedCatalog = try metadata(arguments["catalog"], allowOfflineFiles: rename)
+    let actualCatalog = try catalog(scope, allowOfflineFiles: rename)
     func rows(_ values: [Metadata]) -> [String] { values.map { "\($0.path)|\($0.revision)|\($0.isDirectory)|\($0.local)" }.sorted() }
     guard rows(expectedCatalog) == rows(actualCatalog) else { throw Failure("catalog_changed") }
     let assets = try metadata(arguments["assets"] ?? [[String: Any]](), assets: true)
@@ -2035,7 +2050,8 @@ final class WorkspaceNoteTransaction {
     for entry in entries {
       if let path = entry.artifactPath, try !pathAbsent(scope, path: path, artifact: true) { throw Failure("artifact_exists") }
     }
-    let fingerprint = try digest(actualCatalog, excluding: Set(entries.map(\.path)), assets: assets, scope: scope)
+    let fingerprint = try digest(actualCatalog, excluding: Set(entries.map(\.path)), assets: assets, scope: scope,
+                                 allowOfflineFiles: rename)
     let record = Record(id: id, scope: scope, rootIdentity: rootIdentity, source: source,
                         destination: destination, digest: fingerprint, entries: entries)
     record.version = 2
@@ -2127,7 +2143,7 @@ final class WorkspaceNoteTransaction {
       }
       // Project paths back to the original namespace, but retain every member
       // and every outside dependency. Never exempt the whole moved subtree.
-      _ = try catalog(scope)
+      _ = try catalog(scope, allowOfflineFiles: isDirectoryRename(record))
       let copies = record.recoveries.filter { $0.state == "applied" }.map(\.path)
       guard try dependencyDigest(scope, excluding: Set(record.entries.map(\.path) + copies),
                                  directoryRecord: record) == record.catalogDigest else { throw Failure("catalog_changed") }

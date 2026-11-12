@@ -98,7 +98,7 @@ void main() {
     int maximumBackupBytes = 32 * 1024 * 1024,
     bool Function()? isCancelled,
   }) async {
-    final snapshot = await references.refresh();
+    final snapshot = await references.refresh(refreshMetadata: true);
     return WorkspaceNoteMovePlanner(
       references,
       maximumFiles: maximumFiles,
@@ -426,6 +426,96 @@ void main() {
         containsAll(['unsupportedMember', 'hiddenMember', 'retainedArtifacts']),
       );
       expect(codes(result), isNot(contains('sourceMissing')));
+    },
+  );
+
+  test(
+    'rename updates confirmed inbound links despite external offline notes',
+    () async {
+      source.note('a/One.md', '[internal](Two.md)');
+      source.note('a/Two.md', '# Two');
+      source.note('Incoming.md', '[one](a/One.md) [[a/Two]]');
+      source.note('Elsewhere/Offline.md', '[one](../a/One.md)');
+      source.offline.add('Elsewhere/Offline.md');
+      final result = await plan(to: 'renamed');
+      expect(result.canExecute, isTrue, reason: codes(result).toString());
+      expect(result.complete, isFalse);
+      expect(
+        result.warnings.any((w) => w.path == 'Elsewhere/Offline.md'),
+        isTrue,
+      );
+      expect(
+        result.files.any((f) => f.path == 'Elsewhere/Offline.md'),
+        isFalse,
+      );
+      expect(
+        result.files.firstWhere((f) => f.path == 'Incoming.md').contents,
+        '[one](renamed/One.md) [[/renamed/Two]]',
+      );
+      expect(
+        result.files.firstWhere((f) => f.path == 'a/One.md').edits,
+        isEmpty,
+      );
+      expect((await plan(to: 'elsewhere/renamed')).canExecute, isFalse);
+    },
+  );
+
+  test(
+    'rename discloses external parser failures without editing partial sources',
+    () async {
+      source.note('a/One.md', '# One');
+      source.note('TooLong.md', 'x' * 200000);
+      final result = await plan(to: 'renamed');
+      expect(result.canExecute, isTrue, reason: codes(result).toString());
+      expect(result.warnings.any((w) => w.path == 'TooLong.md'), isTrue);
+      expect(result.files.map((f) => f.path), ['a/One.md']);
+    },
+  );
+
+  test(
+    'rename keeps source availability, conflicts and known dirty inbound notes blocking',
+    () async {
+      source.note('a/One.md', '# One');
+      source.note('Incoming.md', '[one](a/One.md)');
+      source.offline.add('a/One.md');
+      expect((await plan(to: 'renamed')).canExecute, isFalse);
+      source.offline.clear();
+      source.note('renamed/Exists.md', '# Existing');
+      expect(codes(await plan(to: 'renamed')), contains('destinationExists'));
+      source.files.remove('renamed/Exists.md');
+      source.folders.remove('renamed');
+      index.configure('/vault');
+      index.updateBuffer(
+        sessionId: 'incoming',
+        path: '/vault/Incoming.md',
+        name: 'Incoming.md',
+        text: '[one](a/One.md)',
+      );
+      expect(
+        codes(await plan(to: 'renamed', dirty: {'incoming'})),
+        contains('dirty'),
+      );
+    },
+  );
+
+  test(
+    'rename can omit unresolved external notes but never rewrite a note with unresolved dependencies',
+    () async {
+      source.note('a/One.md', '# One');
+      source.note('Outside.md', '[opaque](secret.pdf)');
+      var result = await plan(to: 'renamed');
+      expect(result.canExecute, isTrue, reason: codes(result).toString());
+      expect(result.warnings, isNotEmpty);
+      source.note('Outside.md', '[one](a/One.md) [opaque](secret.pdf)');
+      index.updateBuffer(
+        sessionId: 'outside',
+        path: '/vault/Outside.md',
+        name: 'Outside.md',
+        text: source.files['Outside.md']!,
+      );
+      result = await plan(to: 'renamed');
+      expect(result.canExecute, isFalse);
+      expect(codes(result), contains('unresolved'));
     },
   );
 
