@@ -1742,10 +1742,7 @@ class WorkspaceController extends ChangeNotifier {
   }
 
   void _validateNoteMovePlan(WorkspaceNoteMovePlan plan) {
-    if (_disposed ||
-        !plan.executionSupported ||
-        !plan.complete ||
-        !plan.isCurrent(index)) {
+    if (_disposed || !plan.canExecute || !plan.isCurrent(index)) {
       throw StateError(
         'The preview changed. Refresh and confirm a new preview.',
       );

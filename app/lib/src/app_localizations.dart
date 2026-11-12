@@ -28,6 +28,87 @@ String appText(
 }
 
 const appMessages = <String, List<String>>{
+  "Some affected files are not available locally.": [
+    "Some affected files are not available locally.",
+    "部分受影响文件尚未下载到本地，暂不能更新链接。",
+  ],
+  "A file or folder already occupies the destination.": [
+    "A file or folder already occupies the destination.",
+    "目标位置已存在同名文件或文件夹。",
+  ],
+  "Save or resolve the affected notes first.": [
+    "Save or resolve the affected notes first.",
+    "请先保存受影响笔记，或处理其外部变更。",
+  ],
+  "An affected note could not be fully parsed or resolved.": [
+    "An affected note could not be fully parsed or resolved.",
+    "受影响笔记无法完整解析或确认链接目标，暂不能改写。",
+  ],
+  "Rename folder": ["Rename folder", "重命名文件夹"],
+  "Location: {0}": ["Location: {0}", "所在位置：{0}"],
+  "Rename and confirmed link updates verified. Unchecked links may remain.": [
+    "Rename and confirmed link updates verified. Unchecked links may remain.",
+    "已验证重命名及已确认链接的更新，未检查的链接可能仍需处理。",
+  ],
+  "Original recovery copies are retained and may sync with your vault.": [
+    "Original recovery copies are retained and may sync with your vault.",
+    "将保留原始内容恢复副本，副本可能随工作区同步。",
+  ],
+  "Moving without updates may break existing links.": [
+    "Moving without updates may break existing links.",
+    "不更新链接的移动可能导致现有链接失效。",
+  ],
+  "Renaming without updates may break existing links.": [
+    "Renaming without updates may break existing links.",
+    "仅重命名可能导致现有链接失效。",
+  ],
+  "Link changes": ["Link changes", "链接变更"],
+  "{0} blockers · {1} coverage warnings": [
+    "{0} blockers · {1} coverage warnings",
+    "{0} 项阻塞 · {1} 项覆盖提示",
+  ],
+  "Check details": ["Check details", "检查详情"],
+  "Directory contents": ["Directory contents", "目录内容"],
+  "Known references have been checked. The destination will be verified before changes.": [
+    "Known references have been checked. The destination will be verified before changes.",
+    "已检查已知引用，执行前还会核验目标位置。",
+  ],
+  "Only confirmed links will be updated. Unchecked notes may still contain old links.": [
+    "Only confirmed links will be updated. Unchecked notes may still contain old links.",
+    "仅更新已确认的链接，未检查的笔记中可能仍有旧链接。",
+  ],
+  "Resolve the affected files or destination issues before updating links.": [
+    "Resolve the affected files or destination issues before updating links.",
+    "受影响文件或目标位置存在问题，请展开检查详情。",
+  ],
+  "Ready to update links": ["Ready to update links", "可以更新链接"],
+  "Some links could not be checked": [
+    "Some links could not be checked",
+    "部分链接尚未检查",
+  ],
+  "Link updates are blocked": ["Link updates are blocked", "链接维护检查未通过"],
+  "Includes relocated notes whose contents do not need changes.": [
+    "Includes relocated notes whose contents do not need changes.",
+    "包含随目录移动、内容无需修改的笔记。",
+  ],
+  "{0} link replacements": ["{0} link replacements", "{0} 处链接替换"],
+  "{0} involved notes": ["{0} involved notes", "{0} 篇涉及笔记"],
+  "{0} directory items": ["{0} directory items", "{0} 项目录内容"],
+  "Impact overview": ["Impact overview", "影响概览"],
+  "Review name changes and link impact": [
+    "Review name changes and link impact",
+    "预览名称变更与链接影响",
+  ],
+  "Rename preview": ["Rename preview", "重命名预览"],
+  "Rename and update links": ["Rename and update links", "重命名并更新链接"],
+  "Rename and update confirmed links": [
+    "Rename and update confirmed links",
+    "重命名并更新已确认链接",
+  ],
+  "Rename only": ["Rename only", "仅重命名"],
+  "View full paths": ["View full paths", "查看完整路径"],
+  "New name": ["New name", "新名称"],
+  "Current name": ["Current name", "原名称"],
   "Drag to resize sidebar. Double-click to reset.": [
     "Drag to resize sidebar. Double-click to reset.",
     "拖动以调整侧栏宽度，双击重置。",

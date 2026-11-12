@@ -1,7 +1,7 @@
 name: linefold
 description: A shared Markdown workspace and editor for macOS and iOS.
 publish_to: none
-version: 0.1.14+17
+version: 0.1.15+18
 
 environment:
   sdk: ^3.12.0
@@ -37,6 +37,8 @@ flutter:
   config:
     enable-swift-package-manager: false
   uses-material-design: true
+  assets:
+    - assets/icons/move-preview-atlas.png
 
 # Native Assets hooks 2.2 require newer annotations than Flutter 3.44 pins.
 dependency_overrides:

@@ -57,3 +57,51 @@ No actionable P0–P2 visual discrepancy remains in the requested scope.
 The final full-view, focused-header, and mode-menu before/after comparisons were reviewed at matched scales. Dark and narrow 200% text captures were inspected. No actionable P0–P2 issue remains in the requested header, centering, or mode-menu scope.
 
 final result: passed
+
+---
+
+# Design QA — directory rename overview (2026-11-12)
+
+This section records the current rename-dialog work; the earlier header review above is preserved as historical evidence.
+
+## Source and implementation evidence
+
+- Source concept: `/Users/robinfai/.codex/generated_images/01a1cd5d-67dc-7171-afd1-8db1113de8dc/exec-4a924f4f-31ad-4a80-899b-8df01f1da97e.png` (1351 × 1164 pixels).
+- Generated transparent icon atlas: `app/assets/icons/move-preview-atlas.png` (1774 × 887 pixels, four columns by two rows).
+- Implementation: `app/build/workflow-ui/rename-blocked-zh.png`, `rename-partial-zh.png`, and `rename-partial-dark-zh.png`.
+- Flutter widget-harness viewport: 1000 × 900 logical pixels, device pixel ratio 1, screenshots 1000 × 900. These are real Flutter component renders with synthetic workspace data, not captures of the installed macOS application.
+- The concept has no declared device density. Compare hierarchy and the modal component, not the outside canvas or an inferred exact pixel scale. No images were stretched to claim a pixel match.
+- Shared blocked state: one folder renamed in its current parent, two directory entries, one involved note, zero text replacements, a visible disabled update action, details initially collapsed.
+- Additional states: partial external coverage with an enabled, explicitly labeled confirmed-links action; dark mode; expanded diagnostics; completed partial update.
+
+## Comparison and iteration history
+
+The source concept and rendered blocked dialog were opened together in the same comparison input. Full-resolution captures were readable enough to inspect headings, labels, action text, and icon shapes without a separate crop.
+
+1. Initial capture exposed missing CJK fonts in the harness and a purple caution surface. Loaded local CJK test fonts and used the existing Ianvs warning token. Follow-up captures show legible Chinese and an amber/brown warning treatment.
+2. Replaced the dialog's folder, document, link, warning, location, close and disclosure glyphs with the generated transparent atlas, as requested. Disclosure arrows rotate with expansion. Fixed harness capture timing by decoding the asset before capturing, so first-frame image loading is not mistaken for a missing icon.
+3. Dark capture exposed low-contrast old-name and overview-heading text (P2). Set those foregrounds explicitly to the theme's `onSurface`; the final dark capture was reopened and checked after the fix.
+
+## Required visual surfaces
+
+- Typography: a 20-point heading, compact application body typography, clear secondary captions, wrapping action labels at narrow sizes. The harness uses local Heiti for reproducible Chinese glyphs; installed-app system font rasterization is outside this review.
+- Spacing/layout: one white/dark modal, aligned before/after names, a single impact overview, one caution region, collapsed details and footer actions. No clipped default controls in the desktop captures. Existing 320-point-wide tests pass at text scales 1, 2 and 3.
+- Colors/tokens: existing app surfaces and blue actions; warning uses the Ianvs warning token. Icons use an alpha tint, including dark and disabled colors. Dark text contrast was fixed and visually rechecked.
+- Image quality/assets: the original generated PNG is bundled in the app. Eight separate atlas cells preserve transparent backgrounds; no hand-drawn replacement glyphs. Actual folder, note, link, warning, location, close and arrow renders were inspected.
+- Copy: overview is Chinese; full paths and raw diagnostics appear only on expansion. Partial coverage says only confirmed links will be updated and repeats possible omissions on completion. Blocking explanations distinguish offline sources, destination collisions, dirty notes and unparseable dependencies.
+
+## Intentional product adaptations
+
+The implementation uses existing compact native typography and button styling rather than reproducing the enlarged concept canvas literally. A separate collapsed link-changes row keeps source diffs reachable without expanding diagnostic logs. Recovery-copy disclosure remains visible before execution. These preserve existing application behavior and were retained intentionally.
+
+## Verification and limits
+
+- 201 related Dart regression tests passed before icon integration; 88 affected UI/execution regression tests passed after integration.
+- Final Chinese overview checks pass in light partial, light blocked and dark partial states (3 tests), including detail expansion and explicit execution of the displayed plan.
+- Real production Swift transaction suite passed, including external offline placeholders, changed-placeholder rejection, source-placeholder rejection, cross-parent behavior and restart reconciliation.
+- `flutter analyze --no-pub`: no issues. `git diff --check`: passed.
+- This review does not claim a fresh installed-app launch or an end-to-end test against the user's real iCloud workspace.
+
+No actionable P0/P1/P2 issue remains in the reviewed rename-dialog scope. Minor P3 follow-up: native system font appearance can differ slightly from the deterministic test fonts.
+
+final result: passed

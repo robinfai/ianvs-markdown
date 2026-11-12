@@ -291,10 +291,7 @@ class AppleWorkspaceNoteTransactionStore
     WorkspaceNoteMovePlan plan,
     String transactionId,
   ) async {
-    if (!plan.executionSupported ||
-        !plan.complete ||
-        plan.root == null ||
-        !_validId(transactionId)) {
+    if (!plan.canExecute || plan.root == null || !_validId(transactionId)) {
       throw StateError('Only a complete exact preview can be prepared.');
     }
     final metadata = {
