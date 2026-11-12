@@ -1586,6 +1586,14 @@ struct NativeNoteTransactionAcceptance {
         try require(try f.identity(moved) == identities[path], "Unchanged metadata must stay on the same inode")
         try require(try attributes(f.url(moved)) == metadata[path], "Every xattr, including quarantine, must survive unchanged")
       }
+      let stored = try JSONSerialization.jsonObject(with: Data(contentsOf:
+        f.journal.appendingPathComponent((request["transactionId"] as! String).lowercased() + ".json"))) as! [String: Any]
+      for entry in stored["entries"] as! [[String: Any]] {
+        if let expected = metadata[entry["path"] as! String]?["com.apple.provenance"] {
+          try require(entry["provenance"] as? String == expected.base64EncodedString(),
+                      "Existing v2 provenance evidence must remain compatible for unchanged notes")
+        }
+      }
       let restarted = WorkspaceNoteTransaction(journalDirectory: f.journal)
       let observed = try f.invoke(restarted, "reconcileWorkspaceNoteMove", f.command(request))
       try require(observed["phase"] as? String == "completed", "Preserved-metadata result must verify after restart")

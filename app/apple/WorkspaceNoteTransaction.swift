@@ -605,6 +605,26 @@ final class WorkspaceNoteTransaction {
     #endif
   }
 
+  /// Read the already-supported attribute without rejecting other metadata
+  /// on an inode-preserving member. Retaining this value also keeps older v2
+  /// journals (which recorded provenance for unchanged notes) verifiable.
+  private func preservedProvenance(_ descriptor: Int32) throws -> Data? {
+    #if os(macOS)
+    errno = 0
+    let size = fgetxattr(descriptor, "com.apple.provenance", nil, 0, 0, 0)
+    if size < 0 && errno == ENOATTR { return nil }
+    guard size > 0, size <= 4096 else { throw Failure("unsupported_metadata") }
+    var data = Data(count: size)
+    let read = data.withUnsafeMutableBytes {
+      fgetxattr(descriptor, "com.apple.provenance", $0.baseAddress, $0.count, 0, 0)
+    }
+    guard read == size else { throw Failure("unsupported_metadata") }
+    return data
+    #else
+    return nil
+    #endif
+  }
+
   private func requireEmptyACL(_ descriptor: Int32, failureCode: String = "unsupported_metadata") throws {
     errno = 0
     if let acl = acl_get_fd_np(descriptor, ACL_TYPE_EXTENDED) {
@@ -640,7 +660,7 @@ final class WorkspaceNoteTransaction {
       }
     } else { try requirePlainMetadata(descriptor) }
     let dataProtection = try protectionClass(descriptor)
-    let sourceProvenance = preservingInode ? nil : try readProvenance(descriptor)
+    let sourceProvenance = try preservingInode ? preservedProvenance(descriptor) : readProvenance(descriptor)
     var inspected = stat()
     guard fstat(descriptor, &inspected) == 0,
           WorkspaceFileScope.revision(inspected) == WorkspaceFileScope.revision(attributes) else { throw Failure("file_conflict") }
