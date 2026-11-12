@@ -124,9 +124,10 @@ list 元素 span 必须落在当前属性 value 内。带引号的普通 `"&name
 
 ## 显式不完整边界
 
-- 正文使用默认 `IanvsMarkdownRenderBudget`：1 Mi UTF-16 原文、4 Ki 单行、4,096 syntax
-  tokens。超限返回 `bodyBudget`，不把截断文本当完整文档。
-- references、tags 与 issues 合计最多分配 4,096 条常规记录；超限即停止正文解析，
+- 链接语义扫描使用独立预算：8 Mi UTF-16 原文、1 Mi 单行、262,144 syntax
+  tokens；不复用交互式渲染预算。目录改写复检共用相同源长度、行长度和引用数量上限。
+  超限返回 `bodyBudget`，不把截断文本当完整文档。
+- references、tags 与 issues 合计最多分配 65,536 条常规记录；超限即停止正文解析，
   另附一条 `occurrenceBudget` 终止标记，包括不计入 renderer syntax tokens 的 tag-heavy
   或 automatic-URL-heavy 输入。
 - source-mapped container 嵌套最多 64 层；超限或无法建立语义时返回 `parserLimit`。

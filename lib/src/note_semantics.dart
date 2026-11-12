@@ -112,6 +112,17 @@ final class IanvsMarkdownNoteSemantics {
   bool get complete => issues.isEmpty;
 }
 
+/// Link indexing has no layout/widget cost and uses its own generous budget.
+/// Shared with post-edit verification instead of interactive render limits.
+const ianvsMarkdownSemanticSourceLimit = 8 * 1024 * 1024;
+const ianvsMarkdownSemanticLineLimit = 1024 * 1024;
+const ianvsMarkdownSemanticBudget = IanvsMarkdownRenderBudget(
+  maxSourceCodeUnits: ianvsMarkdownSemanticSourceLimit,
+  maxLineCodeUnits: ianvsMarkdownSemanticLineLimit,
+  maxSyntaxTokens: 256 * 1024,
+);
+const ianvsMarkdownSemanticOccurrenceLimit = 64 * 1024;
+
 /// Parses bounded, source-preserving note references and metadata.
 ///
 /// No files are read, targets resolved, or source rewritten. CommonMark link
@@ -124,7 +135,7 @@ IanvsMarkdownNoteSemantics parseIanvsMarkdownNoteSemantics(String source) {
   final bodyStart = collector.frontMatter();
   final decision = scanMarkdownForRendering(
     source,
-    budget: const IanvsMarkdownRenderBudget(),
+    budget: ianvsMarkdownSemanticBudget,
   );
   if (!decision.useMarkdown) {
     collector.issue(
@@ -203,7 +214,8 @@ IanvsMarkdownNoteSemantics parseIanvsMarkdownNoteSemantics(String source) {
   } on _SemanticOccurrenceLimit {
     collector.issue(
       'occurrenceBudget',
-      'Semantic references, tags and issues exceed the 4096-occurrence limit.',
+      'Semantic references, tags and issues exceed the '
+          '$ianvsMarkdownSemanticOccurrenceLimit-occurrence limit.',
     );
   } on Object {
     collector.issue(
@@ -241,7 +253,8 @@ final class _SemanticCollector {
   }
 
   void _checkOccurrenceBudget() {
-    if (references.length + tags.length + issues.length >= 4096) {
+    if (references.length + tags.length + issues.length >=
+        ianvsMarkdownSemanticOccurrenceLimit) {
       throw const _SemanticOccurrenceLimit();
     }
   }
@@ -437,6 +450,7 @@ final class _SemanticCollector {
         IanvsMarkdownLiteralReferenceWhitespaceSyntax(),
         _HtmlSyntax(this, region),
         _AutolinkSyntax(this, region),
+        _SemanticPlainWordSyntax(),
         _WikiSyntax(this, region),
         _TagSyntax(this, region),
         _LinkSyntax(this, region),
@@ -871,6 +885,46 @@ final class _WikiSyntax extends md.InlineSyntax {
     parser.addNode(md.Text(match.group(0)!));
     return true;
   }
+}
+
+/// The upstream plain-text regex requires trailing whitespace and otherwise
+/// retries a long word at every offset. Advance ASCII words once, preserving
+/// suffixes at which Obsidian's permissive bare URL matcher can still start.
+/// Autolinks run first, so a valid email is consumed before this literal path.
+final class _SemanticPlainWordSyntax extends md.InlineSyntax {
+  _SemanticPlainWordSyntax() : super(r'[A-Za-z0-9]+');
+
+  @override
+  bool tryMatch(md.InlineParser parser, [int? startMatchPos]) {
+    final match = pattern.matchAsPrefix(
+      parser.source,
+      startMatchPos ?? parser.pos,
+    );
+    if (match == null) return false;
+    var end = match.end;
+    final word = match[0]!.toLowerCase();
+    if (end < parser.source.length) {
+      final next = parser.source.codeUnitAt(end);
+      final suffixes = next == 0x3a
+          ? const ['https', 'http', 'ftp']
+          : next == 0x2e
+          ? const ['www']
+          : const <String>[];
+      for (final suffix in suffixes) {
+        if (word.endsWith(suffix)) {
+          end -= suffix.length;
+          break;
+        }
+      }
+    }
+    if (end == parser.pos) return false;
+    parser.writeText();
+    parser.advanceBy(end - parser.pos);
+    return true;
+  }
+
+  @override
+  bool onMatch(md.InlineParser parser, Match match) => false;
 }
 
 final class _AutolinkSyntax extends IanvsMarkdownAutolinkSyntax {
