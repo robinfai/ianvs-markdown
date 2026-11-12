@@ -338,4 +338,40 @@ void main() {
       );
     },
   );
+  testWidgets(
+    'native prepare rejection reports no changes rather than partial completion',
+    (tester) async {
+      final value = (await tester.runAsync(() => plan()))!;
+      final blocked = WorkspaceNoteMoveRecord(
+        transactionId: 'rejected',
+        phase: 'blocked',
+        code: 'unsupported_metadata',
+        entries: [],
+      );
+      expect(blocked.blockedBeforeChanges, isTrue);
+      await open(
+        tester,
+        preview: Future.value(value),
+        execute: (_) async => blocked,
+        onResult: (_) {},
+      );
+      expect(
+        find.text(
+          'The operation was blocked before changes. No files were changed.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text('A file has metadata that cannot be safely rewritten.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Operation state: blocked'), findsNothing);
+      expect(find.textContaining('Recovery journal:'), findsNothing);
+      expect(find.byKey(const ValueKey('move-and-update-links')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('move-without-updating-links')),
+        findsNothing,
+      );
+    },
+  );
 }

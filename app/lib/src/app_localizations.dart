@@ -28,6 +28,26 @@ String appText(
 }
 
 const appMessages = <String, List<String>>{
+  'Link scanning reached its limit. The note will remain unchanged; some links may need manual repair.': [
+    'Link scanning reached its limit. The note will remain unchanged; some links may need manual repair.',
+    '链接检查达到处理上限。这篇笔记将保留原文，部分链接可能需要手动修复。',
+  ],
+  'Line {0}: link target "{1}" could not be uniquely resolved. This link was not changed.': [
+    'Line {0}: link target "{1}" could not be uniquely resolved. This link was not changed.',
+    '第 {0} 行：无法唯一确定链接“{1}”的目标，该链接不会被改写。',
+  ],
+  "The operation was blocked before changes. No files were changed.": [
+    "The operation was blocked before changes. No files were changed.",
+    "操作已在执行前被阻止，文件未被更改。",
+  ],
+  "The move is partial or unverified. Review recovery before retrying.": [
+    "The move is partial or unverified. Review recovery before retrying.",
+    "移动可能部分完成或尚未验证，请先查看恢复记录再重试。",
+  ],
+  "A file has metadata that cannot be safely rewritten.": [
+    "A file has metadata that cannot be safely rewritten.",
+    "文件包含目前无法安全保留的元数据，无法改写其正文。",
+  ],
   "Renamed. Unchecked links may still need repair.": [
     "Renamed. Unchecked links may still need repair.",
     "已重命名，未检查的链接可能仍需手动修复。",

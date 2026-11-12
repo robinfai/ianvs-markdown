@@ -19,6 +19,16 @@ class WorkspaceNoteMoveDecision {
   bool get cancelled => !manual && automatic == null;
 }
 
+String workspaceNoteMoveFailureMessage(
+  BuildContext context,
+  WorkspaceNoteMoveRecord record,
+) => appText(
+  context,
+  record.blockedBeforeChanges
+      ? 'The operation was blocked before changes. No files were changed.'
+      : 'The move is partial or unverified. Review recovery before retrying.',
+);
+
 /// A submitted, fully checked rename needs no second confirmation. Incomplete
 /// coverage still requires a choice; moves/batches retain their review flow.
 Future<WorkspaceNoteMoveDecision> showWorkspaceNoteMovePreview({
@@ -755,7 +765,20 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                                 ? issue.code
                                 : _displayPath(issue.path!),
                           ),
-                          subtitle: SelectableText(issue.message),
+                          subtitle: SelectableText(
+                            issue.code == 'scanBudget'
+                                ? appText(
+                                    context,
+                                    'Link scanning reached its limit. The note will remain unchanged; some links may need manual repair.',
+                                  )
+                                : issue.target != null && issue.line != null
+                                ? appText(
+                                    context,
+                                    'Line {0}: link target "{1}" could not be uniquely resolved. This link was not changed.',
+                                    [issue.line, issue.target],
+                                  )
+                                : issue.message,
+                          ),
                         ),
                       if (plan.canExecute)
                         Padding(
@@ -911,6 +934,8 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                                 ? 'Rename and confirmed link updates verified. Unchecked links may remain.'
                                 : 'Move and reference updates verified.',
                           )
+                        : record.blockedBeforeChanges
+                        ? workspaceNoteMoveFailureMessage(context, record)
                         : appText(
                             context,
                             "Operation state: {0}. Do not assume every file changed.",
@@ -918,6 +943,13 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                           ),
                   ),
                   if (record.message != null) Text(record.message!),
+                  if (record.code == 'unsupported_metadata')
+                    Text(
+                      appText(
+                        context,
+                        'A file has metadata that cannot be safely rewritten.',
+                      ),
+                    ),
                   if (record.code != null) Text(record.code!),
                   if (record.namespace case final namespace?)
                     Text(
@@ -953,11 +985,12 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                     Text(
                       appText(context, "Recovered original copy: {0}", [path]),
                     ),
-                  Text(
-                    appText(context, "Recovery journal: {0}", [
-                      record.transactionId,
-                    ]),
-                  ),
+                  if (!record.blockedBeforeChanges)
+                    Text(
+                      appText(context, "Recovery journal: {0}", [
+                        record.transactionId,
+                      ]),
+                    ),
                 ],
                 if (scrollActions) ...[
                   const SizedBox(height: 16),

@@ -238,6 +238,7 @@ struct NativeNoteTransactionAcceptance {
     try run("storageInventoryCountsAndBounds", storageInventoryCountsAndBounds)
     try run("storageInventoryScopeAndArtifacts", storageInventoryScopeAndArtifacts)
     try run("storageInventoryRaces", storageInventoryRaces)
+    try run("directoryUnchangedMetadata", directoryUnchangedMetadata)
     try run("directoryRenameExternalOffline", directoryRenameExternalOffline)
     try run("directorySuccessAndRestart", directorySuccessAndRestart)
     try run("directoryEmptyAndImageOnly", directoryEmptyAndImageOnly)
@@ -1523,6 +1524,91 @@ struct NativeNoteTransactionAcceptance {
     return ["path": f.root.path, "transactionId": UUID().uuidString, "sourcePath": source,
             "destinationPath": destination, "files": files, "tree": tree,
             "catalog": try f.catalogRows(), "assets": [["path": "assets/image.png", "revision": try f.revision("assets/image.png")]]]
+  }
+
+  private static func directoryUnchangedMetadata() throws {
+    func attributes(_ url: URL) throws -> [String: Data] {
+      let count = listxattr(url.path, nil, 0, XATTR_NOFOLLOW)
+      try require(count >= 0 && count < 65536, "Unable to inspect test metadata")
+      if count == 0 { return [:] }
+      var names = [CChar](repeating: 0, count: count)
+      let actual = names.withUnsafeMutableBufferPointer { listxattr(url.path, $0.baseAddress, $0.count, XATTR_NOFOLLOW) }
+      try require(actual == count, "Test metadata changed while listing")
+      var result: [String: Data] = [:]
+      for name in String(decoding: names.map { UInt8(bitPattern: $0) }, as: UTF8.self).split(separator: "\0") {
+        let key = String(name)
+        let size = getxattr(url.path, key, nil, 0, 0, XATTR_NOFOLLOW)
+        try require(size >= 0 && size < 65536, "Invalid test attribute size")
+        var value = Data(count: size)
+        let read = value.withUnsafeMutableBytes { getxattr(url.path, key, $0.baseAddress, $0.count, 0, XATTR_NOFOLLOW) }
+        try require(read == size, "Unable to read test attribute")
+        result[key] = value
+      }
+      return result
+    }
+    var fixtures: [String?] = [nil]
+    if let path = ProcessInfo.processInfo.environment["LINEFOLD_REAL_RENAME_FIXTURE"] { fixtures.append(path) }
+    for input in fixtures {
+      let f = try Fixture()
+      if let input {
+        // Only COPY the user-selected directory into this disposable vault.
+        // Never prepare or execute a transaction against the original path.
+        try f.manager.copyItem(at: URL(fileURLWithPath: input), to: f.url("Imported"))
+      } else {
+        try f.write("Imported/Note.md", Data("# Unchanged\n".utf8))
+        let value = Data("synthetic provider metadata".utf8)
+        try require(value.withUnsafeBytes { setxattr(f.url("Imported/Note.md").path,
+          "work.ianvs.synthetic", $0.baseAddress, $0.count, 0, 0) } == 0, "Install test xattr")
+      }
+      let tree = CloudWorkspace.inspectWorkspaceDirectoryMoveTree(f.root, relativePath: "Imported", requestId: UUID().uuidString)
+      let members = tree["members"] as! [[String: Any]]
+      let notes = members.filter { $0["kind"] as? String == "note" }.map { $0["path"] as! String }
+      try require(!notes.isEmpty && tree["complete"] as? Bool == true, "Selected copied fixture must have a complete local tree")
+      let bytes = try Dictionary(uniqueKeysWithValues: notes.map { ($0, try f.bytes($0)) })
+      let identities = try Dictionary(uniqueKeysWithValues: notes.map { ($0, try f.identity($0)) })
+      let metadata = try Dictionary(uniqueKeysWithValues: notes.map { ($0, try attributes(f.url($0))) })
+      let files: [[String: Any]] = try notes.map { path in
+        ["path": path, "destinationPath": path.replacingOccurrences(of: "Imported/", with: "Renamed/"),
+         "expectedRevision": try f.revision(path), "expectedBytes": FlutterStandardTypedData(bytes: bytes[path]!),
+         "replacementBytes": FlutterStandardTypedData(bytes: bytes[path]!)]
+      }
+      let request: [String: Any] = ["path": f.root.path, "transactionId": UUID().uuidString,
+        "sourcePath": "Imported", "destinationPath": "Renamed", "tree": tree,
+        "catalog": try f.catalogRows(), "files": files, "assets": [[String: Any]]()]
+      let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let prepared = try f.invoke(executor, "prepareWorkspaceDirectoryMove", request)
+      try require(prepared["phase"] as? String == "prepared", "Unchanged metadata must not block directory rename: \(prepared)")
+      let result = try f.invoke(executor, "executeWorkspaceNoteMove", f.command(request, token: prepared["token"]))
+      try require(result["phase"] as? String == "completed", "Unchanged metadata rename should finish: \(result)")
+      for path in notes {
+        let moved = path.replacingOccurrences(of: "Imported/", with: "Renamed/")
+        try require(try f.bytes(moved) == bytes[path], "Unchanged text must be byte identical")
+        try require(try f.identity(moved) == identities[path], "Unchanged metadata must stay on the same inode")
+        try require(try attributes(f.url(moved)) == metadata[path], "Every xattr, including quarantine, must survive unchanged")
+      }
+      let stored = try JSONSerialization.jsonObject(with: Data(contentsOf:
+        f.journal.appendingPathComponent((request["transactionId"] as! String).lowercased() + ".json"))) as! [String: Any]
+      for entry in stored["entries"] as! [[String: Any]] {
+        if let expected = metadata[entry["path"] as! String]?["com.apple.provenance"] {
+          try require(entry["provenance"] as? String == expected.base64EncodedString(),
+                      "Existing v2 provenance evidence must remain compatible for unchanged notes")
+        }
+      }
+      let restarted = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let observed = try f.invoke(restarted, "reconcileWorkspaceNoteMove", f.command(request))
+      try require(observed["phase"] as? String == "completed", "Preserved-metadata result must verify after restart")
+      print(input == nil ? "PASS: synthetic unchanged xattrs retained" : "PASS: user-selected directory COPY retained bytes, inode and all xattrs")
+    }
+    // A real text replacement still must refuse metadata it cannot preserve.
+    let f = try Fixture()
+    let value = Data("must survive".utf8)
+    try require(value.withUnsafeBytes { setxattr(f.url(f.source).path,
+      "work.ianvs.synthetic", $0.baseAddress, $0.count, 0, 0) } == 0, "Install rewrite xattr")
+    let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+    let blocked = try f.invoke(executor, "prepareWorkspaceDirectoryMove", directoryRequest(f))
+    try require(blocked["phase"] as? String == "blocked" && blocked["code"] as? String == "unsupported_metadata",
+                "Text rewriting must not strip unsupported metadata")
+    try f.expectOriginals()
   }
 
   private static func directoryRenameExternalOffline() throws {

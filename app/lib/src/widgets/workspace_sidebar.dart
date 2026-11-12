@@ -1557,7 +1557,10 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                           : 'Renamed. Updated {0} link(s).',
                       [decision.plan?.editCount ?? 0],
                     )
-                  : 'The move is partial or unverified. Review recovery before retrying.',
+                  : workspaceNoteMoveFailureMessage(
+                      context,
+                      decision.automatic!,
+                    ),
               onDetails: decision.plan == null
                   ? null
                   : () => _showRenameDetails(
@@ -1669,12 +1672,12 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
     final decision = await _confirmNoteMove(paths, [
       for (final path in paths) p.join(target, p.basename(path)),
     ]);
-    if (decision.cancelled) return;
+    if (!mounted || decision.cancelled) return;
     if (!decision.manual) {
       _message(
         decision.automatic!.completed
             ? 'Moved and reference updates verified.'
-            : 'The move is partial or unverified. Review recovery before retrying.',
+            : workspaceNoteMoveFailureMessage(context, decision.automatic!),
       );
       return;
     }

@@ -112,6 +112,15 @@ class WorkspaceNoteMoveRecord {
   final List<String> recoveryPaths;
   final List<WorkspaceNoteMoveArtifact> retainedArtifacts;
   final List<WorkspaceNoteRecoveryReceipt> recoveryEntries;
+
+  /// Native prepare rejected the request before exposing a user-file manifest.
+  /// Do not label this as a partial move or suggest that recovery is needed.
+  bool get blockedBeforeChanges =>
+      phase == 'blocked' &&
+      entries.isEmpty &&
+      namespace == null &&
+      namespaces.isEmpty;
+
   bool get completed =>
       phase == 'completed' &&
       ((version == 1 &&
