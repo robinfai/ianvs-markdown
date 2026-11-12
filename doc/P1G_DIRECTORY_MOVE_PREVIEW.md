@@ -193,3 +193,17 @@ flags. Exact bytes, identity, revision (including ctime), owner, permissions and
 local availability remain checked. Modified notes and private artifacts retain
 the strict supported-metadata policy. A prepare rejection with no user-file
 manifest is reported as blocked before changes, rather than partial completion.
+
+
+### Private receipt quarantine compatibility
+
+Private journal receipts created by a downloaded macOS app can carry both
+`com.apple.provenance` and `com.apple.quarantine`. Their dedicated admission check
+allows these bounded OS labels (at most 4096 bytes each) and retains them without
+modification. Ownership, flags, empty ACL, regular single-link file identity and
+0600 permissions are still verified before writing a journal payload. Unknown
+attributes remain explicit failures. This policy applies only to fresh app-owned
+receipts; workspace text replacement keeps its existing metadata policy.
+Native regression tests inject quarantine on every journal generation, verify
+completion and restart reconciliation, preserve the exact label, and cover the
+user-selected directory copy with quarantined receipts.
