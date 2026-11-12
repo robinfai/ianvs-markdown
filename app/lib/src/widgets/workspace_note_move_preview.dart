@@ -942,7 +942,14 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                             [record.phase],
                           ),
                   ),
-                  if (record.message != null) Text(record.message!),
+                  if (record.message != null) SelectableText(record.message!),
+                  if (record.code == 'private_journal_unavailable')
+                    Text(
+                      appText(
+                        context,
+                        'The local recovery journal could not be prepared. Copy the diagnostic details for troubleshooting.',
+                      ),
+                    ),
                   if (record.code == 'unsupported_metadata')
                     Text(
                       appText(

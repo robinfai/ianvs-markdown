@@ -28,6 +28,10 @@ String appText(
 }
 
 const appMessages = <String, List<String>>{
+  'The local recovery journal could not be prepared. Copy the diagnostic details for troubleshooting.': [
+    'The local recovery journal could not be prepared. Copy the diagnostic details for troubleshooting.',
+    '无法准备本地恢复记录。请复制诊断详情以定位原因。',
+  ],
   'Link scanning reached its limit. The note will remain unchanged; some links may need manual repair.': [
     'Link scanning reached its limit. The note will remain unchanged; some links may need manual repair.',
     '链接检查达到处理上限。这篇笔记将保留原文，部分链接可能需要手动修复。',

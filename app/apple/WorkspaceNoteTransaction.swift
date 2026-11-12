@@ -66,8 +66,11 @@ final class WorkspaceNoteTransaction {
 
   private struct Failure: Error, LocalizedError {
     let code: String
+    let diagnostic: String?
     var errorDescription: String? { code }
-    init(_ code: String) { self.code = code }
+    init(_ code: String, diagnostic: String? = nil) {
+      self.code = code; self.diagnostic = diagnostic
+    }
   }
   private struct Entry: Codable {
     let path: String
@@ -249,11 +252,15 @@ final class WorkspaceNoteTransaction {
     } catch {
       if let id = try? transactionId(arguments["transactionId"]), let record = try? load(id) {
         markUnverifiable(record); record.code = code(error)
-        return result(record)
+        var response = result(record)
+        if let diagnostic = (error as? Failure)?.diagnostic { response["message"] = diagnostic }
+        return response
       }
-      return ["transactionId": arguments["transactionId"] as? String ?? "",
+      var response: [String: Any] = ["transactionId": arguments["transactionId"] as? String ?? "",
               "phase": "blocked", "code": code(error), "retryAllowed": false,
-              "entries": [], "recoveryPaths": []] as [String: Any]
+              "entries": [], "recoveryPaths": []]
+      if let diagnostic = (error as? Failure)?.diagnostic { response["message"] = diagnostic }
+      return response
     }
   }
 
@@ -1611,15 +1618,55 @@ final class WorkspaceNoteTransaction {
     try scope.verifyRootLocation()
   }
 
+  /// Only operation labels and bounded metadata are exposed. Never include
+  /// note contents, paths, attribute values or encoded journal payloads.
+  private func privateJournalFailure(_ stage: String, systemError: Int32? = nil,
+                                     descriptor: Int32? = nil, cause: Error? = nil) -> Failure {
+    var details = ["stage=\(stage)"]
+    if let systemError { details.append("POSIX=\(systemError) (\(String(cString: strerror(systemError))))") }
+    if let cause {
+      details.append("cause=\(code(cause))")
+      let error = cause as NSError
+      if !(cause is Failure) { details.append("system=\(error.domain.prefix(80)):\(error.code)") }
+    }
+    if let descriptor {
+      var info = stat()
+      if fstat(descriptor, &info) == 0 {
+        details.append("mode=\(String(info.st_mode & 0o7777, radix: 8))")
+        details.append("flags=\(info.st_flags)")
+        details.append("ownerMatches=\(info.st_uid == getuid())")
+      }
+      let count = flistxattr(descriptor, nil, 0, 0)
+      if count >= 0 && count <= 4096 {
+        var names = [CChar](repeating: 0, count: count)
+        let actual = names.withUnsafeMutableBufferPointer { flistxattr(descriptor, $0.baseAddress, $0.count, 0) }
+        if actual == count {
+          // Restrict diagnostic output to known system labels; custom attribute
+          // names can themselves contain user information.
+          let keys = String(decoding: names.map { UInt8(bitPattern: $0) }, as: UTF8.self).split(separator: "\0")
+          let known: Set<String> = ["com.apple.provenance", "com.apple.quarantine", "com.apple.macl",
+                                    "com.apple.metadata:com_apple_backup_excludeItem", "com.apple.FinderInfo"]
+          details.append("xattrs=\(keys.map { known.contains(String($0)) ? String($0) : "other" }.prefix(32).joined(separator: ","))")
+        }
+      }
+    }
+    let message = "NoteMoveJournal: " + details.joined(separator: "; ")
+    NSLog("%@", message)
+    return Failure("private_journal_unavailable", diagnostic: message)
+  }
+
   private func verifyDirectoryLocation(_ descriptor: Int32, url: URL) throws {
     var path = [CChar](repeating: 0, count: Int(MAXPATHLEN))
     var held = stat(); var named = stat()
     let pathStatus = path.withUnsafeMutableBufferPointer { fcntl(descriptor, F_GETPATH, $0.baseAddress!) }
-    guard pathStatus == 0,
-          URL(fileURLWithPath: String(cString: path)).standardizedFileURL == url.standardizedFileURL,
-          fstat(descriptor, &held) == 0, lstat(url.path, &named) == 0,
-          named.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR), Self.identity(held) == Self.identity(named) else {
-      throw Failure("private_journal_unavailable")
+    guard pathStatus == 0 else { throw privateJournalFailure("directory_getpath", systemError: errno) }
+    guard URL(fileURLWithPath: String(cString: path)).standardizedFileURL == url.standardizedFileURL else {
+      throw privateJournalFailure("directory_path_mismatch")
+    }
+    guard fstat(descriptor, &held) == 0 else { throw privateJournalFailure("directory_fstat", systemError: errno) }
+    guard lstat(url.path, &named) == 0 else { throw privateJournalFailure("directory_lstat", systemError: errno) }
+    guard named.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR), Self.identity(held) == Self.identity(named) else {
+      throw privateJournalFailure("directory_identity_mismatch")
     }
   }
 
@@ -1634,26 +1681,26 @@ final class WorkspaceNoteTransaction {
     var anchorURL = journalBaseURL
     var info = stat()
     while lstat(anchorURL.path, &info) != 0 {
-      guard errno == ENOENT, anchorURL.path != "/" else { throw Failure("private_journal_unavailable") }
+      guard errno == ENOENT, anchorURL.path != "/" else { throw privateJournalFailure("anchor_lookup", systemError: errno) }
       anchorURL.deleteLastPathComponent()
     }
-    guard info.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR) else { throw Failure("private_journal_unavailable") }
+    guard info.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR) else { throw privateJournalFailure("anchor_type") }
     let suffix = Array(journalURL.pathComponents.dropFirst(anchorURL.pathComponents.count))
-    guard !suffix.isEmpty, !suffix.contains(".."), !suffix.contains(".") else { throw Failure("private_journal_unavailable") }
+    guard !suffix.isEmpty, !suffix.contains(".."), !suffix.contains(".") else { throw privateJournalFailure("journal_suffix") }
     anchorURL = anchorURL.resolvingSymlinksInPath().standardizedFileURL
     let anchor = open(anchorURL.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
-    guard anchor >= 0 else { throw Failure("private_journal_unavailable") }
+    guard anchor >= 0 else { throw privateJournalFailure("anchor_open", systemError: errno) }
     defer { close(anchor) }
     try verifyDirectoryLocation(anchor, url: anchorURL)
     // Also persist the anchor's own name if it was created by a prior attempt.
     let ancestor = openat(anchor, "..", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
-    guard ancestor >= 0 else { throw Failure("private_journal_unavailable") }
+    guard ancestor >= 0 else { throw privateJournalFailure("anchor_parent_open", systemError: errno) }
     defer { close(ancestor) }
     try syncDescriptor(anchor, operation: "JournalAnchorSync")
     try syncDescriptor(ancestor, operation: "JournalAncestorSync")
     try verifyDirectoryLocation(anchor, url: anchorURL)
     var current = dup(anchor)
-    guard current >= 0 else { throw Failure("private_journal_unavailable") }
+    guard current >= 0 else { throw privateJournalFailure("anchor_dup", systemError: errno) }
     var currentURL = anchorURL
     do {
       for name in suffix {
@@ -1661,31 +1708,37 @@ final class WorkspaceNoteTransaction {
         try verifyDirectoryLocation(current, url: currentURL)
         var named = stat()
         if fstatat(current, name, &named, AT_SYMLINK_NOFOLLOW) != 0 {
-          guard errno == ENOENT else { throw Failure("private_journal_unavailable") }
+          guard errno == ENOENT else { throw privateJournalFailure("child_lookup", systemError: errno) }
           try checkCapacity([(current, 64 * 1024)], context: "journalDirectory")
           try point("beforeJournalDirectoryCreate")
-          guard mkdirat(current, name, 0o700) == 0 else { throw Failure("private_journal_unavailable") }
+          guard mkdirat(current, name, 0o700) == 0 else { throw privateJournalFailure("child_create", systemError: errno) }
           try point("afterJournalDirectoryCreate")
         }
         let child = openat(current, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
-        guard child >= 0 else { throw Failure("private_journal_unavailable") }
+        guard child >= 0 else { throw privateJournalFailure("child_open", systemError: errno) }
         do {
           var attributes = stat()
-          guard fstat(child, &attributes) == 0, attributes.st_uid == getuid(),
-                attributes.st_flags & UInt32(SF_DATALESS) == 0 else { throw Failure("private_journal_unavailable") }
-          try requireEmptyACL(child, failureCode: "private_journal_unavailable")
+          guard fstat(child, &attributes) == 0 else { throw privateJournalFailure("child_stat", systemError: errno) }
+          guard attributes.st_uid == getuid(), attributes.st_flags & UInt32(SF_DATALESS) == 0 else {
+            throw privateJournalFailure("directory_metadata", descriptor: child)
+          }
+          do { try requireEmptyACL(child, failureCode: "private_journal_unavailable") }
+          catch { throw privateJournalFailure("directory_acl", descriptor: child, cause: error) }
           let childURL = currentURL.appendingPathComponent(name, isDirectory: true)
           try verifyDirectoryLocation(child, url: childURL)
           if name == suffix.last! {
-            let excluded = try childURL.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true
+            let excluded: Bool
+            do { excluded = try childURL.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true }
+            catch { throw privateJournalFailure("backup_exclusion_read", cause: error) }
             if attributes.st_mode & 0o777 != 0o700 || !excluded {
               // Existing private journals remain readable under low free space.
               // Capacity checks apply to creation/metadata changes, not opens.
               try checkCapacity([(child, 64 * 1024)], context: "journalDirectory")
-              guard fchmod(child, 0o700) == 0 else { throw Failure("private_journal_unavailable") }
+              guard fchmod(child, 0o700) == 0 else { throw privateJournalFailure("directory_permissions", systemError: errno) }
               var privateURL = childURL
               var values = URLResourceValues(); values.isExcludedFromBackup = true
-              try privateURL.setResourceValues(values)
+              do { try privateURL.setResourceValues(values) }
+              catch { throw privateJournalFailure("backup_exclusion_write", cause: error) }
             }
           }
           try syncDescriptor(child, operation: "JournalDirectoryChildSync")
@@ -1697,9 +1750,9 @@ final class WorkspaceNoteTransaction {
       }
       try verifyDirectoryLocation(anchor, url: anchorURL)
       var attributes = stat()
-      guard fstat(current, &attributes) == 0 else { throw Failure("private_journal_unavailable") }
+      guard fstat(current, &attributes) == 0 else { throw privateJournalFailure("journal_stat", systemError: errno) }
       let identity = Self.identity(attributes)
-      guard journalIdentity == nil || journalIdentity == identity else { throw Failure("private_journal_unavailable") }
+      guard journalIdentity == nil || journalIdentity == identity else { throw privateJournalFailure("journal_identity_changed") }
       journalIdentity = identity; journalCanonicalURL = currentURL
       return current
     } catch { close(current); throw error }
@@ -1759,25 +1812,29 @@ final class WorkspaceNoteTransaction {
         guard reserved <= Self.maximumArtifactReservationBytes else { throw Failure("artifact_storage_full") }
       }
       try checkCapacity([(directory, data.count + receiptReserve)], context: "journal")
-      guard let journalCanonicalURL else { throw Failure("private_journal_unavailable") }
+      guard let journalCanonicalURL else { throw privateJournalFailure("journal_canonical_location") }
       try verifyDirectoryLocation(directory, url: journalCanonicalURL)
       let temporary = record.transactionId + ".\(UUID().uuidString).pending"
       let fd = openat(directory, temporary, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
       guard fd >= 0 else { throw Failure("journal_unavailable") }
       defer { close(fd) }
       do {
+        try point("beforeJournalMetadataCheck")
         try requirePlainMetadata(fd)
         var created = stat()
         guard fstat(fd, &created) == 0, created.st_nlink == 1,
               created.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG), created.st_mode & 0o777 == 0o600 else {
-          throw Failure("private_journal_unavailable")
+          throw privateJournalFailure("receipt_identity_or_permissions", descriptor: fd)
         }
-      } catch { throw Failure("private_journal_unavailable") }
+      } catch {
+        if let failure = error as? Failure, failure.diagnostic != nil { throw failure }
+        throw privateJournalFailure("receipt_metadata", descriptor: fd, cause: error)
+      }
       // Never prune .pending crash remnants or unfinished records to make room.
       #if os(iOS)
       // Class A (complete protection) before any original bytes enter the journal.
       guard fcntl(fd, F_SETPROTECTIONCLASS, Int32(1)) == 0,
-            try protectionClass(fd) == 1 else { throw Failure("private_journal_unavailable") }
+            try protectionClass(fd) == 1 else { throw privateJournalFailure("receipt_data_protection", descriptor: fd) }
       #endif
       try writeAll(fd, data: data, operation: "journal")
       try point("beforeJournalSync")
@@ -1815,7 +1872,8 @@ final class WorkspaceNoteTransaction {
         guard count > 0 else { throw Failure("journal_invalid") }; offset += count
       }
     }
-    try requireEmptyACL(fd, failureCode: "private_journal_unavailable")
+    do { try requireEmptyACL(fd, failureCode: "private_journal_unavailable") }
+    catch { throw privateJournalFailure("existing_receipt_acl", descriptor: fd, cause: error) }
     let record = try decodeRecord(data, id: id)
     if observedConsistencyConflicts.contains(id) { record.consistencyConflict = true }
     if unpersistedUncertainty.contains(id) { record.completionVerified = false }
