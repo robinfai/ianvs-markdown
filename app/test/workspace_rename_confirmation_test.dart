@@ -338,6 +338,41 @@ void main() {
       );
     },
   );
+  testWidgets('journal failures show selectable diagnostic details', (
+    tester,
+  ) async {
+    final value = (await tester.runAsync(() => plan()))!;
+    const diagnostic =
+        'NoteMoveJournal: stage=receipt_metadata; cause=unsupported_metadata; xattrs=com.apple.quarantine';
+    final blocked = WorkspaceNoteMoveRecord(
+      transactionId: 'rejected',
+      phase: 'blocked',
+      code: 'private_journal_unavailable',
+      message: diagnostic,
+      entries: [],
+    );
+    await open(
+      tester,
+      preview: Future.value(value),
+      execute: (_) async => blocked,
+      onResult: (_) {},
+    );
+    expect(find.text(diagnostic), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is SelectableText && widget.data == diagnostic,
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'The local recovery journal could not be prepared. Copy the diagnostic details for troubleshooting.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Recovery journal:'), findsNothing);
+  });
+
   testWidgets(
     'native prepare rejection reports no changes rather than partial completion',
     (tester) async {

@@ -229,6 +229,7 @@ struct NativeNoteTransactionAcceptance {
     try run("capacityAndParentPreflight", capacityAndParentPreflight)
     try run("maximumPlanAndLowSpaceListing", maximumPlanAndLowSpaceListing)
     try run("journalDirectoryDurabilityAndPrivacy", journalDirectoryDurabilityAndPrivacy)
+    try run("journalMetadataDiagnostics", journalMetadataDiagnostics)
     try run("inheritedRecoveryACL", inheritedRecoveryACL)
     try run("recoveryIndependentOfOldReadSet", recoveryIndependentOfOldReadSet)
     try run("coordinatorRootAliases", coordinatorRootAliases)
@@ -993,9 +994,42 @@ struct NativeNoteTransactionAcceptance {
       let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
       let result = try f.prepare(executor, f.request())
       try require(result["code"] as? String == "private_journal_unavailable", "chmod 0700 is not enough to neutralize inherited ACL disclosure")
+      let diagnostic = result["message"] as? String ?? ""
+      try require(diagnostic.contains("stage=directory_acl") && !diagnostic.contains(f.directory.path),
+                  "ACL failure must identify its stage without exposing a path")
       try require(try FileManager.default.contentsOfDirectory(atPath: f.journal.path).isEmpty, "No original bytes may be persisted under unsafe private ACL")
       try f.expectOriginals()
     }
+  }
+
+  private static func journalMetadataDiagnostics() throws {
+    let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+    executor.fault = { point in
+      if point != "beforeJournalMetadataCheck" { return }
+      let files = try FileManager.default.contentsOfDirectory(at: f.journal, includingPropertiesForKeys: nil)
+      guard let pending = files.first(where: { $0.pathExtension == "pending" }) else {
+        throw TestFailure(description: "Expected fresh empty receipt")
+      }
+      let marker = Data("synthetic quarantine value must never be logged".utf8)
+      try require(marker.withUnsafeBytes { setxattr(pending.path, "com.apple.quarantine", $0.baseAddress, $0.count, 0, 0) } == 0,
+                  "Install quarantine on the new journal receipt")
+      let privateName = Data("hidden".utf8)
+      try require(privateName.withUnsafeBytes { setxattr(pending.path, "work.ianvs.private-user-name", $0.baseAddress, $0.count, 0, 0) } == 0,
+                  "Install custom attribute to check diagnostic redaction")
+    }
+    let result = try f.prepare(executor, f.request())
+    try require(result["phase"] as? String == "blocked" && result["code"] as? String == "private_journal_unavailable",
+                "Journal metadata failure must block before any workspace change")
+    let diagnostic = result["message"] as? String ?? ""
+    try require(diagnostic.contains("stage=receipt_metadata") && diagnostic.contains("cause=unsupported_metadata") &&
+                diagnostic.contains("com.apple.quarantine") && diagnostic.contains("other"),
+                "Receipt diagnostic must retain the actual failing stage and supported attribute labels")
+    try require(!diagnostic.contains("synthetic quarantine value") && !diagnostic.contains("private-user-name") &&
+                !diagnostic.contains(f.directory.path) && !diagnostic.contains("Café"),
+                "Diagnostics must not disclose values, custom attribute names, paths or note text")
+    let remaining = try FileManager.default.contentsOfDirectory(at: f.journal, includingPropertiesForKeys: nil)
+    for file in remaining { try require(try Data(contentsOf: file).isEmpty, "No payload may precede successful metadata verification") }
+    try f.expectOriginals()
   }
 
   private static func inheritedRecoveryACL() throws {
