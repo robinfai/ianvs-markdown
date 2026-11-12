@@ -255,11 +255,20 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
     }());
   }
 
-  void _message(String message) {
+  void _message(String message, {VoidCallback? onDetails}) {
     if (mounted) {
-      ScaffoldMessenger.maybeOf(
-        context,
-      )?.showSnackBar(SnackBar(content: Text(message), showCloseIcon: true));
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text(message),
+          showCloseIcon: true,
+          action: onDetails == null
+              ? null
+              : SnackBarAction(
+                  label: appText(context, 'Details'),
+                  onPressed: onDetails,
+                ),
+        ),
+      );
     }
   }
 
@@ -1471,10 +1480,20 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
       style: DesktopTypography.body.copyWith(color: Colors.white),
       cursorColor: _accent,
       onSubmitted: (_) => _run(_commitName),
-      decoration: const InputDecoration(
+      decoration: InputDecoration(
         isDense: true,
         filled: false,
         contentPadding: EdgeInsets.zero,
+        suffixIconConstraints: const BoxConstraints.tightFor(
+          width: 20,
+          height: 20,
+        ),
+        suffixIcon: _committing && ModalRoute.isCurrentOf(context) != false
+            ? const Padding(
+                padding: EdgeInsets.all(3),
+                child: CircularProgressIndicator(strokeWidth: 1.5),
+              )
+            : null,
         border: InputBorder.none,
         enabledBorder: InputBorder.none,
         focusedBorder: InputBorder.none,
@@ -1505,23 +1524,49 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
       } else if (_editingPath != null) {
         final name = WorkspaceController.validateEntryName(_name.text);
         final old = _editingPath!;
-        result = p.join(p.dirname(old), name);
+        final renameDestination = p.join(p.dirname(old), name);
+        result = renameDestination;
         if (result != old) {
           final row = _rows.where((row) => row.entry?.path == old).firstOrNull;
           if (row?.entry?.isDirectory == false && !isMarkdownFileName(name)) {
             throw const FormatException('Use a Markdown or text extension.');
           }
-          final decision = await _confirmNoteMove([old], [result]);
-          if (decision.cancelled) return;
+          final decision = await _confirmNoteMove(
+            [old],
+            [result],
+            submittedRename: true,
+          );
+          if (!mounted || decision.cancelled) return;
           if (decision.manual) {
             await widget.workspace.moveFileEntry(old, result);
             _message('Renamed. Relative Markdown links were not updated.');
           } else {
             final completed = decision.automatic!.completed;
+            final detailsRoot = widget.workspace.workspaceRoot;
+            final detailsEpoch = widget.workspace.index.epoch;
             _message(
               completed
-                  ? 'Renamed and reference updates verified.'
+                  ? appText(
+                      context,
+                      decision.plan?.warnings.isNotEmpty == true
+                          ? decision.plan?.editCount == 0
+                                ? 'Renamed. Unchecked links may still need repair.'
+                                : 'Renamed. Updated {0} confirmed link(s); unchecked links may remain.'
+                          : decision.plan?.editCount == 0
+                          ? 'Renamed.'
+                          : 'Renamed. Updated {0} link(s).',
+                      [decision.plan?.editCount ?? 0],
+                    )
                   : 'The move is partial or unverified. Review recovery before retrying.',
+              onDetails: decision.plan == null
+                  ? null
+                  : () => _showRenameDetails(
+                      decision,
+                      old,
+                      renameDestination,
+                      detailsRoot,
+                      detailsEpoch,
+                    ),
             );
             if (!completed) result = null;
           }
@@ -1539,6 +1584,36 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
     } finally {
       if (mounted) setState(() => _committing = false);
     }
+  }
+
+  void _showRenameDetails(
+    WorkspaceNoteMoveDecision decision,
+    String source,
+    String destination,
+    String? root,
+    int epoch,
+  ) {
+    bool current() =>
+        mounted &&
+        root == widget.workspace.workspaceRoot &&
+        epoch == widget.workspace.index.epoch;
+    if (!current()) return;
+    unawaited(
+      showWorkspaceNoteMovePreview(
+        context: context,
+        sources: [source],
+        destinations: [destination],
+        displayRoot: root,
+        preview: Future.value(decision.plan),
+        initialRecord: decision.automatic,
+        onRecoverCopies: (id) {
+          if (!current()) {
+            throw StateError('Open recovery in the original workspace.');
+          }
+          return widget.workspace.recoverNoteMoveCopies(id);
+        },
+      ),
+    );
   }
 
   Future<void> _batch(
@@ -1614,8 +1689,9 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
 
   Future<WorkspaceNoteMoveDecision> _confirmNoteMove(
     List<String> sources,
-    List<String> destinations,
-  ) async {
+    List<String> destinations, {
+    bool submittedRename = false,
+  }) async {
     if (_previewingMove) return const WorkspaceNoteMoveDecision();
     _previewingMove = true;
     final cancellation = WorkspaceMovePreviewCancellation();
@@ -1658,6 +1734,12 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
         sources: sources,
         destinations: destinations,
         displayRoot: _touchLayout ? root : null,
+        onlyConfirmRisks: submittedRename,
+        isCurrent: () =>
+            mounted &&
+            root == widget.workspace.workspaceRoot &&
+            epoch == widget.workspace.index.epoch &&
+            (!submittedRename || _editingPath == sources.single),
         preview: preview,
         unavailable: unavailable,
         onMaintain: widget.workspace.executeNoteMove,

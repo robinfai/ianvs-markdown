@@ -111,6 +111,7 @@ void main() {
                       sources: ['/vault/最近删除/项目资料'],
                       destinations: ['/vault/最近删除/项目资料-2'],
                       displayRoot: '/vault',
+                      onlyConfirmRisks: true,
                       preview: Future.value(plan),
                       onMaintain: (approved) async {
                         expect(identical(approved, plan), isTrue);
@@ -145,26 +146,28 @@ void main() {
         );
         await tester.tap(find.text('Open'));
         await tester.pumpAndSettle();
-        expect(find.text('影响概览'), findsOneWidget);
-        expect(find.text('2 项目录内容'), findsNWidgets(2));
-        expect(find.text('1 篇涉及笔记'), findsNWidgets(2));
+        expect(find.text('影响概览'), findsNothing);
+        expect(find.text('2 项目录内容'), findsNothing);
+        expect(find.text('1 篇涉及笔记'), findsNothing);
+        expect(find.byKey(const ValueKey('move-link-details')), findsNothing);
         expect(find.textContaining('offline'), findsNothing);
         expect(find.textContaining('/vault/'), findsNothing);
         expect(find.text('其他目录/离线.md'), findsNothing);
         expect(find.text('Line 1:'), findsNothing);
         final action = find.byKey(const ValueKey('move-and-update-links'));
-        expect(tester.widget<FilledButton>(action).onPressed != null, !blocked);
-        expect(find.text(blocked ? '重命名并更新链接' : '重命名并更新已确认链接'), findsOneWidget);
-        expect(find.text(blocked ? '链接维护检查未通过' : '部分链接尚未检查'), findsOneWidget);
+        expect(action, blocked ? findsNothing : findsOneWidget);
+        expect(find.text('返回'), findsOneWidget);
+        expect(find.text('仍然重命名'), blocked ? findsNothing : findsOneWidget);
+        expect(find.text(blocked ? '暂时无法直接重命名' : '部分链接可能需要修复'), findsOneWidget);
         if (_capture) {
           await captureWorkflowScreenshot(
             tester,
             boundary,
             blocked
-                ? 'rename-blocked-zh'
+                ? 'rename-risk-blocked-zh'
                 : dark
-                ? 'rename-partial-dark-zh'
-                : 'rename-partial-zh',
+                ? 'rename-risk-partial-dark-zh'
+                : 'rename-risk-partial-zh',
           );
         }
         await tester.ensureVisible(
@@ -182,7 +185,7 @@ void main() {
           await tester.tap(action);
           await tester.pumpAndSettle();
           expect(calls, 1);
-          expect(find.text('已验证重命名及已确认链接的更新，未检查的链接可能仍需处理。'), findsOneWidget);
+          expect(find.byType(AlertDialog), findsNothing);
         }
         expect(tester.takeException(), isNull);
       },

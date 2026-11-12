@@ -315,7 +315,7 @@ void main() {
   });
 
   testWidgets(
-    'inline create validates collision and rename preserves unsaved text',
+    'inline create validates collision and blocked rename preserves unsaved text',
     (tester) async {
       await pump(tester);
       await menu(tester, 'New Markdown');
@@ -345,17 +345,17 @@ void main() {
       await tester.testTextInput.receiveAction(TextInputAction.done);
       await tester.pumpAndSettle();
       expect(workspace.activeDocument?.path, '/vault/新笔记.md');
-      await tester.tap(
+      expect(
         find.byKey(const ValueKey('move-without-updating-links')),
+        findsNothing,
       );
+      expect(find.byKey(const ValueKey('move-and-update-links')), findsNothing);
+      await tester.tap(find.text('Back'));
       await tester.pumpAndSettle();
-      expect(workspace.activeDocument?.path, '/vault/renamed.md');
+      expect(workspace.activeDocument?.path, '/vault/新笔记.md');
       expect(workspace.activeDocument?.controller.text, 'draft');
       expect(workspace.activeDocument?.controller.isDirty, isTrue);
-      expect(
-        find.textContaining('Relative Markdown links were not updated'),
-        findsOneWidget,
-      );
+      expect(files.files.containsKey('/vault/renamed.md'), isFalse);
       expect(errors, isEmpty);
       await finish(tester);
     },

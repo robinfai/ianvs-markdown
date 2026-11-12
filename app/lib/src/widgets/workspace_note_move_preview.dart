@@ -8,13 +8,19 @@ import 'workspace_note_move_recovery.dart';
 import 'workspace_move_preview_icon.dart';
 
 class WorkspaceNoteMoveDecision {
-  const WorkspaceNoteMoveDecision({this.manual = false, this.automatic});
+  const WorkspaceNoteMoveDecision({
+    this.manual = false,
+    this.automatic,
+    this.plan,
+  });
   final bool manual;
   final WorkspaceNoteMoveRecord? automatic;
+  final WorkspaceNoteMovePlan? plan;
   bool get cancelled => !manual && automatic == null;
 }
 
-/// The only executor entry point requires an explicit choice on this preview.
+/// A submitted, fully checked rename needs no second confirmation. Incomplete
+/// coverage still requires a choice; moves/batches retain their review flow.
 Future<WorkspaceNoteMoveDecision> showWorkspaceNoteMovePreview({
   required BuildContext context,
   required List<String> sources,
@@ -25,6 +31,9 @@ Future<WorkspaceNoteMoveDecision> showWorkspaceNoteMovePreview({
   Future<WorkspaceNoteMoveRecord> Function(WorkspaceNoteMovePlan)? onMaintain,
   Future<WorkspaceNoteMoveRecord> Function(String)? onRecoverCopies,
   VoidCallback? onCancelPreview,
+  bool onlyConfirmRisks = false,
+  bool Function()? isCurrent,
+  WorkspaceNoteMoveRecord? initialRecord,
 }) async {
   // Attach the error handler before the dialog's first frame. A fast native
   // failure must not become an unhandled Future error before FutureBuilder
@@ -33,7 +42,47 @@ Future<WorkspaceNoteMoveDecision> showWorkspaceNoteMovePreview({
     (plan) => (plan, false),
     onError: (Object _, StackTrace _) => (null, true),
   );
+  var record = initialRecord;
+  String? error;
+  var attempted = initialRecord != null;
+  final rename =
+      sources.length == 1 &&
+      destinations.length == 1 &&
+      p.dirname(sources.single) == p.dirname(destinations.single);
+  final minimalRename = onlyConfirmRisks && rename;
   try {
+    if (minimalRename && !attempted) {
+      final result = await pending;
+      if (!context.mounted || isCurrent?.call() == false) {
+        return const WorkspaceNoteMoveDecision();
+      }
+      final plan = result?.$1;
+      if (plan != null) {
+        final root = plan.root;
+        String relative(String path) => p.isAbsolute(path) && root != null
+            ? p.relative(path, from: root)
+            : path;
+        if (relative(sources.single) != plan.sourcePath ||
+            relative(destinations.single) != plan.destinationPath) {
+          return const WorkspaceNoteMoveDecision();
+        }
+      }
+      if (plan?.canRenameWithoutConfirmation == true && onMaintain != null) {
+        attempted = true;
+        try {
+          record = await onMaintain(plan!);
+          if (record.completed) {
+            return WorkspaceNoteMoveDecision(automatic: record, plan: plan);
+          }
+        } on Object catch (failure) {
+          // Never fall back to a raw rename after execution has been attempted.
+          error = failure.toString();
+        }
+      }
+    }
+    if (!context.mounted || isCurrent?.call() == false) {
+      return WorkspaceNoteMoveDecision(automatic: record);
+    }
     return await showDialog<WorkspaceNoteMoveDecision>(
           context: context,
           builder: (context) => _MovePreviewDialog(
@@ -41,6 +90,10 @@ Future<WorkspaceNoteMoveDecision> showWorkspaceNoteMovePreview({
             sources: sources,
             destinations: destinations,
             pending: pending,
+            minimalRename: minimalRename,
+            initialRecord: record,
+            initialError: error,
+            attempted: attempted,
             unavailable: unavailable,
             onMaintain: onMaintain,
             onRecoverCopies: onRecoverCopies,
@@ -61,12 +114,20 @@ class _MovePreviewDialog extends StatefulWidget {
     this.displayRoot,
     this.onMaintain,
     this.onRecoverCopies,
+    this.minimalRename = false,
+    this.initialRecord,
+    this.initialError,
+    this.attempted = false,
   });
   final List<String> sources;
   final List<String> destinations;
   final Future<(WorkspaceNoteMovePlan?, bool)>? pending;
   final String? unavailable;
   final String? displayRoot;
+  final bool minimalRename;
+  final WorkspaceNoteMoveRecord? initialRecord;
+  final String? initialError;
+  final bool attempted;
   final Future<WorkspaceNoteMoveRecord> Function(WorkspaceNoteMovePlan)?
   onMaintain;
   final Future<WorkspaceNoteMoveRecord> Function(String)? onRecoverCopies;
@@ -101,6 +162,20 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
   WorkspaceNoteMoveRecord? _record;
   String? _error;
 
+  @override
+  void initState() {
+    super.initState();
+    _record = widget.initialRecord;
+    _error = widget.initialError;
+    _attempted = widget.attempted;
+  }
+
+  WorkspaceNoteMoveDecision _decision(WorkspaceNoteMovePlan? plan) =>
+      WorkspaceNoteMoveDecision(
+        automatic: _record,
+        plan: _record == null ? null : plan,
+      );
+
   Future<void> _maintain(WorkspaceNoteMovePlan plan) async {
     if (_busy || _attempted || !plan.canExecute || widget.onMaintain == null) {
       return;
@@ -112,7 +187,16 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
     });
     try {
       final record = await widget.onMaintain!(plan);
-      if (mounted) setState(() => _record = record);
+      if (mounted) {
+        if (widget.minimalRename && record.completed) {
+          Navigator.pop(
+            context,
+            WorkspaceNoteMoveDecision(automatic: record, plan: plan),
+          );
+        } else {
+          setState(() => _record = record);
+        }
+      }
     } on Object catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {
@@ -349,6 +433,8 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
             widget.pending != null &&
             state.connectionState != ConnectionState.done;
         final plan = state.data?.$1;
+        final compact =
+            widget.minimalRename && _record == null && _error == null;
         final media = MediaQuery.of(context);
         // An oversized fixed action footer can consume the entire compact
         // dialog at accessibility text sizes. Keep it scrollable in that case.
@@ -358,17 +444,14 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
           TextButton(
             onPressed: _busy
                 ? null
-                : () => Navigator.pop(
-                    context,
-                    WorkspaceNoteMoveDecision(automatic: _record),
-                  ),
+                : () => Navigator.pop(context, _decision(plan)),
             child: Text(
               _attempted
                   ? appText(context, "Close")
-                  : appText(context, "Cancel"),
+                  : appText(context, compact ? 'Back' : 'Cancel'),
             ),
           ),
-          if (!_attempted)
+          if (!_attempted && (!compact || plan == null))
             OutlinedButton(
               key: const ValueKey('move-without-updating-links'),
               onPressed: waiting
@@ -384,7 +467,7 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                 ),
               ),
             ),
-          if (!_attempted)
+          if (!_attempted && (!compact || plan?.canExecute == true))
             FilledButton(
               key: const ValueKey('move-and-update-links'),
               onPressed:
@@ -396,7 +479,9 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
               child: Text(
                 appText(
                   context,
-                  plan?.canExecute == true && plan!.warnings.isNotEmpty
+                  compact
+                      ? 'Rename anyway'
+                      : plan?.canExecute == true && plan!.warnings.isNotEmpty
                       ? 'Rename and update confirmed links'
                       : _renaming
                       ? 'Rename and update links'
@@ -439,7 +524,11 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                     Text(
                       appText(
                         context,
-                        _renaming
+                        compact
+                            ? plan?.canExecute == true
+                                  ? 'Some links may need repair'
+                                  : 'Rename needs attention'
+                            : _renaming
                             ? plan?.kind == WorkspaceNoteMovePlanKind.directory
                                   ? 'Rename folder'
                                   : 'Rename preview'
@@ -450,13 +539,15 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      appText(context, 'Review name changes and link impact'),
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    if (!compact) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        appText(context, 'Review name changes and link impact'),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -464,22 +555,27 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                 tooltip: appText(context, 'Close'),
                 onPressed: _busy
                     ? null
-                    : () => Navigator.pop(
-                        context,
-                        WorkspaceNoteMoveDecision(automatic: _record),
-                      ),
+                    : () => Navigator.pop(context, _decision(plan)),
                 icon: const MovePreviewIcon(MovePreviewGlyph.close, size: 20),
               ),
             ],
           ),
           content: SizedBox(
-            width: 680,
+            width: compact ? 480 : 680,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                _paths(context),
-                const Divider(height: 24),
+                if (compact) ...[
+                  Text(
+                    '${p.basename(widget.sources.single)} → ${p.basename(widget.destinations.single)}',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 16),
+                ] else ...[
+                  _paths(context),
+                  const Divider(height: 24),
+                ],
                 if (waiting) ...[
                   const LinearProgressIndicator(),
                   const SizedBox(height: 8),
@@ -490,96 +586,122 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                     ),
                   ),
                 ] else if (plan != null) ...[
-                  Text(
-                    appText(context, 'Impact overview'),
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface,
+                  if (compact) ...[
+                    if (plan.canExecute) ...[
+                      Text(
+                        appText(
+                          context,
+                          'Some notes could not be checked. Renaming may leave links that need manual repair.',
+                        ),
+                      ),
+                      if (plan.editCount > 0) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          appText(
+                            context,
+                            '{0} confirmed link(s) will be updated.',
+                            [plan.editCount],
+                          ),
+                        ),
+                      ],
+                    ] else
+                      _status(context, plan),
+                  ] else ...[
+                    Text(
+                      appText(context, 'Impact overview'),
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 24,
-                    runSpacing: 12,
-                    children: [
-                      if (plan.treeSnapshot case final tree?)
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 24,
+                      runSpacing: 12,
+                      children: [
+                        if (plan.treeSnapshot case final tree?)
+                          _metric(
+                            context,
+                            MovePreviewGlyph.folder,
+                            appText(context, '{0} directory items', [
+                              tree.members.length,
+                            ]),
+                          ),
                         _metric(
                           context,
-                          MovePreviewGlyph.folder,
-                          appText(context, '{0} directory items', [
-                            tree.members.length,
+                          MovePreviewGlyph.note,
+                          appText(context, '{0} involved notes', [
+                            plan.files.length,
                           ]),
                         ),
-                      _metric(
-                        context,
-                        MovePreviewGlyph.note,
-                        appText(context, '{0} involved notes', [
-                          plan.files.length,
-                        ]),
-                      ),
-                      _metric(
-                        context,
-                        MovePreviewGlyph.link,
-                        appText(context, '{0} link replacements', [
-                          plan.editCount,
-                        ]),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    appText(
-                      context,
-                      'Includes relocated notes whose contents do not need changes.',
-                    ),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  _status(context, plan),
-                  const SizedBox(height: 12),
-                  if (plan.treeSnapshot case final tree?)
-                    if (tree.members.isNotEmpty)
-                      ExpansionTile(
-                        key: const ValueKey('directory-move-manifest'),
-                        trailing: _chevron('directory-move-manifest'),
-                        onExpansionChanged: (expanded) => setState(
-                          () => _expanded['directory-move-manifest'] = expanded,
-                        ),
-                        leading: const MovePreviewIcon(
-                          MovePreviewGlyph.folder,
-                          size: 20,
-                        ),
-                        title: Text(appText(context, "Directory contents")),
-                        tilePadding: EdgeInsets.zero,
-                        subtitle: Text(
-                          appText(context, '{0} directory items', [
-                            tree.members.length,
+                        _metric(
+                          context,
+                          MovePreviewGlyph.link,
+                          appText(context, '{0} link replacements', [
+                            plan.editCount,
                           ]),
                         ),
-                        children: [
-                          SizedBox(
-                            height: 260,
-                            child: ListView.builder(
-                              itemCount: tree.members.length,
-                              itemBuilder: (context, index) {
-                                final member = tree.members[index];
-                                final locality = switch (member.local) {
-                                  true => 'local',
-                                  false => 'not local',
-                                  null => 'availability unknown',
-                                };
-                                return Padding(
-                                  padding: const EdgeInsets.all(8),
-                                  child: Text(
-                                    '${member.path} · ${member.kind.name} · $locality',
-                                  ),
-                                );
-                              },
-                            ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      appText(
+                        context,
+                        'Includes relocated notes whose contents do not need changes.',
+                      ),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    _status(context, plan),
+                    const SizedBox(height: 12),
+                  ],
+                  if (!compact)
+                    if (plan.treeSnapshot case final tree?)
+                      if (tree.members.isNotEmpty)
+                        ExpansionTile(
+                          key: const ValueKey('directory-move-manifest'),
+                          trailing: _chevron('directory-move-manifest'),
+                          onExpansionChanged: (expanded) => setState(
+                            () =>
+                                _expanded['directory-move-manifest'] = expanded,
                           ),
-                        ],
-                      ),
+                          leading: const MovePreviewIcon(
+                            MovePreviewGlyph.folder,
+                            size: 20,
+                          ),
+                          title: Text(appText(context, "Directory contents")),
+                          tilePadding: EdgeInsets.zero,
+                          subtitle: Text(
+                            appText(context, '{0} directory items', [
+                              tree.members.length,
+                            ]),
+                          ),
+                          children: [
+                            SizedBox(
+                              height: tree.members.length < 5
+                                  ? tree.members.length * 64.0
+                                  : 260,
+                              child: ListView.builder(
+                                itemCount: tree.members.length,
+                                itemBuilder: (context, index) {
+                                  final member = tree.members[index];
+                                  final locality = switch (member.local) {
+                                    true => 'local',
+                                    false => 'not local',
+                                    null => 'availability unknown',
+                                  };
+                                  return Padding(
+                                    padding: const EdgeInsets.all(8),
+                                    child: Text(
+                                      '${member.path} · ${member.kind.name} · $locality',
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
 
                   ExpansionTile(
                     key: const ValueKey('move-check-details'),
@@ -592,12 +714,22 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                       size: 20,
                     ),
                     tilePadding: EdgeInsets.zero,
-                    title: Text(appText(context, 'Check details')),
+                    title: Text(
+                      appText(context, compact ? 'Details' : 'Check details'),
+                    ),
                     subtitle: Text(
-                      appText(context, '{0} blockers · {1} coverage warnings', [
-                        plan.blockers.length,
-                        plan.warnings.length,
-                      ]),
+                      compact
+                          ? appText(
+                              context,
+                              plan.canExecute
+                                  ? 'View unchecked files'
+                                  : 'View affected files',
+                            )
+                          : appText(
+                              context,
+                              '{0} blockers · {1} coverage warnings',
+                              [plan.blockers.length, plan.warnings.length],
+                            ),
                     ),
                     children: [
                       if (plan.kind == WorkspaceNoteMovePlanKind.directory)
@@ -637,7 +769,7 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                         ),
                     ],
                   ),
-                  if (plan.files.isNotEmpty)
+                  if (!compact && plan.editCount > 0)
                     ExpansionTile(
                       key: const ValueKey('move-link-details'),
                       trailing: _chevron('move-link-details'),
@@ -652,11 +784,15 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                       title: Text(appText(context, 'Link changes')),
                       subtitle: Text(
                         appText(context, '{0} involved notes', [
-                          plan.files.length,
+                          plan.files
+                              .where((file) => file.edits.isNotEmpty)
+                              .length,
                         ]),
                       ),
                       children: [
-                        for (final file in plan.files)
+                        for (final file in plan.files.where(
+                          (file) => file.edits.isNotEmpty,
+                        ))
                           ExpansionTile(
                             key: ValueKey('note-move-diff-${file.path}'),
                             trailing: _chevron('diff:${file.path}'),
@@ -730,7 +866,7 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                           'No complete reference preview is available for this selection.',
                         ),
                   ),
-                if (!_attempted) ...[
+                if (!_attempted && !compact) ...[
                   const Divider(height: 24),
                   Text(
                     appText(

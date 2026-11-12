@@ -28,6 +28,34 @@ String appText(
 }
 
 const appMessages = <String, List<String>>{
+  "Renamed. Unchecked links may still need repair.": [
+    "Renamed. Unchecked links may still need repair.",
+    "已重命名，未检查的链接可能仍需手动修复。",
+  ],
+  "View unchecked files": ["View unchecked files", "查看未检查的文件"],
+  "View affected files": ["View affected files", "查看受影响的文件"],
+  "Details": ["Details", "详情"],
+  "Renamed. Updated {0} confirmed link(s); unchecked links may remain.": [
+    "Renamed. Updated {0} confirmed link(s); unchecked links may remain.",
+    "已重命名，更新了 {0} 处已确认链接；未检查的链接可能仍需处理。",
+  ],
+  "Renamed. Updated {0} link(s).": [
+    "Renamed. Updated {0} link(s).",
+    "已重命名，更新了 {0} 处链接。",
+  ],
+  "Renamed.": ["Renamed.", "已重命名。"],
+  "{0} confirmed link(s) will be updated.": [
+    "{0} confirmed link(s) will be updated.",
+    "将自动更新 {0} 处已确认的链接。",
+  ],
+  "Some notes could not be checked. Renaming may leave links that need manual repair.": [
+    "Some notes could not be checked. Renaming may leave links that need manual repair.",
+    "部分笔记未能检查，重命名后可能有链接需要手动修复。",
+  ],
+  "Rename needs attention": ["Rename needs attention", "暂时无法直接重命名"],
+  "Some links may need repair": ["Some links may need repair", "部分链接可能需要修复"],
+  "Rename anyway": ["Rename anyway", "仍然重命名"],
+  "Back": ["Back", "返回"],
   "Some affected files are not available locally.": [
     "Some affected files are not available locally.",
     "部分受影响文件尚未下载到本地，暂不能更新链接。",
