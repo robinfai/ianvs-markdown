@@ -584,6 +584,38 @@ final class WorkspaceNoteTransaction {
     try requireEmptyACL(descriptor)
   }
 
+  /// A freshly created private receipt is not a replacement for a user file.
+  /// macOS may quarantine files written by a downloaded app. Retain these
+  /// bounded OS labels in place; they do not broaden permissions or the ACL.
+  /// Workspace rewrites continue to use requirePlainMetadata instead.
+  private func requireJournalReceiptMetadata(_ descriptor: Int32) throws {
+    #if os(macOS)
+    var attributes = stat()
+    guard fstat(descriptor, &attributes) == 0,
+          attributes.st_uid == getuid(), attributes.st_flags == 0,
+          attributes.st_mode & mode_t(S_ISUID | S_ISGID | S_ISVTX) == 0 else {
+      throw Failure("unsupported_metadata")
+    }
+    try requireEmptyACL(descriptor)
+    let count = flistxattr(descriptor, nil, 0, 0)
+    guard count >= 0, count <= 256 else { throw Failure("unsupported_metadata") }
+    if count == 0 { return }
+    var names = [CChar](repeating: 0, count: count)
+    let actual = names.withUnsafeMutableBufferPointer {
+      flistxattr(descriptor, $0.baseAddress, $0.count, 0)
+    }
+    guard actual == count, names.last == 0 else { throw Failure("unsupported_metadata") }
+    let allowed: Set<String> = ["com.apple.provenance", "com.apple.quarantine"]
+    for name in String(decoding: names.map { UInt8(bitPattern: $0) }, as: UTF8.self).split(separator: "\0") {
+      guard allowed.contains(String(name)) else { throw Failure("unsupported_metadata") }
+      let size = fgetxattr(descriptor, String(name), nil, 0, 0, 0)
+      guard size > 0, size <= 4096 else { throw Failure("unsupported_metadata") }
+    }
+    #else
+    try requirePlainMetadata(descriptor)
+    #endif
+  }
+
   /// Preserve the one OS-generated extended attribute observed on ordinary
   /// macOS files. Unknown attributes still fail closed. Never remove provenance.
   private func readProvenance(_ descriptor: Int32) throws -> Data? {
@@ -1820,7 +1852,7 @@ final class WorkspaceNoteTransaction {
       defer { close(fd) }
       do {
         try point("beforeJournalMetadataCheck")
-        try requirePlainMetadata(fd)
+        try requireJournalReceiptMetadata(fd)
         var created = stat()
         guard fstat(fd, &created) == 0, created.st_nlink == 1,
               created.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG), created.st_mode & 0o777 == 0o600 else {

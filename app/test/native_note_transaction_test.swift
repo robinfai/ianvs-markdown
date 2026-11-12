@@ -230,6 +230,7 @@ struct NativeNoteTransactionAcceptance {
     try run("maximumPlanAndLowSpaceListing", maximumPlanAndLowSpaceListing)
     try run("journalDirectoryDurabilityAndPrivacy", journalDirectoryDurabilityAndPrivacy)
     try run("journalMetadataDiagnostics", journalMetadataDiagnostics)
+    try run("journalQuarantineCompatibility", journalQuarantineCompatibility)
     try run("inheritedRecoveryACL", inheritedRecoveryACL)
     try run("recoveryIndependentOfOldReadSet", recoveryIndependentOfOldReadSet)
     try run("coordinatorRootAliases", coordinatorRootAliases)
@@ -1002,6 +1003,62 @@ struct NativeNoteTransactionAcceptance {
     }
   }
 
+  private static let journalQuarantine = Data("0083;00000000;Linefold;synthetic".utf8)
+
+  private static func quarantineJournalReceipt(_ f: Fixture, point: String, value: Data = journalQuarantine) throws {
+    if point != "beforeJournalMetadataCheck" { return }
+    for file in try FileManager.default.contentsOfDirectory(at: f.journal, includingPropertiesForKeys: nil)
+      where file.pathExtension == "pending" {
+      try require(value.withUnsafeBytes { setxattr(file.path, "com.apple.quarantine", $0.baseAddress, $0.count, 0, 0) } == 0,
+                  "Install system quarantine on fresh private receipt")
+    }
+  }
+
+  private static func journalQuarantineCompatibility() throws {
+    do {
+      let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      var checks = 0
+      executor.fault = { point in
+        try quarantineJournalReceipt(f, point: point)
+        if point == "beforeJournalMetadataCheck" { checks += 1 }
+      }
+      let request = try f.request()
+      let prepared = try f.prepare(executor, request)
+      try require(prepared["phase"] as? String == "prepared", "OS quarantine must not block private receipt creation: \(prepared)")
+      let completed = try f.invoke(executor, "executeWorkspaceNoteMove", f.command(request, token: prepared["token"]))
+      try require(completed["phase"] as? String == "completed" && checks > 1,
+                  "Quarantined receipts must remain valid through every save")
+      let journal = f.journal.appendingPathComponent((request["transactionId"] as! String).lowercased() + ".json")
+      var retained = Data(count: journalQuarantine.count)
+      let count = retained.withUnsafeMutableBytes {
+        getxattr(journal.path, "com.apple.quarantine", $0.baseAddress, $0.count, 0, 0)
+      }
+      try require(count == journalQuarantine.count && retained == journalQuarantine,
+                  "Receipt quarantine must be retained verbatim, never stripped")
+      let restarted = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let observed = try f.invoke(restarted, "reconcileWorkspaceNoteMove", f.command(request))
+      try require(observed["phase"] as? String == "completed", "Quarantined receipt must verify after restart")
+    }
+    do {
+      let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      executor.fault = { point in try quarantineJournalReceipt(f, point: point, value: Data(repeating: 0x31, count: 4097)) }
+      let result = try f.prepare(executor, f.request())
+      try require(result["phase"] as? String == "blocked" && result["code"] as? String == "private_journal_unavailable",
+                  "OS metadata still requires a bounded size")
+      try f.expectOriginals()
+    }
+    do {
+      let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      let value = journalQuarantine
+      try require(value.withUnsafeBytes { setxattr(f.url(f.source).path, "com.apple.quarantine", $0.baseAddress, $0.count, 0, 0) } == 0,
+                  "Install quarantine on a user note")
+      let result = try f.prepare(executor, f.request())
+      try require(result["phase"] as? String == "blocked" && result["code"] as? String == "unsupported_metadata",
+                  "Private receipt compatibility must not weaken user-file rewrite checks")
+      try f.expectOriginals()
+    }
+  }
+
   private static func journalMetadataDiagnostics() throws {
     let f = try Fixture(); let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
     executor.fault = { point in
@@ -1610,6 +1667,7 @@ struct NativeNoteTransactionAcceptance {
         "sourcePath": "Imported", "destinationPath": "Renamed", "tree": tree,
         "catalog": try f.catalogRows(), "files": files, "assets": [[String: Any]]()]
       let executor = WorkspaceNoteTransaction(journalDirectory: f.journal)
+      executor.fault = { point in try quarantineJournalReceipt(f, point: point) }
       let prepared = try f.invoke(executor, "prepareWorkspaceDirectoryMove", request)
       try require(prepared["phase"] as? String == "prepared", "Unchanged metadata must not block directory rename: \(prepared)")
       let result = try f.invoke(executor, "executeWorkspaceNoteMove", f.command(request, token: prepared["token"]))
