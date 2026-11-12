@@ -29,6 +29,13 @@ Reading 的 inline tag 回调带 `tag`。任何点击都不会改写 Markdown �
 
 ## 源码保真笔记语义（P1f）
 
+2026-11-12 增补：导出 `ianvsMarkdownSemanticSourceLimit`（8 Mi UTF-16 单元）、
+`ianvsMarkdownSemanticLineLimit`（1 Mi 单元）、`ianvsMarkdownSemanticOccurrenceLimit`
+（65,536 条 references/tags/issues）及 `ianvsMarkdownSemanticBudget`
+（使用上述长度上限，syntax tokens 为 262,144）。链接扫描与宿主改写复检可共享这些常量，
+不再借用交互式渲染的默认额度。`parseIanvsMarkdownNoteSemantics` 签名不变，
+超限仍返回显式 issue，不把截断正文当成完整结果。
+
 `parseIanvsMarkdownNoteSemantics(source)` 返回不可变的 references/tags/aliases/issues。
 它是纯核心解析，不读取工作区或解析文件身份。所有范围是原文 UTF-16 半开范围，保留
 BOM/CRLF/emoji；reference use 的目标范围指向 first-definition-wins 的有效 definition，

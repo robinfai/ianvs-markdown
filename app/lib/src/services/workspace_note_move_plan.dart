@@ -155,9 +155,10 @@ class WorkspaceNoteMovePlanner {
     this.maximumBackupBytes = 32 * 1024 * 1024,
     this.maximumDirectoryOperations = 200000,
     this.directoryPreviewTimeout = const Duration(seconds: 20),
-    this.maximumDirectoryReparseCodeUnits = 16 * 1024,
-    this.maximumDirectoryReparseReferences = 128,
-    this.maximumDirectoryReparseLineCodeUnits = 512,
+    this.maximumDirectoryReparseCodeUnits = ianvsMarkdownSemanticSourceLimit,
+    this.maximumDirectoryReparseReferences =
+        ianvsMarkdownSemanticOccurrenceLimit,
+    this.maximumDirectoryReparseLineCodeUnits = ianvsMarkdownSemanticLineLimit,
   });
   final WorkspaceReferenceIndex references;
   final int maximumFiles;
@@ -167,7 +168,8 @@ class WorkspaceNoteMovePlanner {
   final int maximumDirectoryOperations;
   final Duration directoryPreviewTimeout;
 
-  /// Conservative synchronous reparse input bounds, not latency guarantees.
+  /// Shared semantic input bounds, independent of interactive render budgets.
+  /// These are allocation guards, not latency guarantees.
   /// Unedited notes still receive full before/after semantic identity checks.
   final int maximumDirectoryReparseCodeUnits;
   final int maximumDirectoryReparseReferences;

@@ -96,6 +96,7 @@ void main() {
     Set<String> dirty = const {},
     int maximumFiles = 128,
     int maximumBackupBytes = 32 * 1024 * 1024,
+    int maximumDirectoryReparseLineCodeUnits = 1024 * 1024,
     bool Function()? isCancelled,
   }) async {
     final snapshot = await references.refresh(refreshMetadata: true);
@@ -103,6 +104,8 @@ void main() {
       references,
       maximumFiles: maximumFiles,
       maximumBackupBytes: maximumBackupBytes,
+      maximumDirectoryReparseLineCodeUnits:
+          maximumDirectoryReparseLineCodeUnits,
     ).buildDirectory(
       snapshot: snapshot,
       sourcePath: from,
@@ -464,7 +467,7 @@ void main() {
     'rename discloses external parser failures without editing partial sources',
     () async {
       source.note('a/One.md', '# One');
-      source.note('TooLong.md', 'x' * 200000);
+      source.note('TooLong.md', 'x' * (ianvsMarkdownSemanticLineLimit + 1));
       final result = await plan(to: 'renamed');
       expect(result.canExecute, isTrue, reason: codes(result).toString());
       expect(result.warnings.any((w) => w.path == 'TooLong.md'), isTrue);
@@ -566,28 +569,48 @@ void main() {
   );
 
   test(
-    'a long moved line is preserved exactly while known inbound links update',
+    'ordinary long moved and inbound notes rename without confirmation',
     () async {
-      final contents = '${'x' * 9000} [self](One.md)';
+      final contents = '${'日常笔记' * 25000} [self](One.md)';
       source.note('a/One.md', contents);
-      source.note('Incoming.md', '[one](a/One.md)');
+      final inbound = '${'记录' * 15000} [one](a/One.md)';
+      source.note('Incoming.md', inbound);
       final result = await plan(to: 'renamed');
-      expect(result.canExecute, isTrue, reason: codes(result).toString());
-      expect(result.complete, isFalse);
+      complete(result);
+      expect(result.canRenameWithoutConfirmation, isTrue);
+      expect(result.warnings, isEmpty);
       expect(
-        result.warnings.any(
-          (w) => w.code == 'scanBudget' && w.path == 'a/One.md',
-        ),
-        isTrue,
+        result.files.firstWhere((f) => f.path == 'a/One.md').contents,
+        contents,
       );
-      final moved = result.files.firstWhere((f) => f.path == 'a/One.md');
-      expect(moved.contents, contents);
-      expect(moved.edits, isEmpty);
       expect(
         result.files.firstWhere((f) => f.path == 'Incoming.md').contents,
-        '[one](renamed/One.md)',
+        inbound.replaceFirst('a/One.md', 'renamed/One.md'),
       );
-      expect((await plan(to: 'dest/a')).canExecute, isFalse);
+      source.folders.add('dest');
+      complete(await plan(to: 'dest/a'));
+    },
+  );
+
+  test(
+    'large changed notes and hundreds of links are fully reverified',
+    () async {
+      final contents = List.generate(
+        400,
+        (_) => '[self](/vault/a/One.md)',
+      ).join('\n');
+      source.note('a/One.md', '${'正文\n\n' * 10000}$contents');
+      final result = await plan(to: 'renamed');
+      complete(result);
+      expect(result.canRenameWithoutConfirmation, isTrue);
+      expect(result.editCount, 400);
+      expect(
+        result.files.single.contents,
+        source.files['a/One.md']!.replaceAll(
+          '/vault/a/One.md',
+          '/vault/renamed/One.md',
+        ),
+      );
     },
   );
 
@@ -597,7 +620,10 @@ void main() {
       final contents = '[self](/vault/a/One.md) ${'x' * 2000}';
       source.note('a/One.md', contents);
       source.note('Incoming.md', '[one](a/One.md)');
-      final result = await plan(to: 'renamed');
+      final result = await plan(
+        to: 'renamed',
+        maximumDirectoryReparseLineCodeUnits: 512,
+      );
       expect(result.canExecute, isTrue, reason: codes(result).toString());
       final moved = result.files.firstWhere((f) => f.path == 'a/One.md');
       expect(moved.contents, contents);
@@ -613,7 +639,10 @@ void main() {
       source.note('a/One.md', '# One');
       final contents = '[one](a/One.md) ${'x' * 2000}';
       source.note('Incoming.md', contents);
-      final result = await plan(to: 'renamed');
+      final result = await plan(
+        to: 'renamed',
+        maximumDirectoryReparseLineCodeUnits: 512,
+      );
       expect(result.canExecute, isTrue, reason: codes(result).toString());
       expect(result.files.map((f) => f.path), ['a/One.md']);
       expect(source.files['Incoming.md'], contents);

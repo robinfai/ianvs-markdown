@@ -1,5 +1,12 @@
 # 从 0.3.1 升级到当前 Unreleased
 
+2026-11-12 增补：笔记语义扫描改用独立的大容量额度，导出
+`ianvsMarkdownSemanticBudget`、`ianvsMarkdownSemanticSourceLimit`、
+`ianvsMarkdownSemanticLineLimit`、`ianvsMarkdownSemanticOccurrenceLimit`。
+现有调用无需修改；普通长行、大笔记和大量引用现在可返回完整解析结果。
+宿主若另行限制改写后的复检输入，可使用同一组常量，避免初次扫描通过却在复检时失败。
+交互式渲染额度不变；需要继续处理超大输入的显式不完整结果。
+
 2026-10-27 增补：Live Preview 新增嵌套列表折叠，折叠仅影响显示，不修改原文。
 `IanvsMarkdownMessage` 在末尾新增 `expandList`、`collapseList`，已有枚举值顺序不变。
 自定义文案 resolver 若使用穷尽 switch，需要处理这两个新值；其余宿主无需调整。

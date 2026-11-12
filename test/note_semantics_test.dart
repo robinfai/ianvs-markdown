@@ -149,6 +149,56 @@ void main() {
     expect(result.tags.single.range.textInside(source), '#tag');
   });
 
+  test('long prose and ordinary large notes retain exact link ranges', () {
+    for (final source in [
+      '${'日常笔记内容' * 20000} [link](Target.md)',
+      '${'x' * 200000} [link](Target.md)',
+      '${'x' * 200000}@invalid [link](Target.md)',
+      '${'段落内容\n\n' * 25000}[link](Target.md)',
+      List.generate(1000, (i) => '[link$i](Target.md)').join('\n'),
+    ]) {
+      final result = parseIanvsMarkdownNoteSemantics(source);
+      expect(
+        result.complete,
+        isTrue,
+        reason: result.issues.map((e) => e.message).join(),
+      );
+      expect(result.references, isNotEmpty);
+      for (final reference in result.references) {
+        expect(reference.destinationRange.textInside(source), 'Target.md');
+      }
+    }
+  });
+
+  test('plain word fast path keeps embedded URL and email boundaries', () {
+    for (final word in [
+      'http:',
+      'https:',
+      'ftp:',
+      'www.',
+      'prefixhttps:',
+      'user@invalid',
+    ]) {
+      final source = '$word [link](Target.md)';
+      final result = parseIanvsMarkdownNoteSemantics(source);
+      expect(result.complete, isTrue, reason: source);
+      expect(result.references.single.target, 'Target.md');
+    }
+    for (final word in [
+      'prefixhttps://example.test',
+      'prefixwww.example.test',
+      'name@example.test',
+    ]) {
+      final result = parseIanvsMarkdownNoteSemantics('$word [link](Target.md)');
+      expect(
+        result.issues.map((e) => e.code),
+        contains('autolinkContext'),
+        reason: word,
+      );
+      expect(result.references.single.target, 'Target.md');
+    }
+  });
+
   test('complete metadata is independent of UI truncation and body budget', () {
     final source =
         '\ufeff---\r\n'
@@ -165,7 +215,9 @@ void main() {
       result.references.single.destinationRange.textInside(source),
       'Alias 24',
     );
-    final large = parseIanvsMarkdownNoteSemantics('$source\n${'x' * 5000}');
+    final large = parseIanvsMarkdownNoteSemantics(
+      '$source\n${'x' * (ianvsMarkdownSemanticBudget.maxLineCodeUnits + 1)}',
+    );
     expect(large.complete, isFalse);
     expect(large.aliasesComplete, isTrue);
     expect(large.aliases, result.aliases);
@@ -394,25 +446,28 @@ void main() {
       // Each line is short enough for the renderer preflight.
       final line = '${'#tag ' * 200}\n';
       final source =
-          '---\naliases: retained\ntags: metadata\n---\n[link](Note)\n${line * 50}';
+          '---\naliases: retained\ntags: metadata\n---\n[link](Note)\n${line * 330}';
       final result = parseIanvsMarkdownNoteSemantics(source);
       expect(result.complete, isFalse);
       expect(result.aliasesComplete, isTrue);
       expect(result.aliases, ['retained']);
-      expect(result.references.length + result.tags.length, 4096);
+      expect(
+        result.references.length + result.tags.length,
+        ianvsMarkdownSemanticOccurrenceLimit,
+      );
       expect(result.issues.map((e) => e.code), ['occurrenceBudget']);
       expect(result.references.single.target, 'Note');
       expect(result.tags.first.name, 'metadata');
       final atLimit = parseIanvsMarkdownNoteSemantics(
-        '${line * 20}${'#tag ' * 96}',
+        '${line * 327}${'#tag ' * 136}',
       );
       expect(atLimit.complete, isTrue);
-      expect(atLimit.tags.length, 4096);
+      expect(atLimit.tags.length, ianvsMarkdownSemanticOccurrenceLimit);
 
       final urlLine = '${'https://example.test ' * 100}\n';
-      final urls = parseIanvsMarkdownNoteSemantics(urlLine * 50);
+      final urls = parseIanvsMarkdownNoteSemantics(urlLine * 660);
       expect(urls.complete, isFalse);
-      expect(urls.issues.length, 4097);
+      expect(urls.issues.length, ianvsMarkdownSemanticOccurrenceLimit + 1);
       expect(urls.issues.last.code, 'occurrenceBudget');
     },
   );

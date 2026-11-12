@@ -81,24 +81,21 @@ void main() {
   );
 
   test(
-    'one real edit plus 1500 definitions is explicitly incomplete',
+    'one real edit plus 1500 definitions is fully verified by default',
     () async {
       source.note('Outside.md', '[touch](a/Move.md)\n\n${definitions(1500)}');
       source.note('a/Move.md', 'body');
       final result = await plan();
-      expect(result.complete, isFalse);
-      expect(codes(result), contains('reparseComplexity'));
+      expect(result.complete, isTrue, reason: codes(result).join(','));
+      expect(result.editCount, 1);
       expect(
-        result.blockers
-            .firstWhere((b) => b.code == 'reparseComplexity')
-            .message,
-        contains('128-reference'),
+        result.files.firstWhere((f) => f.path == 'Outside.md').contents,
+        startsWith('[touch](dest/a/Move.md)'),
       );
-      expect(source.files['Outside.md'], startsWith('[touch](a/Move.md)'));
     },
   );
 
-  test('128 references including changed occurrence fit; 129 do not', () async {
+  test('custom 128-reference budget includes changed occurrences', () async {
     source.note('a/Move.md', 'body');
     for (final count in [127, 128]) {
       source.note('Outside.md', '[touch](a/Move.md)\n\n${definitions(count)}');
@@ -108,38 +105,48 @@ void main() {
       index.dispose();
       index = WorkspaceIndex(source: source)..configure('/vault');
       references = WorkspaceReferenceIndex(index);
-      final result = await plan();
+      final result = await plan(
+        planner: WorkspaceNoteMovePlanner(
+          references,
+          maximumDirectoryReparseReferences: 128,
+        ),
+      );
       expect(result.complete, count == 127, reason: codes(result).join(','));
       expect(codes(result).contains('reparseComplexity'), count == 128);
     }
   });
 
-  test(
-    'large multi-line body with one reference is rejected by source length',
-    () async {
-      source.note(
-        'Outside.md',
-        '[touch](a/Move.md)\n\n${List.filled(140, 'x' * 127).join('\n')}',
-      );
-      source.note('a/Move.md', 'body');
-      final result = await plan();
-      expect(result.complete, isFalse);
-      expect(
-        result.blockers
-            .firstWhere((b) => b.code == 'reparseComplexity')
-            .message,
-        contains('source length'),
-      );
-    },
-  );
+  test('custom source limit rejects an oversized changed note', () async {
+    source.note(
+      'Outside.md',
+      '[touch](a/Move.md)\n\n${List.filled(140, 'x' * 127).join('\n')}',
+    );
+    source.note('a/Move.md', 'body');
+    final result = await plan(
+      planner: WorkspaceNoteMovePlanner(
+        references,
+        maximumDirectoryReparseCodeUnits: 16 * 1024,
+      ),
+    );
+    expect(result.complete, isFalse);
+    expect(
+      result.blockers.firstWhere((b) => b.code == 'reparseComplexity').message,
+      contains('source length'),
+    );
+  });
 
   test(
-    'legal 4096-unit line with one edit is rejected before sync reparse',
+    'custom line limit rejects a changed note before sync reparse',
     () async {
       const prefix = '[touch](a/Move.md) ';
       source.note('Outside.md', '$prefix${'x' * (4096 - prefix.length)}');
       source.note('a/Move.md', 'body');
-      final result = await plan();
+      final result = await plan(
+        planner: WorkspaceNoteMovePlanner(
+          references,
+          maximumDirectoryReparseLineCodeUnits: 512,
+        ),
+      );
       expect(
         result.snapshot.notes['/vault/Outside.md']!.semantics.complete,
         isTrue,

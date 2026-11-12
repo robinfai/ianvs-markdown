@@ -81,15 +81,17 @@ Image metadata never claims that image bytes were read or verified.
 Unchanged text reuses its existing complete parser evidence; it still undergoes
 all before/after target-identity checks and, for moved notes, disk/local/dirty
 checks. Changed text must pass directory-only reparse complexity limits: original
-and proposed text each at most 16 Ki UTF-16 code units, at most 128 semantic
+and proposed text each at most 8 Mi UTF-16 code units, at most 65,536 semantic
 reference occurrences (unused definitions included), and no line longer than
-512 UTF-16 code units. The original and projected sizes are checked before any
+1 Mi UTF-16 code units. The original and projected sizes are checked before any
 replacement-string construction; proposed line length is checked before parsing.
 Exceeding these bounds gives an explicit incomplete complexity reason, never an
 unverified complete proposal. Allowed reparses yield/check cancellation before
-and after the synchronous parser. Ordinary single-note v1 behavior is unchanged.
+and after the synchronous parser. Single-note planning uses the same relaxed
+semantic scanner and retains its existing transaction checks.
 
-These conservative input limits are based on synthetic measurements, not a
+These generous semantic limits are shared with initial link scanning and are
+independent of interactive rendering limits. They are allocation guards, not a
 performance or hard-deadline guarantee. The pre-existing reference index's first
 parse has its own budgets; it is not included in the new directory-planning
 stopwatch. Blocking provider calls cannot be forcibly interrupted either.
