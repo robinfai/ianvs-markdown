@@ -76,6 +76,7 @@ void main() {
     VoidCallback? onCancel,
     bool Function()? current,
     String destination = '/vault/New',
+    bool onlyConfirmRisks = true,
   }) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -89,7 +90,7 @@ void main() {
                   sources: ['/vault/Old'],
                   destinations: [destination],
                   preview: preview,
-                  onlyConfirmRisks: true,
+                  onlyConfirmRisks: onlyConfirmRisks,
                   isCurrent: current,
                   onMaintain: execute,
                   onCancelPreview: onCancel,
@@ -103,6 +104,34 @@ void main() {
     await tester.tap(find.text('Submit rename'));
     await tester.pumpAndSettle();
   }
+
+  testWidgets('zero-edit preview omits empty check and link metrics', (
+    tester,
+  ) async {
+    final value = (await tester.runAsync(() => plan()))!;
+    await open(
+      tester,
+      preview: Future.value(value),
+      execute: (_) async => completed(value),
+      onResult: (_) {},
+      onlyConfirmRisks: false,
+    );
+    expect(find.text('Ready to rename'), findsOneWidget);
+    expect(find.text('Rename'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('move-without-updating-links')),
+      findsNothing,
+    );
+    expect(find.text('0 link replacements'), findsNothing);
+    expect(find.text('1 involved notes'), findsNothing);
+    expect(find.byKey(const ValueKey('move-check-details')), findsNothing);
+    expect(find.byKey(const ValueKey('move-link-details')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('directory-move-manifest')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   for (final inbound in [false, true]) {
     testWidgets(
@@ -221,6 +250,9 @@ void main() {
         onResult: (_) {},
       );
       expect(calls, 1);
+      expect(find.textContaining('Native reply lost'), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('move-result-details')));
+      await tester.pumpAndSettle();
       expect(find.textContaining('Native reply lost'), findsOneWidget);
       expect(find.text('Close'), findsOneWidget);
       expect(find.byKey(const ValueKey('move-and-update-links')), findsNothing);
@@ -357,6 +389,17 @@ void main() {
       execute: (_) async => blocked,
       onResult: (_) {},
     );
+    expect(find.text(diagnostic), findsNothing);
+    expect(find.text('private_journal_unavailable'), findsNothing);
+    expect(find.text('Impact overview'), findsNothing);
+    expect(find.text('Ready to update links'), findsNothing);
+    expect(find.byKey(const ValueKey('move-check-details')), findsNothing);
+    expect(
+      find.text('The local recovery journal could not be prepared.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('move-result-details')));
+    await tester.pumpAndSettle();
     expect(find.text(diagnostic), findsOneWidget);
     expect(
       find.byWidgetPredicate(
@@ -365,9 +408,7 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.text(
-        'The local recovery journal could not be prepared. Copy the diagnostic details for troubleshooting.',
-      ),
+      find.text('The local recovery journal could not be prepared.'),
       findsOneWidget,
     );
     expect(find.textContaining('Recovery journal:'), findsNothing);
