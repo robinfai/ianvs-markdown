@@ -244,6 +244,106 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
     }
   }
 
+  Widget _outcome(BuildContext context, WorkspaceNoteMovePlan? plan) {
+    final record = _record;
+    final summary = record == null
+        ? appText(
+            context,
+            'The operation could not be completed. View details for troubleshooting.',
+          )
+        : record.completed
+        ? appText(
+            context,
+            plan?.warnings.isNotEmpty == true
+                ? 'Rename and confirmed link updates verified. Unchecked links may remain.'
+                : 'Move and reference updates verified.',
+          )
+        : workspaceNoteMoveFailureMessage(context, record);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(summary),
+        if (record?.code == 'private_journal_unavailable')
+          Text(
+            appText(
+              context,
+              'The local recovery journal could not be prepared.',
+            ),
+          ),
+        if (record?.code == 'unsupported_metadata')
+          Text(
+            appText(
+              context,
+              'A file has metadata that cannot be safely rewritten.',
+            ),
+          ),
+        if (record != null && record.recoveryPaths.isNotEmpty)
+          Text(
+            appText(context, '{0} original copies available.', [
+              record.recoveryPaths.length,
+            ]),
+          ),
+        const SizedBox(height: 12),
+        ExpansionTile(
+          key: const ValueKey('move-result-details'),
+          trailing: _chevron('move-result-details'),
+          onExpansionChanged: (expanded) =>
+              setState(() => _expanded['move-result-details'] = expanded),
+          tilePadding: EdgeInsets.zero,
+          childrenPadding: const EdgeInsets.only(bottom: 8),
+          title: Text(appText(context, 'Operation details')),
+          children: [
+            _paths(context),
+            if (_error != null) SelectableText(_error!),
+            if (record != null) ...[
+              if (record.message != null) SelectableText(record.message!),
+              if (record.code != null) SelectableText(record.code!),
+              if (record.namespace case final namespace?)
+                Text(
+                  appText(context, "Directory: {0} → {1}; {2} at {3}.", [
+                    namespace.sourcePath,
+                    namespace.destinationPath,
+                    namespace.verified ? 'verified' : 'unverified',
+                    namespace.actualPath ?? 'unknown location',
+                  ]),
+                ),
+              for (final root in record.namespaces)
+                Text(workspaceBatchRootStatus(root)),
+              for (final entry in record.entries)
+                Text(
+                  '${entry.path}: ${entry.state}${entry.verified ? ' (verified)' : ' (not verified)'}${entry.actualPath == null ? '' : ' at ${entry.actualPath}'}',
+                ),
+              for (final artifact in record.retainedArtifacts)
+                Text(
+                  appText(context, "Retained artifact: {0} ({1}{2})", [
+                    artifact.path,
+                    artifact.state,
+                    artifact.verified ? ', verified' : ', unverified',
+                  ]),
+                ),
+              for (final copy in record.recoveryEntries)
+                Text(
+                  appText(context, "Original copy: {0} ({1})", [
+                    copy.path,
+                    copy.state,
+                  ]),
+                ),
+              for (final path in record.recoveryPaths)
+                Text(appText(context, "Recovered original copy: {0}", [path])),
+              if (!record.blockedBeforeChanges)
+                Text(
+                  appText(context, "Recovery journal: {0}", [
+                    record.transactionId,
+                  ]),
+                ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
   bool get _renaming =>
       widget.sources.length == 1 &&
       widget.destinations.length == 1 &&
@@ -380,6 +480,8 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
         ? 'Link updates are blocked'
         : partial
         ? 'Some links could not be checked'
+        : plan.isRename && plan.editCount == 0
+        ? 'Ready to rename'
         : 'Ready to update links';
     final blockingMessage = switch (plan.blockers.firstOrNull?.code) {
       'offline' ||
@@ -397,6 +499,8 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
         ? blockingMessage
         : partial
         ? 'Only confirmed links will be updated. Unchecked notes may still contain old links.'
+        : plan.isRename && plan.editCount == 0
+        ? 'The destination will be checked before renaming.'
         : 'Known references have been checked. The destination will be verified before changes.';
     return Container(
       width: double.infinity,
@@ -443,8 +547,15 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
             widget.pending != null &&
             state.connectionState != ConnectionState.done;
         final plan = state.data?.$1;
+        final hasOutcome = _record != null || _error != null;
         final compact =
-            widget.minimalRename && _record == null && _error == null;
+            (widget.minimalRename || hasOutcome) && widget.sources.length == 1;
+        final renameOnlyPlan =
+            _renaming &&
+            plan?.canExecute == true &&
+            plan!.editCount == 0 &&
+            plan.warnings.isEmpty &&
+            widget.onMaintain != null;
         final media = MediaQuery.of(context);
         // An oversized fixed action footer can consume the entire compact
         // dialog at accessibility text sizes. Keep it scrollable in that case.
@@ -461,7 +572,7 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                   : appText(context, compact ? 'Back' : 'Cancel'),
             ),
           ),
-          if (!_attempted && (!compact || plan == null))
+          if (!_attempted && (!compact || plan == null) && !renameOnlyPlan)
             OutlinedButton(
               key: const ValueKey('move-without-updating-links'),
               onPressed: waiting
@@ -493,6 +604,8 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                       ? 'Rename anyway'
                       : plan?.canExecute == true && plan!.warnings.isNotEmpty
                       ? 'Rename and update confirmed links'
+                      : renameOnlyPlan
+                      ? 'Rename'
                       : _renaming
                       ? 'Rename and update links'
                       : 'Move and update links',
@@ -534,7 +647,11 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                     Text(
                       appText(
                         context,
-                        compact
+                        hasOutcome
+                            ? _record?.completed == true
+                                  ? 'Operation completed'
+                                  : 'Operation needs attention'
+                            : compact
                             ? plan?.canExecute == true
                                   ? 'Some links may need repair'
                                   : 'Rename needs attention'
@@ -549,7 +666,7 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    if (!compact) ...[
+                    if (!compact && !hasOutcome) ...[
                       const SizedBox(height: 4),
                       Text(
                         appText(context, 'Review name changes and link impact'),
@@ -579,14 +696,16 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                 if (compact) ...[
                   Text(
                     '${p.basename(widget.sources.single)} → ${p.basename(widget.destinations.single)}',
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 16),
-                ] else ...[
+                ] else if (!hasOutcome) ...[
                   _paths(context),
                   const Divider(height: 24),
                 ],
-                if (waiting) ...[
+                if (waiting && !hasOutcome) ...[
                   const LinearProgressIndicator(),
                   const SizedBox(height: 8),
                   Text(
@@ -595,7 +714,7 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                       'Preparing a read-only reference preview…',
                     ),
                   ),
-                ] else if (plan != null) ...[
+                ] else if (plan != null && !hasOutcome) ...[
                   if (compact) ...[
                     if (plan.canExecute) ...[
                       Text(
@@ -636,31 +755,24 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                               tree.members.length,
                             ]),
                           ),
-                        _metric(
-                          context,
-                          MovePreviewGlyph.note,
-                          appText(context, '{0} involved notes', [
-                            plan.files.length,
-                          ]),
-                        ),
-                        _metric(
-                          context,
-                          MovePreviewGlyph.link,
-                          appText(context, '{0} link replacements', [
-                            plan.editCount,
-                          ]),
-                        ),
+                        if (plan.files.isNotEmpty &&
+                            (plan.treeSnapshot == null || plan.editCount > 0))
+                          _metric(
+                            context,
+                            MovePreviewGlyph.note,
+                            appText(context, '{0} involved notes', [
+                              plan.files.length,
+                            ]),
+                          ),
+                        if (plan.editCount > 0)
+                          _metric(
+                            context,
+                            MovePreviewGlyph.link,
+                            appText(context, '{0} link replacements', [
+                              plan.editCount,
+                            ]),
+                          ),
                       ],
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      appText(
-                        context,
-                        'Includes relocated notes whose contents do not need changes.',
-                      ),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
                     ),
                     const SizedBox(height: 18),
                     _status(context, plan),
@@ -713,85 +825,89 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                           ],
                         ),
 
-                  ExpansionTile(
-                    key: const ValueKey('move-check-details'),
-                    trailing: _chevron('move-check-details'),
-                    onExpansionChanged: (expanded) => setState(
-                      () => _expanded['move-check-details'] = expanded,
-                    ),
-                    leading: const MovePreviewIcon(
-                      MovePreviewGlyph.note,
-                      size: 20,
-                    ),
-                    tilePadding: EdgeInsets.zero,
-                    title: Text(
-                      appText(context, compact ? 'Details' : 'Check details'),
-                    ),
-                    subtitle: Text(
-                      compact
-                          ? appText(
-                              context,
-                              plan.canExecute
-                                  ? 'View unchecked files'
-                                  : 'View affected files',
-                            )
-                          : appText(
-                              context,
-                              '{0} blockers · {1} coverage warnings',
-                              [plan.blockers.length, plan.warnings.length],
-                            ),
-                    ),
-                    children: [
-                      if (plan.kind == WorkspaceNoteMovePlanKind.directory)
-                        Text(
-                          appText(
-                            context,
-                            'Directory reference maintenance moves one folder and updates affected notes. Native preflight rechecks the complete tree and destination vacancy. No merging, overwriting or automatic rollback.',
-                          ),
-                        ),
-                      if (plan.kind == WorkspaceNoteMovePlanKind.batch)
-                        Text(
-                          appText(
-                            context,
-                            'Batch reference maintenance maps all selected roots simultaneously and rewrites each affected note once. Destination vacancy and all root identities are rechecked by native preflight before any user file changes. Root moves are not all-or-nothing: a failure can leave some roots at their old locations after references have changed. Review each root receipt; never repeat a partial move blindly.',
-                          ),
-                        ),
-                      for (final issue in [...plan.blockers, ...plan.warnings])
-                        ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(
-                            issue.path == null
-                                ? issue.code
-                                : _displayPath(issue.path!),
-                          ),
-                          subtitle: SelectableText(
-                            issue.code == 'scanBudget'
-                                ? appText(
-                                    context,
-                                    'Link scanning reached its limit. The note will remain unchanged; some links may need manual repair.',
-                                  )
-                                : issue.target != null && issue.line != null
-                                ? appText(
-                                    context,
-                                    'Line {0}: link target "{1}" could not be uniquely resolved. This link was not changed.',
-                                    [issue.line, issue.target],
-                                  )
-                                : issue.message,
-                          ),
-                        ),
-                      if (plan.canExecute)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Text(
+                  if (plan.blockers.isNotEmpty || plan.warnings.isNotEmpty)
+                    ExpansionTile(
+                      key: const ValueKey('move-check-details'),
+                      trailing: _chevron('move-check-details'),
+                      onExpansionChanged: (expanded) => setState(
+                        () => _expanded['move-check-details'] = expanded,
+                      ),
+                      leading: const MovePreviewIcon(
+                        MovePreviewGlyph.note,
+                        size: 20,
+                      ),
+                      tilePadding: EdgeInsets.zero,
+                      title: Text(
+                        appText(context, compact ? 'Details' : 'Check details'),
+                      ),
+                      subtitle: Text(
+                        compact
+                            ? appText(
+                                context,
+                                plan.canExecute
+                                    ? 'View unchecked files'
+                                    : 'View affected files',
+                              )
+                            : appText(
+                                context,
+                                '{0} blockers · {1} coverage warnings',
+                                [plan.blockers.length, plan.warnings.length],
+                              ),
+                      ),
+                      children: [
+                        if (plan.kind == WorkspaceNoteMovePlanKind.directory)
+                          Text(
                             appText(
                               context,
-                              'Moving with updates retains original recovery copies: a private app journal and hidden recovery files beside changed notes. Hidden files use disk space and may sync with your vault. They are not automatically deleted. Review recovery before retrying a partial or unknown result.',
+                              'Directory reference maintenance moves one folder and updates affected notes. Native preflight rechecks the complete tree and destination vacancy. No merging, overwriting or automatic rollback.',
                             ),
                           ),
-                        ),
-                    ],
-                  ),
+                        if (plan.kind == WorkspaceNoteMovePlanKind.batch)
+                          Text(
+                            appText(
+                              context,
+                              'Batch reference maintenance maps all selected roots simultaneously and rewrites each affected note once. Destination vacancy and all root identities are rechecked by native preflight before any user file changes. Root moves are not all-or-nothing: a failure can leave some roots at their old locations after references have changed. Review each root receipt; never repeat a partial move blindly.',
+                            ),
+                          ),
+                        for (final issue in [
+                          ...plan.blockers,
+                          ...plan.warnings,
+                        ])
+                          ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              issue.path == null
+                                  ? issue.code
+                                  : _displayPath(issue.path!),
+                            ),
+                            subtitle: SelectableText(
+                              issue.code == 'scanBudget'
+                                  ? appText(
+                                      context,
+                                      'Link scanning reached its limit. The note will remain unchanged; some links may need manual repair.',
+                                    )
+                                  : issue.target != null && issue.line != null
+                                  ? appText(
+                                      context,
+                                      'Line {0}: link target "{1}" could not be uniquely resolved. This link was not changed.',
+                                      [issue.line, issue.target],
+                                    )
+                                  : issue.message,
+                            ),
+                          ),
+                        if (plan.canExecute)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Text(
+                              appText(
+                                context,
+                                'Moving with updates retains original recovery copies: a private app journal and hidden recovery files beside changed notes. Hidden files use disk space and may sync with your vault. They are not automatically deleted. Review recovery before retrying a partial or unknown result.',
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   if (!compact && plan.editCount > 0)
                     ExpansionTile(
                       key: const ValueKey('move-link-details'),
@@ -876,7 +992,7 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                           ),
                       ],
                     ),
-                ] else
+                ] else if (!hasOutcome)
                   Text(
                     (state.data?.$2 == true
                             ? appText(
@@ -889,7 +1005,7 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                           'No complete reference preview is available for this selection.',
                         ),
                   ),
-                if (!_attempted && !compact) ...[
+                if (!_attempted && !compact && !renameOnlyPlan) ...[
                   const Divider(height: 24),
                   Text(
                     appText(
@@ -923,82 +1039,7 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                     ),
                   ),
                 ],
-                if (_error != null) Text(_error!),
-                if (_record case final record?) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    record.completed
-                        ? appText(
-                            context,
-                            plan?.warnings.isNotEmpty == true
-                                ? 'Rename and confirmed link updates verified. Unchecked links may remain.'
-                                : 'Move and reference updates verified.',
-                          )
-                        : record.blockedBeforeChanges
-                        ? workspaceNoteMoveFailureMessage(context, record)
-                        : appText(
-                            context,
-                            "Operation state: {0}. Do not assume every file changed.",
-                            [record.phase],
-                          ),
-                  ),
-                  if (record.message != null) SelectableText(record.message!),
-                  if (record.code == 'private_journal_unavailable')
-                    Text(
-                      appText(
-                        context,
-                        'The local recovery journal could not be prepared. Copy the diagnostic details for troubleshooting.',
-                      ),
-                    ),
-                  if (record.code == 'unsupported_metadata')
-                    Text(
-                      appText(
-                        context,
-                        'A file has metadata that cannot be safely rewritten.',
-                      ),
-                    ),
-                  if (record.code != null) Text(record.code!),
-                  if (record.namespace case final namespace?)
-                    Text(
-                      appText(context, "Directory: {0} → {1}; {2} at {3}.", [
-                        namespace.sourcePath,
-                        namespace.destinationPath,
-                        namespace.verified ? 'verified' : 'unverified',
-                        namespace.actualPath ?? 'unknown location',
-                      ]),
-                    ),
-                  for (final root in record.namespaces)
-                    Text(workspaceBatchRootStatus(root)),
-                  for (final entry in record.entries)
-                    Text(
-                      '${entry.path}: ${entry.state}${entry.verified ? ' (verified)' : ' (not verified)'}${entry.actualPath == null ? '' : ' at ${entry.actualPath}'}',
-                    ),
-                  for (final artifact in record.retainedArtifacts)
-                    Text(
-                      appText(context, "Retained artifact: {0} ({1}{2})", [
-                        artifact.path,
-                        artifact.state,
-                        artifact.verified ? ', verified' : ', unverified',
-                      ]),
-                    ),
-                  for (final copy in record.recoveryEntries)
-                    Text(
-                      appText(context, "Original copy: {0} ({1})", [
-                        copy.path,
-                        copy.state,
-                      ]),
-                    ),
-                  for (final path in record.recoveryPaths)
-                    Text(
-                      appText(context, "Recovered original copy: {0}", [path]),
-                    ),
-                  if (!record.blockedBeforeChanges)
-                    Text(
-                      appText(context, "Recovery journal: {0}", [
-                        record.transactionId,
-                      ]),
-                    ),
-                ],
+                if (hasOutcome) _outcome(context, plan),
                 if (scrollActions) ...[
                   const SizedBox(height: 16),
                   Wrap(

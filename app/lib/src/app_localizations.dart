@@ -28,6 +28,27 @@ String appText(
 }
 
 const appMessages = <String, List<String>>{
+  'Operation completed': ['Operation completed', '操作已完成'],
+  'Operation needs attention': ['Operation needs attention', '操作未完成'],
+  'Operation details': ['Operation details', '操作详情'],
+  'The operation could not be completed. View details for troubleshooting.': [
+    'The operation could not be completed. View details for troubleshooting.',
+    '操作未能完成，请展开详情查看原因。',
+  ],
+  'The local recovery journal could not be prepared.': [
+    'The local recovery journal could not be prepared.',
+    '无法准备本地恢复记录。',
+  ],
+  '{0} original copies available.': [
+    '{0} original copies available.',
+    '已保留 {0} 份原文副本。',
+  ],
+  'Ready to rename': ['Ready to rename', '可以重命名'],
+  'The destination will be checked before renaming.': [
+    'The destination will be checked before renaming.',
+    '执行前会核验目标位置。',
+  ],
+
   'The local recovery journal could not be prepared. Copy the diagnostic details for troubleshooting.': [
     'The local recovery journal could not be prepared. Copy the diagnostic details for troubleshooting.',
     '无法准备本地恢复记录。请复制诊断详情以定位原因。',
