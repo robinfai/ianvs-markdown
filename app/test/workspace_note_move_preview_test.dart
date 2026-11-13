@@ -216,6 +216,11 @@ void main() {
       expect(find.textContaining('Native reply lost'), findsNothing);
       await tester.tap(find.byKey(const ValueKey('move-result-details')));
       await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('move-technical-details')),
+      );
+      await tester.tap(find.byKey(const ValueKey('move-technical-details')));
+      await tester.pumpAndSettle();
       expect(find.textContaining('Native reply lost'), findsOneWidget);
       expect(find.byKey(const ValueKey('move-and-update-links')), findsNothing);
       expect(calls, 1);
@@ -282,6 +287,11 @@ void main() {
       expect(find.text('Move and reference updates verified.'), findsOneWidget);
       expect(find.textContaining('Retained artifact:'), findsNothing);
       await tester.tap(find.byKey(const ValueKey('move-result-details')));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('move-technical-details')),
+      );
+      await tester.tap(find.byKey(const ValueKey('move-technical-details')));
       await tester.pumpAndSettle();
       expect(find.textContaining('Retained artifact:'), findsOneWidget);
       expect(copies, 0);

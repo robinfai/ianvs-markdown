@@ -253,6 +253,11 @@ void main() {
       expect(find.textContaining('Native reply lost'), findsNothing);
       await tester.tap(find.byKey(const ValueKey('move-result-details')));
       await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('move-technical-details')),
+      );
+      await tester.tap(find.byKey(const ValueKey('move-technical-details')));
+      await tester.pumpAndSettle();
       expect(find.textContaining('Native reply lost'), findsOneWidget);
       expect(find.text('Close'), findsOneWidget);
       expect(find.byKey(const ValueKey('move-and-update-links')), findsNothing);
@@ -399,6 +404,11 @@ void main() {
       findsOneWidget,
     );
     await tester.tap(find.byKey(const ValueKey('move-result-details')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('move-technical-details')),
+    );
+    await tester.tap(find.byKey(const ValueKey('move-technical-details')));
     await tester.pumpAndSettle();
     expect(find.text(diagnostic), findsOneWidget);
     expect(

@@ -124,3 +124,57 @@ Verification: 170 related widget, sidebar, planner and execution tests passed; s
 No actionable P0/P1/P2 issue remains in this refinement's reviewed scope.
 
 final result: passed
+
+---
+
+# Rename/move result dialog design QA
+
+- Date: 2026-11-13.
+- Scope: implement the approved path presentation direction in the existing Flutter app.
+- Source visual truth: `/Users/robinfai/.codex/generated_images/01a1d3d3-b933-72e3-8126-f80e70bb53e5/exec-f836b324-e28c-4a7b-81a1-168aa2eb911e.png`.
+- Implementation screenshot: `app/build/workflow-ui/move-result-zh.png`.
+- Full-view comparison: `app/build/workflow-ui/move-result-comparison.png`.
+- Focused path comparison: `app/build/workflow-ui/move-result-paths-comparison.png`.
+- Additional screenshots: `app/build/workflow-ui/move-result-dark-zh.png`, `app/build/workflow-ui/move-result-narrow-zh.png`.
+- State: completed directory rename, operation details and full paths expanded; updated files and technical details collapsed. Data matches the supplied historical folder names and long Markdown filename.
+- Viewport: 1000 × 1000 logical pixels, density 1; narrow case 390 × 1000, density 1, text scale 2.
+- Normalization: source 1184 × 1328 pixels; source modal cropped to 1156 × 1298 and proportionally resized to 528 × 593. Implementation modal cropped from (236, 178)–(764, 822), 528 × 644. No aspect-ratio stretching.
+- Rendering: real Flutter widgets in the repository's widget harness, using the desktop theme, local Chinese font and Menlo for path text. This is component visual evidence, not native desktop acceptance; browser console checks do not apply.
+
+## Findings
+
+No remaining actionable P0/P1/P2 findings within the requested direction.
+
+- Typography: paths use readable 13-point monospace text with 1.6 line height, wrap without truncation, and highlight the changed suffix. Names use the existing body hierarchy rather than large heavy text. Chinese font fallback and exact raw clipboard values were checked.
+- Layout: original and new paths are separate rows on a muted surface with aligned copy controls. Narrow screens and enlarged text stack labels above paths. Dialog content scrolls while actions remain reachable.
+- Tokens: path surface uses the existing Ianvs chrome token for both light and dark themes; text, dividers, accent and success indicators use theme colors.
+- Assets: existing folder, document, location and disclosure atlas retained; copy, success and settings controls use Material icons. No new raster assets or approximated icons.
+- Content: raw execution logs and journal IDs remain available under technical details, separately from the updated-file disclosure. Failed operations retain their high-level warning and selectable diagnostic message. The summary, names and recovery action preserve existing behavior.
+- Intentional differences from the generated mock: native typography/tokens and existing control dimensions are retained; counts remain in disclosure titles rather than decorative pills; helper text occupies a subtitle for reliable localization. The mock's decorative gradients and label pills are not required by the requested direction.
+
+## Comparison history
+
+1. Initial rendered inspection found insufficient surface separation and overly narrow path columns at 390 pixels with 2× text. Fixed by using the Ianvs chrome surface and switching to a stacked path layout at narrow widths or larger text scales.
+2. Re-captured both themes and the narrow state. Full-view and focused combined comparisons confirm clear path grouping, changed-suffix emphasis, copy alignment and collapsed logs. Directory icon fallback now also reads the initial result receipt when no preview plan is supplied.
+
+## Validation
+
+- 67 tests passed across result layout, move preview, rename confirmation, rename overview, recovery and directory-move flow suites.
+- Interactions: original/new copy returns exact unmodified paths; disclosure toggles independently; filenames and logs stay hidden until requested; recovery still requires its existing confirmation.
+- Flutter analyzer: no issues in the five changed Dart files.
+- `git diff --check`: passed.
+- Widget framework exceptions: none in final runs.
+
+## Implementation checklist
+
+- [x] Separate original/new paths and add exact copying.
+- [x] Highlight changes and allow full wrapping.
+- [x] Fold updated files and technical logs independently.
+- [x] Check Chinese light/dark and narrow enlarged-text layouts.
+- [x] Preserve rename, failure and recovery flows.
+
+## Follow-up polish
+
+Native macOS/iOS font rendering and clipboard integration were not exercised in a running app; clipboard calls were verified at the platform-channel boundary.
+
+final result: passed
