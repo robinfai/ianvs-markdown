@@ -285,7 +285,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('move-and-update-links')));
       await tester.pumpAndSettle();
       expect(find.text('Move and reference updates verified.'), findsOneWidget);
-      expect(find.textContaining('Retained artifact:'), findsNothing);
+      expect(find.text('Retained artifacts'), findsNothing);
       await tester.tap(find.byKey(const ValueKey('move-result-details')));
       await tester.pumpAndSettle();
       await tester.ensureVisible(
@@ -293,7 +293,7 @@ void main() {
       );
       await tester.tap(find.byKey(const ValueKey('move-technical-details')));
       await tester.pumpAndSettle();
-      expect(find.textContaining('Retained artifact:'), findsOneWidget);
+      expect(find.text('Retained artifacts'), findsOneWidget);
       expect(copies, 0);
       final recover = tester.widget<TextButton>(
         find.widgetWithText(TextButton, 'Recover originals as new copies'),

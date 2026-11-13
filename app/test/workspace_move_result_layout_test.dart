@@ -188,12 +188,122 @@ void main() {
       await expand('move-updated-files');
       expect(find.text(_file), findsOneWidget);
       expect(find.text('更新已验证'), findsOneWidget);
+      final newFilePath = tester.widget<SelectableText>(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is SelectableText &&
+              widget.textSpan?.toPlainText() == '$_destination/$_file',
+        ),
+      );
+      final highlights = newFilePath.textSpan!.children!
+          .whereType<TextSpan>()
+          .where((span) => span.style?.backgroundColor != null)
+          .map((span) => span.text)
+          .toList();
+      // Renaming a parent directory must not highlight its unchanged child name.
+      expect(highlights, ['3']);
+      expect(newFilePath.textSpan!.toPlainText(), '$_destination/$_file');
+      if (_capture && scenario.width == 1000 && !scenario.dark) {
+        await captureWorkflowScreenshot(
+          tester,
+          boundary,
+          'move-result-file-highlight-zh',
+        );
+      }
       expect(find.textContaining('恢复记录：'), findsNothing);
       expect(tester.takeException(), isNull);
       await expand('move-updated-files');
       await expand('move-technical-details');
-      expect(find.textContaining('恢复记录：6a614dc9-'), findsOneWidget);
+      expect(find.text('记录编号'), findsOneWidget);
+      expect(
+        find.text('6a614dc9-f595-4506-ac7f-cb3483e356aa', findRichText: true),
+        findsOneWidget,
+      );
+      expect(find.text('目录验证'), findsOneWidget);
+      expect(find.text('文件执行记录（1 个）'), findsOneWidget);
+      expect(find.text('已应用'), findsOneWidget);
+      expect(find.textContaining('applied (verified)'), findsNothing);
+      if (_capture && scenario.width == 1000 && !scenario.dark) {
+        await tester.ensureVisible(find.text('目录验证'));
+        await captureWorkflowScreenshot(
+          tester,
+          boundary,
+          'move-result-technical-details-zh',
+        );
+      }
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('technical details preserve uncertainty and recovery evidence', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => TextButton(
+            child: const Text('Open'),
+            onPressed: () => showWorkspaceNoteMovePreview(
+              context: context,
+              sources: const ['Old'],
+              destinations: const ['New'],
+              initialRecord: WorkspaceNoteMoveRecord(
+                transactionId: 'partial-result',
+                phase: 'partial',
+                version: 2,
+                namespace: const WorkspaceDirectoryMoveReceipt(
+                  sourcePath: 'Old',
+                  destinationPath: 'New',
+                  actualPath: 'Old',
+                  identity: '1:2',
+                  memberCount: 1,
+                  verified: true,
+                ),
+                entries: const [
+                  WorkspaceNoteMoveReceipt(
+                    path: 'Old/Note.md',
+                    destinationPath: 'New/Note.md',
+                    state: 'conflict',
+                  ),
+                ],
+                retainedArtifacts: const [
+                  WorkspaceNoteMoveArtifact('backup.md', 'uncertain', false),
+                ],
+                recoveryEntries: const [
+                  WorkspaceNoteRecoveryReceipt(
+                    'Old/Note.md',
+                    'Recovered.md',
+                    'applied',
+                  ),
+                ],
+                recoveryPaths: const ['Recovered.md'],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    for (final key in ['move-result-details', 'move-technical-details']) {
+      final tile = find.byKey(ValueKey(key));
+      await tester.ensureVisible(tile);
+      await tester.tap(
+        find.descendant(of: tile, matching: find.byType(ListTile)).first,
+      );
+      await tester.pumpAndSettle();
+    }
+    expect(find.text('Not moved'), findsOneWidget);
+    expect(find.text('Disk flush unconfirmed'), findsOneWidget);
+    expect(find.text('Unknown location'), findsOneWidget);
+    expect(find.text('Conflict'), findsOneWidget);
+    expect(find.text('Uncertain'), findsOneWidget);
+    expect(find.text('Not verified'), findsNWidgets(2));
+    expect(find.text('Retained artifacts'), findsOneWidget);
+    expect(find.text('Recovery copies'), findsOneWidget);
+    expect(find.text('Recovered.md', findRichText: true), findsOneWidget);
+    expect(find.text('backup.md', findRichText: true), findsOneWidget);
+    expect(find.text('partial-result', findRichText: true), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
