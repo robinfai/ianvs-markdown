@@ -342,53 +342,225 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
       Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (_error != null) SelectableText(_error!),
+          if (_error != null || record?.message != null || record?.code != null)
+            _technicalSection(context, 'Diagnostics', [
+              if (_error != null)
+                _technicalField(context, 'Error', _error!, code: true),
+              if (record?.message case final message?)
+                _technicalField(context, 'Details', message, code: true),
+              if (record?.code case final code?)
+                _technicalField(context, 'Error code', code, code: true),
+            ]),
           if (record != null) ...[
-            if (record.message != null) SelectableText(record.message!),
-            if (record.code != null) SelectableText(record.code!),
             if (record.namespace case final namespace?)
-              Text(
-                appText(context, "Directory: {0} → {1}; {2} at {3}.", [
-                  namespace.sourcePath,
-                  namespace.destinationPath,
-                  namespace.verified ? 'verified' : 'unverified',
-                  namespace.actualPath ?? 'unknown location',
-                ]),
-              ),
+              _namespaceDetails(context, namespace),
             for (final root in record.namespaces)
-              Text(workspaceBatchRootStatus(root)),
-            for (final entry in record.entries)
-              Text(
-                '${entry.path}: ${entry.state}${entry.verified ? ' (verified)' : ' (not verified)'}${entry.actualPath == null ? '' : ' at ${entry.actualPath}'}',
+              _namespaceDetails(context, root),
+            if (record.entries.isNotEmpty)
+              _technicalSection(
+                context,
+                'File execution records ({0})',
+                [
+                  for (var i = 0; i < record.entries.length; i++) ...[
+                    if (i > 0) const Divider(height: 24),
+                    SelectableText(
+                      p.basename(record.entries[i].path),
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 8),
+                    _technicalField(
+                      context,
+                      'Execution state',
+                      _receiptState(context, record.entries[i].state),
+                    ),
+                    _technicalField(
+                      context,
+                      'Verification',
+                      appText(
+                        context,
+                        record.entries[i].verified
+                            ? 'Verified'
+                            : 'Not verified',
+                      ),
+                    ),
+                    if (record.entries[i].actualPath case final actual?)
+                      _pathRow(context, 'Actual path', actual)
+                    else
+                      _technicalField(
+                        context,
+                        'Actual path',
+                        appText(context, 'Unknown location'),
+                      ),
+                  ],
+                ],
+                arguments: [record.entries.length],
               ),
-            for (final artifact in record.retainedArtifacts)
-              Text(
-                appText(context, "Retained artifact: {0} ({1}{2})", [
-                  artifact.path,
-                  artifact.state,
-                  artifact.verified ? ', verified' : ', unverified',
-                ]),
-              ),
-            for (final copy in record.recoveryEntries)
-              Text(
-                appText(context, "Original copy: {0} ({1})", [
-                  copy.path,
-                  copy.state,
-                ]),
-              ),
-            for (final path in record.recoveryPaths)
-              Text(appText(context, "Recovered original copy: {0}", [path])),
+            if (record.retainedArtifacts.isNotEmpty)
+              _technicalSection(context, 'Retained artifacts', [
+                for (final artifact in record.retainedArtifacts) ...[
+                  _pathRow(context, 'Artifact path', artifact.path),
+                  _technicalField(
+                    context,
+                    'Execution state',
+                    _receiptState(context, artifact.state),
+                  ),
+                  _technicalField(
+                    context,
+                    'Verification',
+                    appText(
+                      context,
+                      artifact.verified ? 'Verified' : 'Not verified',
+                    ),
+                  ),
+                ],
+              ]),
+            if (record.recoveryEntries.isNotEmpty ||
+                record.recoveryPaths.isNotEmpty)
+              _technicalSection(context, 'Recovery copies', [
+                for (final copy in record.recoveryEntries) ...[
+                  _pathRow(context, 'Original path', copy.sourcePath),
+                  _pathRow(context, 'Copy path', copy.path),
+                  _technicalField(
+                    context,
+                    'Execution state',
+                    _receiptState(context, copy.state),
+                  ),
+                ],
+                for (final path in record.recoveryPaths)
+                  if (!record.recoveryEntries.any((copy) => copy.path == path))
+                    _pathRow(context, 'Copy path', path),
+              ]),
             if (!record.blockedBeforeChanges)
-              Text(
-                appText(context, "Recovery journal: {0}", [
-                  record.transactionId,
-                ]),
-              ),
+              _technicalSection(context, 'Recovery journal', [
+                _pathRow(context, 'Journal ID', record.transactionId),
+              ]),
           ],
         ],
       ),
     ],
   );
+
+  Widget _technicalSection(
+    BuildContext context,
+    String title,
+    List<Widget> children, {
+    List<Object?> arguments = const [],
+  }) => Padding(
+    padding: const EdgeInsets.only(top: 12),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          appText(context, title, arguments),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 12),
+        ...children,
+        const Divider(height: 24),
+      ],
+    ),
+  );
+
+  Widget _technicalField(
+    BuildContext context,
+    String label,
+    String value, {
+    bool code = false,
+  }) {
+    final theme = Theme.of(context);
+    final labelWidget = Text(
+      appText(context, label),
+      style: theme.textTheme.bodySmall?.copyWith(
+        color: theme.colorScheme.onSurfaceVariant,
+      ),
+    );
+    final valueWidget = SelectableText(
+      value,
+      style: theme.textTheme.bodyMedium?.copyWith(
+        fontFamily: code ? 'monospace' : null,
+        height: 1.5,
+      ),
+    );
+    final stacked =
+        MediaQuery.sizeOf(context).width < 600 ||
+        MediaQuery.textScalerOf(context).scale(13) > 18;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: stacked
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [labelWidget, const SizedBox(height: 4), valueWidget],
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 100, child: labelWidget),
+                const SizedBox(width: 12),
+                Expanded(child: valueWidget),
+              ],
+            ),
+    );
+  }
+
+  Widget _namespaceDetails(
+    BuildContext context,
+    WorkspaceDirectoryMoveReceipt namespace,
+  ) => _technicalSection(
+    context,
+    namespace is WorkspaceBatchMoveReceipt && namespace.kind == 'note'
+        ? 'File move verification'
+        : 'Directory verification',
+    [
+      _technicalField(
+        context,
+        'Verification',
+        appText(context, namespace.verified ? 'Verified' : 'Not verified'),
+      ),
+      _technicalField(
+        context,
+        'Move status',
+        appText(context, namespace.moved ? 'Moved' : 'Not moved'),
+      ),
+      _technicalField(
+        context,
+        'Disk persistence',
+        appText(
+          context,
+          namespace.synced ? 'Flushed to disk' : 'Disk flush unconfirmed',
+        ),
+      ),
+      _pathPair(
+        context,
+        namespace.sourcePath,
+        namespace.destinationPath,
+        actualPath: namespace.actualPath,
+      ),
+      if (namespace.actualPath == null)
+        _technicalField(
+          context,
+          'Actual path',
+          appText(context, 'Unknown location'),
+        ),
+    ],
+  );
+
+  String _receiptState(BuildContext context, String state) {
+    final key = switch (state) {
+      'applied' => 'Applied',
+      'moved' => 'Moved',
+      'pending' => 'Pending',
+      'original' => 'Original content',
+      'retained' => 'Retained',
+      'uncertain' => 'Uncertain',
+      'conflict' => 'Conflict',
+      'missing' => 'Missing',
+      'removed' => 'Removed',
+      _ => null,
+    };
+    return key == null ? state : appText(context, key);
+  }
 
   Widget _updatedFiles(BuildContext context, WorkspaceNoteMoveRecord record) =>
       ExpansionTile(
@@ -556,8 +728,17 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
         pathRunes[shared] == previousRunes[shared]) {
       shared++;
     }
+    var sharedSuffix = 0;
+    while (sharedSuffix < pathRunes.length - shared &&
+        sharedSuffix < previousRunes.length - shared &&
+        pathRunes[pathRunes.length - sharedSuffix - 1] ==
+            previousRunes[previousRunes.length - sharedSuffix - 1]) {
+      sharedSuffix++;
+    }
+    final changedEnd = pathRunes.length - sharedSuffix;
     final prefix = String.fromCharCodes(pathRunes.take(shared));
-    final changed = String.fromCharCodes(pathRunes.skip(shared));
+    final changed = String.fromCharCodes(pathRunes.sublist(shared, changedEnd));
+    final suffix = String.fromCharCodes(pathRunes.skip(changedEnd));
     final copiedKey = '$label:$path';
     final labelWidget = Text(
       appText(context, label),
@@ -579,6 +760,7 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
                 ),
               ),
             ),
+          if (suffix.isNotEmpty) TextSpan(text: suffix),
         ],
       ),
       style: theme.textTheme.bodySmall?.copyWith(
