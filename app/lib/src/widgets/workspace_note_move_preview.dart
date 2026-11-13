@@ -1,4 +1,5 @@
 import '../app_localizations.dart';
+import 'package:flutter/services.dart';
 import 'package:ianvs_design/ianvs_design.dart';
 import 'package:path/path.dart' as p;
 
@@ -156,6 +157,7 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
   }
 
   final Map<String, bool> _expanded = {};
+  String? _copiedPath;
 
   Widget _chevron(String id, {bool down = false}) => AnimatedRotation(
     turns: _expanded[id] == true ? (down ? .5 : .25) : 0,
@@ -263,7 +265,22 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(summary),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (record?.completed == true) ...[
+              Icon(
+                Icons.check_circle_outline,
+                size: 20,
+                color:
+                    Theme.of(context).extension<IanvsTokens>()?.success ??
+                    Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+            ],
+            Expanded(child: Text(summary)),
+          ],
+        ),
         if (record?.code == 'private_journal_unavailable')
           Text(
             appText(
@@ -295,54 +312,133 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
           title: Text(appText(context, 'Operation details')),
           children: [
             _paths(context),
-            if (_error != null) SelectableText(_error!),
-            if (record != null) ...[
-              if (record.message != null) SelectableText(record.message!),
-              if (record.code != null) SelectableText(record.code!),
-              if (record.namespace case final namespace?)
-                Text(
-                  appText(context, "Directory: {0} → {1}; {2} at {3}.", [
-                    namespace.sourcePath,
-                    namespace.destinationPath,
-                    namespace.verified ? 'verified' : 'unverified',
-                    namespace.actualPath ?? 'unknown location',
-                  ]),
-                ),
-              for (final root in record.namespaces)
-                Text(workspaceBatchRootStatus(root)),
-              for (final entry in record.entries)
-                Text(
-                  '${entry.path}: ${entry.state}${entry.verified ? ' (verified)' : ' (not verified)'}${entry.actualPath == null ? '' : ' at ${entry.actualPath}'}',
-                ),
-              for (final artifact in record.retainedArtifacts)
-                Text(
-                  appText(context, "Retained artifact: {0} ({1}{2})", [
-                    artifact.path,
-                    artifact.state,
-                    artifact.verified ? ', verified' : ', unverified',
-                  ]),
-                ),
-              for (final copy in record.recoveryEntries)
-                Text(
-                  appText(context, "Original copy: {0} ({1})", [
-                    copy.path,
-                    copy.state,
-                  ]),
-                ),
-              for (final path in record.recoveryPaths)
-                Text(appText(context, "Recovered original copy: {0}", [path])),
-              if (!record.blockedBeforeChanges)
-                Text(
-                  appText(context, "Recovery journal: {0}", [
-                    record.transactionId,
-                  ]),
-                ),
+            if (record != null && record.entries.isNotEmpty) ...[
+              _updatedFiles(context, record),
+              const Divider(height: 1),
             ],
+            _technicalDetails(context, record),
           ],
         ),
       ],
     );
   }
+
+  Widget _technicalDetails(
+    BuildContext context,
+    WorkspaceNoteMoveRecord? record,
+  ) => ExpansionTile(
+    key: const ValueKey('move-technical-details'),
+    trailing: _chevron('move-technical-details', down: true),
+    onExpansionChanged: (expanded) =>
+        setState(() => _expanded['move-technical-details'] = expanded),
+    leading: const Icon(Icons.settings_outlined, size: 20),
+    tilePadding: EdgeInsets.zero,
+    childrenPadding: const EdgeInsets.only(bottom: 12),
+    shape: const Border(),
+    collapsedShape: const Border(),
+    title: Text(appText(context, 'Technical details')),
+    subtitle: Text(appText(context, 'Recovery journal and verification logs')),
+    children: [
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_error != null) SelectableText(_error!),
+          if (record != null) ...[
+            if (record.message != null) SelectableText(record.message!),
+            if (record.code != null) SelectableText(record.code!),
+            if (record.namespace case final namespace?)
+              Text(
+                appText(context, "Directory: {0} → {1}; {2} at {3}.", [
+                  namespace.sourcePath,
+                  namespace.destinationPath,
+                  namespace.verified ? 'verified' : 'unverified',
+                  namespace.actualPath ?? 'unknown location',
+                ]),
+              ),
+            for (final root in record.namespaces)
+              Text(workspaceBatchRootStatus(root)),
+            for (final entry in record.entries)
+              Text(
+                '${entry.path}: ${entry.state}${entry.verified ? ' (verified)' : ' (not verified)'}${entry.actualPath == null ? '' : ' at ${entry.actualPath}'}',
+              ),
+            for (final artifact in record.retainedArtifacts)
+              Text(
+                appText(context, "Retained artifact: {0} ({1}{2})", [
+                  artifact.path,
+                  artifact.state,
+                  artifact.verified ? ', verified' : ', unverified',
+                ]),
+              ),
+            for (final copy in record.recoveryEntries)
+              Text(
+                appText(context, "Original copy: {0} ({1})", [
+                  copy.path,
+                  copy.state,
+                ]),
+              ),
+            for (final path in record.recoveryPaths)
+              Text(appText(context, "Recovered original copy: {0}", [path])),
+            if (!record.blockedBeforeChanges)
+              Text(
+                appText(context, "Recovery journal: {0}", [
+                  record.transactionId,
+                ]),
+              ),
+          ],
+        ],
+      ),
+    ],
+  );
+
+  Widget _updatedFiles(BuildContext context, WorkspaceNoteMoveRecord record) =>
+      ExpansionTile(
+        key: const ValueKey('move-updated-files'),
+        trailing: _chevron('move-updated-files', down: true),
+        onExpansionChanged: (expanded) =>
+            setState(() => _expanded['move-updated-files'] = expanded),
+        leading: const MovePreviewIcon(MovePreviewGlyph.note, size: 20),
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: const EdgeInsets.only(bottom: 12),
+        shape: const Border(),
+        collapsedShape: const Border(),
+        title: Text(
+          appText(
+            context,
+            record.completed ? 'Updated files ({0})' : 'Affected files ({0})',
+            [record.entries.length],
+          ),
+        ),
+        children: [
+          for (final entry in record.entries)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    p.basename(entry.path),
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    appText(
+                      context,
+                      entry.applied ? 'Update verified' : 'Needs review',
+                    ),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 8),
+                  _pathPair(
+                    context,
+                    entry.path,
+                    entry.destinationPath,
+                    actualPath: entry.actualPath,
+                  ),
+                ],
+              ),
+            ),
+        ],
+      );
 
   bool get _renaming =>
       widget.sources.length == 1 &&
@@ -401,15 +497,144 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
           ),
           children: [
             for (var i = 0; i < widget.sources.length && i < 20; i++)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: SelectableText(
-                  '${widget.sources[i]} → ${widget.destinations[i]}',
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _pathPair(
+                  context,
+                  widget.sources[i],
+                  widget.destinations[i],
                 ),
               ),
           ],
         ),
       ],
+    );
+  }
+
+  Widget _pathPair(
+    BuildContext context,
+    String source,
+    String destination, {
+    String? actualPath,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color:
+            Theme.of(context).extension<IanvsTokens>()?.chrome ??
+            colors.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        children: [
+          _pathRow(context, 'Original path', source),
+          const Divider(height: 1),
+          _pathRow(context, 'New path', destination, previousPath: source),
+          if (actualPath != null && actualPath != destination) ...[
+            const Divider(height: 1),
+            _pathRow(context, 'Actual path', actualPath),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _pathRow(
+    BuildContext context,
+    String label,
+    String path, {
+    String? previousPath,
+  }) {
+    final theme = Theme.of(context);
+    final pathRunes = path.runes.toList();
+    final previousRunes = previousPath?.runes.toList() ?? pathRunes;
+    var shared = 0;
+    while (shared < pathRunes.length &&
+        shared < previousRunes.length &&
+        pathRunes[shared] == previousRunes[shared]) {
+      shared++;
+    }
+    final prefix = String.fromCharCodes(pathRunes.take(shared));
+    final changed = String.fromCharCodes(pathRunes.skip(shared));
+    final copiedKey = '$label:$path';
+    final labelWidget = Text(
+      appText(context, label),
+      style: theme.textTheme.bodySmall?.copyWith(
+        color: theme.colorScheme.onSurfaceVariant,
+      ),
+    );
+    final pathWidget = SelectableText.rich(
+      TextSpan(
+        children: [
+          TextSpan(text: prefix),
+          if (changed.isNotEmpty)
+            TextSpan(
+              text: changed,
+              style: TextStyle(
+                color: theme.colorScheme.primary,
+                backgroundColor: theme.colorScheme.primary.withValues(
+                  alpha: .08,
+                ),
+              ),
+            ),
+        ],
+      ),
+      style: theme.textTheme.bodySmall?.copyWith(
+        fontFamily: 'monospace',
+        fontSize: 13,
+        height: 1.6,
+        color: theme.colorScheme.onSurface,
+      ),
+    );
+    final copyButton = IconButton(
+      tooltip: appText(
+        context,
+        _copiedPath == copiedKey ? 'Path copied' : 'Copy {0}',
+        [appText(context, label)],
+      ),
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+      padding: const EdgeInsets.all(6),
+      icon: Icon(
+        _copiedPath == copiedKey ? Icons.check : Icons.copy_outlined,
+        size: 17,
+      ),
+      onPressed: () async {
+        await Clipboard.setData(ClipboardData(text: path));
+        if (mounted) setState(() => _copiedPath = copiedKey);
+      },
+    );
+    final stacked =
+        MediaQuery.sizeOf(context).width < 600 ||
+        MediaQuery.textScalerOf(context).scale(13) > 18;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: stacked
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: labelWidget),
+                    copyButton,
+                  ],
+                ),
+                const SizedBox(height: 4),
+                pathWidget,
+              ],
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 64, child: labelWidget),
+                const SizedBox(width: 12),
+                Expanded(child: pathWidget),
+                const SizedBox(width: 8),
+                copyButton,
+              ],
+            ),
     );
   }
 
@@ -435,8 +660,8 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
         Expanded(
           child: Text(
             name,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w500,
               color: accent
                   ? theme.colorScheme.primary
                   : theme.colorScheme.onSurface,
@@ -633,7 +858,8 @@ class _MovePreviewDialogState extends State<_MovePreviewDialog> {
               Padding(
                 padding: const EdgeInsets.only(top: 2),
                 child: MovePreviewIcon(
-                  plan?.kind == WorkspaceNoteMovePlanKind.directory
+                  plan?.kind == WorkspaceNoteMovePlanKind.directory ||
+                          _record?.namespace != null
                       ? MovePreviewGlyph.folder
                       : MovePreviewGlyph.note,
                   size: 32,
